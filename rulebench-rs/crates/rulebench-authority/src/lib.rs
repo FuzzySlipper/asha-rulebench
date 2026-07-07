@@ -55,6 +55,88 @@ pub enum ScenarioCatalogError {
     UnknownScenarioId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandOutcomeClass {
+    AcceptedHit,
+    AcceptedMiss,
+    RejectedTargetLegality,
+}
+
+impl CommandOutcomeClass {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CommandOutcomeClass::AcceptedHit => "acceptedHit",
+            CommandOutcomeClass::AcceptedMiss => "acceptedMiss",
+            CommandOutcomeClass::RejectedTargetLegality => "rejectedTargetLegality",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionSummary {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub seed_label: String,
+    pub steps: Vec<CombatSessionStepSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionStepSummary {
+    pub id: String,
+    pub index: u32,
+    pub title: String,
+    pub summary: String,
+    pub outcome_class: CommandOutcomeClass,
+    pub log_index: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandAttempt {
+    pub step_id: String,
+    pub step_index: u32,
+    pub actor_id: String,
+    pub action_id: String,
+    pub target_id: String,
+    pub roll_stream: Vec<i32>,
+    pub outcome_class: CommandOutcomeClass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatLogEntry {
+    pub id: String,
+    pub step_id: String,
+    pub log_index: u32,
+    pub title: String,
+    pub summary: String,
+    pub outcome_class: CommandOutcomeClass,
+    pub event_types: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionTranscript {
+    pub summary: CombatSessionSummary,
+    pub steps: Vec<CombatSessionStepReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionStepReadout {
+    pub session_id: String,
+    pub step: CombatSessionStepSummary,
+    pub command: CommandAttempt,
+    pub scenario: RulebenchScenario,
+    pub receipt: RulebenchReceipt,
+    pub combat_log: Vec<CombatLogEntry>,
+    pub state_before: ScenarioProjection,
+    pub state_after: ScenarioProjection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionError {
+    UnknownSessionId,
+    UnknownStepId,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioMetadata {
     pub id: String,
@@ -597,6 +679,35 @@ pub fn resolve_catalog_scenario(
     })
 }
 
+pub fn combat_session_summaries() -> Vec<CombatSessionSummary> {
+    combat_session_transcripts()
+        .into_iter()
+        .map(|transcript| transcript.summary)
+        .collect()
+}
+
+pub fn resolve_combat_session_step(
+    session_id: &str,
+    step_id: &str,
+) -> Result<CombatSessionStepReadout, CombatSessionError> {
+    let Some(transcript) = combat_session_transcripts()
+        .into_iter()
+        .find(|transcript| transcript.summary.id == session_id)
+    else {
+        return Err(CombatSessionError::UnknownSessionId);
+    };
+
+    transcript
+        .steps
+        .into_iter()
+        .find(|step| step.step.id == step_id)
+        .ok_or(CombatSessionError::UnknownStepId)
+}
+
+pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
+    vec![hexing_bolt_opening_exchange_session()]
+}
+
 fn accepted_hit_catalog_case() -> ScenarioCatalogCase {
     catalog_case(
         "hexing-bolt-hit",
@@ -661,6 +772,157 @@ fn catalog_case(
         intent,
         roll_stream,
     }
+}
+
+fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
+    let session_id = "hexing-bolt-opening-exchange";
+    let session_title = "Hexing Bolt Opening Exchange";
+    let session_summary =
+        "A deterministic three-step transcript for accepted hit, accepted miss, and target-legality rejection.";
+    let session_seed_label = "roll-streams:17,5|2,5|17,5";
+
+    let step_specs = vec![
+        session_step_spec(
+            "adept-hexing-bolt-hit",
+            0,
+            "Adept hits Raider",
+            "Hexing Bolt hits Raider, applying damage and rattled.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ),
+        session_step_spec(
+            "adept-hexing-bolt-miss",
+            1,
+            "Adept misses Raider",
+            "Hexing Bolt misses Raider; the prior state remains authoritative.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ),
+        session_step_spec(
+            "adept-hexing-bolt-self-target-rejected",
+            2,
+            "Adept targets themself",
+            "Target legality rejects a non-hostile self target; no events are accepted.",
+            CommandOutcomeClass::RejectedTargetLegality,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ),
+    ];
+
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.metadata = ScenarioMetadata {
+        id: session_id.to_string(),
+        title: session_title.to_string(),
+        summary: session_summary.to_string(),
+        seed_label: session_seed_label.to_string(),
+    };
+
+    let mut steps = Vec::new();
+    for spec in step_specs {
+        let state_before = project_initial_state(&scenario, "State before command resolution.");
+        let receipt = resolve_use_action(&scenario, spec.intent.clone(), &spec.roll_stream);
+        let state_after = receipt
+            .projection
+            .clone()
+            .expect("session resolver always produces projection");
+        let command = CommandAttempt {
+            step_id: spec.id.to_string(),
+            step_index: spec.index,
+            actor_id: spec.intent.actor_id,
+            action_id: spec.intent.action_id,
+            target_id: spec.intent.target_id,
+            roll_stream: spec.roll_stream,
+            outcome_class: spec.outcome_class,
+        };
+        let step = CombatSessionStepSummary {
+            id: spec.id.to_string(),
+            index: spec.index,
+            title: spec.title.to_string(),
+            summary: spec.summary.to_string(),
+            outcome_class: spec.outcome_class,
+            log_index: spec.index + 1,
+        };
+        let combat_log = vec![combat_log_entry(&step, &receipt)];
+
+        steps.push(CombatSessionStepReadout {
+            session_id: session_id.to_string(),
+            step,
+            command,
+            scenario: scenario.clone(),
+            receipt,
+            combat_log,
+            state_before,
+            state_after: state_after.clone(),
+        });
+
+        scenario = scenario_with_projection(scenario, &state_after);
+    }
+
+    CombatSessionTranscript {
+        summary: CombatSessionSummary {
+            id: session_id.to_string(),
+            title: session_title.to_string(),
+            summary: session_summary.to_string(),
+            seed_label: session_seed_label.to_string(),
+            steps: steps.iter().map(|readout| readout.step.clone()).collect(),
+        },
+        steps,
+    }
+}
+
+struct SessionStepSpec {
+    id: &'static str,
+    index: u32,
+    title: &'static str,
+    summary: &'static str,
+    outcome_class: CommandOutcomeClass,
+    intent: UseActionIntent,
+    roll_stream: Vec<i32>,
+}
+
+fn session_step_spec(
+    id: &'static str,
+    index: u32,
+    title: &'static str,
+    summary: &'static str,
+    outcome_class: CommandOutcomeClass,
+    intent: UseActionIntent,
+    roll_stream: Vec<i32>,
+) -> SessionStepSpec {
+    SessionStepSpec {
+        id,
+        index,
+        title,
+        summary,
+        outcome_class,
+        intent,
+        roll_stream,
+    }
+}
+
+fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt) -> CombatLogEntry {
+    CombatLogEntry {
+        id: format!("log-{}", step.id),
+        step_id: step.id.clone(),
+        log_index: step.log_index,
+        title: step.title.clone(),
+        summary: step.summary.clone(),
+        outcome_class: step.outcome_class,
+        event_types: receipt.events.iter().map(domain_event_type).collect(),
+    }
+}
+
+fn domain_event_type(event: &DomainEvent) -> String {
+    match event {
+        DomainEvent::IntentShapeAccepted { .. } => "IntentShapeAccepted",
+        DomainEvent::ActionUsed { .. } => "ActionUsed",
+        DomainEvent::AttackRolled { .. } => "AttackRolled",
+        DomainEvent::DamageApplied { .. } => "DamageApplied",
+        DomainEvent::ModifierApplied { .. } => "ModifierApplied",
+    }
+    .to_string()
 }
 
 fn resolve_accepted_action(
@@ -1063,6 +1325,23 @@ fn project_final_state(
     projection
 }
 
+fn scenario_with_projection(
+    mut scenario: RulebenchScenario,
+    projection: &ScenarioProjection,
+) -> RulebenchScenario {
+    for combatant in &mut scenario.combatants {
+        if let Some(projected) = projection
+            .combatants
+            .iter()
+            .find(|projected| projected.id == combatant.id)
+        {
+            combatant.hit_points = projected.hit_points;
+            combatant.conditions = projected.conditions.clone();
+        }
+    }
+    scenario
+}
+
 fn adept_initial() -> Combatant {
     Combatant {
         id: "entity-adept".to_string(),
@@ -1374,5 +1653,139 @@ mod tests {
         let error = resolve_catalog_scenario("not-a-scenario").expect_err("unknown id fails");
 
         assert_eq!(error, ScenarioCatalogError::UnknownScenarioId);
+    }
+
+    #[test]
+    fn combat_session_enumerates_stable_summary_and_steps() {
+        let summaries = combat_session_summaries();
+
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].id, "hexing-bolt-opening-exchange");
+        assert_eq!(
+            summaries[0]
+                .steps
+                .iter()
+                .map(|step| step.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "adept-hexing-bolt-hit",
+                "adept-hexing-bolt-miss",
+                "adept-hexing-bolt-self-target-rejected"
+            ]
+        );
+        assert_eq!(
+            summaries[0]
+                .steps
+                .iter()
+                .map(|step| step.log_index)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn combat_session_first_step_records_accepted_hit() {
+        let readout =
+            resolve_combat_session_step("hexing-bolt-opening-exchange", "adept-hexing-bolt-hit")
+                .expect("step exists");
+
+        assert_eq!(readout.step.index, 0);
+        assert_eq!(
+            readout.command.outcome_class,
+            CommandOutcomeClass::AcceptedHit
+        );
+        assert_eq!(readout.command.roll_stream, vec![17, 5]);
+        assert!(readout.receipt.accepted);
+        assert_eq!(readout.receipt.events.len(), 4);
+        assert_eq!(readout.combat_log.len(), 1);
+        assert_eq!(readout.combat_log[0].log_index, 1);
+        assert_eq!(
+            readout.combat_log[0].event_types,
+            vec![
+                "ActionUsed".to_string(),
+                "AttackRolled".to_string(),
+                "DamageApplied".to_string(),
+                "ModifierApplied".to_string()
+            ]
+        );
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 18);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.state_after.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_session_later_miss_preserves_prior_authority_state() {
+        let readout =
+            resolve_combat_session_step("hexing-bolt-opening-exchange", "adept-hexing-bolt-miss")
+                .expect("step exists");
+
+        assert_eq!(readout.step.index, 1);
+        assert_eq!(
+            readout.command.outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+        assert!(readout.receipt.accepted);
+        assert_eq!(
+            readout
+                .receipt
+                .attack_roll
+                .as_ref()
+                .map(|roll| roll.outcome),
+            Some(AttackOutcome::Miss)
+        );
+        assert_eq!(readout.receipt.events.len(), 2);
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 9);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.state_after.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_session_rejected_step_preserves_prior_authority_state_without_events() {
+        let readout = resolve_combat_session_step(
+            "hexing-bolt-opening-exchange",
+            "adept-hexing-bolt-self-target-rejected",
+        )
+        .expect("step exists");
+
+        assert_eq!(readout.step.index, 2);
+        assert_eq!(
+            readout.command.outcome_class,
+            CommandOutcomeClass::RejectedTargetLegality
+        );
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
+        assert!(readout.receipt.events.is_empty());
+        assert!(readout.combat_log[0].event_types.is_empty());
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 9);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.state_after.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_session_rejects_unknown_session_id() {
+        let error = resolve_combat_session_step("not-a-session", "adept-hexing-bolt-hit")
+            .expect_err("unknown session fails");
+
+        assert_eq!(error, CombatSessionError::UnknownSessionId);
+    }
+
+    #[test]
+    fn combat_session_rejects_unknown_step_id() {
+        let error = resolve_combat_session_step("hexing-bolt-opening-exchange", "not-a-step")
+            .expect_err("unknown step fails");
+
+        assert_eq!(error, CombatSessionError::UnknownStepId);
     }
 }
