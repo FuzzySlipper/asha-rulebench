@@ -1,14 +1,23 @@
 import type {
   Result,
+  RulebenchCombatSessionCatalogDto,
+  RulebenchCombatSessionStepReadoutDto,
+  RulebenchCombatSessionSummaryDto,
   RulebenchScenarioCatalogDto,
   RulebenchScenarioCatalogSummaryDto,
   RulebenchScenarioReadoutDto,
 } from '@asha-rulebench/protocol';
+import { rustBackedCombatSessionCatalog } from './generated/rust-combat-session';
 import { rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
 
 export interface RulebenchTransport {
   readonly loadCatalog: () => Promise<Result<readonly RulebenchScenarioCatalogSummaryDto[]>>;
   readonly loadScenario: (scenarioId?: string) => Promise<Result<RulebenchScenarioReadoutDto>>;
+  readonly loadSessionCatalog: () => Promise<Result<readonly RulebenchCombatSessionSummaryDto[]>>;
+  readonly loadSessionStep: (
+    sessionId?: string,
+    stepId?: string,
+  ) => Promise<Result<RulebenchCombatSessionStepReadoutDto>>;
 }
 
 export const defaultScenarioCatalog: RulebenchScenarioCatalogDto = rustBackedScenarioCatalog;
@@ -17,9 +26,18 @@ export const defaultScenarioReadout: RulebenchScenarioReadoutDto = requireScenar
   defaultScenarioCatalog,
   defaultScenarioId,
 );
+export const defaultCombatSessionCatalog: RulebenchCombatSessionCatalogDto = rustBackedCombatSessionCatalog;
+export const defaultCombatSessionId: string = firstSessionId(defaultCombatSessionCatalog);
+export const defaultCombatSessionStepId: string = firstSessionStepId(defaultCombatSessionCatalog, defaultCombatSessionId);
+export const defaultCombatSessionStepReadout: RulebenchCombatSessionStepReadoutDto = requireSessionStepReadout(
+  defaultCombatSessionCatalog,
+  defaultCombatSessionId,
+  defaultCombatSessionStepId,
+);
 
 export const createFakeRulebenchTransport = (
   catalog: RulebenchScenarioCatalogDto = defaultScenarioCatalog,
+  sessionCatalog: RulebenchCombatSessionCatalogDto = defaultCombatSessionCatalog,
 ): RulebenchTransport => ({
   loadCatalog: async () => ({ ok: true, value: catalog.summaries }),
   loadScenario: async (scenarioId: string = firstScenarioId(catalog)) => {
@@ -30,6 +48,23 @@ export const createFakeRulebenchTransport = (
           error: {
             kind: 'not-found',
             message: `Scenario not found: ${scenarioId}`,
+            retryable: false,
+          },
+        }
+      : { ok: true, value: readout };
+  },
+  loadSessionCatalog: async () => ({ ok: true, value: sessionCatalog.summaries }),
+  loadSessionStep: async (
+    sessionId: string = firstSessionId(sessionCatalog),
+    stepId: string = firstSessionStepId(sessionCatalog, sessionId),
+  ) => {
+    const readout = sessionStepReadout(sessionCatalog, sessionId, stepId);
+    return readout === null
+      ? {
+          ok: false,
+          error: {
+            kind: 'not-found',
+            message: sessionMissingMessage(sessionCatalog, sessionId, stepId),
             retryable: false,
           },
         }
@@ -52,4 +87,42 @@ function requireScenarioReadout(catalog: RulebenchScenarioCatalogDto, scenarioId
 
 function scenarioReadout(catalog: RulebenchScenarioCatalogDto, scenarioId: string): RulebenchScenarioReadoutDto | null {
   return catalog.readouts.find((readout) => readout.id === scenarioId) ?? null;
+}
+
+function firstSessionId(catalog: RulebenchCombatSessionCatalogDto): string {
+  const firstSummary = catalog.summaries[0];
+  return firstSummary?.id ?? '';
+}
+
+function firstSessionStepId(catalog: RulebenchCombatSessionCatalogDto, sessionId: string): string {
+  const summary = catalog.summaries.find((candidate) => candidate.id === sessionId);
+  const firstStep = summary?.steps[0];
+  return firstStep?.id ?? '';
+}
+
+function requireSessionStepReadout(
+  catalog: RulebenchCombatSessionCatalogDto,
+  sessionId: string,
+  stepId: string,
+): RulebenchCombatSessionStepReadoutDto {
+  const readout = sessionStepReadout(catalog, sessionId, stepId);
+  if (readout === null) {
+    throw new Error(`Default combat session step readout is missing: ${sessionId} / ${stepId}`);
+  }
+  return readout;
+}
+
+function sessionStepReadout(
+  catalog: RulebenchCombatSessionCatalogDto,
+  sessionId: string,
+  stepId: string,
+): RulebenchCombatSessionStepReadoutDto | null {
+  return catalog.readouts.find((readout) => readout.sessionId === sessionId && readout.step.id === stepId) ?? null;
+}
+
+function sessionMissingMessage(catalog: RulebenchCombatSessionCatalogDto, sessionId: string, stepId: string): string {
+  const session = catalog.summaries.find((summary) => summary.id === sessionId);
+  return session === undefined
+    ? `Combat session not found: ${sessionId}`
+    : `Combat session step not found: ${sessionId} / ${stepId}`;
 }

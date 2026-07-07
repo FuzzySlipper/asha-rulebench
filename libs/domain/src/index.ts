@@ -1,6 +1,9 @@
 import type {
+  RulebenchCombatLogEntryDto,
+  RulebenchCombatSessionStepReadoutDto,
   RulebenchCombatantDto,
   RulebenchDomainEventDto,
+  RulebenchFinalStateDto,
   RulebenchScenarioReadoutDto,
   RulebenchTraceEntryDto,
 } from '@asha-rulebench/protocol';
@@ -87,6 +90,45 @@ export interface RulebenchFinalCombatantStateView {
   readonly conditionLabels: readonly string[];
 }
 
+export interface RulebenchCombatSessionStepView {
+  readonly sessionId: string;
+  readonly step: RulebenchCombatSessionStepSummaryView;
+  readonly command: RulebenchCommandAttemptView;
+  readonly scenario: RulebenchScenarioView;
+  readonly combatLog: readonly RulebenchCombatLogEntryView[];
+  readonly stateBefore: RulebenchFinalStateView;
+  readonly stateAfter: RulebenchFinalStateView;
+}
+
+export interface RulebenchCombatSessionStepSummaryView {
+  readonly id: string;
+  readonly indexLabel: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeLabel: string;
+  readonly logIndexLabel: string;
+}
+
+export interface RulebenchCommandAttemptView {
+  readonly stepId: string;
+  readonly stepIndexLabel: string;
+  readonly actorId: string;
+  readonly actionId: string;
+  readonly targetId: string;
+  readonly rollStreamLabel: string;
+  readonly outcomeLabel: string;
+}
+
+export interface RulebenchCombatLogEntryView {
+  readonly id: string;
+  readonly stepId: string;
+  readonly logIndexLabel: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeLabel: string;
+  readonly eventTypeLabels: readonly string[];
+}
+
 type TracePhase = RulebenchTraceEntryDto['phase'];
 
 const tracePhaseOrder: readonly TracePhase[] = ['proposal', 'validation', 'resolution', 'commit'];
@@ -114,15 +156,36 @@ export function projectRulebenchScenario(readout: RulebenchScenarioReadoutDto): 
     },
     timeline: readout.domainEvents.map((event) => projectTimelineRow(event, combatantLabels)),
     traceGroups: projectTraceGroups(readout.trace),
-    finalState: {
-      summary: readout.finalState.summary,
-      combatants: readout.finalState.combatants.map((combatant) => ({
-        id: combatant.id,
-        name: combatant.name,
-        hitPointLabel: labelHitPoints(combatant.hitPoints.current, combatant.hitPoints.max),
-        conditionLabels: labelConditions(combatant.conditions),
-      })),
+    finalState: projectFinalState(readout.finalState),
+  };
+}
+
+export function projectRulebenchCombatSessionStep(
+  readout: RulebenchCombatSessionStepReadoutDto,
+): RulebenchCombatSessionStepView {
+  return {
+    sessionId: readout.sessionId,
+    step: {
+      id: readout.step.id,
+      indexLabel: String(readout.step.index + 1),
+      title: readout.step.title,
+      summary: readout.step.summary,
+      outcomeLabel: labelOutcomeClass(readout.step.outcomeClass),
+      logIndexLabel: String(readout.step.logIndex),
     },
+    command: {
+      stepId: readout.command.stepId,
+      stepIndexLabel: String(readout.command.stepIndex + 1),
+      actorId: readout.command.actorId,
+      actionId: readout.command.actionId,
+      targetId: readout.command.targetId,
+      rollStreamLabel: readout.command.rollStream.join(','),
+      outcomeLabel: labelOutcomeClass(readout.command.outcomeClass),
+    },
+    scenario: projectRulebenchScenario(readout.scenarioReadout),
+    combatLog: readout.combatLog.map(projectCombatLogEntry),
+    stateBefore: projectFinalState(readout.stateBefore),
+    stateAfter: projectFinalState(readout.stateAfter),
   };
 }
 
@@ -199,6 +262,30 @@ function projectTraceEntry(entry: RulebenchTraceEntryDto): RulebenchTraceEntryVi
   };
 }
 
+function projectCombatLogEntry(entry: RulebenchCombatLogEntryDto): RulebenchCombatLogEntryView {
+  return {
+    id: entry.id,
+    stepId: entry.stepId,
+    logIndexLabel: String(entry.logIndex),
+    title: entry.title,
+    summary: entry.summary,
+    outcomeLabel: labelOutcomeClass(entry.outcomeClass),
+    eventTypeLabels: entry.eventTypes,
+  };
+}
+
+function projectFinalState(finalState: RulebenchFinalStateDto): RulebenchFinalStateView {
+  return {
+    summary: finalState.summary,
+    combatants: finalState.combatants.map((combatant) => ({
+      id: combatant.id,
+      name: combatant.name,
+      hitPointLabel: labelHitPoints(combatant.hitPoints.current, combatant.hitPoints.max),
+      conditionLabels: labelConditions(combatant.conditions),
+    })),
+  };
+}
+
 function createCombatantLabels(combatants: readonly RulebenchCombatantDto[]): ReadonlyMap<string, string> {
   return new Map(combatants.map((combatant) => [combatant.id, combatant.name]));
 }
@@ -225,6 +312,17 @@ function labelTerrain(tags: readonly string[]): string {
 
 function labelLegality(legality: RulebenchScenarioReadoutDto['selectedTarget']['legality']): string {
   return legality === 'accepted' ? 'Accepted' : 'Rejected';
+}
+
+function labelOutcomeClass(outcomeClass: RulebenchCombatSessionStepReadoutDto['step']['outcomeClass']): string {
+  switch (outcomeClass) {
+    case 'acceptedHit':
+      return 'Accepted hit';
+    case 'acceptedMiss':
+      return 'Accepted miss';
+    case 'rejectedTargetLegality':
+      return 'Rejected target';
+  }
 }
 
 function labelTracePhase(phase: TracePhase): string {
