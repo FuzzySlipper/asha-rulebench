@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { renderApiTypes } from './generate-api-types.mjs';
 
 const generatedRoot = join(process.cwd(), 'libs/protocol/src/generated');
+const apiTypesPath = join(generatedRoot, 'api-types.ts');
 const failures = [];
 
 for (const file of collectTsFiles(generatedRoot)) {
@@ -9,6 +11,10 @@ for (const file of collectTsFiles(generatedRoot)) {
   if (!text.startsWith('// GENERATED')) {
     failures.push(`${file} must start with // GENERATED`);
   }
+}
+
+if (readFileSync(apiTypesPath, 'utf8') !== renderApiTypes()) {
+  failures.push(`${apiTypesPath} is out of date. Run node libs/protocol/scripts/generate-api-types.mjs.`);
 }
 
 if (failures.length > 0) {
