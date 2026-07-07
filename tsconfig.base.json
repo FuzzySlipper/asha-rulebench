@@ -28,6 +28,7 @@
       "@asha-rulebench/platform": ["libs/platform/src/index.ts"],
       "@asha-rulebench/protocol": ["libs/protocol/src/index.ts"],
       "@asha-rulebench/renderer": ["libs/renderer/src/index.ts"],
+      "@asha-rulebench/scenario-viewer": ["libs/scenario-viewer/src/index.ts"],
       "@asha-rulebench/shell": ["libs/shell/src/index.ts"],
       "@asha-rulebench/store": ["libs/store/src/index.ts"],
       "@asha-rulebench/testing-fixtures": ["libs/testing-fixtures/src/index.ts"],

@@ -1,0 +1,1 @@
+{"name":"scenario-viewer","$schema":"../../node_modules/nx/schemas/project-schema.json","sourceRoot":"libs/scenario-viewer/src","projectType":"library","tags":["type:lib","scope:feature"],"targets":{"lint":{"executor":"@nx/eslint:lint"},"typecheck":{"executor":"nx:run-commands","options":{"command":"tsc -p libs/scenario-viewer/tsconfig.lib.json --noEmit"}}}}

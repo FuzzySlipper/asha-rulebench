@@ -11,6 +11,7 @@ export default defineConfig({
       '@asha-rulebench/platform': workspacePath('./libs/platform/src/index.ts'),
       '@asha-rulebench/protocol': workspacePath('./libs/protocol/src/index.ts'),
       '@asha-rulebench/renderer': workspacePath('./libs/renderer/src/index.ts'),
+      '@asha-rulebench/scenario-viewer': workspacePath('./libs/scenario-viewer/src/index.ts'),
       '@asha-rulebench/shell': workspacePath('./libs/shell/src/index.ts'),
       '@asha-rulebench/store': workspacePath('./libs/store/src/index.ts'),
       '@asha-rulebench/testing-fixtures': workspacePath('./libs/testing-fixtures/src/index.ts'),
