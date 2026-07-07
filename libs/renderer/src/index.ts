@@ -1,10 +1,10 @@
 import { Component, input } from '@angular/core';
 import { StatusLineComponent } from '@asha-rulebench/components';
-import type { RulebenchStatusView } from '@asha-rulebench/domain';
+import type { RulebenchScenarioView } from '@asha-rulebench/domain';
 
 @Component({
   imports: [StatusLineComponent],
-  selector: 'arb-status-renderer',
+  selector: 'arb-scenario-summary-renderer',
   standalone: true,
   styles: [
     `
@@ -13,8 +13,8 @@ import type { RulebenchStatusView } from '@asha-rulebench/domain';
       }
     `,
   ],
-  template: `<arb-status-line [label]="status().label" />`,
+  template: `<arb-status-line [label]="scenario().title" />`,
 })
-export class StatusRendererComponent {
-  readonly status = input.required<RulebenchStatusView>();
+export class ScenarioSummaryRendererComponent {
+  readonly scenario = input.required<RulebenchScenarioView>();
 }

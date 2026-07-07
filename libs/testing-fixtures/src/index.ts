@@ -1,12 +1,4 @@
-import type { RulebenchScenarioReadoutDto, TemplateStatusDto } from '@asha-rulebench/protocol';
-
-export function makeRulebenchStatus(overrides: Partial<TemplateStatusDto> = {}): TemplateStatusDto {
-  return {
-    status: 'idle',
-    label: 'Session idle',
-    ...overrides,
-  };
-}
+import type { RulebenchScenarioReadoutDto } from '@asha-rulebench/protocol';
 
 export const twoCombatantScenarioReadout: RulebenchScenarioReadoutDto = {
   id: 'two-combatant-hexing-bolt',

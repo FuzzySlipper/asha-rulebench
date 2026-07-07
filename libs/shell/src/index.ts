@@ -42,12 +42,12 @@ import { SessionStore } from '@asha-rulebench/store';
     <main>
       <h1>ASHA Rulebench</h1>
       <p>Rule workbench shell online</p>
-      <section class="status" aria-label="Session status">
-        @switch (status().kind) {
-          @case ('idle') { <p>Session idle</p> }
-          @case ('loading') { <p>Loading session</p> }
-          @case ('data') { <p>{{ status().value.label }}</p> }
-          @case ('error') { <p>{{ status().error.message }}</p> }
+      <section class="status" aria-label="Scenario status">
+        @switch (scenario().kind) {
+          @case ('idle') { <p>Scenario idle</p> }
+          @case ('loading') { <p>Loading scenario</p> }
+          @case ('data') { <p>{{ scenario().value.title }}</p> }
+          @case ('error') { <p>{{ scenario().error.message }}</p> }
         }
       </section>
     </main>
@@ -55,10 +55,10 @@ import { SessionStore } from '@asha-rulebench/store';
 })
 export class ShellHomeComponent implements OnInit {
   private readonly sessionStore = inject(SessionStore);
-  protected readonly status = computed(() => this.sessionStore.status());
+  protected readonly scenario = computed(() => this.sessionStore.scenario());
 
   ngOnInit(): void {
-    void this.sessionStore.load();
+    void this.sessionStore.loadScenario();
   }
 }
 

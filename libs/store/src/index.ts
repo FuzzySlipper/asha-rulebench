@@ -1,6 +1,6 @@
 import { InjectionToken, Injectable, signal } from '@angular/core';
 import type { Provider, Signal } from '@angular/core';
-import { projectRulebenchStatus, type RulebenchStatusView } from '@asha-rulebench/domain';
+import { projectRulebenchScenario, type RulebenchScenarioView } from '@asha-rulebench/domain';
 import { browserClock, type ClockPort } from '@asha-rulebench/platform';
 import type { ClassifiedError } from '@asha-rulebench/protocol';
 import { createFakeRulebenchTransport, type RulebenchTransport } from '@asha-rulebench/transport';
@@ -21,20 +21,20 @@ export const RULEBENCH_CLOCK = new InjectionToken<ClockPort>('RULEBENCH_CLOCK', 
 
 @Injectable()
 export class SessionStore {
-  private readonly _status = signal<AsyncState<RulebenchStatusView>>({ kind: 'idle' });
-  readonly status: Signal<AsyncState<RulebenchStatusView>> = this._status.asReadonly();
+  private readonly _scenario = signal<AsyncState<RulebenchScenarioView>>({ kind: 'idle' });
+  readonly scenario: Signal<AsyncState<RulebenchScenarioView>> = this._scenario.asReadonly();
 
   constructor(
     private readonly transport: RulebenchTransport,
     private readonly clock: ClockPort,
   ) {}
 
-  async load(): Promise<void> {
-    this._status.set({ kind: 'loading' });
-    const result = await this.transport.loadStatus();
-    this._status.set(
+  async loadScenario(): Promise<void> {
+    this._scenario.set({ kind: 'loading' });
+    const result = await this.transport.loadScenario();
+    this._scenario.set(
       result.ok
-        ? { kind: 'data', value: projectRulebenchStatus(result.value) }
+        ? { kind: 'data', value: projectRulebenchScenario(result.value) }
         : { kind: 'error', error: result.error },
     );
     this.clock.now();
