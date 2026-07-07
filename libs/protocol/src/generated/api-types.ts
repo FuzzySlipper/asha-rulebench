@@ -14,6 +14,60 @@ export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'empt
 
 export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
 
+export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
+
+export interface RulebenchCombatSessionCatalogDto {
+  readonly summaries: readonly RulebenchCombatSessionSummaryDto[];
+  readonly readouts: readonly RulebenchCombatSessionStepReadoutDto[];
+}
+
+export interface RulebenchCombatSessionSummaryDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly seedLabel: string;
+  readonly steps: readonly RulebenchCombatSessionStepSummaryDto[];
+}
+
+export interface RulebenchCombatSessionStepSummaryDto {
+  readonly id: string;
+  readonly index: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly logIndex: number;
+}
+
+export interface RulebenchCommandAttemptDto {
+  readonly stepId: string;
+  readonly stepIndex: number;
+  readonly actorId: string;
+  readonly actionId: string;
+  readonly targetId: string;
+  readonly rollStream: readonly number[];
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+}
+
+export interface RulebenchCombatLogEntryDto {
+  readonly id: string;
+  readonly stepId: string;
+  readonly logIndex: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly eventTypes: readonly string[];
+}
+
+export interface RulebenchCombatSessionStepReadoutDto {
+  readonly sessionId: string;
+  readonly step: RulebenchCombatSessionStepSummaryDto;
+  readonly command: RulebenchCommandAttemptDto;
+  readonly scenarioReadout: RulebenchScenarioReadoutDto;
+  readonly combatLog: readonly RulebenchCombatLogEntryDto[];
+  readonly stateBefore: RulebenchFinalStateDto;
+  readonly stateAfter: RulebenchFinalStateDto;
+}
+
 export interface RulebenchScenarioCatalogDto {
   readonly summaries: readonly RulebenchScenarioCatalogSummaryDto[];
   readonly readouts: readonly RulebenchScenarioReadoutDto[];

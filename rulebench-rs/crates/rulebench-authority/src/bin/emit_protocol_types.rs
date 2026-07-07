@@ -44,11 +44,178 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';",
         "export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';",
         "export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
+        "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
     ]
 }
 
 fn interfaces() -> &'static [Interface] {
     &[
+        Interface {
+            name: "RulebenchCombatSessionCatalogDto",
+            fields: &[
+                Field {
+                    name: "summaries",
+                    ty: "readonly RulebenchCombatSessionSummaryDto[]",
+                },
+                Field {
+                    name: "readouts",
+                    ty: "readonly RulebenchCombatSessionStepReadoutDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatSessionSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "seedLabel",
+                    ty: "string",
+                },
+                Field {
+                    name: "steps",
+                    ty: "readonly RulebenchCombatSessionStepSummaryDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatSessionStepSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "index",
+                    ty: "number",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "outcomeClass",
+                    ty: "RulebenchCommandOutcomeClassDto",
+                },
+                Field {
+                    name: "logIndex",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCommandAttemptDto",
+            fields: &[
+                Field {
+                    name: "stepId",
+                    ty: "string",
+                },
+                Field {
+                    name: "stepIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "actorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rollStream",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "outcomeClass",
+                    ty: "RulebenchCommandOutcomeClassDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatLogEntryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "stepId",
+                    ty: "string",
+                },
+                Field {
+                    name: "logIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "outcomeClass",
+                    ty: "RulebenchCommandOutcomeClassDto",
+                },
+                Field {
+                    name: "eventTypes",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatSessionStepReadoutDto",
+            fields: &[
+                Field {
+                    name: "sessionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "step",
+                    ty: "RulebenchCombatSessionStepSummaryDto",
+                },
+                Field {
+                    name: "command",
+                    ty: "RulebenchCommandAttemptDto",
+                },
+                Field {
+                    name: "scenarioReadout",
+                    ty: "RulebenchScenarioReadoutDto",
+                },
+                Field {
+                    name: "combatLog",
+                    ty: "readonly RulebenchCombatLogEntryDto[]",
+                },
+                Field {
+                    name: "stateBefore",
+                    ty: "RulebenchFinalStateDto",
+                },
+                Field {
+                    name: "stateAfter",
+                    ty: "RulebenchFinalStateDto",
+                },
+            ],
+        },
         Interface {
             name: "RulebenchScenarioCatalogDto",
             fields: &[
