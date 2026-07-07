@@ -1,0 +1,11 @@
+[package]
+name = "rulebench-authority"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local ASHA Rulebench authority incubation crate."
+
+[lints]
+workspace = true
+
+[dependencies]

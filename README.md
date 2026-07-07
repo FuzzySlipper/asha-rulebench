@@ -21,6 +21,19 @@ The UI can stay modest. The product value is explainability. If the bench says a
 
 This repo is also a proving ground. Local Rust crates may incubate RPG-domain or game-rules behavior while ideas are still forming. Pieces that become clearly game-generic can later move upstream into ASHA.
 
+## Rust Authority Workspace
+
+Local Rust authority work lives under `rulebench-rs/`. It is an incubation workspace for Rulebench-specific scenario resolution, not an upstream ASHA crate set.
+
+The first crate, `rulebench-authority`, establishes the local authority lane with typed intents, explicit rejections, DomainEvent-shaped accepted facts, diagnostic trace, and readout receipts. It intentionally has no external Rust dependencies and no path dependency on `/home/dev/asha-engine`; adding serialization/codegen crates or ASHA path dependencies is a planner-approval moment.
+
+Run the focused Rust gates with:
+
+```bash
+pnpm run rust:check
+pnpm run rust:test
+```
+
 ## Source Material
 
 This repo starts from four planning references:

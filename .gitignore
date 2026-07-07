@@ -7,3 +7,4 @@ tmp/
 playwright-report/
 test-results/
 *.tsbuildinfo
+rulebench-rs/target/

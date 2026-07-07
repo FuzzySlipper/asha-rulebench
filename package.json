@@ -14,6 +14,8 @@
     "verify": "pnpm run check:pattern && pnpm run check:docs && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
     "check:pattern": "node tools/scripts/check-pattern.mjs",
     "check:docs": "node tools/scripts/check-docs-commands.mjs",
+    "rust:check": "cargo check --manifest-path rulebench-rs/Cargo.toml",
+    "rust:test": "cargo test --manifest-path rulebench-rs/Cargo.toml",
     "protocol:generate": "node libs/protocol/scripts/generate-api-types.mjs",
     "protocol:check": "node libs/protocol/scripts/check-generated.mjs",
     "serve:local": "node tools/scripts/serve-local.mjs",
