@@ -1,10 +1,10 @@
 import { Component, computed, inject } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import type { Routes } from '@angular/router';
-import { SessionStore } from '@template/store';
+import { SessionStore } from '@asha-rulebench/store';
 
 @Component({
-  selector: 'tpl-shell-home',
+  selector: 'arb-shell-home',
   standalone: true,
   styles: [
     `
@@ -33,15 +33,15 @@ import { SessionStore } from '@template/store';
       }
 
       .status {
-        border-left: 4px solid var(--tpl-accent);
+        border-left: 4px solid var(--arb-accent);
         padding-left: 12px;
       }
     `,
   ],
   template: `
     <main>
-      <h1>UI Pattern Bootstrap</h1>
-      <p>Layer skeleton online</p>
+      <h1>ASHA Rulebench</h1>
+      <p>Rule workbench shell online</p>
       <section class="status" aria-label="Session status">
         @switch (status().kind) {
           @case ('idle') { <p>Session idle</p> }

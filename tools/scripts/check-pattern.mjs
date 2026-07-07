@@ -80,7 +80,7 @@ function validateSourceImports() {
   for (const file of files) {
     const rel = relative(root, file);
     const text = readFileSync(file, 'utf8');
-    if (/@template\/[^'"]+\/src\//.test(text)) {
+    if (/@(?:template|asha-rulebench)\/[^'"]+\/src\//.test(text)) {
       failures.push(`${rel} deep-imports another lib src path`);
     }
     if (/from ['"](?:\.\.\/)*apps\//.test(text)) {
@@ -90,7 +90,7 @@ function validateSourceImports() {
       !rel.startsWith('libs/testing-fixtures/')
       && !rel.includes('.spec.')
       && !rel.startsWith('apps/app-e2e/')
-      && /(?:from|import)\s*['"]@template\/testing-fixtures['"]/.test(text)
+      && /(?:from|import)\s*['"]@(?:template|asha-rulebench)\/testing-fixtures['"]/.test(text)
     ) {
       failures.push(`${rel} imports testing-fixtures from production code`);
     }

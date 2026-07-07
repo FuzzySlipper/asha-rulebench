@@ -23,16 +23,16 @@
     "noFallthroughCasesInSwitch": true,
     "useUnknownInCatchVariables": true,
     "paths": {
-      "@template/components": ["libs/components/src/index.ts"],
-      "@template/domain": ["libs/domain/src/index.ts"],
-      "@template/platform": ["libs/platform/src/index.ts"],
-      "@template/protocol": ["libs/protocol/src/index.ts"],
-      "@template/renderer": ["libs/renderer/src/index.ts"],
-      "@template/shell": ["libs/shell/src/index.ts"],
-      "@template/store": ["libs/store/src/index.ts"],
-      "@template/testing-fixtures": ["libs/testing-fixtures/src/index.ts"],
-      "@template/theme": ["libs/theme/src/index.ts"],
-      "@template/transport": ["libs/transport/src/index.ts"]
+      "@asha-rulebench/components": ["libs/components/src/index.ts"],
+      "@asha-rulebench/domain": ["libs/domain/src/index.ts"],
+      "@asha-rulebench/platform": ["libs/platform/src/index.ts"],
+      "@asha-rulebench/protocol": ["libs/protocol/src/index.ts"],
+      "@asha-rulebench/renderer": ["libs/renderer/src/index.ts"],
+      "@asha-rulebench/shell": ["libs/shell/src/index.ts"],
+      "@asha-rulebench/store": ["libs/store/src/index.ts"],
+      "@asha-rulebench/testing-fixtures": ["libs/testing-fixtures/src/index.ts"],
+      "@asha-rulebench/theme": ["libs/theme/src/index.ts"],
+      "@asha-rulebench/transport": ["libs/transport/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp", "dist", "coverage"]

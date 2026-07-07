@@ -1,13 +1,13 @@
 import { Component, input } from '@angular/core';
 
 @Component({
-  selector: 'tpl-status-line',
+  selector: 'arb-status-line',
   standalone: true,
   styles: [
     `
       :host {
         display: block;
-        color: var(--tpl-muted);
+        color: var(--arb-muted);
       }
     `,
   ],

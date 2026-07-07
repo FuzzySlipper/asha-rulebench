@@ -3,7 +3,7 @@ import { RouterOutlet } from '@angular/router';
 
 @Component({
   imports: [RouterOutlet],
-  selector: 'tpl-root',
+  selector: 'arb-root',
   styles: [
     `
       :host {

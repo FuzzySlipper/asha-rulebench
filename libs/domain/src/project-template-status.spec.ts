@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { projectTemplateStatus } from './index';
+import { projectRulebenchStatus } from './index';
 
-describe('projectTemplateStatus', () => {
+describe('projectRulebenchStatus', () => {
   it('projects ready status', () => {
-    expect(projectTemplateStatus({ status: 'ready', label: 'Ready' })).toEqual({ isReady: true, label: 'Ready' });
+    expect(projectRulebenchStatus({ status: 'ready', label: 'Ready' })).toEqual({ isReady: true, label: 'Ready' });
   });
 });

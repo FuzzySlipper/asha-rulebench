@@ -1,11 +1,11 @@
-import type { TemplateStatusDto } from '@template/protocol';
+import type { TemplateStatusDto } from '@asha-rulebench/protocol';
 
-export interface TemplateStatusView {
+export interface RulebenchStatusView {
   readonly label: string;
   readonly isReady: boolean;
 }
 
-export function projectTemplateStatus(status: TemplateStatusDto): TemplateStatusView {
+export function projectRulebenchStatus(status: TemplateStatusDto): RulebenchStatusView {
   return {
     label: status.label,
     isReady: status.status === 'ready',

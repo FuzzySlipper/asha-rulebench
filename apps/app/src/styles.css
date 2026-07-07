@@ -11,9 +11,9 @@ body {
 }
 
 body {
-  background: var(--tpl-bg);
-  color: var(--tpl-text);
-  font-family: var(--tpl-font-family);
+  background: var(--arb-bg);
+  color: var(--arb-text);
+  font-family: var(--arb-font-family);
 }
 
 button,

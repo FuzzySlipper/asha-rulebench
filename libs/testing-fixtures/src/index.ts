@@ -1,6 +1,6 @@
-import type { TemplateStatusDto } from '@template/protocol';
+import type { TemplateStatusDto } from '@asha-rulebench/protocol';
 
-export function makeTemplateStatus(overrides: Partial<TemplateStatusDto> = {}): TemplateStatusDto {
+export function makeRulebenchStatus(overrides: Partial<TemplateStatusDto> = {}): TemplateStatusDto {
   return {
     status: 'idle',
     label: 'Session idle',

@@ -1,9 +1,9 @@
-import type { Result, TemplateStatusDto } from '@template/protocol';
+import type { Result, TemplateStatusDto } from '@asha-rulebench/protocol';
 
-export interface TemplateTransport {
+export interface RulebenchTransport {
   readonly loadStatus: () => Promise<Result<TemplateStatusDto>>;
 }
 
-export const createFakeTemplateTransport = (status: TemplateStatusDto = { status: 'idle', label: 'Session idle' }): TemplateTransport => ({
+export const createFakeRulebenchTransport = (status: TemplateStatusDto = { status: 'idle', label: 'Session idle' }): RulebenchTransport => ({
   loadStatus: async () => ({ ok: true, value: status }),
 });

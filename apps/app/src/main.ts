@@ -1,11 +1,11 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { shellRoutes } from '@template/shell';
-import { provideTemplateStoreKernel } from '@template/store';
+import { shellRoutes } from '@asha-rulebench/shell';
+import { provideRulebenchStoreKernel } from '@asha-rulebench/store';
 import { AppComponent } from './app.component';
 
 bootstrapApplication(AppComponent, {
-  providers: [provideRouter(shellRoutes), provideTemplateStoreKernel()],
+  providers: [provideRouter(shellRoutes), provideRulebenchStoreKernel()],
 }).catch((error: unknown) => {
   console.error(error);
 });

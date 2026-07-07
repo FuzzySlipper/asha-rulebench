@@ -1,1 +1,1 @@
-export const themeName = 'ui-pattern-bootstrap';
+export const themeName = 'asha-rulebench';

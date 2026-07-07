@@ -2,7 +2,7 @@
   "name": "app",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "prefix": "tpl",
+  "prefix": "arb",
   "sourceRoot": "apps/app/src",
   "tags": ["type:app", "scope:shell"],
   "targets": {
