@@ -12,6 +12,21 @@ export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';
 
 export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';
 
+export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
+
+export interface RulebenchScenarioCatalogDto {
+  readonly summaries: readonly RulebenchScenarioCatalogSummaryDto[];
+  readonly readouts: readonly RulebenchScenarioReadoutDto[];
+}
+
+export interface RulebenchScenarioCatalogSummaryDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly seedLabel: string;
+  readonly outcomeClass: RulebenchScenarioOutcomeClassDto;
+}
+
 export interface RulebenchUseActionIntentDto {
   readonly actorId: string;
   readonly actionId: string;

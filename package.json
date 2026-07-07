@@ -18,6 +18,8 @@
     "rust:test": "cargo test --manifest-path rulebench-rs/Cargo.toml",
     "protocol:generate": "node libs/protocol/scripts/generate-api-types.mjs",
     "protocol:check": "node libs/protocol/scripts/check-generated.mjs",
+    "catalog:generate": "node libs/transport/scripts/generate-rust-scenario-catalog.mjs",
+    "catalog:check": "node libs/transport/scripts/generate-rust-scenario-catalog.mjs --check",
     "serve:local": "node tools/scripts/serve-local.mjs",
     "e2e": "nx e2e app-e2e",
     "e2e:live": "playwright test --config apps/app-e2e/playwright.config.mts --grep @live"

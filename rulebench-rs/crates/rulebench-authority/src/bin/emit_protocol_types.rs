@@ -43,11 +43,50 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchTracePhaseDto = 'proposal' | 'validation' | 'resolution' | 'commit';",
         "export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';",
         "export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';",
+        "export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
     ]
 }
 
 fn interfaces() -> &'static [Interface] {
     &[
+        Interface {
+            name: "RulebenchScenarioCatalogDto",
+            fields: &[
+                Field {
+                    name: "summaries",
+                    ty: "readonly RulebenchScenarioCatalogSummaryDto[]",
+                },
+                Field {
+                    name: "readouts",
+                    ty: "readonly RulebenchScenarioReadoutDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchScenarioCatalogSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "seedLabel",
+                    ty: "string",
+                },
+                Field {
+                    name: "outcomeClass",
+                    ty: "RulebenchScenarioOutcomeClassDto",
+                },
+            ],
+        },
         Interface {
             name: "RulebenchUseActionIntentDto",
             fields: &[
