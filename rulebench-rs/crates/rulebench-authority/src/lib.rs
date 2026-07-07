@@ -9,6 +9,52 @@
 
 pub const AUTHORITY_SURFACE: &str = "asha-rulebench.local-authority.v0";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScenarioOutcomeClass {
+    AcceptedHit,
+    AcceptedMiss,
+    RejectedTargetLegality,
+}
+
+impl ScenarioOutcomeClass {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ScenarioOutcomeClass::AcceptedHit => "acceptedHit",
+            ScenarioOutcomeClass::AcceptedMiss => "acceptedMiss",
+            ScenarioOutcomeClass::RejectedTargetLegality => "rejectedTargetLegality",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenarioCatalogSummary {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub seed_label: String,
+    pub outcome_class: ScenarioOutcomeClass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenarioCatalogCase {
+    pub summary: ScenarioCatalogSummary,
+    pub scenario: RulebenchScenario,
+    pub intent: UseActionIntent,
+    pub roll_stream: Vec<i32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenarioCatalogResolution {
+    pub case: ScenarioCatalogSummary,
+    pub scenario: RulebenchScenario,
+    pub receipt: RulebenchReceipt,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScenarioCatalogError {
+    UnknownScenarioId,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioMetadata {
     pub id: String,
@@ -517,6 +563,104 @@ pub fn rejected_target_fixture_receipt() -> RulebenchReceipt {
         UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
         &[17, 5],
     )
+}
+
+pub fn scenario_catalog_summaries() -> Vec<ScenarioCatalogSummary> {
+    scenario_catalog_cases()
+        .into_iter()
+        .map(|case| case.summary)
+        .collect()
+}
+
+pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
+    vec![
+        accepted_hit_catalog_case(),
+        accepted_miss_catalog_case(),
+        rejected_target_legality_catalog_case(),
+    ]
+}
+
+pub fn resolve_catalog_scenario(
+    id: &str,
+) -> Result<ScenarioCatalogResolution, ScenarioCatalogError> {
+    let Some(case) = scenario_catalog_cases()
+        .into_iter()
+        .find(|case| case.summary.id == id)
+    else {
+        return Err(ScenarioCatalogError::UnknownScenarioId);
+    };
+    let receipt = resolve_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
+    Ok(ScenarioCatalogResolution {
+        case: case.summary,
+        scenario: case.scenario,
+        receipt,
+    })
+}
+
+fn accepted_hit_catalog_case() -> ScenarioCatalogCase {
+    catalog_case(
+        "hexing-bolt-hit",
+        "Hexing Bolt Hit",
+        "Adept hits Raider, applying psychic damage and rattled.",
+        "roll-stream:17,5",
+        ScenarioOutcomeClass::AcceptedHit,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        vec![17, 5],
+    )
+}
+
+fn accepted_miss_catalog_case() -> ScenarioCatalogCase {
+    catalog_case(
+        "hexing-bolt-miss",
+        "Hexing Bolt Miss",
+        "Adept targets Raider but the attack misses, leaving state unchanged.",
+        "roll-stream:2,5",
+        ScenarioOutcomeClass::AcceptedMiss,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        vec![2, 5],
+    )
+}
+
+fn rejected_target_legality_catalog_case() -> ScenarioCatalogCase {
+    catalog_case(
+        "hexing-bolt-self-target-rejected",
+        "Hexing Bolt Self Target Rejected",
+        "Adept attempts to target themself and target legality rejects the intent.",
+        "roll-stream:17,5",
+        ScenarioOutcomeClass::RejectedTargetLegality,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+        vec![17, 5],
+    )
+}
+
+fn catalog_case(
+    id: &str,
+    title: &str,
+    summary: &str,
+    seed_label: &str,
+    outcome_class: ScenarioOutcomeClass,
+    intent: UseActionIntent,
+    roll_stream: Vec<i32>,
+) -> ScenarioCatalogCase {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.metadata = ScenarioMetadata {
+        id: id.to_string(),
+        title: title.to_string(),
+        summary: summary.to_string(),
+        seed_label: seed_label.to_string(),
+    };
+    ScenarioCatalogCase {
+        summary: ScenarioCatalogSummary {
+            id: id.to_string(),
+            title: title.to_string(),
+            summary: summary.to_string(),
+            seed_label: seed_label.to_string(),
+            outcome_class,
+        },
+        scenario,
+        intent,
+        roll_stream,
+    }
 }
 
 fn resolve_accepted_action(
@@ -1123,5 +1267,112 @@ mod tests {
         assert_eq!(receipt.rejection, Some(RulebenchRejection::InvalidAction));
         assert!(receipt.events.is_empty());
         assert!(receipt.attack_roll.is_none());
+    }
+
+    #[test]
+    fn catalog_enumerates_stable_scenario_summaries() {
+        let summaries = scenario_catalog_summaries();
+
+        assert_eq!(
+            summaries
+                .iter()
+                .map(|summary| summary.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "hexing-bolt-hit",
+                "hexing-bolt-miss",
+                "hexing-bolt-self-target-rejected"
+            ]
+        );
+        assert_eq!(
+            summaries
+                .iter()
+                .map(|summary| summary.outcome_class.code())
+                .collect::<Vec<_>>(),
+            vec!["acceptedHit", "acceptedMiss", "rejectedTargetLegality"]
+        );
+    }
+
+    #[test]
+    fn catalog_resolves_accepted_hit_case() {
+        let resolution = resolve_catalog_scenario("hexing-bolt-hit").expect("case exists");
+
+        assert_eq!(
+            resolution.case.outcome_class,
+            ScenarioOutcomeClass::AcceptedHit
+        );
+        assert_eq!(resolution.scenario.metadata.id, "hexing-bolt-hit");
+        assert!(resolution.receipt.accepted);
+        assert_eq!(
+            resolution
+                .receipt
+                .attack_roll
+                .as_ref()
+                .map(|roll| roll.outcome),
+            Some(AttackOutcome::Hit)
+        );
+        assert_eq!(resolution.receipt.events.len(), 4);
+    }
+
+    #[test]
+    fn catalog_resolves_accepted_miss_case() {
+        let resolution = resolve_catalog_scenario("hexing-bolt-miss").expect("case exists");
+
+        assert_eq!(
+            resolution.case.outcome_class,
+            ScenarioOutcomeClass::AcceptedMiss
+        );
+        assert!(resolution.receipt.accepted);
+        assert_eq!(
+            resolution
+                .receipt
+                .attack_roll
+                .as_ref()
+                .map(|roll| roll.outcome),
+            Some(AttackOutcome::Miss)
+        );
+        assert!(resolution.receipt.damage.is_none());
+        assert!(resolution.receipt.modifier.is_none());
+        assert_eq!(resolution.receipt.events.len(), 2);
+        assert_eq!(
+            resolution
+                .receipt
+                .projection
+                .as_ref()
+                .map(|projection| projection.combatants[1].hit_points.current),
+            Some(18)
+        );
+    }
+
+    #[test]
+    fn catalog_resolves_rejected_target_legality_case() {
+        let resolution =
+            resolve_catalog_scenario("hexing-bolt-self-target-rejected").expect("case exists");
+
+        assert_eq!(
+            resolution.case.outcome_class,
+            ScenarioOutcomeClass::RejectedTargetLegality
+        );
+        assert!(!resolution.receipt.accepted);
+        assert_eq!(
+            resolution.receipt.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
+        assert!(resolution.receipt.events.is_empty());
+        assert_eq!(
+            resolution
+                .receipt
+                .target_legality
+                .as_ref()
+                .map(|target| target.reason.as_str()),
+            Some("Target is not hostile.")
+        );
+    }
+
+    #[test]
+    fn catalog_rejects_unknown_scenario_id() {
+        let error = resolve_catalog_scenario("not-a-scenario").expect_err("unknown id fails");
+
+        assert_eq!(error, ScenarioCatalogError::UnknownScenarioId);
     }
 }
