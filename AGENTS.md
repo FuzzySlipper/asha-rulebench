@@ -1,3 +1,89 @@
+# AGENTS.md
+
+## Den Guidance Bootstrap
+
+- Project ID: `asha-rulebench`
+- Resolve live guidance with the Den MCP `get_agent_guidance` tool or `den guidance` before substantial work.
+- Treat the resolved Den guidance packet and its referenced Den documents as the source of truth.
+- If Den is unreachable, stop and tell the user which Den tool or command failed and what you were about to do. Do not reconstruct Den state from local files.
+- Use the project-local notes below only as bootstrap context for connecting to Den and working in this repository.
+
+# ASHA Rulebench Local Bootstrap
+
+Live project guidance lives in Den. Use project ID `asha-rulebench` for Den tasks, messages, documents, librarian queries, and guidance lookups.
+
+When creating or updating Den tasks for this repository, tag them with `asha-rulebench` plus any lane/system tags.
+
+## Source-of-Truth Posture
+
+This local file is bootstrap context for agents entering the repository. It is not the current planning queue.
+
+- **Den** owns current task state, implementation queues, durable planning docs, review packets, and known limitations.
+- **Repo docs** describe architecture and committed implementation surfaces.
+- **The code/tests** are the implementation truth when they conflict with old planning prose.
+- Resolve live Den guidance with `get_agent_guidance(project_id="asha-rulebench")` before substantial work.
+- The initial Angular template state is startup residue; do not infer product direction from old template names.
+
+## Architecture Soul
+
+> TypeScript references and configures Rust behavior. Rust defines and executes rule logic.
+
+- **Rust** is authoritative: content validation, rule semantics, capability mutation, deterministic dice, effect interpretation, reaction windows, accepted DomainEvents, trace, replay, and state hashes.
+- **TypeScript** authors catalogs, scenarios, fixtures, policy proposals, UI view models, and display mapping over generated protocol surfaces.
+- TypeScript **never mutates** authoritative gameplay state and never becomes a parallel rules engine.
+- Protocols are **generated** from authority surfaces; hand-editing generated files is forbidden.
+- The old RuleWeaver project is evidence, not structure to preserve.
+
+See `README.md` and Den doc `asha-rulebench/basic-design` for current repo orientation.
+
+## Repository Structure
+
+```text
+/asha-rulebench
+  /apps
+    /app                 # Angular shell composition
+    /app-e2e             # deterministic and live browser scenarios
+  /libs
+    /protocol            # generated protocol exports and shared result/error types
+    /transport           # backend/native/WASM/fake communication through protocol types
+    /domain              # pure protocol-to-view mapping, no Angular/browser APIs
+    /store               # app state mutation, AsyncState<T>, transport orchestration
+    /renderer            # feature rendering composition
+    /components          # reusable presentational Angular components
+    /platform            # browser/host ports and fakes
+    /shell               # routes and app composition only
+    /theme               # approved tokens and theme entrypoints
+    /testing-fixtures    # typed fixtures for tests and scenario examples
+  /tools                 # workspace scripts and generators
+```
+
+Future local Rust crates may be added only when a task explicitly calls for incubating authority behavior here. Keep local Rust separate from the Angular shell and promote generic pieces upstream to ASHA when proven.
+
+## Local Commands
+
+```bash
+# Full local gate
+pnpm run verify
+
+# Focused gates
+pnpm run check:pattern
+pnpm run check:docs
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run build
+pnpm run e2e
+
+# LAN-first development server
+pnpm run dev
+
+# Opt-in live browser evidence
+pnpm run serve:local
+BASE_URL=<printed-url> LIVE_RUN=1 pnpm run e2e:live
+```
+
+## Frontend Boundary Rules
+
 This frontend is built as layered infrastructure. Architecture is fixed unless the task explicitly says otherwise.
 
 Use workspace generators for new components, libraries, features, stores, and tests.
@@ -8,10 +94,42 @@ Do not bypass the transport layer for backend communication.
 Do not bypass platform ports for browser/host APIs.
 Do not bypass the store for application state mutation.
 Do not put domain logic in components. Do not put feature logic in shell.
-Expose async state as AsyncState<T>; map all failures to classified errors.
+Expose async state as `AsyncState<T>`; map all failures to classified errors.
 Do not close a user-deliverable UI task on deterministic evidence alone: run the live scenario, inspect the rendered artifacts yourself, and report what the UI did, including non-claims. A passing synthetic test is diagnostic, not proof.
-Do not use any, non-null assertions, unsafe casts, or lint disables.
+Do not use `any`, non-null assertions, unsafe casts, or lint disables.
 Do not add global CSS except through approved token/theme files.
 Do not create circular dependencies or reverse dependency direction.
 Prefer explicit, boring, typed code over clever abstractions.
 When a task seems to require breaking a boundary, stop and request planner review.
+
+## Agent Lane Quick Reference
+
+| Lane | Location | May not |
+|------|----------|---------|
+| protocol | `libs/protocol` | Duplicate generated backend types or hand-edit generated files |
+| transport | `libs/transport` | Own app state or bypass protocol DTOs |
+| domain | `libs/domain` | Import Angular, browser APIs, store, renderer, or components |
+| store | `libs/store` | Put rendering logic in state services |
+| renderer | `libs/renderer` | Mutate application state directly or encode rule authority |
+| components | `libs/components` | Know gameplay/domain logic |
+| platform | `libs/platform` | Reach into application state or transport |
+| shell | `libs/shell`, `apps/app` | Contain feature/domain logic |
+| testing | `libs/testing-fixtures`, `apps/app-e2e` | Become the only proof for a user-facing UI task |
+
+## TypeScript House Style
+
+TypeScript in this repo is written for agent governance, not clever human terseness.
+
+Prefer longer, clearer code over compact clever code. Use named intermediate values for meaningful decisions. Split work into small functions with explicit verbs. Avoid generic abstractions until duplication has stabilized. Keep mutation local and visible. Do not create ambient state, manager classes, global registries, or hidden runtime coupling.
+
+A good TypeScript diff should be easy for a reviewer agent to inspect mechanically: imports reveal lane boundaries, functions reveal intent, tests reveal behavior, and public API changes are explicit.
+
+When in doubt, write the boring version.
+
+## Rust House Style
+
+Rust in this repo should be boring authority code. Prefer explicit state, explicit errors, explicit events, and narrow crate APIs. Do not introduce clever abstractions, runtime escape hatches, mutable callback systems, or framework-shaped machinery unless a planner explicitly approves them.
+
+## Non-Claims
+
+ASHA Rulebench is not a full RPG, a straight RuleWeaver port, a D&D 4e compatibility target, an ASHA fork, a generic rules engine, a place for mutable TypeScript authority callbacks, a renderer-first game prototype, or a replacement for upstream ASHA runtime/replay/validation infrastructure.
