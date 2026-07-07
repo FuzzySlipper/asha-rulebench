@@ -1,0 +1,24 @@
+@import '../../../libs/theme/src/tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--tpl-bg);
+  color: var(--tpl-text);
+  font-family: var(--tpl-font-family);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}

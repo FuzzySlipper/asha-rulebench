@@ -1,0 +1,11 @@
+{
+  "projectId": "ui-pattern-bootstrap",
+  "serveCommand": "pnpm nx serve app --host 0.0.0.0 --port {port}",
+  "healthUrl": "http://127.0.0.1:{port}/",
+  "readyText": "UI Pattern Bootstrap",
+  "playwrightConfig": "apps/app-e2e/playwright.config.mts",
+  "artifactPolicy": {
+    "root": "test-results",
+    "liveSubdir": "live-artifacts"
+  }
+}

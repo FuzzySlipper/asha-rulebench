@@ -1,0 +1,39 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "baseUrl": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "bundler",
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2022",
+    "module": "preserve",
+    "lib": ["es2022", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+    "paths": {
+      "@template/components": ["libs/components/src/index.ts"],
+      "@template/domain": ["libs/domain/src/index.ts"],
+      "@template/platform": ["libs/platform/src/index.ts"],
+      "@template/protocol": ["libs/protocol/src/index.ts"],
+      "@template/renderer": ["libs/renderer/src/index.ts"],
+      "@template/shell": ["libs/shell/src/index.ts"],
+      "@template/store": ["libs/store/src/index.ts"],
+      "@template/testing-fixtures": ["libs/testing-fixtures/src/index.ts"],
+      "@template/theme": ["libs/theme/src/index.ts"],
+      "@template/transport": ["libs/transport/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp", "dist", "coverage"]
+}

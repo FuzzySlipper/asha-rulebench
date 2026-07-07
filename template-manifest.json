@@ -1,0 +1,8 @@
+{
+  "template": "ui-pattern-bootstrap",
+  "templateVersion": "2.0.0",
+  "templateCommit": "local-template-worktree",
+  "patternDoc": "den:patch/rusty-view-ui-architecture-pattern",
+  "copiedAt": "2026-07-07",
+  "localDeviations": []
+}
