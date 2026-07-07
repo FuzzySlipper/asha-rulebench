@@ -1,11 +1,14 @@
 # Live Testing
 
-Live scenarios are opt-in and gated by `LIVE_RUN=1`. They require `BASE_URL` from the run broker or the local fallback:
+Live scenarios are opt-in and gated by `LIVE_RUN=1`. Start the app through `den-serve` so it binds LAN-facing and records a managed session:
 
 ```bash
-pnpm run serve:local
-BASE_URL=<printed-url> LIVE_RUN=1 pnpm run e2e:live
+den-serve up asha-rulebench -repo /home/dev/asha-rulebench
+BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
+
+Use the printed `local:` URL for Playwright probes. Report the printed `lan:`
+URL for human inspection from another machine.
 
 Each scenario must write an evidence packet, milestone screenshots when the claim is visual, console and page error dumps, visible text, and explicit non-claims.
 

@@ -20,6 +20,6 @@ export function resolveLiveBaseUrl(): LiveBaseUrl {
   }
 
   throw new Error(
-    'BASE_URL is required for live scenarios. Run `pnpm run serve:local`, then re-run with BASE_URL=<printed-url> LIVE_RUN=1.',
+    'BASE_URL is required for live scenarios. Run `den-serve up asha-rulebench -repo /home/dev/asha-rulebench`, then re-run with BASE_URL=<local-url-from-den-serve> LIVE_RUN=1.',
   );
 }

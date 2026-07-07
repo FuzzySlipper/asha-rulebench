@@ -75,11 +75,11 @@ pnpm run build
 pnpm run e2e
 
 # LAN-first development server
-pnpm run dev
+den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 
 # Opt-in live browser evidence
-pnpm run serve:local
-BASE_URL=<printed-url> LIVE_RUN=1 pnpm run e2e:live
+den-serve up asha-rulebench -repo /home/dev/asha-rulebench
+BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 ## Frontend Boundary Rules

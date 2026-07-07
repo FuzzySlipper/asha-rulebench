@@ -183,9 +183,12 @@ pnpm run verify
 For opt-in live evidence:
 
 ```bash
-pnpm run serve:local
-BASE_URL=<printed-url> LIVE_RUN=1 pnpm run e2e:live
+den-serve up asha-rulebench -repo /home/dev/asha-rulebench
+BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
+
+Use the `local:` URL printed by `den-serve` for Playwright `BASE_URL`. Report
+the printed `lan:` URL for human inspection from another machine.
 
 ## Current State
 
