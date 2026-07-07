@@ -1,16 +1,14 @@
 //! Local Rust authority incubation surface for ASHA Rulebench.
 //!
 //! This crate establishes the local authority lane: typed intents enter,
-//! structural rejections fail closed, accepted facts are represented as
-//! DomainEvent-shaped records, and trace/readout values explain what happened.
-//! It does not claim to be upstream ASHA or a complete combat resolver.
+//! rejections fail closed, accepted facts are represented as DomainEvent-shaped
+//! records, and trace/readout values explain what happened. It does not claim to
+//! be upstream ASHA or a complete combat resolver.
 
 #![forbid(unsafe_code)]
 
-/// Current local authority surface identifier.
 pub const AUTHORITY_SURFACE: &str = "asha-rulebench.local-authority.v0";
 
-/// Stable scenario metadata used by readouts, traces, and fixture receipts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioMetadata {
     pub id: String,
@@ -19,7 +17,6 @@ pub struct ScenarioMetadata {
     pub seed_label: String,
 }
 
-/// A tactical grid for the first Rulebench scenario model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grid {
     pub width: u32,
@@ -45,7 +42,6 @@ pub enum Team {
     Enemy,
 }
 
-/// A bounded value such as hit points.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BoundedValue {
     pub current: i32,
@@ -71,7 +67,6 @@ pub struct Combatant {
     pub is_actor: bool,
 }
 
-/// Scenario input/state before a proposed intent is resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
@@ -80,7 +75,6 @@ pub struct RulebenchScenario {
     pub selected_action: ActionDefinition,
 }
 
-/// A proposed player, policy, or harness action.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseActionIntent {
     pub actor_id: String,
@@ -108,11 +102,31 @@ pub struct ActionDefinition {
     pub name: String,
     pub actor_id: String,
     pub target_ids: Vec<String>,
+    pub range: u32,
+    pub line_of_sight_required: bool,
+    pub visible_target_ids: Vec<String>,
+    pub attack: AttackSpec,
+    pub hit: HitEffect,
     pub action_text: String,
     pub effect_text: String,
 }
 
-/// A typed authority rejection. Rejections do not mutate state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttackSpec {
+    pub modifier: i32,
+    pub defense_id: String,
+    pub defense_label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HitEffect {
+    pub damage_bonus: i32,
+    pub damage_type: String,
+    pub modifier_id: String,
+    pub modifier_label: String,
+    pub modifier_duration: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RulebenchRejection {
     EmptyActorId,
@@ -122,6 +136,10 @@ pub enum RulebenchRejection {
     InvalidAction,
     InvalidTarget,
     TargetLegalityFailed,
+    TargetOutOfRange,
+    TargetNotVisible,
+    MissingAttackRoll,
+    MissingDamageRoll,
 }
 
 impl RulebenchRejection {
@@ -134,11 +152,14 @@ impl RulebenchRejection {
             RulebenchRejection::InvalidAction => "invalidAction",
             RulebenchRejection::InvalidTarget => "invalidTarget",
             RulebenchRejection::TargetLegalityFailed => "targetLegalityFailed",
+            RulebenchRejection::TargetOutOfRange => "targetOutOfRange",
+            RulebenchRejection::TargetNotVisible => "targetNotVisible",
+            RulebenchRejection::MissingAttackRoll => "missingAttackRoll",
+            RulebenchRejection::MissingDamageRoll => "missingDamageRoll",
         }
     }
 }
 
-/// A diagnostic trace entry. Trace explains resolution; it is not authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceEntry {
     pub sequence: u32,
@@ -221,7 +242,6 @@ pub struct ModifierOutcome {
     pub duration: String,
 }
 
-/// Accepted facts emitted by local Rulebench authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainEvent {
     IntentShapeAccepted {
@@ -262,15 +282,12 @@ pub struct FinalCombatantState {
     pub conditions: Vec<String>,
 }
 
-/// Derived readout/projection for UI and review. It displays truth; it does not
-/// own authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioProjection {
     pub summary: String,
     pub combatants: Vec<FinalCombatantState>,
 }
 
-/// A receipt for one authority pass over a proposed intent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RulebenchReceipt {
     pub accepted: bool,
@@ -286,12 +303,6 @@ pub struct RulebenchReceipt {
     pub projection: Option<ScenarioProjection>,
 }
 
-/// Validate only the structural shape of a `UseActionIntent`.
-///
-/// Later tasks add scenario state, target legality, deterministic rolls,
-/// effects, modifiers, and final-state projection. This function exists so the
-/// Rust workspace has a compiled fail-closed authority boundary before those
-/// semantics arrive.
 pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     let trace = vec![TraceEntry::new(
         1,
@@ -312,6 +323,306 @@ pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     }
 
     accepted_shape(intent.clone(), trace)
+}
+
+/// Resolve the first local Hexing Bolt-shaped action path.
+///
+/// The resolver is intentionally narrow and deterministic. It consumes a
+/// scenario, a typed intent, and an explicit roll stream. It returns accepted
+/// DomainEvents plus final projection, or a typed rejection with no accepted
+/// events and unchanged projection.
+pub fn resolve_use_action(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    roll_stream: &[i32],
+) -> RulebenchReceipt {
+    let trace = vec![TraceEntry::new(
+        1,
+        TracePhase::Proposal,
+        TraceStatus::Info,
+        "UseActionIntent received.",
+        format!(
+            "Actor {} proposed action {} against {}.",
+            intent.actor_id, intent.action_id, intent.target_id
+        ),
+    )];
+
+    if intent.actor_id.is_empty() {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::EmptyActorId,
+            None,
+            trace,
+        );
+    }
+    if intent.action_id.is_empty() {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::EmptyActionId,
+            None,
+            trace,
+        );
+    }
+    if intent.target_id.is_empty() {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::EmptyTargetId,
+            None,
+            trace,
+        );
+    }
+
+    let Some(actor) = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == intent.actor_id)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidActor,
+            None,
+            trace,
+        );
+    };
+
+    let action = &scenario.selected_action;
+    if action.id != intent.action_id || action.actor_id != intent.actor_id {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    }
+
+    let Some(target) = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == intent.target_id)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidTarget,
+            None,
+            trace,
+        );
+    };
+
+    let target_legality = validate_target_legality(actor, target, action);
+    if !target_legality.accepted {
+        let rejection = target_legality_rejection(&target_legality);
+        return rejected_with_projection(scenario, intent, rejection, Some(target_legality), trace);
+    }
+
+    if roll_stream.is_empty() {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::MissingAttackRoll,
+            Some(target_legality),
+            trace,
+        );
+    }
+    if roll_stream.len() < 2 {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::MissingDamageRoll,
+            Some(target_legality),
+            trace,
+        );
+    }
+
+    resolve_accepted_action(
+        scenario,
+        intent,
+        actor,
+        target,
+        target_legality,
+        roll_stream,
+    )
+}
+
+pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
+    RulebenchScenario {
+        metadata: ScenarioMetadata {
+            id: "two-combatant-hexing-bolt".to_string(),
+            title: "Hexing Bolt Opening".to_string(),
+            summary: "A focused two-combatant fixture for proving board, event, trace, and final-state readouts.".to_string(),
+            seed_label: "roll-stream:17,5".to_string(),
+        },
+        grid: Grid {
+            width: 6,
+            height: 4,
+            cells: vec![
+                GridCell {
+                    position: GridPosition { x: 1, y: 1 },
+                    terrain_tags: vec!["clear".to_string()],
+                },
+                GridCell {
+                    position: GridPosition { x: 4, y: 1 },
+                    terrain_tags: vec!["clear".to_string()],
+                },
+                GridCell {
+                    position: GridPosition { x: 2, y: 2 },
+                    terrain_tags: vec!["cover".to_string()],
+                },
+            ],
+        },
+        combatants: vec![adept_initial(), raider_initial()],
+        selected_action: ActionDefinition {
+            id: "hexing_bolt".to_string(),
+            name: "Hexing Bolt".to_string(),
+            actor_id: "entity-adept".to_string(),
+            target_ids: vec!["entity-raider".to_string()],
+            range: 10,
+            line_of_sight_required: true,
+            visible_target_ids: vec!["entity-raider".to_string()],
+            attack: AttackSpec {
+                modifier: 4,
+                defense_id: "nerve".to_string(),
+                defense_label: "Nerve".to_string(),
+            },
+            hit: HitEffect {
+                damage_bonus: 4,
+                damage_type: "psychic".to_string(),
+                modifier_id: "rattled".to_string(),
+                modifier_label: "rattled".to_string(),
+                modifier_duration: "until end of next turn".to_string(),
+            },
+            action_text: "Mind vs Nerve at range 10".to_string(),
+            effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
+                .to_string(),
+        },
+    }
+}
+
+pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
+    resolve_use_action(
+        &hexing_bolt_fixture_scenario(),
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    )
+}
+
+pub fn rejected_target_fixture_receipt() -> RulebenchReceipt {
+    resolve_use_action(
+        &hexing_bolt_fixture_scenario(),
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+        &[17, 5],
+    )
+}
+
+fn resolve_accepted_action(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    _actor: &Combatant,
+    target: &Combatant,
+    target_legality: TargetLegality,
+    roll_stream: &[i32],
+) -> RulebenchReceipt {
+    let action = &scenario.selected_action;
+    let defense_value = defense_value(target, &action.attack.defense_id);
+    let total = roll_stream[0] + action.attack.modifier;
+    let attack_roll = AttackRollResult {
+        roll: roll_stream[0],
+        modifier: action.attack.modifier,
+        total,
+        defense_id: action.attack.defense_id.clone(),
+        defense_value,
+        outcome: if total >= defense_value {
+            AttackOutcome::Hit
+        } else {
+            AttackOutcome::Miss
+        },
+    };
+
+    let mut trace = vec![
+        TraceEntry::new(
+            1,
+            TracePhase::Proposal,
+            TraceStatus::Info,
+            "UseActionIntent received.",
+            format!(
+                "Actor {} proposed action {} against {}.",
+                intent.actor_id, intent.action_id, intent.target_id
+            ),
+        ),
+        TraceEntry::new(
+            2,
+            TracePhase::Validation,
+            TraceStatus::Accepted,
+            "Target legality accepted.",
+            target_legality.reason.clone(),
+        ),
+    ];
+
+    if attack_roll.outcome == AttackOutcome::Miss {
+        trace.push(TraceEntry::new(
+            3,
+            TracePhase::Resolution,
+            TraceStatus::Accepted,
+            "Miss branch selected.",
+            format!(
+                "Roll stream supplied {}; total {} misses {} {}.",
+                attack_roll.roll, attack_roll.total, action.attack.defense_label, defense_value
+            ),
+        ));
+        trace.push(TraceEntry::new(
+            4,
+            TracePhase::Commit,
+            TraceStatus::Accepted,
+            "DomainEvents committed.",
+            "ActionUsed and AttackRolled became accepted facts.",
+        ));
+        return accepted_miss_receipt(scenario, intent, target_legality, attack_roll, trace);
+    }
+
+    let damage = apply_damage(
+        target,
+        roll_stream[1] + action.hit.damage_bonus,
+        &action.hit.damage_type,
+    );
+    let modifier = ModifierOutcome {
+        target_id: target.id.clone(),
+        modifier_id: action.hit.modifier_id.clone(),
+        label: action.hit.modifier_label.clone(),
+        duration: action.hit.modifier_duration.clone(),
+    };
+
+    trace.push(TraceEntry::new(
+        3,
+        TracePhase::Resolution,
+        TraceStatus::Accepted,
+        "Hit branch selected.",
+        format!(
+            "Roll stream supplied {}; total {} beats {} {}.",
+            attack_roll.roll, attack_roll.total, action.attack.defense_label, defense_value
+        ),
+    ));
+    trace.push(TraceEntry::new(
+        4,
+        TracePhase::Commit,
+        TraceStatus::Accepted,
+        "DomainEvents committed.",
+        "ActionUsed, AttackRolled, DamageApplied, and ModifierApplied became accepted facts.",
+    ));
+
+    accepted_hit_receipt(
+        scenario,
+        intent,
+        target_legality,
+        attack_roll,
+        damage,
+        modifier,
+        trace,
+    )
 }
 
 fn accepted_shape(intent: UseActionIntent, mut trace: Vec<TraceEntry>) -> RulebenchReceipt {
@@ -368,198 +679,244 @@ fn rejected(
     }
 }
 
-/// A Rust-owned representation of the current Hexing Bolt fixture input.
-pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
-    RulebenchScenario {
-        metadata: ScenarioMetadata {
-            id: "two-combatant-hexing-bolt".to_string(),
-            title: "Hexing Bolt Opening".to_string(),
-            summary: "A focused two-combatant fixture for proving board, event, trace, and final-state readouts.".to_string(),
-            seed_label: "roll-stream:17,5".to_string(),
-        },
-        grid: Grid {
-            width: 6,
-            height: 4,
-            cells: vec![
-                GridCell {
-                    position: GridPosition { x: 1, y: 1 },
-                    terrain_tags: vec!["clear".to_string()],
-                },
-                GridCell {
-                    position: GridPosition { x: 4, y: 1 },
-                    terrain_tags: vec!["clear".to_string()],
-                },
-                GridCell {
-                    position: GridPosition { x: 2, y: 2 },
-                    terrain_tags: vec!["cover".to_string()],
-                },
-            ],
-        },
-        combatants: vec![adept_initial(), raider_initial()],
-        selected_action: ActionDefinition {
-            id: "hexing_bolt".to_string(),
-            name: "Hexing Bolt".to_string(),
-            actor_id: "entity-adept".to_string(),
-            target_ids: vec!["entity-raider".to_string()],
-            action_text: "Mind vs Nerve at range 10".to_string(),
-            effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
-                .to_string(),
-        },
-    }
-}
-
-/// Accepted fixture receipt. This is hand-shaped model evidence, not the
-/// resolver; task #4652 owns computing it from scenario + roll stream.
-pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
-    let intent = UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider");
+fn accepted_hit_receipt(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    target_legality: TargetLegality,
+    attack_roll: AttackRollResult,
+    damage: DamageOutcome,
+    modifier: ModifierOutcome,
+    trace: Vec<TraceEntry>,
+) -> RulebenchReceipt {
     RulebenchReceipt {
         accepted: true,
         authority_surface: AUTHORITY_SURFACE,
-        intent,
+        intent: intent.clone(),
         rejection: None,
-        target_legality: Some(TargetLegality {
-            target_id: "entity-raider".to_string(),
-            accepted: true,
-            reason: "Target is hostile, within range, and line of sight is clear.".to_string(),
-        }),
-        attack_roll: Some(AttackRollResult {
-            roll: 17,
-            modifier: 4,
-            total: 21,
-            defense_id: "nerve".to_string(),
-            defense_value: 13,
-            outcome: AttackOutcome::Hit,
-        }),
-        damage: Some(DamageOutcome {
-            target_id: "entity-raider".to_string(),
-            damage_type: "psychic".to_string(),
-            amount: 9,
-            before: BoundedValue {
-                current: 18,
-                max: 18,
-            },
-            after: BoundedValue {
-                current: 9,
-                max: 18,
-            },
-        }),
-        modifier: Some(ModifierOutcome {
-            target_id: "entity-raider".to_string(),
-            modifier_id: "rattled".to_string(),
-            label: "rattled".to_string(),
-            duration: "until end of next turn".to_string(),
-        }),
-        events: vec![
-            DomainEvent::ActionUsed {
-                actor_id: "entity-adept".to_string(),
-                action_id: "hexing_bolt".to_string(),
-                target_id: "entity-raider".to_string(),
-            },
-            DomainEvent::AttackRolled {
-                actor_id: "entity-adept".to_string(),
-                target_id: "entity-raider".to_string(),
-                total: 21,
-                defense_id: "nerve".to_string(),
-                defense_value: 13,
-                outcome: AttackOutcome::Hit,
-            },
-            DomainEvent::DamageApplied {
-                target_id: "entity-raider".to_string(),
-                amount: 9,
-                damage_type: "psychic".to_string(),
-            },
-            DomainEvent::ModifierApplied {
-                target_id: "entity-raider".to_string(),
-                modifier_id: "rattled".to_string(),
-                duration: "until end of next turn".to_string(),
-            },
-        ],
-        trace: vec![
-            TraceEntry::new(
-                1,
-                TracePhase::Proposal,
-                TraceStatus::Info,
-                "UseActionIntent received.",
-                "Actor entity-adept proposed action hexing_bolt against entity-raider.",
-            ),
-            TraceEntry::new(
-                2,
-                TracePhase::Validation,
-                TraceStatus::Accepted,
-                "Target legality accepted.",
-                "The target is hostile, in range, and visible.",
-            ),
-            TraceEntry::new(
-                3,
-                TracePhase::Resolution,
-                TraceStatus::Accepted,
-                "Hit branch selected.",
-                "Roll stream supplied 17; total 21 beats Nerve 13.",
-            ),
-            TraceEntry::new(
-                4,
-                TracePhase::Commit,
-                TraceStatus::Accepted,
-                "DomainEvents committed.",
-                "ActionUsed, AttackRolled, DamageApplied, and ModifierApplied became accepted facts.",
-            ),
-        ],
-        projection: Some(ScenarioProjection {
-            summary: "Raider is damaged and rattled; Adept is unchanged.".to_string(),
-            combatants: vec![
-                final_adept(),
-                FinalCombatantState {
-                    id: "entity-raider".to_string(),
-                    name: "Raider".to_string(),
-                    hit_points: BoundedValue {
-                        current: 9,
-                        max: 18,
-                    },
-                    conditions: vec!["rattled".to_string()],
-                },
-            ],
-        }),
+        target_legality: Some(target_legality),
+        attack_roll: Some(attack_roll.clone()),
+        damage: Some(damage.clone()),
+        modifier: Some(modifier.clone()),
+        events: accepted_hit_events(&intent, &attack_roll, &damage, &modifier),
+        trace,
+        projection: Some(project_final_state(
+            scenario,
+            "Raider is damaged and rattled; Adept is unchanged.",
+            Some((&damage, &modifier)),
+        )),
     }
 }
 
-/// Rejected target fixture receipt for model coverage.
-pub fn rejected_target_fixture_receipt() -> RulebenchReceipt {
-    let intent = UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept");
+fn accepted_miss_receipt(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    target_legality: TargetLegality,
+    attack_roll: AttackRollResult,
+    trace: Vec<TraceEntry>,
+) -> RulebenchReceipt {
+    RulebenchReceipt {
+        accepted: true,
+        authority_surface: AUTHORITY_SURFACE,
+        intent: intent.clone(),
+        rejection: None,
+        target_legality: Some(target_legality),
+        attack_roll: Some(attack_roll.clone()),
+        damage: None,
+        modifier: None,
+        events: vec![
+            DomainEvent::ActionUsed {
+                actor_id: intent.actor_id.clone(),
+                action_id: intent.action_id.clone(),
+                target_id: intent.target_id.clone(),
+            },
+            DomainEvent::AttackRolled {
+                actor_id: intent.actor_id,
+                target_id: intent.target_id,
+                total: attack_roll.total,
+                defense_id: attack_roll.defense_id,
+                defense_value: attack_roll.defense_value,
+                outcome: attack_roll.outcome,
+            },
+        ],
+        trace,
+        projection: Some(project_initial_state(
+            scenario,
+            "Attack missed; no authority state changed.",
+        )),
+    }
+}
+
+fn accepted_hit_events(
+    intent: &UseActionIntent,
+    attack_roll: &AttackRollResult,
+    damage: &DamageOutcome,
+    modifier: &ModifierOutcome,
+) -> Vec<DomainEvent> {
+    vec![
+        DomainEvent::ActionUsed {
+            actor_id: intent.actor_id.clone(),
+            action_id: intent.action_id.clone(),
+            target_id: intent.target_id.clone(),
+        },
+        DomainEvent::AttackRolled {
+            actor_id: intent.actor_id.clone(),
+            target_id: intent.target_id.clone(),
+            total: attack_roll.total,
+            defense_id: attack_roll.defense_id.clone(),
+            defense_value: attack_roll.defense_value,
+            outcome: attack_roll.outcome,
+        },
+        DomainEvent::DamageApplied {
+            target_id: damage.target_id.clone(),
+            amount: damage.amount,
+            damage_type: damage.damage_type.clone(),
+        },
+        DomainEvent::ModifierApplied {
+            target_id: modifier.target_id.clone(),
+            modifier_id: modifier.modifier_id.clone(),
+            duration: modifier.duration.clone(),
+        },
+    ]
+}
+
+fn rejected_with_projection(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    rejection: RulebenchRejection,
+    target_legality: Option<TargetLegality>,
+    mut trace: Vec<TraceEntry>,
+) -> RulebenchReceipt {
+    let detail = target_legality.as_ref().map_or_else(
+        || rejection.code().to_string(),
+        |legality| legality.reason.clone(),
+    );
+    trace.push(TraceEntry::new(
+        2,
+        TracePhase::Validation,
+        TraceStatus::Rejected,
+        "Intent rejected.",
+        detail,
+    ));
     RulebenchReceipt {
         accepted: false,
         authority_surface: AUTHORITY_SURFACE,
         intent,
-        rejection: Some(RulebenchRejection::TargetLegalityFailed),
-        target_legality: Some(TargetLegality {
-            target_id: "entity-adept".to_string(),
-            accepted: false,
-            reason: "Target is not hostile.".to_string(),
-        }),
+        rejection: Some(rejection),
+        target_legality,
         attack_roll: None,
         damage: None,
         modifier: None,
         events: Vec::new(),
-        trace: vec![
-            TraceEntry::new(
-                1,
-                TracePhase::Proposal,
-                TraceStatus::Info,
-                "UseActionIntent received.",
-                "Actor entity-adept proposed action hexing_bolt against entity-adept.",
-            ),
-            TraceEntry::new(
-                2,
-                TracePhase::Validation,
-                TraceStatus::Rejected,
-                "Target legality rejected.",
-                "Target is not hostile.",
-            ),
-        ],
-        projection: Some(ScenarioProjection {
-            summary: "No authority state changed; target legality rejected.".to_string(),
-            combatants: vec![final_adept(), final_raider_initial()],
-        }),
+        trace,
+        projection: Some(project_initial_state(
+            scenario,
+            "No authority state changed; intent rejected.",
+        )),
     }
+}
+
+fn validate_target_legality(
+    actor: &Combatant,
+    target: &Combatant,
+    action: &ActionDefinition,
+) -> TargetLegality {
+    if actor.team == target.team {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target is not hostile.".to_string(),
+        };
+    }
+    if range_between(actor.position, target.position) > action.range {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target is outside range.".to_string(),
+        };
+    }
+    if action.line_of_sight_required && !action.visible_target_ids.contains(&target.id) {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Line of sight is blocked.".to_string(),
+        };
+    }
+    TargetLegality {
+        target_id: target.id.clone(),
+        accepted: true,
+        reason: "Target is hostile, within range, and line of sight is clear.".to_string(),
+    }
+}
+
+fn target_legality_rejection(target_legality: &TargetLegality) -> RulebenchRejection {
+    match target_legality.reason.as_str() {
+        "Target is outside range." => RulebenchRejection::TargetOutOfRange,
+        "Line of sight is blocked." => RulebenchRejection::TargetNotVisible,
+        _ => RulebenchRejection::TargetLegalityFailed,
+    }
+}
+
+fn range_between(from: GridPosition, to: GridPosition) -> u32 {
+    from.x.abs_diff(to.x) + from.y.abs_diff(to.y)
+}
+
+fn defense_value(target: &Combatant, defense_id: &str) -> i32 {
+    target
+        .defenses
+        .iter()
+        .find(|defense| defense.id == defense_id)
+        .map_or(0, |defense| defense.value)
+}
+
+fn apply_damage(target: &Combatant, amount: i32, damage_type: &str) -> DamageOutcome {
+    let before = target.hit_points;
+    let next = before.current.saturating_sub(amount).max(0);
+    DamageOutcome {
+        target_id: target.id.clone(),
+        damage_type: damage_type.to_string(),
+        amount: before.current - next,
+        before,
+        after: BoundedValue {
+            current: next,
+            max: before.max,
+        },
+    }
+}
+
+fn project_initial_state(scenario: &RulebenchScenario, summary: &str) -> ScenarioProjection {
+    ScenarioProjection {
+        summary: summary.to_string(),
+        combatants: scenario
+            .combatants
+            .iter()
+            .map(|combatant| FinalCombatantState {
+                id: combatant.id.clone(),
+                name: combatant.name.clone(),
+                hit_points: combatant.hit_points,
+                conditions: combatant.conditions.clone(),
+            })
+            .collect(),
+    }
+}
+
+fn project_final_state(
+    scenario: &RulebenchScenario,
+    summary: &str,
+    target_update: Option<(&DamageOutcome, &ModifierOutcome)>,
+) -> ScenarioProjection {
+    let mut projection = project_initial_state(scenario, summary);
+    if let Some((damage, modifier)) = target_update {
+        for combatant in &mut projection.combatants {
+            if combatant.id == damage.target_id {
+                combatant.hit_points = damage.after;
+            }
+            if combatant.id == modifier.target_id && !combatant.conditions.contains(&modifier.label)
+            {
+                combatant.conditions.push(modifier.label.clone());
+            }
+        }
+    }
+    projection
 }
 
 fn adept_initial() -> Combatant {
@@ -613,30 +970,6 @@ fn raider_initial() -> Combatant {
         ],
         conditions: Vec::new(),
         is_actor: false,
-    }
-}
-
-fn final_adept() -> FinalCombatantState {
-    FinalCombatantState {
-        id: "entity-adept".to_string(),
-        name: "Adept".to_string(),
-        hit_points: BoundedValue {
-            current: 24,
-            max: 24,
-        },
-        conditions: Vec::new(),
-    }
-}
-
-fn final_raider_initial() -> FinalCombatantState {
-    FinalCombatantState {
-        id: "entity-raider".to_string(),
-        name: "Raider".to_string(),
-        hit_points: BoundedValue {
-            current: 18,
-            max: 18,
-        },
-        conditions: Vec::new(),
     }
 }
 
@@ -709,7 +1042,32 @@ mod tests {
     }
 
     #[test]
-    fn model_represents_rejected_target_without_events_or_damage() {
+    fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
+        let receipt = resolve_use_action(
+            &hexing_bolt_fixture_scenario(),
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(receipt.rejection, None);
+        assert_eq!(receipt.events.len(), 4);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.outcome),
+            Some(AttackOutcome::Hit)
+        );
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+        assert_eq!(
+            receipt
+                .projection
+                .as_ref()
+                .map(|projection| projection.combatants[1].hit_points.current),
+            Some(9)
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_non_hostile_target_without_events_or_damage() {
         let receipt = rejected_target_fixture_receipt();
 
         assert!(!receipt.accepted);
@@ -734,5 +1092,36 @@ mod tests {
                 .map(|projection| projection.combatants[1].hit_points.current),
             Some(18)
         );
+    }
+
+    #[test]
+    fn resolver_rejects_missing_attack_roll_without_events() {
+        let receipt = resolve_use_action(
+            &hexing_bolt_fixture_scenario(),
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[],
+        );
+
+        assert!(!receipt.accepted);
+        assert_eq!(
+            receipt.rejection,
+            Some(RulebenchRejection::MissingAttackRoll)
+        );
+        assert!(receipt.events.is_empty());
+        assert!(receipt.damage.is_none());
+    }
+
+    #[test]
+    fn resolver_rejects_invalid_action_without_events() {
+        let receipt = resolve_use_action(
+            &hexing_bolt_fixture_scenario(),
+            UseActionIntent::new("entity-adept", "not_hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(!receipt.accepted);
+        assert_eq!(receipt.rejection, Some(RulebenchRejection::InvalidAction));
+        assert!(receipt.events.is_empty());
+        assert!(receipt.attack_roll.is_none());
     }
 }
