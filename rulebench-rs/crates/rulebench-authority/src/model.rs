@@ -242,6 +242,89 @@ pub struct TurnAdvanceReadout {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionResourceKind {
+    StandardAction,
+}
+
+impl ActionResourceKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ActionResourceKind::StandardAction => "standardAction",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourceState {
+    pub kind: ActionResourceKind,
+    pub current: i32,
+    pub max: i32,
+    pub available: bool,
+}
+
+impl ActionResourceState {
+    pub const fn new(kind: ActionResourceKind, current: i32, max: i32) -> Self {
+        Self {
+            kind,
+            current,
+            max,
+            available: current > 0,
+        }
+    }
+
+    pub const fn standard_action_available() -> Self {
+        Self::new(ActionResourceKind::StandardAction, 1, 1)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatantActionResourceReadout {
+    pub combatant_id: String,
+    pub resources: Vec<ActionResourceState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourceLedgerReadout {
+    pub combatants: Vec<CombatantActionResourceReadout>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionResourceSpendDecisionKind {
+    Spent,
+    RejectedByMissingCombatant,
+    RejectedByMissingResource,
+    RejectedByUnavailableResource,
+}
+
+impl ActionResourceSpendDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ActionResourceSpendDecisionKind::Spent => "spent",
+            ActionResourceSpendDecisionKind::RejectedByMissingCombatant => {
+                "rejectedByMissingCombatant"
+            }
+            ActionResourceSpendDecisionKind::RejectedByMissingResource => {
+                "rejectedByMissingResource"
+            }
+            ActionResourceSpendDecisionKind::RejectedByUnavailableResource => {
+                "rejectedByUnavailableResource"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourceSpendReadout {
+    pub combatant_id: String,
+    pub resource_kind: ActionResourceKind,
+    pub accepted: bool,
+    pub decision_kind: ActionResourceSpendDecisionKind,
+    pub previous_resource: Option<ActionResourceState>,
+    pub next_resource: Option<ActionResourceState>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatControlCommandKind {
     ExplicitStart,
     ExplicitEnd,
@@ -411,6 +494,7 @@ pub enum CommandPreflightDecisionKind {
     RejectedByActionOwnership,
     RejectedByTargetLookup,
     RejectedByTargetLegality,
+    RejectedByActionResource,
 }
 
 impl CommandPreflightDecisionKind {
@@ -425,6 +509,7 @@ impl CommandPreflightDecisionKind {
             CommandPreflightDecisionKind::RejectedByActionOwnership => "rejectedByActionOwnership",
             CommandPreflightDecisionKind::RejectedByTargetLookup => "rejectedByTargetLookup",
             CommandPreflightDecisionKind::RejectedByTargetLegality => "rejectedByTargetLegality",
+            CommandPreflightDecisionKind::RejectedByActionResource => "rejectedByActionResource",
         }
     }
 }
@@ -437,6 +522,7 @@ pub struct CommandPreflightReadout {
     pub rejection: Option<RulebenchRejection>,
     pub current_actor_id: Option<String>,
     pub target_legality: Option<TargetLegality>,
+    pub action_resource: Option<ActionResourceState>,
     pub reason: String,
 }
 
@@ -639,6 +725,7 @@ pub struct CombatSessionStepReadout {
     pub scenario: RulebenchScenario,
     pub receipt: RulebenchReceipt,
     pub combat_log: Vec<CombatLogEntry>,
+    pub action_resource_ledger: ActionResourceLedgerReadout,
     pub audit_entry: CommandAuditEntry,
     pub state_before: ScenarioProjection,
     pub state_after: ScenarioProjection,

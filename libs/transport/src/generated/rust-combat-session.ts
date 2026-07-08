@@ -212,6 +212,32 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           eventTypes: ['ActionUsed', 'AttackRolled', 'DamageApplied', 'ModifierApplied'],
         },
       ],
+      actionResourceLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 0,
+                max: 1,
+                available: false,
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+        ],
+      },
       stateBefore: {
         summary: 'State before command resolution.',
         combatants: [
@@ -409,6 +435,32 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           eventTypes: ['ActionUsed', 'AttackRolled'],
         },
       ],
+      actionResourceLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 0,
+                max: 1,
+                available: false,
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+        ],
+      },
       stateBefore: {
         summary: 'State before command resolution.',
         combatants: [
@@ -580,6 +632,32 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           eventTypes: [],
         },
       ],
+      actionResourceLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 0,
+                max: 1,
+                available: false,
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+        ],
+      },
       stateBefore: {
         summary: 'State before command resolution.',
         combatants: [

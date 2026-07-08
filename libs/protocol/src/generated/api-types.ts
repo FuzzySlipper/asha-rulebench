@@ -20,6 +20,10 @@ export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | '
 
 export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
 
+export type RulebenchActionResourceKindDto = 'standardAction';
+
+export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
+
 export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn' | 'endIfConditionMet';
 
 export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';
@@ -142,12 +146,29 @@ export interface RulebenchCombatLogEntryDto {
   readonly eventTypes: readonly string[];
 }
 
+export interface RulebenchActionResourceLedgerDto {
+  readonly combatants: readonly RulebenchCombatantActionResourceReadoutDto[];
+}
+
+export interface RulebenchCombatantActionResourceReadoutDto {
+  readonly combatantId: string;
+  readonly resources: readonly RulebenchActionResourceStateDto[];
+}
+
+export interface RulebenchActionResourceStateDto {
+  readonly kind: RulebenchActionResourceKindDto;
+  readonly current: number;
+  readonly max: number;
+  readonly available: boolean;
+}
+
 export interface RulebenchCombatSessionStepReadoutDto {
   readonly sessionId: string;
   readonly step: RulebenchCombatSessionStepSummaryDto;
   readonly command: RulebenchCommandAttemptDto;
   readonly scenarioReadout: RulebenchScenarioReadoutDto;
   readonly combatLog: readonly RulebenchCombatLogEntryDto[];
+  readonly actionResourceLedger: RulebenchActionResourceLedgerDto;
   readonly stateBefore: RulebenchFinalStateDto;
   readonly stateAfter: RulebenchFinalStateDto;
 }

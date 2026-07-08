@@ -2242,6 +2242,17 @@ mod tests {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
 
+        assert_eq!(
+            session
+                .action_resource_ledger()
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::standard_action_available())
+        );
+
         let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
             "runtime-derived-hit",
             "Runtime derived hit",
@@ -2272,6 +2283,127 @@ mod tests {
             readout.audit_entry.preflight_decision_kind,
             Some(CommandPreflightDecisionKind::Accepted)
         );
+        assert_eq!(
+            readout
+                .audit_entry
+                .preflight_decision_kind
+                .map(CommandPreflightDecisionKind::code),
+            Some("accepted")
+        );
+        assert_eq!(
+            session
+                .action_resource_ledger()
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::new(
+                ActionResourceKind::StandardAction,
+                0,
+                1
+            ))
+        );
+    }
+
+    #[test]
+    fn session_runtime_intent_command_rejects_spent_action_resource() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-first-action",
+            "Runtime first action",
+            "Adept spends the standard action resource.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let before = session.snapshot();
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-spent-resource-rejected",
+            "Runtime spent resource rejection",
+            "Rust rejects repeated use-action after the standard action is spent.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let after = session.snapshot();
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByPreflight
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByActionResource)
+        );
+        assert_eq!(
+            readout
+                .audit_entry
+                .preflight_decision_kind
+                .map(CommandPreflightDecisionKind::code),
+            Some("rejectedByActionResource")
+        );
+        assert!(readout.receipt.events.is_empty());
+        assert_eq!(
+            readout.audit_entry.state_before_fingerprint,
+            readout.audit_entry.state_after_fingerprint
+        );
+        assert_eq!(
+            after.current_state_fingerprint,
+            before.current_state_fingerprint
+        );
+        assert_eq!(after.action_usage_log.len(), before.action_usage_log.len());
+        assert_eq!(
+            session
+                .action_resource_ledger()
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::new(
+                ActionResourceKind::StandardAction,
+                0,
+                1
+            ))
+        );
+    }
+
+    #[test]
+    fn session_runtime_intent_command_resolver_rejection_does_not_spend_action_resource() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before = session.action_resource_ledger();
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-roll-missing-rejected",
+            "Runtime missing roll rejection",
+            "Rust rejects missing attack rolls without spending action resources.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![],
+        ));
+        let after = session.action_resource_ledger();
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::MissingAttackRoll)
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByResolver
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
+        assert_eq!(before, after);
+        assert!(session.action_usage_log().is_empty());
     }
 
     #[test]
@@ -3190,7 +3322,15 @@ mod tests {
         );
         assert_eq!(candidates.candidates[0].target_current_hit_points, 9);
         assert_eq!(candidates.candidates[0].target_max_hit_points, 18);
-        assert!(candidates.candidates[0].accepted);
+        assert!(!candidates.candidates[0].accepted);
+        assert_eq!(
+            candidates.candidates[0].decision_kind,
+            CommandPreflightDecisionKind::RejectedByActionResource
+        );
+        assert_eq!(
+            candidates.candidates[0].reason,
+            "Actor has no available standard action resource."
+        );
     }
 
     #[test]
@@ -3846,7 +3986,19 @@ mod tests {
         ));
         let after_preflight = session.snapshot();
 
-        assert!(preflight.accepted);
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByActionResource
+        );
+        assert_eq!(
+            preflight.action_resource,
+            Some(ActionResourceState::new(
+                ActionResourceKind::StandardAction,
+                0,
+                1
+            ))
+        );
         assert_eq!(after_preflight, before_preflight);
         assert_eq!(session.next_step_index(), 1);
         assert_eq!(session.combat_log().len(), 1);

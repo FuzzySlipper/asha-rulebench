@@ -47,6 +47,8 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
+        "export type RulebenchActionResourceKindDto = 'standardAction';",
+        "export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';",
         "export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn' | 'endIfConditionMet';",
         "export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';",
         "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';",
@@ -429,6 +431,47 @@ fn interfaces() -> &'static [Interface] {
             ],
         },
         Interface {
+            name: "RulebenchActionResourceLedgerDto",
+            fields: &[Field {
+                name: "combatants",
+                ty: "readonly RulebenchCombatantActionResourceReadoutDto[]",
+            }],
+        },
+        Interface {
+            name: "RulebenchCombatantActionResourceReadoutDto",
+            fields: &[
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "resources",
+                    ty: "readonly RulebenchActionResourceStateDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActionResourceStateDto",
+            fields: &[
+                Field {
+                    name: "kind",
+                    ty: "RulebenchActionResourceKindDto",
+                },
+                Field {
+                    name: "current",
+                    ty: "number",
+                },
+                Field {
+                    name: "max",
+                    ty: "number",
+                },
+                Field {
+                    name: "available",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchCombatSessionStepReadoutDto",
             fields: &[
                 Field {
@@ -450,6 +493,10 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "combatLog",
                     ty: "readonly RulebenchCombatLogEntryDto[]",
+                },
+                Field {
+                    name: "actionResourceLedger",
+                    ty: "RulebenchActionResourceLedgerDto",
                 },
                 Field {
                     name: "stateBefore",

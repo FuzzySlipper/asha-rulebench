@@ -5,7 +5,8 @@ mod ts_emit;
 
 use rulebench_authority::{
     combat_session_control_history_readouts, combat_session_script_readouts,
-    combat_session_transcripts, CombatControlCommandKind, CombatControlDecisionKind,
+    combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
+    ActionResourceState, CombatControlCommandKind, CombatControlDecisionKind,
     CombatControlHistoryEntry, CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
@@ -123,6 +124,12 @@ fn render_step_readout(readout: &CombatSessionStepReadout) -> String {
         out.push_str(&render_log_entry(entry, "        "));
     }
     out.push_str("      ],\n");
+    out.push_str("      actionResourceLedger: ");
+    out.push_str(&render_action_resource_ledger(
+        &readout.action_resource_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      stateBefore: ");
     out.push_str(&render_state(&readout.state_before, "      "));
     out.push_str(",\n");
@@ -130,6 +137,47 @@ fn render_step_readout(readout: &CombatSessionStepReadout) -> String {
     out.push_str(&render_state(&readout.state_after, "      "));
     out.push_str(",\n");
     out.push_str("    },\n");
+    out
+}
+
+fn render_action_resource_ledger(ledger: &ActionResourceLedgerReadout, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  combatants: [\n"));
+    for combatant in &ledger.combatants {
+        out.push_str(&format!("{indent}    {{\n"));
+        out.push_str(&format!(
+            "{indent}      combatantId: {},\n",
+            ts_string(&combatant.combatant_id)
+        ));
+        out.push_str(&format!("{indent}      resources: [\n"));
+        for resource in &combatant.resources {
+            out.push_str(&render_action_resource_state(resource, indent));
+        }
+        out.push_str(&format!("{indent}      ],\n"));
+        out.push_str(&format!("{indent}    }},\n"));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+fn render_action_resource_state(resource: &ActionResourceState, indent: &str) -> String {
+    let mut out = String::from("");
+    out.push_str(&format!("{indent}        {{\n"));
+    out.push_str(&format!(
+        "{indent}          kind: {},\n",
+        ts_string(action_resource_kind(resource.kind))
+    ));
+    out.push_str(&format!(
+        "{indent}          current: {},\n",
+        resource.current
+    ));
+    out.push_str(&format!("{indent}          max: {},\n", resource.max));
+    out.push_str(&format!(
+        "{indent}          available: {},\n",
+        resource.available
+    ));
+    out.push_str(&format!("{indent}        }},\n"));
     out
 }
 
@@ -502,6 +550,12 @@ fn lifecycle_phase(phase: CombatLifecyclePhase) -> &'static str {
         CombatLifecyclePhase::Ready => "ready",
         CombatLifecyclePhase::InProgress => "inProgress",
         CombatLifecyclePhase::Ended => "ended",
+    }
+}
+
+fn action_resource_kind(kind: ActionResourceKind) -> &'static str {
+    match kind {
+        ActionResourceKind::StandardAction => "standardAction",
     }
 }
 

@@ -428,6 +428,7 @@ impl CombatSessionState {
                 &self.lifecycle,
                 self.turn_order.current_actor_id.clone(),
                 &self.scenario,
+                &self.state.action_resource_ledger(),
                 intent.clone(),
             ))
         } else {
@@ -486,6 +487,12 @@ impl CombatSessionState {
                     } else {
                         CommandDecisionKind::RejectedByResolver
                     };
+                    if receipt.accepted {
+                        self.state.spend_action_resource(
+                            &intent.actor_id,
+                            ActionResourceKind::StandardAction,
+                        );
+                    }
 
                     (receipt, state_after, true, decision_kind)
                 }
@@ -536,7 +543,7 @@ impl CombatSessionState {
         }
         self.next_step_index += 1;
         if should_apply_state {
-            self.state = CombatState::from_projection(&state_after);
+            self.state.apply_projection(&state_after);
         }
 
         CombatSessionStepReadout {
@@ -546,6 +553,7 @@ impl CombatSessionState {
             scenario: self.scenario.clone(),
             receipt,
             combat_log: vec![log_entry],
+            action_resource_ledger: self.state.action_resource_ledger(),
             audit_entry,
             state_before,
             state_after,
@@ -580,6 +588,10 @@ impl CombatSessionState {
         current_turn_action_usage(&self.turn_order, &self.action_usage_log)
     }
 
+    pub fn action_resource_ledger(&self) -> ActionResourceLedgerReadout {
+        self.state.action_resource_ledger()
+    }
+
     pub fn combatant_vitality(&self) -> CombatantVitalitySummary {
         let current_state = self.state.project("Current session state.");
         combatant_vitality_summary(&current_state)
@@ -610,7 +622,12 @@ impl CombatSessionState {
             &current_state,
         );
 
-        current_actor_command_candidates(&self.lifecycle, &current_scenario, current_actor_options)
+        current_actor_command_candidates(
+            &self.lifecycle,
+            &current_scenario,
+            &self.state.action_resource_ledger(),
+            current_actor_options,
+        )
     }
 
     pub fn plan_candidate_command(
@@ -643,6 +660,7 @@ impl CombatSessionState {
             &self.lifecycle,
             self.turn_order.current_actor_id.clone(),
             &current_scenario,
+            &self.state.action_resource_ledger(),
             intent,
         )
     }
@@ -1191,6 +1209,7 @@ fn command_preflight_readout(
     lifecycle: &CombatLifecycle,
     current_actor_id: Option<String>,
     scenario: &RulebenchScenario,
+    action_resources: &ActionResourceLedgerReadout,
     intent: UseActionIntent,
 ) -> CommandPreflightReadout {
     if intent.actor_id.is_empty() {
@@ -1199,6 +1218,7 @@ fn command_preflight_readout(
             CommandPreflightDecisionKind::RejectedByShape,
             Some(RulebenchRejection::EmptyActorId),
             current_actor_id,
+            None,
             None,
             "Actor id is empty.",
         );
@@ -1210,6 +1230,7 @@ fn command_preflight_readout(
             Some(RulebenchRejection::EmptyActionId),
             current_actor_id,
             None,
+            None,
             "Action id is empty.",
         );
     }
@@ -1219,6 +1240,7 @@ fn command_preflight_readout(
             CommandPreflightDecisionKind::RejectedByShape,
             Some(RulebenchRejection::EmptyTargetId),
             current_actor_id,
+            None,
             None,
             "Target id is empty.",
         );
@@ -1230,6 +1252,7 @@ fn command_preflight_readout(
             CommandPreflightDecisionKind::RejectedByLifecycle,
             Some(RulebenchRejection::InvalidAction),
             current_actor_id,
+            None,
             None,
             "Combat is already ended.",
         );
@@ -1244,6 +1267,7 @@ fn command_preflight_readout(
             CommandPreflightDecisionKind::RejectedByTurnOrder,
             Some(RulebenchRejection::InvalidAction),
             current_actor_id,
+            None,
             None,
             "Actor is not the current turn actor.",
         );
@@ -1260,6 +1284,7 @@ fn command_preflight_readout(
             Some(RulebenchRejection::InvalidActor),
             current_actor_id,
             None,
+            None,
             "Actor is not present in the current scenario.",
         );
     };
@@ -1271,6 +1296,7 @@ fn command_preflight_readout(
             Some(RulebenchRejection::InvalidAction),
             current_actor_id,
             None,
+            None,
             "Action is not present in the current scenario.",
         );
     };
@@ -1281,6 +1307,7 @@ fn command_preflight_readout(
             CommandPreflightDecisionKind::RejectedByActionOwnership,
             Some(RulebenchRejection::InvalidAction),
             current_actor_id,
+            None,
             None,
             "Action does not belong to the proposed actor.",
         );
@@ -1297,6 +1324,7 @@ fn command_preflight_readout(
             Some(RulebenchRejection::InvalidTarget),
             current_actor_id,
             None,
+            None,
             "Target is not present in the current scenario.",
         );
     };
@@ -1311,7 +1339,33 @@ fn command_preflight_readout(
             Some(rejection),
             current_actor_id,
             Some(target_legality),
+            None,
             reason,
+        );
+    }
+
+    let action_resource = standard_action_resource_for(action_resources, &intent.actor_id);
+    let Some(action_resource) = action_resource else {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActionResource,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            Some(target_legality),
+            None,
+            "Actor has no standard action resource in the ledger.",
+        );
+    };
+
+    if !action_resource.available {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActionResource,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            Some(target_legality),
+            Some(action_resource),
+            "Actor has no available standard action resource.",
         );
     }
 
@@ -1322,8 +1376,26 @@ fn command_preflight_readout(
         rejection: None,
         current_actor_id,
         target_legality: Some(target_legality),
+        action_resource: Some(action_resource),
         reason: "Command is admissible before roll resolution.".to_string(),
     }
+}
+
+fn standard_action_resource_for(
+    action_resources: &ActionResourceLedgerReadout,
+    combatant_id: &str,
+) -> Option<ActionResourceState> {
+    action_resources
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == combatant_id)
+        .and_then(|combatant| {
+            combatant
+                .resources
+                .iter()
+                .find(|resource| resource.kind == ActionResourceKind::StandardAction)
+                .cloned()
+        })
 }
 
 fn rejected_command_preflight(
@@ -1332,6 +1404,7 @@ fn rejected_command_preflight(
     rejection: Option<RulebenchRejection>,
     current_actor_id: Option<String>,
     target_legality: Option<TargetLegality>,
+    action_resource: Option<ActionResourceState>,
     reason: impl Into<String>,
 ) -> CommandPreflightReadout {
     CommandPreflightReadout {
@@ -1341,6 +1414,7 @@ fn rejected_command_preflight(
         rejection,
         current_actor_id,
         target_legality,
+        action_resource,
         reason: reason.into(),
     }
 }
@@ -1754,10 +1828,11 @@ fn current_actor_option_summary(
 fn current_actor_command_candidates(
     lifecycle: &CombatLifecycle,
     scenario: &RulebenchScenario,
+    action_resources: &ActionResourceLedgerReadout,
     options: CurrentActorOptionSummary,
 ) -> CommandCandidateSummary {
     let candidates = if options.available {
-        current_actor_id_command_candidates(lifecycle, scenario, &options)
+        current_actor_id_command_candidates(lifecycle, scenario, action_resources, &options)
     } else {
         Vec::new()
     };
@@ -1876,6 +1951,7 @@ fn candidate_selection_unavailable_reason(
 fn current_actor_id_command_candidates(
     lifecycle: &CombatLifecycle,
     scenario: &RulebenchScenario,
+    action_resources: &ActionResourceLedgerReadout,
     options: &CurrentActorOptionSummary,
 ) -> Vec<CommandCandidateEntry> {
     let Some(actor_id) = options.current_actor_id.as_deref() else {
@@ -1896,6 +1972,7 @@ fn current_actor_id_command_candidates(
                     lifecycle,
                     options.current_actor_id.clone(),
                     scenario,
+                    action_resources,
                     intent.clone(),
                 );
 

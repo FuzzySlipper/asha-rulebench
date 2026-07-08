@@ -172,6 +172,16 @@ describe('RulebenchTransport fixtures', () => {
       ]);
       expect(result.value.stateBefore.combatants[1]?.hitPoints.current).toBe(18);
       expect(result.value.stateAfter.combatants[1]?.conditions).toEqual(['rattled']);
+      expect(result.value.actionResourceLedger.combatants).toEqual([
+        {
+          combatantId: 'entity-adept',
+          resources: [{ kind: 'standardAction', current: 0, max: 1, available: false }],
+        },
+        {
+          combatantId: 'entity-raider',
+          resources: [{ kind: 'standardAction', current: 1, max: 1, available: true }],
+        },
+      ]);
     }
   });
 
