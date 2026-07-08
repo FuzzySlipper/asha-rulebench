@@ -381,6 +381,12 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      finalStateFingerprint: {},\n",
         render_fingerprint(&readout.final_snapshot.current_state_fingerprint, "      ")
     ));
+    out.push_str("      finalState: ");
+    out.push_str(&render_state(
+        &readout.final_snapshot.current_state,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      finalTurnOrder: ");
     out.push_str(&render_turn_order(
         &readout.final_snapshot.turn_order,

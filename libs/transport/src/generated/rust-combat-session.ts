@@ -909,6 +909,23 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       ],
       finalLifecyclePhase: 'ended',
       finalStateFingerprint: { algorithm: 'fnv1a64.rulebench-projection.v0', value: '6dca51e52dc95225' },
+      finalState: {
+        summary: 'Current session state.',
+        combatants: [
+          {
+            id: 'entity-adept',
+            name: 'Adept',
+            hitPoints: { current: 24, max: 24 },
+            conditions: [],
+          },
+          {
+            id: 'entity-raider',
+            name: 'Raider',
+            hitPoints: { current: 9, max: 18 },
+            conditions: [],
+          },
+        ],
+      },
       finalTurnOrder: {
         roundNumber: 2,
         currentTurnIndex: 0,

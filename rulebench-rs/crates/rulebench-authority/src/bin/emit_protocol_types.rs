@@ -283,6 +283,10 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchStateFingerprintDto",
                 },
                 Field {
+                    name: "finalState",
+                    ty: "RulebenchFinalStateDto",
+                },
+                Field {
                     name: "finalTurnOrder",
                     ty: "RulebenchCombatTurnOrderDto",
                 },
