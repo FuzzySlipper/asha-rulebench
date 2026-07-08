@@ -3151,6 +3151,10 @@ mod tests {
             snapshot.turn_order.current_actor_id,
             Some("entity-raider".to_string())
         );
+        assert_eq!(snapshot.turn_transition_log.len(), 1);
+        assert_eq!(snapshot.turn_transition_log[0].previous_turn_index, 0);
+        assert_eq!(snapshot.turn_transition_log[0].next_turn_index, 1);
+        assert!(!snapshot.turn_transition_log[0].wrapped_round);
     }
 
     #[test]
@@ -3202,6 +3206,15 @@ mod tests {
         assert_eq!(summary.used_action_count, 0);
         assert!(summary.used_action_ids.is_empty());
         assert!(summary.used_ability_ids.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_turn_transition_history_is_empty_initially() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        assert!(session.turn_transition_log().is_empty());
+        assert!(session.snapshot().turn_transition_log.is_empty());
     }
 
     #[test]
@@ -3276,6 +3289,51 @@ mod tests {
             session.turn_order().current_actor_id,
             Some("entity-adept".to_string())
         );
+    }
+
+    #[test]
+    fn session_runtime_records_successful_turn_transition() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.advance_turn();
+
+        assert_eq!(session.turn_transition_log().len(), 1);
+        let transition = &session.turn_transition_log()[0];
+        assert_eq!(transition.sequence, 0);
+        assert_eq!(transition.previous_round_number, 1);
+        assert_eq!(transition.previous_turn_index, 0);
+        assert_eq!(
+            transition.previous_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(transition.next_round_number, 1);
+        assert_eq!(transition.next_turn_index, 1);
+        assert_eq!(transition.next_actor_id, Some("entity-raider".to_string()));
+        assert!(!transition.wrapped_round);
+    }
+
+    #[test]
+    fn session_runtime_records_turn_transition_round_wrap() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.advance_turn();
+        session.advance_turn();
+
+        assert_eq!(session.turn_transition_log().len(), 2);
+        let transition = &session.turn_transition_log()[1];
+        assert_eq!(transition.sequence, 1);
+        assert_eq!(transition.previous_round_number, 1);
+        assert_eq!(transition.previous_turn_index, 1);
+        assert_eq!(
+            transition.previous_actor_id,
+            Some("entity-raider".to_string())
+        );
+        assert_eq!(transition.next_round_number, 2);
+        assert_eq!(transition.next_turn_index, 0);
+        assert_eq!(transition.next_actor_id, Some("entity-adept".to_string()));
+        assert!(transition.wrapped_round);
     }
 
     #[test]
@@ -3369,6 +3427,10 @@ mod tests {
         assert_eq!(after_attempt.lifecycle, before_attempt.lifecycle);
         assert_eq!(after_attempt.turn_order, before_attempt.turn_order);
         assert_eq!(
+            after_attempt.turn_transition_log,
+            before_attempt.turn_transition_log
+        );
+        assert_eq!(
             after_attempt.next_step_index,
             before_attempt.next_step_index
         );
@@ -3411,12 +3473,14 @@ mod tests {
                 defeated_count: 0,
             }
         );
+        assert!(session.turn_transition_log().is_empty());
 
         session.advance_turn();
 
         assert_eq!(session.turn_order().round_number, 0);
         assert_eq!(session.turn_order().current_turn_index, 0);
         assert_eq!(session.turn_order().current_actor_id, None);
+        assert!(session.turn_transition_log().is_empty());
     }
 
     #[test]
@@ -3493,6 +3557,7 @@ mod tests {
             snapshot.action_usage_log[0].ability_id,
             "ability.hexing-bolt"
         );
+        assert!(snapshot.turn_transition_log.is_empty());
         assert_eq!(snapshot.current_turn_action_usage.used_action_count, 1);
         assert_eq!(
             snapshot.current_turn_action_usage.used_action_ids,

@@ -156,6 +156,18 @@ impl CombatTurnOrder {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TurnTransitionEntry {
+    pub sequence: u32,
+    pub previous_round_number: u32,
+    pub previous_turn_index: u32,
+    pub previous_actor_id: Option<String>,
+    pub next_round_number: u32,
+    pub next_turn_index: u32,
+    pub next_actor_id: Option<String>,
+    pub wrapped_round: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
     pub id: String,
     pub title: String,
@@ -299,6 +311,7 @@ pub struct CombatSessionSnapshot {
     pub combat_log: Vec<CombatLogEntry>,
     pub audit_log: Vec<CommandAuditEntry>,
     pub action_usage_log: Vec<ActionUsageEntry>,
+    pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
     pub current_state: ScenarioProjection,

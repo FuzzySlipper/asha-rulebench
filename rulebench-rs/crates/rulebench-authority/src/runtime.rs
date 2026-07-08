@@ -41,6 +41,7 @@ pub struct CombatSessionState {
     combat_log: Vec<CombatLogEntry>,
     audit_log: Vec<CommandAuditEntry>,
     action_usage_log: Vec<ActionUsageEntry>,
+    turn_transition_log: Vec<TurnTransitionEntry>,
     next_step_index: u32,
     lifecycle: CombatLifecycle,
     turn_order: CombatTurnOrder,
@@ -63,6 +64,7 @@ impl CombatSessionState {
             combat_log: Vec::new(),
             audit_log: Vec::new(),
             action_usage_log: Vec::new(),
+            turn_transition_log: Vec::new(),
             next_step_index: 0,
             lifecycle: CombatLifecycle::ready(),
             turn_order,
@@ -190,6 +192,10 @@ impl CombatSessionState {
         &self.action_usage_log
     }
 
+    pub fn turn_transition_log(&self) -> &[TurnTransitionEntry] {
+        &self.turn_transition_log
+    }
+
     pub fn current_turn_action_usage(&self) -> ActionUsageSummary {
         current_turn_action_usage(&self.turn_order, &self.action_usage_log)
     }
@@ -224,7 +230,16 @@ impl CombatSessionState {
             return;
         }
 
+        let previous_turn_order = self.turn_order.clone();
         self.turn_order.advance_turn();
+        if self.turn_order != previous_turn_order {
+            let transition = turn_transition_entry(
+                self.turn_transition_log.len() as u32,
+                &previous_turn_order,
+                &self.turn_order,
+            );
+            self.turn_transition_log.push(transition);
+        }
     }
 
     pub fn snapshot(&self) -> CombatSessionSnapshot {
@@ -239,6 +254,7 @@ impl CombatSessionState {
             combat_log: self.combat_log.clone(),
             audit_log: self.audit_log.clone(),
             action_usage_log: self.action_usage_log.clone(),
+            turn_transition_log: self.turn_transition_log.clone(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
             current_state,
@@ -367,6 +383,23 @@ fn action_usage_entry(
         ability_id: action.ability_id.clone(),
         target_id: command.target_id.clone(),
         outcome_class: step.outcome_class,
+    }
+}
+
+fn turn_transition_entry(
+    sequence: u32,
+    previous_turn_order: &CombatTurnOrder,
+    next_turn_order: &CombatTurnOrder,
+) -> TurnTransitionEntry {
+    TurnTransitionEntry {
+        sequence,
+        previous_round_number: previous_turn_order.round_number,
+        previous_turn_index: previous_turn_order.current_turn_index,
+        previous_actor_id: previous_turn_order.current_actor_id.clone(),
+        next_round_number: next_turn_order.round_number,
+        next_turn_index: next_turn_order.current_turn_index,
+        next_actor_id: next_turn_order.current_actor_id.clone(),
+        wrapped_round: next_turn_order.round_number > previous_turn_order.round_number,
     }
 }
 
