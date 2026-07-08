@@ -37,6 +37,8 @@ pub use modifiers::{
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
+    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
+    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
     CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
     CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
     CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
@@ -3667,6 +3669,197 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_auto_candidate_plan_selects_first_accepted_candidate_read_only() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+            "auto-hit",
+            "Auto hit",
+            "Rust selects the first accepted current actor command candidate.",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionAutoCandidateDecisionKind::Accepted
+        );
+        assert_eq!(plan.decision_kind.code(), "accepted");
+        assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(plan.candidate_count, 1);
+        assert_eq!(plan.accepted_candidate_count, 1);
+        assert_eq!(plan.selected_action_id, Some("hexing_bolt".to_string()));
+        assert_eq!(plan.selected_target_id, Some("entity-raider".to_string()));
+        assert_eq!(plan.unavailable_reason, None);
+        assert_eq!(
+            plan.reason,
+            "First accepted command candidate planned for deterministic auto submission."
+        );
+
+        let selection = plan
+            .selection
+            .as_ref()
+            .expect("accepted auto plan carries selection");
+        assert_eq!(
+            selection.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::Accepted
+        );
+        assert_eq!(
+            selection
+                .command
+                .as_ref()
+                .map(|command| command.intent.clone()),
+            Some(UseActionIntent::new(
+                "entity-adept",
+                "hexing_bolt",
+                "entity-raider"
+            ))
+        );
+        assert_eq!(after_plan, before_plan);
+        assert!(session.combat_log().is_empty());
+        assert!(session.audit_log().is_empty());
+    }
+
+    #[test]
+    fn session_runtime_auto_candidate_submission_accepts_hit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let execution =
+            session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+                "auto-hit",
+                "Auto hit",
+                "Rust selects and submits the first accepted candidate.",
+                vec![17, 5],
+            ));
+
+        assert!(execution.plan.accepted);
+        assert_eq!(
+            execution.plan.decision_kind,
+            CombatSessionAutoCandidateDecisionKind::Accepted
+        );
+        let submitted_step = execution
+            .submitted_step
+            .as_ref()
+            .expect("accepted auto plan submits command");
+        assert!(submitted_step.receipt.accepted);
+        assert_eq!(submitted_step.step.id, "auto-hit");
+        assert_eq!(
+            submitted_step.command,
+            CommandAttempt {
+                step_id: "auto-hit".to_string(),
+                step_index: 0,
+                actor_id: "entity-adept".to_string(),
+                action_id: "hexing_bolt".to_string(),
+                target_id: "entity-raider".to_string(),
+                roll_stream: vec![17, 5],
+                outcome_class: CommandOutcomeClass::AcceptedHit,
+            }
+        );
+        assert_eq!(
+            submitted_step.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
+        assert_eq!(
+            submitted_step.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
+        assert_eq!(session.combat_log().len(), 1);
+        assert_eq!(session.audit_log().len(), 1);
+        assert_eq!(session.action_usage_log().len(), 1);
+        assert_eq!(
+            session.snapshot().current_state.combatants[1]
+                .hit_points
+                .current,
+            9
+        );
+    }
+
+    #[test]
+    fn session_runtime_auto_candidate_rejects_when_no_candidate_is_accepted() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let first_execution =
+            session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+                "auto-hit",
+                "Auto hit",
+                "Rust spends the current actor standard action.",
+                vec![17, 5],
+            ));
+        assert!(first_execution.plan.accepted);
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+            "auto-spent",
+            "Auto spent",
+            "Rust refuses to auto-submit when preflight rejects every candidate.",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(!plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate
+        );
+        assert_eq!(plan.decision_kind.code(), "rejectedByNoAcceptedCandidate");
+        assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(plan.candidate_count, 1);
+        assert_eq!(plan.accepted_candidate_count, 0);
+        assert_eq!(plan.selected_action_id, None);
+        assert_eq!(plan.selected_target_id, None);
+        assert_eq!(plan.selection, None);
+        assert_eq!(
+            plan.reason,
+            "No accepted command candidates are available for deterministic auto submission."
+        );
+        assert_eq!(after_plan, before_plan);
+        assert_eq!(session.combat_log().len(), 1);
+        assert_eq!(session.audit_log().len(), 1);
+    }
+
+    #[test]
+    fn session_runtime_auto_candidate_submission_rejects_unavailable_candidates_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+        let before_execution = session.snapshot();
+
+        let execution =
+            session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+                "auto-unavailable",
+                "Auto unavailable",
+                "Rust refuses to auto-submit when no command candidates exist.",
+                vec![17, 5],
+            ));
+        let after_execution = session.snapshot();
+
+        assert!(!execution.plan.accepted);
+        assert_eq!(
+            execution.plan.decision_kind,
+            CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates
+        );
+        assert_eq!(
+            execution.plan.current_actor_id,
+            Some("entity-raider".to_string())
+        );
+        assert_eq!(execution.plan.candidate_count, 0);
+        assert_eq!(execution.plan.accepted_candidate_count, 0);
+        assert_eq!(
+            execution.plan.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
+        );
+        assert_eq!(execution.submitted_step, None);
+        assert_eq!(after_execution, before_execution);
+        assert!(session.combat_log().is_empty());
+        assert!(session.audit_log().is_empty());
+        assert_eq!(session.turn_transition_log().len(), 1);
+    }
+
+    #[test]
     fn session_runtime_selected_candidate_submission_accepts_hit() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -3725,6 +3918,10 @@ mod tests {
         assert_eq!(
             snapshot.current_state.combatants[1].conditions,
             vec!["rattled"]
+        );
+        assert_eq!(
+            execution.selection.reason,
+            "Selected command candidate planned for deterministic submission."
         );
     }
 

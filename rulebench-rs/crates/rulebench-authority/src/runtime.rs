@@ -136,6 +136,71 @@ pub struct CombatSessionCandidateExecutionReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutoCandidateCommandSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionAutoCandidateCommandSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutoCandidateDecisionKind {
+    Accepted,
+    RejectedByUnavailableCandidates,
+    RejectedByNoAcceptedCandidate,
+}
+
+impl CombatSessionAutoCandidateDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutoCandidateDecisionKind::Accepted => "accepted",
+            CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates => {
+                "rejectedByUnavailableCandidates"
+            }
+            CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate => {
+                "rejectedByNoAcceptedCandidate"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutoCandidatePlanReadout {
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutoCandidateDecisionKind,
+    pub current_actor_id: Option<String>,
+    pub candidate_count: usize,
+    pub accepted_candidate_count: usize,
+    pub selected_action_id: Option<String>,
+    pub selected_target_id: Option<String>,
+    pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
+    pub reason: String,
+    pub selection: Option<CombatSessionCandidateSelectionReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutoCandidateExecutionReadout {
+    pub plan: CombatSessionAutoCandidatePlanReadout,
+    pub submitted_step: Option<CombatSessionStepReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionScriptSpec {
     pub id: String,
     pub title: String,
@@ -675,6 +740,31 @@ impl CombatSessionState {
 
         CombatSessionCandidateExecutionReadout {
             selection,
+            submitted_step,
+        }
+    }
+
+    pub fn plan_auto_candidate_command(
+        &self,
+        spec: CombatSessionAutoCandidateCommandSpec,
+    ) -> CombatSessionAutoCandidatePlanReadout {
+        let candidates = self.current_actor_command_candidates();
+        plan_auto_candidate_command(spec, candidates)
+    }
+
+    pub fn submit_auto_candidate_command(
+        &mut self,
+        spec: CombatSessionAutoCandidateCommandSpec,
+    ) -> CombatSessionAutoCandidateExecutionReadout {
+        let plan = self.plan_auto_candidate_command(spec);
+        let submitted_step = plan
+            .selection
+            .as_ref()
+            .and_then(|selection| selection.command.clone())
+            .map(|command| self.submit_intent_command(command));
+
+        CombatSessionAutoCandidateExecutionReadout {
+            plan,
             submitted_step,
         }
     }
@@ -2046,6 +2136,83 @@ fn plan_candidate_command(
         rejection: None,
         reason: "Selected command candidate planned for deterministic submission.".to_string(),
         command: Some(command),
+    }
+}
+
+fn plan_auto_candidate_command(
+    spec: CombatSessionAutoCandidateCommandSpec,
+    candidates: CommandCandidateSummary,
+) -> CombatSessionAutoCandidatePlanReadout {
+    let candidate_count = candidates.candidates.len();
+    let accepted_candidate_count = candidates
+        .candidates
+        .iter()
+        .filter(|candidate| candidate.accepted)
+        .count();
+
+    if !candidates.available {
+        return CombatSessionAutoCandidatePlanReadout {
+            accepted: false,
+            decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates,
+            current_actor_id: candidates.current_actor_id,
+            candidate_count,
+            accepted_candidate_count,
+            selected_action_id: None,
+            selected_target_id: None,
+            unavailable_reason: candidates.unavailable_reason,
+            reason: candidate_selection_unavailable_reason(candidates.unavailable_reason),
+            selection: None,
+        };
+    }
+
+    let Some(candidate) = candidates
+        .candidates
+        .iter()
+        .find(|candidate| candidate.accepted)
+        .cloned()
+    else {
+        return CombatSessionAutoCandidatePlanReadout {
+            accepted: false,
+            decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate,
+            current_actor_id: candidates.current_actor_id,
+            candidate_count,
+            accepted_candidate_count,
+            selected_action_id: None,
+            selected_target_id: None,
+            unavailable_reason: None,
+            reason:
+                "No accepted command candidates are available for deterministic auto submission."
+                    .to_string(),
+            selection: None,
+        };
+    };
+
+    let selected_action_id = candidate.action_id.clone();
+    let selected_target_id = candidate.target_id.clone();
+    let selection = plan_candidate_command(
+        CombatSessionCandidateSelectionSpec::new(
+            spec.id,
+            spec.title,
+            spec.summary,
+            candidate.action_id,
+            candidate.target_id,
+            spec.roll_stream,
+        ),
+        candidates,
+    );
+
+    CombatSessionAutoCandidatePlanReadout {
+        accepted: selection.accepted,
+        decision_kind: CombatSessionAutoCandidateDecisionKind::Accepted,
+        current_actor_id: selection.current_actor_id.clone(),
+        candidate_count,
+        accepted_candidate_count,
+        selected_action_id: Some(selected_action_id),
+        selected_target_id: Some(selected_target_id),
+        unavailable_reason: None,
+        reason: "First accepted command candidate planned for deterministic auto submission."
+            .to_string(),
+        selection: Some(selection),
     }
 }
 
