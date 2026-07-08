@@ -3,6 +3,18 @@ use crate::resolver::{resolve_use_action, target_legality_rejection, validate_ta
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
 
+mod automation;
+mod replay;
+
+use automation::{
+    combat_session_automatic_run_readout, plan_auto_candidate_command, plan_automatic_step,
+    plan_candidate_command,
+};
+pub use replay::{
+    verify_automatic_run_replay, CombatSessionAutomaticRunReplayDecisionKind,
+    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionCommandSpec {
     pub id: String,
@@ -340,80 +352,6 @@ pub struct CombatSessionAutomaticRunReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CombatSessionAutomaticRunReplaySpec {
-    pub id: String,
-    pub title: String,
-    pub summary: String,
-    pub initial_session_id: String,
-    pub initial_scenario: RulebenchScenario,
-    pub run: CombatSessionAutomaticRunSpec,
-    pub expected_final_state_fingerprint: StateFingerprint,
-    pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
-    pub expected_executed_step_count: u32,
-}
-
-impl CombatSessionAutomaticRunReplaySpec {
-    pub fn new(
-        id: impl Into<String>,
-        title: impl Into<String>,
-        summary: impl Into<String>,
-        initial_session_id: impl Into<String>,
-        initial_scenario: RulebenchScenario,
-        run: CombatSessionAutomaticRunSpec,
-        expected_final_state_fingerprint: StateFingerprint,
-        expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
-        expected_executed_step_count: u32,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            title: title.into(),
-            summary: summary.into(),
-            initial_session_id: initial_session_id.into(),
-            initial_scenario,
-            run,
-            expected_final_state_fingerprint,
-            expected_run_decision_kind,
-            expected_executed_step_count,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CombatSessionAutomaticRunReplayDecisionKind {
-    Verified,
-    MismatchedEvidence,
-}
-
-impl CombatSessionAutomaticRunReplayDecisionKind {
-    pub const fn code(self) -> &'static str {
-        match self {
-            CombatSessionAutomaticRunReplayDecisionKind::Verified => "verified",
-            CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence => "mismatchedEvidence",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CombatSessionAutomaticRunReplayReadout {
-    pub id: String,
-    pub title: String,
-    pub summary: String,
-    pub accepted: bool,
-    pub decision_kind: CombatSessionAutomaticRunReplayDecisionKind,
-    pub expected_final_state_fingerprint: StateFingerprint,
-    pub actual_final_state_fingerprint: StateFingerprint,
-    pub final_state_fingerprint_matches: bool,
-    pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
-    pub actual_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
-    pub run_decision_kind_matches: bool,
-    pub expected_executed_step_count: u32,
-    pub actual_executed_step_count: u32,
-    pub executed_step_count_matches: bool,
-    pub replayed_run: CombatSessionAutomaticRunReadout,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionScriptSpec {
     pub id: String,
     pub title: String,
@@ -579,58 +517,6 @@ pub struct CombatSessionState {
     next_step_index: u32,
     lifecycle: CombatLifecycle,
     turn_order: CombatTurnOrder,
-}
-
-pub fn verify_automatic_run_replay(
-    spec: CombatSessionAutomaticRunReplaySpec,
-) -> CombatSessionAutomaticRunReplayReadout {
-    let mut replay_session =
-        CombatSessionState::new(spec.initial_session_id.clone(), spec.initial_scenario);
-    let replayed_run = replay_session.run_automatic_combat(spec.run);
-    let actual_final_state_fingerprint = replayed_run
-        .final_snapshot
-        .current_state_fingerprint
-        .clone();
-    let actual_run_decision_kind = replayed_run.decision_kind;
-    let actual_executed_step_count = replayed_run.executed_step_count;
-
-    let final_state_fingerprint_matches =
-        actual_final_state_fingerprint == spec.expected_final_state_fingerprint;
-    let run_decision_kind_matches = actual_run_decision_kind == spec.expected_run_decision_kind;
-    let executed_step_count_matches =
-        actual_executed_step_count == spec.expected_executed_step_count;
-    let accepted =
-        final_state_fingerprint_matches && run_decision_kind_matches && executed_step_count_matches;
-    let decision_kind = if accepted {
-        CombatSessionAutomaticRunReplayDecisionKind::Verified
-    } else {
-        CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence
-    };
-    let reason = if accepted {
-        "Automatic run replay verified expected final evidence.".to_string()
-    } else {
-        "Automatic run replay produced evidence that does not match expected final evidence."
-            .to_string()
-    };
-
-    CombatSessionAutomaticRunReplayReadout {
-        id: spec.id,
-        title: spec.title,
-        summary: spec.summary,
-        accepted,
-        decision_kind,
-        expected_final_state_fingerprint: spec.expected_final_state_fingerprint,
-        actual_final_state_fingerprint,
-        final_state_fingerprint_matches,
-        expected_run_decision_kind: spec.expected_run_decision_kind,
-        actual_run_decision_kind,
-        run_decision_kind_matches,
-        expected_executed_step_count: spec.expected_executed_step_count,
-        actual_executed_step_count,
-        executed_step_count_matches,
-        replayed_run,
-        reason,
-    }
 }
 
 impl CombatSessionState {
@@ -1577,90 +1463,6 @@ impl CombatSessionState {
     }
 }
 
-fn combat_session_automatic_run_readout(
-    id: String,
-    title: String,
-    summary: String,
-    accepted: bool,
-    decision_kind: CombatSessionAutomaticRunDecisionKind,
-    max_steps: u32,
-    steps: Vec<CombatSessionAutomaticStepExecutionReadout>,
-    final_snapshot: CombatSessionSnapshot,
-    reason: impl Into<String>,
-) -> CombatSessionAutomaticRunReadout {
-    CombatSessionAutomaticRunReadout {
-        id,
-        title,
-        summary,
-        accepted,
-        decision_kind,
-        max_steps,
-        executed_step_count: steps.len() as u32,
-        steps,
-        final_snapshot,
-        reason: reason.into(),
-    }
-}
-
-fn plan_automatic_step(
-    lifecycle_phase: CombatLifecyclePhase,
-    current_actor_id: Option<String>,
-    combat_end_condition: CombatEndConditionReadout,
-    auto_candidate_plan: impl FnOnce() -> CombatSessionAutoCandidatePlanReadout,
-) -> CombatSessionAutomaticStepPlanReadout {
-    if lifecycle_phase == CombatLifecyclePhase::Ended {
-        return CombatSessionAutomaticStepPlanReadout {
-            accepted: false,
-            decision_kind: CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle,
-            operation_kind: None,
-            lifecycle_phase,
-            current_actor_id,
-            combat_end_condition,
-            auto_candidate_plan: None,
-            reason: "Automatic combat step rejected because combat is already ended.".to_string(),
-        };
-    }
-
-    if combat_end_condition.combat_should_end {
-        return CombatSessionAutomaticStepPlanReadout {
-            accepted: true,
-            decision_kind: CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
-            operation_kind: Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd),
-            lifecycle_phase,
-            current_actor_id,
-            combat_end_condition,
-            auto_candidate_plan: None,
-            reason: "Automatic combat step planned conditional combat end.".to_string(),
-        };
-    }
-
-    let candidate_plan = auto_candidate_plan();
-    if candidate_plan.accepted {
-        return CombatSessionAutomaticStepPlanReadout {
-            accepted: true,
-            decision_kind: CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
-            operation_kind: Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate),
-            lifecycle_phase,
-            current_actor_id,
-            combat_end_condition,
-            auto_candidate_plan: Some(candidate_plan),
-            reason: "Automatic combat step planned first accepted command candidate.".to_string(),
-        };
-    }
-
-    CombatSessionAutomaticStepPlanReadout {
-        accepted: true,
-        decision_kind: CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
-        operation_kind: Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn),
-        lifecycle_phase,
-        current_actor_id,
-        combat_end_condition,
-        auto_candidate_plan: Some(candidate_plan),
-        reason: "Automatic combat step planned turn advancement because no accepted command candidate is available."
-            .to_string(),
-    }
-}
-
 fn combat_control_readout(
     command_kind: CombatControlCommandKind,
     accepted: bool,
@@ -2547,182 +2349,6 @@ fn current_actor_command_candidates(
         unavailable_reason: options.unavailable_reason,
         candidates,
     }
-}
-
-fn plan_candidate_command(
-    spec: CombatSessionCandidateSelectionSpec,
-    candidates: CommandCandidateSummary,
-) -> CombatSessionCandidateSelectionReadout {
-    if !candidates.available {
-        return CombatSessionCandidateSelectionReadout {
-            action_id: spec.action_id,
-            target_id: spec.target_id,
-            accepted: false,
-            decision_kind:
-                CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates,
-            current_actor_id: candidates.current_actor_id,
-            unavailable_reason: candidates.unavailable_reason,
-            preflight_decision_kind: None,
-            rejection: None,
-            reason: candidate_selection_unavailable_reason(candidates.unavailable_reason),
-            command: None,
-        };
-    }
-
-    let Some(candidate) = candidates.candidates.iter().find(|candidate| {
-        candidate.action_id == spec.action_id && candidate.target_id == spec.target_id
-    }) else {
-        return CombatSessionCandidateSelectionReadout {
-            action_id: spec.action_id,
-            target_id: spec.target_id,
-            accepted: false,
-            decision_kind: CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate,
-            current_actor_id: candidates.current_actor_id,
-            unavailable_reason: None,
-            preflight_decision_kind: None,
-            rejection: None,
-            reason: "Selected command candidate is not available for the current actor."
-                .to_string(),
-            command: None,
-        };
-    };
-
-    if !candidate.accepted {
-        return CombatSessionCandidateSelectionReadout {
-            action_id: spec.action_id,
-            target_id: spec.target_id,
-            accepted: false,
-            decision_kind: CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight,
-            current_actor_id: candidates.current_actor_id,
-            unavailable_reason: None,
-            preflight_decision_kind: Some(candidate.decision_kind),
-            rejection: candidate.rejection,
-            reason: candidate.reason.clone(),
-            command: None,
-        };
-    }
-
-    let command = CombatSessionIntentCommandSpec::new(
-        spec.id,
-        spec.title,
-        spec.summary,
-        candidate.intent.clone(),
-        spec.roll_stream,
-    );
-
-    CombatSessionCandidateSelectionReadout {
-        action_id: spec.action_id,
-        target_id: spec.target_id,
-        accepted: true,
-        decision_kind: CombatSessionCandidateSelectionDecisionKind::Accepted,
-        current_actor_id: candidates.current_actor_id,
-        unavailable_reason: None,
-        preflight_decision_kind: Some(candidate.decision_kind),
-        rejection: None,
-        reason: "Selected command candidate planned for deterministic submission.".to_string(),
-        command: Some(command),
-    }
-}
-
-fn plan_auto_candidate_command(
-    spec: CombatSessionAutoCandidateCommandSpec,
-    candidates: CommandCandidateSummary,
-) -> CombatSessionAutoCandidatePlanReadout {
-    let candidate_count = candidates.candidates.len();
-    let accepted_candidate_count = candidates
-        .candidates
-        .iter()
-        .filter(|candidate| candidate.accepted)
-        .count();
-
-    if !candidates.available {
-        return CombatSessionAutoCandidatePlanReadout {
-            accepted: false,
-            decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates,
-            current_actor_id: candidates.current_actor_id,
-            candidate_count,
-            accepted_candidate_count,
-            selected_action_id: None,
-            selected_target_id: None,
-            unavailable_reason: candidates.unavailable_reason,
-            reason: candidate_selection_unavailable_reason(candidates.unavailable_reason),
-            selection: None,
-        };
-    }
-
-    let Some(candidate) = candidates
-        .candidates
-        .iter()
-        .find(|candidate| candidate.accepted)
-        .cloned()
-    else {
-        return CombatSessionAutoCandidatePlanReadout {
-            accepted: false,
-            decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate,
-            current_actor_id: candidates.current_actor_id,
-            candidate_count,
-            accepted_candidate_count,
-            selected_action_id: None,
-            selected_target_id: None,
-            unavailable_reason: None,
-            reason:
-                "No accepted command candidates are available for deterministic auto submission."
-                    .to_string(),
-            selection: None,
-        };
-    };
-
-    let selected_action_id = candidate.action_id.clone();
-    let selected_target_id = candidate.target_id.clone();
-    let selection = plan_candidate_command(
-        CombatSessionCandidateSelectionSpec::new(
-            spec.id,
-            spec.title,
-            spec.summary,
-            candidate.action_id,
-            candidate.target_id,
-            spec.roll_stream,
-        ),
-        candidates,
-    );
-
-    CombatSessionAutoCandidatePlanReadout {
-        accepted: selection.accepted,
-        decision_kind: CombatSessionAutoCandidateDecisionKind::Accepted,
-        current_actor_id: selection.current_actor_id.clone(),
-        candidate_count,
-        accepted_candidate_count,
-        selected_action_id: Some(selected_action_id),
-        selected_target_id: Some(selected_target_id),
-        unavailable_reason: None,
-        reason: "First accepted command candidate planned for deterministic auto submission."
-            .to_string(),
-        selection: Some(selection),
-    }
-}
-
-fn candidate_selection_unavailable_reason(
-    reason: Option<CurrentActorOptionsUnavailableReason>,
-) -> String {
-    match reason {
-        Some(CurrentActorOptionsUnavailableReason::CombatEnded) => {
-            "No command candidates are available because combat is ended."
-        }
-        Some(CurrentActorOptionsUnavailableReason::NoCurrentActor) => {
-            "No command candidates are available because there is no current actor."
-        }
-        Some(CurrentActorOptionsUnavailableReason::CurrentActorDefeated) => {
-            "No command candidates are available because the current actor is defeated."
-        }
-        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions) => {
-            "No command candidates are available because the current actor has no matching actions."
-        }
-        Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets) => {
-            "No command candidates are available because there are no visible active targets."
-        }
-        None => "No command candidates are available.",
-    }
-    .to_string()
 }
 
 fn current_actor_id_command_candidates(
