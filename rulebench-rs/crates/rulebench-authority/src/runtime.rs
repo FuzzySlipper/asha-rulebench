@@ -182,6 +182,10 @@ impl CombatSessionState {
     }
 
     pub fn advance_turn(&mut self) {
+        if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+            return;
+        }
+
         self.turn_order.advance_turn();
     }
 

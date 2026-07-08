@@ -2722,6 +2722,41 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_does_not_advance_turn_after_combat_end() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.advance_turn();
+        session.end_combat();
+        let before_attempt = session.snapshot();
+
+        session.advance_turn();
+        let after_attempt = session.snapshot();
+
+        assert_eq!(before_attempt.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(before_attempt.lifecycle.ended_at_step, Some(1));
+        assert_eq!(after_attempt.lifecycle, before_attempt.lifecycle);
+        assert_eq!(after_attempt.turn_order, before_attempt.turn_order);
+        assert_eq!(
+            after_attempt.next_step_index,
+            before_attempt.next_step_index
+        );
+        assert_eq!(
+            after_attempt.current_state_fingerprint,
+            before_attempt.current_state_fingerprint
+        );
+        assert_eq!(after_attempt.combat_log, before_attempt.combat_log);
+        assert_eq!(after_attempt.audit_log, before_attempt.audit_log);
+    }
+
+    #[test]
     fn session_runtime_turn_order_represents_empty_participants() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.combatants.clear();
