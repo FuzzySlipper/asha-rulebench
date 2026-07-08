@@ -4,9 +4,11 @@
 mod ts_emit;
 
 use rulebench_authority::{
-    combat_session_transcripts, CombatLogEntry, CombatSessionStepReadout, CombatSessionStepSummary,
+    combat_session_control_history_readouts, combat_session_transcripts, CombatControlCommandKind,
+    CombatControlDecisionKind, CombatControlHistoryEntry, CombatControlHistoryReadout,
+    CombatLifecyclePhase, CombatLogEntry, CombatSessionStepReadout, CombatSessionStepSummary,
     CombatSessionSummary, CommandAttempt, CommandOutcomeClass, ScenarioMetadata,
-    ScenarioProjection,
+    ScenarioProjection, StateFingerprint,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -35,6 +37,11 @@ fn render_combat_session_catalog() -> String {
         for readout in &transcript.steps {
             out.push_str(&render_step_readout(readout));
         }
+    }
+    out.push_str("  ],\n");
+    out.push_str("  controlHistoryReadouts: [\n");
+    for readout in combat_session_control_history_readouts() {
+        out.push_str(&render_control_history_readout(&readout));
     }
     out.push_str("  ],\n");
     out.push_str("};\n");
@@ -196,6 +203,94 @@ fn render_log_entry(entry: &CombatLogEntry, indent: &str) -> String {
     out
 }
 
+fn render_control_history_readout(readout: &CombatControlHistoryReadout) -> String {
+    let mut out = String::from("    {\n");
+    out.push_str(&format!(
+        "      sessionId: {},\n",
+        ts_string(&readout.session_id)
+    ));
+    out.push_str(&format!("      title: {},\n", ts_string(&readout.title)));
+    out.push_str(&format!(
+        "      summary: {},\n",
+        ts_string(&readout.summary)
+    ));
+    out.push_str("      history: [\n");
+    for entry in &readout.history {
+        out.push_str(&render_control_history_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("    },\n");
+    out
+}
+
+fn render_control_history_entry(entry: &CombatControlHistoryEntry, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  commandKind: {},\n",
+        ts_string(control_command_kind(entry.command_kind))
+    ));
+    out.push_str(&format!("{indent}  accepted: {},\n", entry.accepted));
+    out.push_str(&format!(
+        "{indent}  decisionKind: {},\n",
+        ts_string(control_decision_kind(entry.decision_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  previousLifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(entry.previous_lifecycle_phase))
+    ));
+    out.push_str(&format!(
+        "{indent}  nextLifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(entry.next_lifecycle_phase))
+    ));
+    out.push_str(&format!(
+        "{indent}  previousRoundNumber: {},\n",
+        entry.previous_round_number
+    ));
+    out.push_str(&format!(
+        "{indent}  previousTurnIndex: {},\n",
+        entry.previous_turn_index
+    ));
+    out.push_str(&format!(
+        "{indent}  previousActorId: {},\n",
+        render_optional_string(&entry.previous_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  nextRoundNumber: {},\n",
+        entry.next_round_number
+    ));
+    out.push_str(&format!(
+        "{indent}  nextTurnIndex: {},\n",
+        entry.next_turn_index
+    ));
+    out.push_str(&format!(
+        "{indent}  nextActorId: {},\n",
+        render_optional_string(&entry.next_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  lifecycleTransitionSequence: {},\n",
+        render_optional_u32(entry.lifecycle_transition_sequence)
+    ));
+    out.push_str(&format!(
+        "{indent}  turnTransitionSequence: {},\n",
+        render_optional_u32(entry.turn_transition_sequence)
+    ));
+    out.push_str(&format!(
+        "{indent}  stateBeforeFingerprint: {},\n",
+        render_fingerprint(&entry.state_before_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  stateAfterFingerprint: {},\n",
+        render_fingerprint(&entry.state_after_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&entry.reason)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
 fn render_state(state: &ScenarioProjection, indent: &str) -> String {
     let mut out = String::from("{\n");
     out.push_str(&format!(
@@ -226,6 +321,52 @@ fn render_state(state: &ScenarioProjection, indent: &str) -> String {
     out.push_str(&format!("{indent}  ],\n"));
     out.push_str(&format!("{indent}}}"));
     out
+}
+
+fn render_fingerprint(fingerprint: &StateFingerprint, _indent: &str) -> String {
+    format!(
+        "{{ algorithm: {}, value: {} }}",
+        ts_string(&fingerprint.algorithm),
+        ts_string(&fingerprint.value)
+    )
+}
+
+fn render_optional_string(value: &Option<String>) -> String {
+    value
+        .as_ref()
+        .map(|inner| ts_string(inner))
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn render_optional_u32(value: Option<u32>) -> String {
+    value
+        .map(|inner| inner.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn control_command_kind(kind: CombatControlCommandKind) -> &'static str {
+    match kind {
+        CombatControlCommandKind::ExplicitStart => "explicitStart",
+        CombatControlCommandKind::ExplicitEnd => "explicitEnd",
+        CombatControlCommandKind::AdvanceTurn => "advanceTurn",
+    }
+}
+
+fn control_decision_kind(kind: CombatControlDecisionKind) -> &'static str {
+    match kind {
+        CombatControlDecisionKind::Accepted => "accepted",
+        CombatControlDecisionKind::RejectedNoop => "rejectedNoop",
+        CombatControlDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+        CombatControlDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
+    }
+}
+
+fn lifecycle_phase(phase: CombatLifecyclePhase) -> &'static str {
+    match phase {
+        CombatLifecyclePhase::Ready => "ready",
+        CombatLifecyclePhase::InProgress => "inProgress",
+        CombatLifecyclePhase::Ended => "ended",
+    }
 }
 
 fn outcome_class(outcome_class: CommandOutcomeClass) -> &'static str {

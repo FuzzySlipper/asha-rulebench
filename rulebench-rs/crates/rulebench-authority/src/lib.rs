@@ -35,7 +35,8 @@ pub use modifiers::{
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionState};
 pub use session::{
-    combat_session_summaries, combat_session_transcripts, resolve_combat_session_step,
+    combat_session_control_history_readouts, combat_session_summaries, combat_session_transcripts,
+    resolve_combat_session_step,
 };
 
 #[cfg(test)]

@@ -31,6 +31,10 @@ pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
     vec![hexing_bolt_opening_exchange_session()]
 }
 
+pub fn combat_session_control_history_readouts() -> Vec<CombatControlHistoryReadout> {
+    vec![hexing_bolt_control_history_readout()]
+}
+
 fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
     let session_id = "hexing-bolt-opening-exchange";
     let session_title = "Hexing Bolt Opening Exchange";
@@ -98,6 +102,25 @@ fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
                 .collect(),
         },
         steps: readouts,
+    }
+}
+
+fn hexing_bolt_control_history_readout() -> CombatControlHistoryReadout {
+    let session_id = "hexing-bolt-control-sequence";
+    let title = "Hexing Bolt Control Sequence";
+    let summary = "A generated Rust control-history fixture for explicit start, turn advance, explicit end, and rejected post-end turn advance.";
+
+    let mut session_state = CombatSessionState::new(session_id, hexing_bolt_fixture_scenario());
+    session_state.submit_control_command(CombatControlCommandSpec::explicit_start());
+    session_state.submit_control_command(CombatControlCommandSpec::advance_turn());
+    session_state.submit_control_command(CombatControlCommandSpec::explicit_end());
+    session_state.submit_control_command(CombatControlCommandSpec::advance_turn());
+
+    CombatControlHistoryReadout {
+        session_id: session_id.to_string(),
+        title: title.to_string(),
+        summary: summary.to_string(),
+        history: session_state.control_history().to_vec(),
     }
 }
 

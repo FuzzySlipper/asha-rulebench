@@ -45,6 +45,9 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';",
         "export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",
+        "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
+        "export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn';",
+        "export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';",
     ]
 }
 
@@ -60,6 +63,117 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "readouts",
                     ty: "readonly RulebenchCombatSessionStepReadoutDto[]",
+                },
+                Field {
+                    name: "controlHistoryReadouts",
+                    ty: "readonly RulebenchCombatControlHistoryReadoutDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchStateFingerprintDto",
+            fields: &[
+                Field {
+                    name: "algorithm",
+                    ty: "string",
+                },
+                Field {
+                    name: "value",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatControlHistoryReadoutDto",
+            fields: &[
+                Field {
+                    name: "sessionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "history",
+                    ty: "readonly RulebenchCombatControlHistoryEntryDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatControlHistoryEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "commandKind",
+                    ty: "RulebenchCombatControlCommandKindDto",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchCombatControlDecisionKindDto",
+                },
+                Field {
+                    name: "previousLifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "nextLifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "previousRoundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "previousTurnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "previousActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "nextRoundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "nextTurnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "nextActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "lifecycleTransitionSequence",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "turnTransitionSequence",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "stateBeforeFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "stateAfterFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },

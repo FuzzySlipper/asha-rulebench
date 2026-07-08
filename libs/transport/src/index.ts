@@ -1,5 +1,6 @@
 import type {
   Result,
+  RulebenchCombatControlHistoryReadoutDto,
   RulebenchCombatSessionCatalogDto,
   RulebenchCombatSessionStepReadoutDto,
   RulebenchCombatSessionSummaryDto,
@@ -18,6 +19,9 @@ export interface RulebenchTransport {
     sessionId?: string,
     stepId?: string,
   ) => Promise<Result<RulebenchCombatSessionStepReadoutDto>>;
+  readonly loadSessionControlHistory: (
+    sessionId?: string,
+  ) => Promise<Result<RulebenchCombatControlHistoryReadoutDto>>;
 }
 
 export const defaultScenarioCatalog: RulebenchScenarioCatalogDto = rustBackedScenarioCatalog;
@@ -34,6 +38,9 @@ export const defaultCombatSessionStepReadout: RulebenchCombatSessionStepReadoutD
   defaultCombatSessionId,
   defaultCombatSessionStepId,
 );
+export const defaultCombatControlHistoryId: string = firstControlHistoryId(defaultCombatSessionCatalog);
+export const defaultCombatControlHistoryReadout: RulebenchCombatControlHistoryReadoutDto =
+  requireSessionControlHistory(defaultCombatSessionCatalog, defaultCombatControlHistoryId);
 
 export const createFakeRulebenchTransport = (
   catalog: RulebenchScenarioCatalogDto = defaultScenarioCatalog,
@@ -65,6 +72,19 @@ export const createFakeRulebenchTransport = (
           error: {
             kind: 'not-found',
             message: sessionMissingMessage(sessionCatalog, sessionId, stepId),
+            retryable: false,
+          },
+        }
+      : { ok: true, value: readout };
+  },
+  loadSessionControlHistory: async (sessionId: string = firstControlHistoryId(sessionCatalog)) => {
+    const readout = sessionControlHistory(sessionCatalog, sessionId);
+    return readout === null
+      ? {
+          ok: false,
+          error: {
+            kind: 'not-found',
+            message: `Combat control history not found: ${sessionId}`,
             retryable: false,
           },
         }
@@ -110,6 +130,29 @@ function requireSessionStepReadout(
     throw new Error(`Default combat session step readout is missing: ${sessionId} / ${stepId}`);
   }
   return readout;
+}
+
+function firstControlHistoryId(catalog: RulebenchCombatSessionCatalogDto): string {
+  const firstReadout = catalog.controlHistoryReadouts[0];
+  return firstReadout?.sessionId ?? '';
+}
+
+function requireSessionControlHistory(
+  catalog: RulebenchCombatSessionCatalogDto,
+  sessionId: string,
+): RulebenchCombatControlHistoryReadoutDto {
+  const readout = sessionControlHistory(catalog, sessionId);
+  if (readout === null) {
+    throw new Error(`Default combat control history readout is missing: ${sessionId}`);
+  }
+  return readout;
+}
+
+function sessionControlHistory(
+  catalog: RulebenchCombatSessionCatalogDto,
+  sessionId: string,
+): RulebenchCombatControlHistoryReadoutDto | null {
+  return catalog.controlHistoryReadouts.find((readout) => readout.sessionId === sessionId) ?? null;
 }
 
 function sessionStepReadout(

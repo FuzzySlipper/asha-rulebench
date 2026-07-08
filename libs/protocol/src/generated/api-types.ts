@@ -16,9 +16,48 @@ export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 
 
 export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';
 
+export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
+
+export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn';
+
+export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';
+
 export interface RulebenchCombatSessionCatalogDto {
   readonly summaries: readonly RulebenchCombatSessionSummaryDto[];
   readonly readouts: readonly RulebenchCombatSessionStepReadoutDto[];
+  readonly controlHistoryReadouts: readonly RulebenchCombatControlHistoryReadoutDto[];
+}
+
+export interface RulebenchStateFingerprintDto {
+  readonly algorithm: string;
+  readonly value: string;
+}
+
+export interface RulebenchCombatControlHistoryReadoutDto {
+  readonly sessionId: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly history: readonly RulebenchCombatControlHistoryEntryDto[];
+}
+
+export interface RulebenchCombatControlHistoryEntryDto {
+  readonly sequence: number;
+  readonly commandKind: RulebenchCombatControlCommandKindDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCombatControlDecisionKindDto;
+  readonly previousLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly nextLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly previousRoundNumber: number;
+  readonly previousTurnIndex: number;
+  readonly previousActorId: string | null;
+  readonly nextRoundNumber: number;
+  readonly nextTurnIndex: number;
+  readonly nextActorId: string | null;
+  readonly lifecycleTransitionSequence: number | null;
+  readonly turnTransitionSequence: number | null;
+  readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchStateFingerprintDto;
+  readonly reason: string;
 }
 
 export interface RulebenchCombatSessionSummaryDto {

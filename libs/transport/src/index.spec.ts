@@ -3,6 +3,7 @@ import {
   createFakeRulebenchTransport,
   defaultCombatSessionCatalog,
   defaultCombatSessionStepReadout,
+  defaultCombatControlHistoryReadout,
   defaultScenarioCatalog,
   defaultScenarioReadout,
 } from './index';
@@ -82,6 +83,48 @@ describe('RulebenchTransport fixtures', () => {
       expect(result.value.stateBefore.combatants[1]?.hitPoints.current).toBe(18);
       expect(result.value.stateAfter.combatants[1]?.conditions).toEqual(['rattled']);
     }
+  });
+
+  it('uses the checked Rust-backed control history fixture as the default transport payload', async () => {
+    expect(defaultCombatSessionCatalog).toBe(rustBackedCombatSessionCatalog);
+
+    const transport = createFakeRulebenchTransport();
+    const result = await transport.loadSessionControlHistory('hexing-bolt-control-sequence');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(defaultCombatControlHistoryReadout);
+      expect(result.value.history.map((entry) => entry.commandKind)).toEqual([
+        'explicitStart',
+        'advanceTurn',
+        'explicitEnd',
+        'advanceTurn',
+      ]);
+      expect(result.value.history.map((entry) => entry.decisionKind)).toEqual([
+        'accepted',
+        'accepted',
+        'accepted',
+        'rejectedByLifecycle',
+      ]);
+      expect(result.value.history[0]?.lifecycleTransitionSequence).toBe(0);
+      expect(result.value.history[1]?.turnTransitionSequence).toBe(0);
+      expect(result.value.history[3]?.reason).toBe('Combat is already ended.');
+    }
+  });
+
+  it('classifies missing combat control history ids as not found', async () => {
+    const transport = createFakeRulebenchTransport();
+
+    const result = await transport.loadSessionControlHistory('missing-control-history');
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: 'not-found',
+        message: 'Combat control history not found: missing-control-history',
+        retryable: false,
+      },
+    });
   });
 
   it('classifies missing combat session ids as not found', async () => {

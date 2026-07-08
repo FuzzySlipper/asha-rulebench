@@ -569,6 +569,14 @@ pub struct CombatSessionTranscript {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatControlHistoryReadout {
+    pub session_id: String,
+    pub title: String,
+    pub summary: String,
+    pub history: Vec<CombatControlHistoryEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionStepReadout {
     pub session_id: String,
     pub step: CombatSessionStepSummary,
