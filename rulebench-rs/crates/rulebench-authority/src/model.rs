@@ -223,6 +223,23 @@ pub struct ActionUsageSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatantVitalityEntry {
+    pub combatant_id: String,
+    pub current_hit_points: i32,
+    pub max_hit_points: i32,
+    pub defeated: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatantVitalitySummary {
+    pub combatants: Vec<CombatantVitalityEntry>,
+    pub active_combatant_ids: Vec<String>,
+    pub defeated_combatant_ids: Vec<String>,
+    pub active_count: u32,
+    pub defeated_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatLogEntry {
     pub id: String,
     pub step_id: String,
@@ -262,6 +279,7 @@ pub struct CombatSessionSnapshot {
     pub audit_log: Vec<CommandAuditEntry>,
     pub action_usage_log: Vec<ActionUsageEntry>,
     pub current_turn_action_usage: ActionUsageSummary,
+    pub combatant_vitality: CombatantVitalitySummary,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,
 }

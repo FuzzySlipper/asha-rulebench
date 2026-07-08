@@ -186,6 +186,11 @@ impl CombatSessionState {
         current_turn_action_usage(&self.turn_order, &self.action_usage_log)
     }
 
+    pub fn combatant_vitality(&self) -> CombatantVitalitySummary {
+        let current_state = self.state.project("Current session state.");
+        combatant_vitality_summary(&current_state)
+    }
+
     pub fn next_step_index(&self) -> u32 {
         self.next_step_index
     }
@@ -227,6 +232,7 @@ impl CombatSessionState {
             audit_log: self.audit_log.clone(),
             action_usage_log: self.action_usage_log.clone(),
             current_turn_action_usage: self.current_turn_action_usage(),
+            combatant_vitality: combatant_vitality_summary(&current_state),
             current_state,
             current_state_fingerprint,
         }
@@ -383,6 +389,37 @@ fn current_turn_action_usage(
         used_action_count: used_action_ids.len() as u32,
         used_action_ids,
         used_ability_ids,
+    }
+}
+
+fn combatant_vitality_summary(projection: &ScenarioProjection) -> CombatantVitalitySummary {
+    let mut combatants = Vec::new();
+    let mut active_combatant_ids = Vec::new();
+    let mut defeated_combatant_ids = Vec::new();
+
+    for combatant in &projection.combatants {
+        let defeated = combatant.hit_points.current <= 0;
+        let entry = CombatantVitalityEntry {
+            combatant_id: combatant.id.clone(),
+            current_hit_points: combatant.hit_points.current,
+            max_hit_points: combatant.hit_points.max,
+            defeated,
+        };
+
+        if defeated {
+            defeated_combatant_ids.push(combatant.id.clone());
+        } else {
+            active_combatant_ids.push(combatant.id.clone());
+        }
+        combatants.push(entry);
+    }
+
+    CombatantVitalitySummary {
+        active_count: active_combatant_ids.len() as u32,
+        defeated_count: defeated_combatant_ids.len() as u32,
+        combatants,
+        active_combatant_ids,
+        defeated_combatant_ids,
     }
 }
 

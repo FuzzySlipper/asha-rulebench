@@ -2223,6 +2223,31 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_vitality_summary_reads_initial_active_combatants() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let summary = session.combatant_vitality();
+
+        assert_eq!(summary.combatants.len(), 2);
+        assert_eq!(summary.active_count, 2);
+        assert_eq!(summary.defeated_count, 0);
+        assert_eq!(
+            summary.active_combatant_ids,
+            vec!["entity-adept".to_string(), "entity-raider".to_string()]
+        );
+        assert!(summary.defeated_combatant_ids.is_empty());
+        assert_eq!(summary.combatants[0].combatant_id, "entity-adept");
+        assert_eq!(summary.combatants[0].current_hit_points, 24);
+        assert_eq!(summary.combatants[0].max_hit_points, 24);
+        assert!(!summary.combatants[0].defeated);
+        assert_eq!(summary.combatants[1].combatant_id, "entity-raider");
+        assert_eq!(summary.combatants[1].current_hit_points, 18);
+        assert_eq!(summary.combatants[1].max_hit_points, 18);
+        assert!(!summary.combatants[1].defeated);
+    }
+
+    #[test]
     fn session_runtime_miss_preserves_prior_state() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -2260,6 +2285,29 @@ mod tests {
             readout.state_after.combatants[1].conditions,
             vec!["rattled".to_string()]
         );
+    }
+
+    #[test]
+    fn session_runtime_vitality_summary_keeps_damaged_combatant_active_above_zero() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let summary = session.combatant_vitality();
+
+        assert_eq!(summary.active_count, 2);
+        assert_eq!(summary.defeated_count, 0);
+        assert_eq!(summary.combatants[1].combatant_id, "entity-raider");
+        assert_eq!(summary.combatants[1].current_hit_points, 9);
+        assert_eq!(summary.combatants[1].max_hit_points, 18);
+        assert!(!summary.combatants[1].defeated);
     }
 
     #[test]
@@ -3287,6 +3335,16 @@ mod tests {
                 used_ability_ids: Vec::new(),
             }
         );
+        assert_eq!(
+            session.combatant_vitality(),
+            CombatantVitalitySummary {
+                combatants: Vec::new(),
+                active_combatant_ids: Vec::new(),
+                defeated_combatant_ids: Vec::new(),
+                active_count: 0,
+                defeated_count: 0,
+            }
+        );
 
         session.advance_turn();
 
@@ -3369,11 +3427,60 @@ mod tests {
             snapshot.current_turn_action_usage.used_action_ids,
             vec!["hexing_bolt".to_string()]
         );
+        assert_eq!(snapshot.combatant_vitality.active_count, 2);
+        assert_eq!(snapshot.combatant_vitality.defeated_count, 0);
+        assert_eq!(
+            snapshot.combatant_vitality.active_combatant_ids,
+            vec!["entity-adept".to_string(), "entity-raider".to_string()]
+        );
         assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
         assert_eq!(
             snapshot.current_state.combatants[1].conditions,
             vec!["rattled".to_string()]
         );
+    }
+
+    #[test]
+    fn session_runtime_vitality_summary_marks_zero_hp_defeated() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1].hit_points.current = 0;
+        let session = CombatSessionState::new("runtime-zero-hp", scenario);
+
+        let summary = session.combatant_vitality();
+
+        assert_eq!(summary.active_count, 1);
+        assert_eq!(summary.defeated_count, 1);
+        assert_eq!(
+            summary.active_combatant_ids,
+            vec!["entity-adept".to_string()]
+        );
+        assert_eq!(
+            summary.defeated_combatant_ids,
+            vec!["entity-raider".to_string()]
+        );
+        assert!(summary.combatants[1].defeated);
+    }
+
+    #[test]
+    fn session_runtime_vitality_summary_marks_negative_hp_defeated() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].hit_points.current = -3;
+        let session = CombatSessionState::new("runtime-negative-hp", scenario);
+
+        let summary = session.combatant_vitality();
+
+        assert_eq!(summary.active_count, 1);
+        assert_eq!(summary.defeated_count, 1);
+        assert_eq!(
+            summary.active_combatant_ids,
+            vec!["entity-raider".to_string()]
+        );
+        assert_eq!(
+            summary.defeated_combatant_ids,
+            vec!["entity-adept".to_string()]
+        );
+        assert_eq!(summary.combatants[0].current_hit_points, -3);
+        assert!(summary.combatants[0].defeated);
     }
 
     #[test]
