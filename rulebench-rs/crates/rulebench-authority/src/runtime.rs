@@ -71,24 +71,44 @@ impl CombatSessionState {
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let state_before = self.state.project("State before command resolution.");
         let state_before_fingerprint = fingerprint_projected_state(&state_before);
-        let (receipt, state_after) = if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+        let combat_has_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
+        let (receipt, state_after, should_apply_state) = if combat_has_ended {
             let state_after = self
                 .state
                 .project("No authority state changed; combat already ended.");
             (
                 ended_combat_receipt(spec.intent.clone(), state_after.clone()),
                 state_after,
+                false,
             )
         } else {
-            self.lifecycle.start_at_step(self.next_step_index);
-            let receipt =
-                resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
-            let state_after = receipt
-                .projection
-                .clone()
-                .expect("session runtime resolver always produces projection");
+            match self.turn_order.current_actor_id.as_deref() {
+                Some(current_actor_id) if spec.intent.actor_id != current_actor_id => {
+                    let state_after = self.state.project(
+                        "No authority state changed; actor is not the current turn actor.",
+                    );
+                    (
+                        non_current_actor_receipt(
+                            spec.intent.clone(),
+                            current_actor_id,
+                            state_after.clone(),
+                        ),
+                        state_after,
+                        false,
+                    )
+                }
+                _ => {
+                    self.lifecycle.start_at_step(self.next_step_index);
+                    let receipt =
+                        resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
+                    let state_after = receipt
+                        .projection
+                        .clone()
+                        .expect("session runtime resolver always produces projection");
 
-            (receipt, state_after)
+                    (receipt, state_after, true)
+                }
+            }
         };
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
 
@@ -120,7 +140,7 @@ impl CombatSessionState {
         self.combat_log.push(log_entry.clone());
         self.audit_log.push(audit_entry.clone());
         self.next_step_index += 1;
-        if self.lifecycle.phase != CombatLifecyclePhase::Ended {
+        if should_apply_state {
             self.state = CombatState::from_projection(&state_after);
         }
 
@@ -210,6 +230,41 @@ fn ended_combat_receipt(
                 TraceStatus::Rejected,
                 "Command rejected by lifecycle.",
                 "Combat is already ended.",
+            ),
+        ],
+        projection: Some(projection),
+    }
+}
+
+fn non_current_actor_receipt(
+    intent: UseActionIntent,
+    current_actor_id: &str,
+    projection: ScenarioProjection,
+) -> RulebenchReceipt {
+    RulebenchReceipt {
+        accepted: false,
+        authority_surface: AUTHORITY_SURFACE,
+        intent,
+        rejection: Some(RulebenchRejection::InvalidAction),
+        target_legality: None,
+        attack_roll: None,
+        damage: None,
+        modifier: None,
+        events: Vec::new(),
+        trace: vec![
+            TraceEntry::new(
+                1,
+                TracePhase::Proposal,
+                TraceStatus::Info,
+                "UseActionIntent received.",
+                "Session command submitted for actor outside the current turn.",
+            ),
+            TraceEntry::new(
+                2,
+                TracePhase::Validation,
+                TraceStatus::Rejected,
+                "Command rejected by turn order.",
+                format!("Current actor is {current_actor_id}."),
             ),
         ],
         projection: Some(projection),
