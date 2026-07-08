@@ -195,18 +195,34 @@ impl CombatSessionScriptStepSpec {
             command: CombatSessionScriptCommandSpec::Control(command),
         }
     }
+
+    pub fn selected_candidate(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        command: CombatSessionCandidateSelectionSpec,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            command: CombatSessionScriptCommandSpec::SelectedCandidate(command),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CombatSessionScriptCommandSpec {
     Intent(CombatSessionIntentCommandSpec),
     Control(CombatControlCommandSpec),
+    SelectedCandidate(CombatSessionCandidateSelectionSpec),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatSessionScriptCommandKind {
     Intent,
     Control,
+    SelectedCandidate,
 }
 
 impl CombatSessionScriptCommandKind {
@@ -214,6 +230,7 @@ impl CombatSessionScriptCommandKind {
         match self {
             CombatSessionScriptCommandKind::Intent => "intent",
             CombatSessionScriptCommandKind::Control => "control",
+            CombatSessionScriptCommandKind::SelectedCandidate => "selectedCandidate",
         }
     }
 }
@@ -222,6 +239,8 @@ impl CombatSessionScriptCommandKind {
 pub enum CombatSessionScriptDecisionKind {
     Intent(CommandDecisionKind),
     Control(CombatControlDecisionKind),
+    SelectedCandidateSubmitted(CommandDecisionKind),
+    SelectedCandidateSelection(CombatSessionCandidateSelectionDecisionKind),
 }
 
 impl CombatSessionScriptDecisionKind {
@@ -229,6 +248,12 @@ impl CombatSessionScriptDecisionKind {
         match self {
             CombatSessionScriptDecisionKind::Intent(decision_kind) => decision_kind.code(),
             CombatSessionScriptDecisionKind::Control(decision_kind) => decision_kind.code(),
+            CombatSessionScriptDecisionKind::SelectedCandidateSubmitted(decision_kind) => {
+                decision_kind.code()
+            }
+            CombatSessionScriptDecisionKind::SelectedCandidateSelection(decision_kind) => {
+                decision_kind.code()
+            }
         }
     }
 }
@@ -367,6 +392,18 @@ impl CombatSessionState {
                     spec,
                     &readout,
                     control_history_sequence,
+                )
+            }
+            CombatSessionScriptCommandSpec::SelectedCandidate(command) => {
+                let state_before_fingerprint = self.snapshot().current_state_fingerprint;
+                let execution = self.submit_candidate_command(command);
+                let state_after_fingerprint = self.snapshot().current_state_fingerprint;
+                combat_session_script_selected_candidate_step_readout(
+                    sequence,
+                    spec,
+                    &execution,
+                    state_before_fingerprint,
+                    state_after_fingerprint,
                 )
             }
         }
@@ -982,6 +1019,52 @@ fn combat_session_script_control_step_readout(
     }
 }
 
+fn combat_session_script_selected_candidate_step_readout(
+    sequence: u32,
+    spec: CombatSessionScriptStepSpec,
+    readout: &CombatSessionCandidateExecutionReadout,
+    state_before_fingerprint: StateFingerprint,
+    state_after_fingerprint: StateFingerprint,
+) -> CombatSessionScriptStepReadout {
+    if let Some(submitted_step) = &readout.submitted_step {
+        return CombatSessionScriptStepReadout {
+            sequence,
+            id: spec.id,
+            title: spec.title,
+            summary: spec.summary,
+            command_kind: CombatSessionScriptCommandKind::SelectedCandidate,
+            accepted: submitted_step.audit_entry.accepted,
+            decision_kind: CombatSessionScriptDecisionKind::SelectedCandidateSubmitted(
+                submitted_step.audit_entry.decision_kind,
+            ),
+            reason: selected_candidate_submitted_script_step_reason(&submitted_step.audit_entry),
+            state_before_fingerprint: submitted_step.audit_entry.state_before_fingerprint.clone(),
+            state_after_fingerprint: submitted_step.audit_entry.state_after_fingerprint.clone(),
+            runtime_step_id: Some(submitted_step.step.id.clone()),
+            command_audit_sequence: Some(submitted_step.audit_entry.sequence),
+            control_history_sequence: None,
+        };
+    }
+
+    CombatSessionScriptStepReadout {
+        sequence,
+        id: spec.id,
+        title: spec.title,
+        summary: spec.summary,
+        command_kind: CombatSessionScriptCommandKind::SelectedCandidate,
+        accepted: false,
+        decision_kind: CombatSessionScriptDecisionKind::SelectedCandidateSelection(
+            readout.selection.decision_kind,
+        ),
+        reason: readout.selection.reason.clone(),
+        state_before_fingerprint,
+        state_after_fingerprint,
+        runtime_step_id: None,
+        command_audit_sequence: None,
+        control_history_sequence: None,
+    }
+}
+
 fn intent_script_step_reason(audit_entry: &CommandAuditEntry) -> String {
     match audit_entry.decision_kind {
         CommandDecisionKind::AcceptedByResolver => "Intent command accepted by resolver.",
@@ -989,6 +1072,27 @@ fn intent_script_step_reason(audit_entry: &CommandAuditEntry) -> String {
         CommandDecisionKind::RejectedByPreflight => "Intent command rejected by preflight.",
         CommandDecisionKind::RejectedByLifecycle => "Intent command rejected by lifecycle.",
         CommandDecisionKind::RejectedByTurnOrder => "Intent command rejected by turn order.",
+    }
+    .to_string()
+}
+
+fn selected_candidate_submitted_script_step_reason(audit_entry: &CommandAuditEntry) -> String {
+    match audit_entry.decision_kind {
+        CommandDecisionKind::AcceptedByResolver => {
+            "Selected candidate command accepted by resolver."
+        }
+        CommandDecisionKind::RejectedByResolver => {
+            "Selected candidate command rejected by resolver."
+        }
+        CommandDecisionKind::RejectedByPreflight => {
+            "Selected candidate command rejected by preflight."
+        }
+        CommandDecisionKind::RejectedByLifecycle => {
+            "Selected candidate command rejected by lifecycle."
+        }
+        CommandDecisionKind::RejectedByTurnOrder => {
+            "Selected candidate command rejected by turn order."
+        }
     }
     .to_string()
 }

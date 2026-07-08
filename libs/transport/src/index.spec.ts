@@ -229,9 +229,9 @@ describe('RulebenchTransport fixtures', () => {
       expect(result.value.steps.map((step) => step.commandKind)).toEqual([
         'control',
         'control',
-        'intent',
+        'selectedCandidate',
         'control',
-        'intent',
+        'selectedCandidate',
         'control',
       ]);
       expect(result.value.steps.map((step) => step.decisionKind)).toEqual([
@@ -239,12 +239,13 @@ describe('RulebenchTransport fixtures', () => {
         'rejectedNoop',
         'acceptedByResolver',
         'accepted',
-        'rejectedByTurnOrder',
+        'rejectedByUnavailableCandidates',
         'accepted',
       ]);
-      expect(result.value.steps[2]?.runtimeStepId).toBe('script-runtime-hit');
+      expect(result.value.steps[2]?.runtimeStepId).toBe('script-selected-runtime-hit');
       expect(result.value.steps[2]?.commandAuditSequence).toBe(0);
-      expect(result.value.steps[4]?.commandAuditSequence).toBe(1);
+      expect(result.value.steps[4]?.runtimeStepId).toBeNull();
+      expect(result.value.steps[4]?.commandAuditSequence).toBeNull();
       expect(result.value.steps[1]?.controlHistorySequence).toBe(1);
       expect(result.value.finalLifecyclePhase).toBe('ended');
     }

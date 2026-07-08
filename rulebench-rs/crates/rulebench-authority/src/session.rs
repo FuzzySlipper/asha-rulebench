@@ -1,7 +1,7 @@
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
 use crate::runtime::{
-    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptReadout,
+    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionScriptReadout,
     CombatSessionScriptSpec, CombatSessionScriptStepSpec, CombatSessionState,
 };
 
@@ -116,7 +116,7 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
     let session_id = "hexing-bolt-mixed-control-script";
     let script_id = "hexing-bolt-mixed-control-script";
     let title = "Hexing Bolt Mixed Control Script";
-    let summary = "A generated Rust script readout that mixes lifecycle control, accepted intent, and rejected wrong-actor intent.";
+    let summary = "A generated Rust script readout that mixes lifecycle control, selected-candidate execution, and rejected selected-candidate planning.";
 
     let mut session_state = CombatSessionState::new(session_id, hexing_bolt_fixture_scenario());
 
@@ -137,15 +137,16 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
                 "A repeated explicit start is rejected as a no-op without changing state.",
                 CombatControlCommandSpec::explicit_start(),
             ),
-            CombatSessionScriptStepSpec::intent(
-                "script-hit-step",
-                "Adept hits Raider",
-                "The current actor uses Hexing Bolt and the resolver accepts the hit.",
-                CombatSessionIntentCommandSpec::new(
-                    "script-runtime-hit",
+            CombatSessionScriptStepSpec::selected_candidate(
+                "script-selected-hit-step",
+                "Adept selects Hexing Bolt",
+                "The current actor selects the Rust-visible Hexing Bolt candidate and the resolver accepts the hit.",
+                CombatSessionCandidateSelectionSpec::new(
+                    "script-selected-runtime-hit",
                     "Adept hits Raider",
-                    "Hexing Bolt resolves as an accepted hit inside the mixed script.",
-                    UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                    "Hexing Bolt resolves as an accepted hit inside the selected-candidate script.",
+                    "hexing_bolt",
+                    "entity-raider",
                     vec![17, 5],
                 ),
             ),
@@ -155,15 +156,16 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
                 "Control command advances the active turn after the accepted intent.",
                 CombatControlCommandSpec::advance_turn(),
             ),
-            CombatSessionScriptStepSpec::intent(
-                "script-wrong-actor-step",
-                "Adept acts out of turn",
-                "The preflight layer rejects an Adept intent while Raider is the current actor.",
-                CombatSessionIntentCommandSpec::new(
-                    "script-runtime-wrong-actor",
-                    "Adept acts out of turn",
-                    "Hexing Bolt is rejected before resolver mutation because the actor is not current.",
-                    UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            CombatSessionScriptStepSpec::selected_candidate(
+                "script-selected-unavailable-step",
+                "Raider has no candidate",
+                "Selected-candidate planning rejects because Raider has no matching action in this fixture.",
+                CombatSessionCandidateSelectionSpec::new(
+                    "script-selected-unavailable",
+                    "Raider unavailable selected candidate",
+                    "Raider has no command candidates in this fixture.",
+                    "hexing_bolt",
+                    "entity-raider",
                     vec![17, 5],
                 ),
             ),

@@ -447,6 +447,7 @@ fn script_command_kind(kind: CombatSessionScriptCommandKind) -> &'static str {
     match kind {
         CombatSessionScriptCommandKind::Intent => "intent",
         CombatSessionScriptCommandKind::Control => "control",
+        CombatSessionScriptCommandKind::SelectedCandidate => "selectedCandidate",
     }
 }
 
@@ -457,6 +458,29 @@ fn script_decision_kind(kind: CombatSessionScriptDecisionKind) -> &'static str {
         }
         CombatSessionScriptDecisionKind::Control(decision_kind) => {
             control_decision_kind(decision_kind)
+        }
+        CombatSessionScriptDecisionKind::SelectedCandidateSubmitted(decision_kind) => {
+            command_decision_kind(decision_kind)
+        }
+        CombatSessionScriptDecisionKind::SelectedCandidateSelection(decision_kind) => {
+            candidate_selection_decision_kind(decision_kind)
+        }
+    }
+}
+
+fn candidate_selection_decision_kind(
+    kind: rulebench_authority::CombatSessionCandidateSelectionDecisionKind,
+) -> &'static str {
+    match kind {
+        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::Accepted => "accepted",
+        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates => {
+            "rejectedByUnavailableCandidates"
+        }
+        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate => {
+            "rejectedByMissingCandidate"
+        }
+        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight => {
+            "rejectedByPreflight"
         }
     }
 }

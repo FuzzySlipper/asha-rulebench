@@ -24,9 +24,9 @@ export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEn
 
 export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';
 
-export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control';
+export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';
 
-export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder';
+export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';
 
 export interface RulebenchRulesetCatalogDto {
   readonly selectedRulesetId: string;

@@ -2730,6 +2730,128 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_script_selected_candidate_accepts_hit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.run_script(CombatSessionScriptSpec::new(
+            "selected-candidate-script",
+            "Selected candidate script",
+            "Script selects a Rust-visible command candidate for submission.",
+            vec![CombatSessionScriptStepSpec::selected_candidate(
+                "script-selected-hit-step",
+                "Selected Hexing Bolt hit",
+                "The current actor selected Hexing Bolt against Raider.",
+                CombatSessionCandidateSelectionSpec::new(
+                    "script-selected-runtime-hit",
+                    "Script selected runtime hit",
+                    "Selected-candidate script command resolves as a hit.",
+                    "hexing_bolt",
+                    "entity-raider",
+                    vec![17, 5],
+                ),
+            )],
+        ));
+
+        assert_eq!(readout.steps.len(), 1);
+        let step = &readout.steps[0];
+        assert_eq!(
+            step.command_kind,
+            CombatSessionScriptCommandKind::SelectedCandidate
+        );
+        assert_eq!(step.command_kind.code(), "selectedCandidate");
+        assert!(step.accepted);
+        assert_eq!(
+            step.decision_kind,
+            CombatSessionScriptDecisionKind::SelectedCandidateSubmitted(
+                CommandDecisionKind::AcceptedByResolver
+            )
+        );
+        assert_eq!(step.decision_kind.code(), "acceptedByResolver");
+        assert_eq!(
+            step.runtime_step_id,
+            Some("script-selected-runtime-hit".to_string())
+        );
+        assert_eq!(step.command_audit_sequence, Some(0));
+        assert_eq!(step.control_history_sequence, None);
+        assert_ne!(step.state_before_fingerprint, step.state_after_fingerprint);
+        assert_eq!(
+            step.reason,
+            "Selected candidate command accepted by resolver."
+        );
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.next_step_index, 1);
+        assert_eq!(snapshot.combat_log.len(), 1);
+        assert_eq!(snapshot.audit_log.len(), 1);
+        assert_eq!(snapshot.action_usage_log.len(), 1);
+        assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            snapshot.current_state.combatants[1].conditions,
+            vec!["rattled"]
+        );
+        assert_eq!(readout.final_snapshot, snapshot);
+    }
+
+    #[test]
+    fn session_runtime_script_selected_candidate_rejection_is_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+        let before_script = session.snapshot();
+
+        let readout = session.run_script(CombatSessionScriptSpec::new(
+            "selected-candidate-rejected-script",
+            "Selected candidate rejected script",
+            "Script selects a candidate when Raider has no available action.",
+            vec![CombatSessionScriptStepSpec::selected_candidate(
+                "script-selected-unavailable-step",
+                "Selected unavailable candidate",
+                "The current actor has no matching command candidate.",
+                CombatSessionCandidateSelectionSpec::new(
+                    "script-selected-unavailable",
+                    "Script selected unavailable",
+                    "Raider has no command candidates in this fixture.",
+                    "hexing_bolt",
+                    "entity-raider",
+                    vec![17, 5],
+                ),
+            )],
+        ));
+
+        assert_eq!(readout.steps.len(), 1);
+        let step = &readout.steps[0];
+        assert_eq!(
+            step.command_kind,
+            CombatSessionScriptCommandKind::SelectedCandidate
+        );
+        assert!(!step.accepted);
+        assert_eq!(
+            step.decision_kind,
+            CombatSessionScriptDecisionKind::SelectedCandidateSelection(
+                CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates
+            )
+        );
+        assert_eq!(step.decision_kind.code(), "rejectedByUnavailableCandidates");
+        assert_eq!(step.runtime_step_id, None);
+        assert_eq!(step.command_audit_sequence, None);
+        assert_eq!(step.control_history_sequence, None);
+        assert_eq!(step.state_before_fingerprint, step.state_after_fingerprint);
+        assert_eq!(
+            step.reason,
+            "No command candidates are available because the current actor has no matching actions."
+        );
+
+        let after_script = session.snapshot();
+        assert_eq!(after_script, before_script);
+        assert_eq!(readout.final_snapshot, before_script);
+        assert!(session.combat_log().is_empty());
+        assert!(session.audit_log().is_empty());
+        assert!(session.action_usage_log().is_empty());
+        assert_eq!(session.turn_transition_log().len(), 1);
+    }
+
+    #[test]
     fn session_runtime_existing_command_spec_preserves_supplied_outcome_class() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
