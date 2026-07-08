@@ -24,6 +24,10 @@ export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEn
 
 export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';
 
+export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control';
+
+export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder';
+
 export interface RulebenchRulesetCatalogDto {
   readonly selectedRulesetId: string;
   readonly rulesets: readonly RulebenchRulesetSummaryDto[];
@@ -40,6 +44,7 @@ export interface RulebenchCombatSessionCatalogDto {
   readonly summaries: readonly RulebenchCombatSessionSummaryDto[];
   readonly readouts: readonly RulebenchCombatSessionStepReadoutDto[];
   readonly controlHistoryReadouts: readonly RulebenchCombatControlHistoryReadoutDto[];
+  readonly scriptReadouts: readonly RulebenchCombatScriptReadoutDto[];
 }
 
 export interface RulebenchStateFingerprintDto {
@@ -80,6 +85,32 @@ export interface RulebenchCombatSessionSummaryDto {
   readonly summary: string;
   readonly seedLabel: string;
   readonly steps: readonly RulebenchCombatSessionStepSummaryDto[];
+}
+
+export interface RulebenchCombatScriptReadoutDto {
+  readonly sessionId: string;
+  readonly scriptId: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly steps: readonly RulebenchCombatScriptStepReadoutDto[];
+  readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+}
+
+export interface RulebenchCombatScriptStepReadoutDto {
+  readonly sequence: number;
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly commandKind: RulebenchCombatScriptCommandKindDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCombatScriptDecisionKindDto;
+  readonly reason: string;
+  readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchStateFingerprintDto;
+  readonly runtimeStepId: string | null;
+  readonly commandAuditSequence: number | null;
+  readonly controlHistorySequence: number | null;
 }
 
 export interface RulebenchCombatSessionStepSummaryDto {

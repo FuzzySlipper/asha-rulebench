@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   createFakeRulebenchTransport,
-  defaultCombatSessionCatalog,
   defaultCombatControlHistoryReadout,
+  defaultCombatScriptReadout,
+  defaultCombatSessionCatalog,
   defaultCombatSessionStepReadout,
   defaultContentValidationCatalog,
   defaultContentValidationReport,
@@ -211,6 +212,54 @@ describe('RulebenchTransport fixtures', () => {
       error: {
         kind: 'not-found',
         message: 'Combat control history not found: missing-control-history',
+        retryable: false,
+      },
+    });
+  });
+
+  it('uses the checked Rust-backed mixed combat script fixture as the default transport payload', async () => {
+    expect(defaultCombatSessionCatalog).toBe(rustBackedCombatSessionCatalog);
+
+    const transport = createFakeRulebenchTransport();
+    const result = await transport.loadSessionScriptReadout('hexing-bolt-mixed-control-script');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(defaultCombatScriptReadout);
+      expect(result.value.steps.map((step) => step.commandKind)).toEqual([
+        'control',
+        'control',
+        'intent',
+        'control',
+        'intent',
+        'control',
+      ]);
+      expect(result.value.steps.map((step) => step.decisionKind)).toEqual([
+        'accepted',
+        'rejectedNoop',
+        'acceptedByResolver',
+        'accepted',
+        'rejectedByTurnOrder',
+        'accepted',
+      ]);
+      expect(result.value.steps[2]?.runtimeStepId).toBe('script-runtime-hit');
+      expect(result.value.steps[2]?.commandAuditSequence).toBe(0);
+      expect(result.value.steps[4]?.commandAuditSequence).toBe(1);
+      expect(result.value.steps[1]?.controlHistorySequence).toBe(1);
+      expect(result.value.finalLifecyclePhase).toBe('ended');
+    }
+  });
+
+  it('classifies missing combat script readout ids as not found', async () => {
+    const transport = createFakeRulebenchTransport();
+
+    const result = await transport.loadSessionScriptReadout('missing-script');
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: 'not-found',
+        message: 'Combat script readout not found: missing-script',
         retryable: false,
       },
     });

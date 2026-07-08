@@ -4,11 +4,13 @@
 mod ts_emit;
 
 use rulebench_authority::{
-    combat_session_control_history_readouts, combat_session_transcripts, CombatControlCommandKind,
-    CombatControlDecisionKind, CombatControlHistoryEntry, CombatControlHistoryReadout,
-    CombatLifecyclePhase, CombatLogEntry, CombatSessionStepReadout, CombatSessionStepSummary,
-    CombatSessionSummary, CommandAttempt, CommandOutcomeClass, ScenarioMetadata,
-    ScenarioProjection, StateFingerprint,
+    combat_session_control_history_readouts, combat_session_script_readouts,
+    combat_session_transcripts, CombatControlCommandKind, CombatControlDecisionKind,
+    CombatControlHistoryEntry, CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
+    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
+    CombatSessionSummary, CommandAttempt, CommandDecisionKind, CommandOutcomeClass,
+    ScenarioMetadata, ScenarioProjection, StateFingerprint,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -42,6 +44,11 @@ fn render_combat_session_catalog() -> String {
     out.push_str("  controlHistoryReadouts: [\n");
     for readout in combat_session_control_history_readouts() {
         out.push_str(&render_control_history_readout(&readout));
+    }
+    out.push_str("  ],\n");
+    out.push_str("  scriptReadouts: [\n");
+    for readout in combat_session_script_readouts() {
+        out.push_str(&render_script_readout(&readout));
     }
     out.push_str("  ],\n");
     out.push_str("};\n");
@@ -291,6 +298,81 @@ fn render_control_history_entry(entry: &CombatControlHistoryEntry, indent: &str)
     out
 }
 
+fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
+    let mut out = String::from("    {\n");
+    out.push_str(&format!(
+        "      sessionId: {},\n",
+        ts_string(&readout.session_id)
+    ));
+    out.push_str(&format!(
+        "      scriptId: {},\n",
+        ts_string(&readout.script_id)
+    ));
+    out.push_str(&format!("      title: {},\n", ts_string(&readout.title)));
+    out.push_str(&format!(
+        "      summary: {},\n",
+        ts_string(&readout.summary)
+    ));
+    out.push_str("      steps: [\n");
+    for step in &readout.steps {
+        out.push_str(&render_script_step_readout(step, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str(&format!(
+        "      finalLifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(readout.final_snapshot.lifecycle.phase))
+    ));
+    out.push_str(&format!(
+        "      finalStateFingerprint: {},\n",
+        render_fingerprint(&readout.final_snapshot.current_state_fingerprint, "      ")
+    ));
+    out.push_str("    },\n");
+    out
+}
+
+fn render_script_step_readout(step: &CombatSessionScriptStepReadout, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", step.sequence));
+    out.push_str(&format!("{indent}  id: {},\n", ts_string(&step.id)));
+    out.push_str(&format!("{indent}  title: {},\n", ts_string(&step.title)));
+    out.push_str(&format!(
+        "{indent}  summary: {},\n",
+        ts_string(&step.summary)
+    ));
+    out.push_str(&format!(
+        "{indent}  commandKind: {},\n",
+        ts_string(script_command_kind(step.command_kind))
+    ));
+    out.push_str(&format!("{indent}  accepted: {},\n", step.accepted));
+    out.push_str(&format!(
+        "{indent}  decisionKind: {},\n",
+        ts_string(script_decision_kind(step.decision_kind))
+    ));
+    out.push_str(&format!("{indent}  reason: {},\n", ts_string(&step.reason)));
+    out.push_str(&format!(
+        "{indent}  stateBeforeFingerprint: {},\n",
+        render_fingerprint(&step.state_before_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  stateAfterFingerprint: {},\n",
+        render_fingerprint(&step.state_after_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  runtimeStepId: {},\n",
+        render_optional_string(&step.runtime_step_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  commandAuditSequence: {},\n",
+        render_optional_u32(step.command_audit_sequence)
+    ));
+    out.push_str(&format!(
+        "{indent}  controlHistorySequence: {},\n",
+        render_optional_u32(step.control_history_sequence)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
 fn render_state(state: &ScenarioProjection, indent: &str) -> String {
     let mut out = String::from("{\n");
     out.push_str(&format!(
@@ -358,6 +440,34 @@ fn control_decision_kind(kind: CombatControlDecisionKind) -> &'static str {
         CombatControlDecisionKind::RejectedNoop => "rejectedNoop",
         CombatControlDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
         CombatControlDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
+    }
+}
+
+fn script_command_kind(kind: CombatSessionScriptCommandKind) -> &'static str {
+    match kind {
+        CombatSessionScriptCommandKind::Intent => "intent",
+        CombatSessionScriptCommandKind::Control => "control",
+    }
+}
+
+fn script_decision_kind(kind: CombatSessionScriptDecisionKind) -> &'static str {
+    match kind {
+        CombatSessionScriptDecisionKind::Intent(decision_kind) => {
+            command_decision_kind(decision_kind)
+        }
+        CombatSessionScriptDecisionKind::Control(decision_kind) => {
+            control_decision_kind(decision_kind)
+        }
+    }
+}
+
+fn command_decision_kind(kind: CommandDecisionKind) -> &'static str {
+    match kind {
+        CommandDecisionKind::AcceptedByResolver => "acceptedByResolver",
+        CommandDecisionKind::RejectedByResolver => "rejectedByResolver",
+        CommandDecisionKind::RejectedByPreflight => "rejectedByPreflight",
+        CommandDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+        CommandDecisionKind::RejectedByTurnOrder => "rejectedByTurnOrder",
     }
 }
 

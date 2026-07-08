@@ -1,6 +1,9 @@
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
-use crate::runtime::{CombatSessionCommandSpec, CombatSessionState};
+use crate::runtime::{
+    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepSpec, CombatSessionState,
+};
 
 pub fn combat_session_summaries() -> Vec<CombatSessionSummary> {
     combat_session_transcripts()
@@ -33,6 +36,10 @@ pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
 
 pub fn combat_session_control_history_readouts() -> Vec<CombatControlHistoryReadout> {
     vec![hexing_bolt_control_history_readout()]
+}
+
+pub fn combat_session_script_readouts() -> Vec<CombatSessionScriptReadout> {
+    vec![hexing_bolt_mixed_script_readout()]
 }
 
 fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
@@ -103,6 +110,71 @@ fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
         },
         steps: readouts,
     }
+}
+
+fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
+    let session_id = "hexing-bolt-mixed-control-script";
+    let script_id = "hexing-bolt-mixed-control-script";
+    let title = "Hexing Bolt Mixed Control Script";
+    let summary = "A generated Rust script readout that mixes lifecycle control, accepted intent, and rejected wrong-actor intent.";
+
+    let mut session_state = CombatSessionState::new(session_id, hexing_bolt_fixture_scenario());
+
+    session_state.run_script(CombatSessionScriptSpec::new(
+        script_id,
+        title,
+        summary,
+        vec![
+            CombatSessionScriptStepSpec::control(
+                "script-start",
+                "Explicitly starts combat",
+                "Control command starts the combat lifecycle before the first intent.",
+                CombatControlCommandSpec::explicit_start(),
+            ),
+            CombatSessionScriptStepSpec::control(
+                "script-repeat-start",
+                "Repeats combat start",
+                "A repeated explicit start is rejected as a no-op without changing state.",
+                CombatControlCommandSpec::explicit_start(),
+            ),
+            CombatSessionScriptStepSpec::intent(
+                "script-hit-step",
+                "Adept hits Raider",
+                "The current actor uses Hexing Bolt and the resolver accepts the hit.",
+                CombatSessionIntentCommandSpec::new(
+                    "script-runtime-hit",
+                    "Adept hits Raider",
+                    "Hexing Bolt resolves as an accepted hit inside the mixed script.",
+                    UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                    vec![17, 5],
+                ),
+            ),
+            CombatSessionScriptStepSpec::control(
+                "script-advance-turn",
+                "Advances to Raider",
+                "Control command advances the active turn after the accepted intent.",
+                CombatControlCommandSpec::advance_turn(),
+            ),
+            CombatSessionScriptStepSpec::intent(
+                "script-wrong-actor-step",
+                "Adept acts out of turn",
+                "The preflight layer rejects an Adept intent while Raider is the current actor.",
+                CombatSessionIntentCommandSpec::new(
+                    "script-runtime-wrong-actor",
+                    "Adept acts out of turn",
+                    "Hexing Bolt is rejected before resolver mutation because the actor is not current.",
+                    UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                    vec![17, 5],
+                ),
+            ),
+            CombatSessionScriptStepSpec::control(
+                "script-end",
+                "Explicitly ends combat",
+                "Control command ends the combat lifecycle after mixed command processing.",
+                CombatControlCommandSpec::explicit_end(),
+            ),
+        ],
+    ))
 }
 
 fn hexing_bolt_control_history_readout() -> CombatControlHistoryReadout {

@@ -49,6 +49,8 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
         "export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn';",
         "export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';",
+        "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control';",
+        "export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder';",
     ]
 }
 
@@ -102,6 +104,10 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "controlHistoryReadouts",
                     ty: "readonly RulebenchCombatControlHistoryReadoutDto[]",
+                },
+                Field {
+                    name: "scriptReadouts",
+                    ty: "readonly RulebenchCombatScriptReadoutDto[]",
                 },
             ],
         },
@@ -234,6 +240,96 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "steps",
                     ty: "readonly RulebenchCombatSessionStepSummaryDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatScriptReadoutDto",
+            fields: &[
+                Field {
+                    name: "sessionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scriptId",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "steps",
+                    ty: "readonly RulebenchCombatScriptStepReadoutDto[]",
+                },
+                Field {
+                    name: "finalLifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "finalStateFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatScriptStepReadoutDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "commandKind",
+                    ty: "RulebenchCombatScriptCommandKindDto",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchCombatScriptDecisionKindDto",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+                Field {
+                    name: "stateBeforeFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "stateAfterFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "runtimeStepId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "commandAuditSequence",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "controlHistorySequence",
+                    ty: "number | null",
                 },
             ],
         },
