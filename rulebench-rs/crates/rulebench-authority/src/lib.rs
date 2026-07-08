@@ -2354,6 +2354,147 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_command_candidates_read_initial_current_actor_intents() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let candidates = session.current_actor_command_candidates();
+
+        assert!(candidates.available);
+        assert_eq!(candidates.round_number, 1);
+        assert_eq!(candidates.turn_index, 0);
+        assert_eq!(candidates.lifecycle_phase, CombatLifecyclePhase::Ready);
+        assert_eq!(
+            candidates.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert!(!candidates.current_actor_defeated);
+        assert_eq!(candidates.unavailable_reason, None);
+        assert_eq!(candidates.candidates.len(), 1);
+
+        let candidate = &candidates.candidates[0];
+        assert_eq!(
+            candidate.intent,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider")
+        );
+        assert_eq!(candidate.action_id, "hexing_bolt");
+        assert_eq!(candidate.ability_id, "ability.hexing-bolt");
+        assert_eq!(candidate.target_id, "entity-raider");
+        assert_eq!(candidate.target_name, "Raider");
+        assert_eq!(candidate.target_current_hit_points, 18);
+        assert_eq!(candidate.target_max_hit_points, 18);
+        assert!(candidate.accepted);
+        assert_eq!(
+            candidate.decision_kind,
+            CommandPreflightDecisionKind::Accepted
+        );
+        assert_eq!(candidate.decision_kind.code(), "accepted");
+        assert_eq!(candidate.rejection, None);
+        assert_eq!(
+            candidate
+                .target_legality
+                .as_ref()
+                .map(|legality| legality.accepted),
+            Some(true)
+        );
+        assert_eq!(
+            candidate.reason,
+            "Command is admissible before roll resolution."
+        );
+    }
+
+    #[test]
+    fn session_runtime_command_candidates_read_current_state_after_hit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let candidates = session.current_actor_command_candidates();
+
+        assert!(candidates.available);
+        assert_eq!(candidates.candidates.len(), 1);
+        assert_eq!(
+            candidates.candidates[0].intent,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider")
+        );
+        assert_eq!(candidates.candidates[0].target_current_hit_points, 9);
+        assert_eq!(candidates.candidates[0].target_max_hit_points, 18);
+        assert!(candidates.candidates[0].accepted);
+    }
+
+    #[test]
+    fn session_runtime_command_candidates_report_no_candidates_when_unavailable() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+
+        let candidates = session.current_actor_command_candidates();
+
+        assert!(!candidates.available);
+        assert_eq!(
+            candidates.current_actor_id,
+            Some("entity-raider".to_string())
+        );
+        assert_eq!(
+            candidates.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
+        );
+        assert!(candidates.candidates.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_command_candidates_report_ended_combat_unavailable() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+
+        let candidates = session.current_actor_command_candidates();
+
+        assert!(!candidates.available);
+        assert_eq!(candidates.lifecycle_phase, CombatLifecyclePhase::Ended);
+        assert_eq!(
+            candidates.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::CombatEnded)
+        );
+        assert!(candidates.candidates.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_command_candidates_are_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let before_candidates = session.snapshot();
+
+        let candidates = session.current_actor_command_candidates();
+        let after_candidates = session.snapshot();
+
+        assert!(candidates.available);
+        assert_eq!(candidates.candidates.len(), 1);
+        assert_eq!(after_candidates, before_candidates);
+        assert_eq!(session.next_step_index(), 1);
+        assert_eq!(session.combat_log().len(), 1);
+        assert_eq!(session.audit_log().len(), 1);
+        assert_eq!(session.action_usage_log().len(), 1);
+        assert_eq!(session.turn_transition_log().len(), 0);
+        assert_eq!(session.lifecycle_transition_log().len(), 1);
+    }
+
+    #[test]
     fn session_runtime_command_preflight_accepts_current_actor_action_target_without_rolls() {
         let session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());

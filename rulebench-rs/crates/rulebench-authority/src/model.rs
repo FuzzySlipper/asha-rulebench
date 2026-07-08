@@ -392,6 +392,34 @@ pub struct CurrentActorOptionSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandCandidateEntry {
+    pub intent: UseActionIntent,
+    pub action_id: String,
+    pub ability_id: String,
+    pub target_id: String,
+    pub target_name: String,
+    pub target_current_hit_points: i32,
+    pub target_max_hit_points: i32,
+    pub accepted: bool,
+    pub decision_kind: CommandPreflightDecisionKind,
+    pub rejection: Option<RulebenchRejection>,
+    pub target_legality: Option<TargetLegality>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandCandidateSummary {
+    pub round_number: u32,
+    pub turn_index: u32,
+    pub lifecycle_phase: CombatLifecyclePhase,
+    pub current_actor_id: Option<String>,
+    pub current_actor_defeated: bool,
+    pub available: bool,
+    pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
+    pub candidates: Vec<CommandCandidateEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatLogEntry {
     pub id: String,
     pub step_id: String,

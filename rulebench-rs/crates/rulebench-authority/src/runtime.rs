@@ -221,6 +221,19 @@ impl CombatSessionState {
         )
     }
 
+    pub fn current_actor_command_candidates(&self) -> CommandCandidateSummary {
+        let current_state = self.state.project("Current session state.");
+        let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
+        let current_actor_options = current_actor_option_summary(
+            &self.lifecycle,
+            &self.turn_order,
+            &current_scenario,
+            &current_state,
+        );
+
+        current_actor_command_candidates(&self.lifecycle, &current_scenario, current_actor_options)
+    }
+
     pub fn preflight_command(&self, intent: UseActionIntent) -> CommandPreflightReadout {
         let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
         command_preflight_readout(
@@ -774,6 +787,74 @@ fn current_actor_option_summary(
         unavailable_reason,
         actions,
     }
+}
+
+fn current_actor_command_candidates(
+    lifecycle: &CombatLifecycle,
+    scenario: &RulebenchScenario,
+    options: CurrentActorOptionSummary,
+) -> CommandCandidateSummary {
+    let candidates = if options.available {
+        current_actor_id_command_candidates(lifecycle, scenario, &options)
+    } else {
+        Vec::new()
+    };
+
+    CommandCandidateSummary {
+        round_number: options.round_number,
+        turn_index: options.turn_index,
+        lifecycle_phase: options.lifecycle_phase,
+        current_actor_id: options.current_actor_id,
+        current_actor_defeated: options.current_actor_defeated,
+        available: !candidates.is_empty(),
+        unavailable_reason: options.unavailable_reason,
+        candidates,
+    }
+}
+
+fn current_actor_id_command_candidates(
+    lifecycle: &CombatLifecycle,
+    scenario: &RulebenchScenario,
+    options: &CurrentActorOptionSummary,
+) -> Vec<CommandCandidateEntry> {
+    let Some(actor_id) = options.current_actor_id.as_deref() else {
+        return Vec::new();
+    };
+
+    options
+        .actions
+        .iter()
+        .flat_map(|action| {
+            action.target_options.iter().map(move |target| {
+                let intent = UseActionIntent::new(
+                    actor_id,
+                    action.action_id.clone(),
+                    target.target_id.clone(),
+                );
+                let preflight = command_preflight_readout(
+                    lifecycle,
+                    options.current_actor_id.clone(),
+                    scenario,
+                    intent.clone(),
+                );
+
+                CommandCandidateEntry {
+                    intent,
+                    action_id: action.action_id.clone(),
+                    ability_id: action.ability_id.clone(),
+                    target_id: target.target_id.clone(),
+                    target_name: target.target_name.clone(),
+                    target_current_hit_points: target.current_hit_points,
+                    target_max_hit_points: target.max_hit_points,
+                    accepted: preflight.accepted,
+                    decision_kind: preflight.decision_kind,
+                    rejection: preflight.rejection,
+                    target_legality: preflight.target_legality,
+                    reason: preflight.reason,
+                }
+            })
+        })
+        .collect()
 }
 
 fn unavailable_current_actor_options(
