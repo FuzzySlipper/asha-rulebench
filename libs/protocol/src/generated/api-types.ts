@@ -105,10 +105,28 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly steps: readonly RulebenchCombatScriptStepReadoutDto[];
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly finalTurnOrder: RulebenchCombatTurnOrderDto;
+  readonly currentTurnActionUsage: RulebenchActionUsageSummaryDto;
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
+}
+
+export interface RulebenchCombatTurnOrderDto {
+  readonly roundNumber: number;
+  readonly currentTurnIndex: number;
+  readonly participantOrder: readonly string[];
+  readonly currentActorId: string | null;
+}
+
+export interface RulebenchActionUsageSummaryDto {
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly currentActorId: string | null;
+  readonly usedActionCount: number;
+  readonly usedActionIds: readonly string[];
+  readonly usedAbilityIds: readonly string[];
 }
 
 export interface RulebenchActiveModifierDto {

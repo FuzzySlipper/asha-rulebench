@@ -266,6 +266,20 @@ describe('RulebenchTransport fixtures', () => {
       expect(result.value.steps[6]?.id).toBe('script-advance-turn-wrap');
       expect(result.value.steps[6]?.controlHistorySequence).toBe(3);
       expect(result.value.finalLifecyclePhase).toBe('ended');
+      expect(result.value.finalTurnOrder).toEqual({
+        roundNumber: 2,
+        currentTurnIndex: 0,
+        participantOrder: ['entity-adept', 'entity-raider'],
+        currentActorId: 'entity-adept',
+      });
+      expect(result.value.currentTurnActionUsage).toEqual({
+        roundNumber: 2,
+        turnIndex: 0,
+        currentActorId: 'entity-adept',
+        usedActionCount: 0,
+        usedActionIds: [],
+        usedAbilityIds: [],
+      });
       expect(result.value.commandAuditLog).toEqual([
         {
           id: 'audit-script-selected-runtime-hit',

@@ -7,13 +7,14 @@ use rulebench_authority::{
     combat_session_control_history_readouts, combat_session_script_readouts,
     combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
     ActionResourceState, ActionResourceTransitionEntry, ActionResourceTransitionKind,
-    ActionUsageEntry, ActiveModifier, CombatControlCommandKind, CombatControlDecisionKind,
-    CombatControlHistoryEntry, CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
-    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
-    CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
-    CombatSessionSummary, CommandAttempt, CommandAuditEntry, CommandDecisionKind,
-    CommandOutcomeClass, CommandPreflightDecisionKind, ModifierDurationExpirationEntry,
-    ModifierTenure, RulebenchRejection, ScenarioMetadata, ScenarioProjection, StateFingerprint,
+    ActionUsageEntry, ActionUsageSummary, ActiveModifier, CombatControlCommandKind,
+    CombatControlDecisionKind, CombatControlHistoryEntry, CombatControlHistoryReadout,
+    CombatLifecyclePhase, CombatLogEntry, CombatSessionScriptCommandKind,
+    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptStepReadout,
+    CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary, CombatTurnOrder,
+    CommandAttempt, CommandAuditEntry, CommandDecisionKind, CommandOutcomeClass,
+    CommandPreflightDecisionKind, ModifierDurationExpirationEntry, ModifierTenure,
+    RulebenchRejection, ScenarioMetadata, ScenarioProjection, StateFingerprint,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -376,6 +377,18 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      finalStateFingerprint: {},\n",
         render_fingerprint(&readout.final_snapshot.current_state_fingerprint, "      ")
     ));
+    out.push_str("      finalTurnOrder: ");
+    out.push_str(&render_turn_order(
+        &readout.final_snapshot.turn_order,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      currentTurnActionUsage: ");
+    out.push_str(&render_action_usage_summary(
+        &readout.final_snapshot.current_turn_action_usage,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      commandAuditLog: [\n");
     for entry in &readout.final_snapshot.audit_log {
         out.push_str(&render_command_audit_entry(entry, "        "));
@@ -472,6 +485,55 @@ fn render_action_usage_entry(entry: &ActionUsageEntry, indent: &str) -> String {
         ts_string(outcome_class(entry.outcome_class))
     ));
     out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_turn_order(turn_order: &CombatTurnOrder, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!(
+        "{indent}  roundNumber: {},\n",
+        turn_order.round_number
+    ));
+    out.push_str(&format!(
+        "{indent}  currentTurnIndex: {},\n",
+        turn_order.current_turn_index
+    ));
+    out.push_str(&format!(
+        "{indent}  participantOrder: {},\n",
+        ts_string_array(&turn_order.participant_order)
+    ));
+    out.push_str(&format!(
+        "{indent}  currentActorId: {},\n",
+        render_optional_string(&turn_order.current_actor_id)
+    ));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+fn render_action_usage_summary(summary: &ActionUsageSummary, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!(
+        "{indent}  roundNumber: {},\n",
+        summary.round_number
+    ));
+    out.push_str(&format!("{indent}  turnIndex: {},\n", summary.turn_index));
+    out.push_str(&format!(
+        "{indent}  currentActorId: {},\n",
+        render_optional_string(&summary.current_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  usedActionCount: {},\n",
+        summary.used_action_count
+    ));
+    out.push_str(&format!(
+        "{indent}  usedActionIds: {},\n",
+        ts_string_array(&summary.used_action_ids)
+    ));
+    out.push_str(&format!(
+        "{indent}  usedAbilityIds: {},\n",
+        ts_string_array(&summary.used_ability_ids)
+    ));
+    out.push_str(&format!("{indent}}}"));
     out
 }
 

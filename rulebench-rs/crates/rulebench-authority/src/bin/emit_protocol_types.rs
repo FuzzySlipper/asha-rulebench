@@ -280,6 +280,14 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchStateFingerprintDto",
                 },
                 Field {
+                    name: "finalTurnOrder",
+                    ty: "RulebenchCombatTurnOrderDto",
+                },
+                Field {
+                    name: "currentTurnActionUsage",
+                    ty: "RulebenchActionUsageSummaryDto",
+                },
+                Field {
                     name: "commandAuditLog",
                     ty: "readonly RulebenchCommandAuditEntryDto[]",
                 },
@@ -294,6 +302,56 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "modifierDurationExpirationLog",
                     ty: "readonly RulebenchModifierDurationExpirationEntryDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatTurnOrderDto",
+            fields: &[
+                Field {
+                    name: "roundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "currentTurnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "participantOrder",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "currentActorId",
+                    ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActionUsageSummaryDto",
+            fields: &[
+                Field {
+                    name: "roundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "turnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "currentActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "usedActionCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "usedActionIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "usedAbilityIds",
+                    ty: "readonly string[]",
                 },
             ],
         },
