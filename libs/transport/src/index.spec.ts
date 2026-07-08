@@ -272,6 +272,32 @@ describe('RulebenchTransport fixtures', () => {
         participantOrder: ['entity-adept', 'entity-raider'],
         currentActorId: 'entity-adept',
       });
+      expect(result.value.finalActionResourceLedger).toEqual({
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+        ],
+      });
       expect(result.value.currentTurnActionUsage).toEqual({
         roundNumber: 2,
         turnIndex: 0,

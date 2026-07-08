@@ -6005,6 +6005,10 @@ mod tests {
                 .cloned(),
             Some(ActionResourceState::standard_action_available())
         );
+        assert_eq!(
+            session.snapshot().action_resource_ledger,
+            session.action_resource_ledger()
+        );
         assert!(
             session
                 .preflight_command(UseActionIntent::new(

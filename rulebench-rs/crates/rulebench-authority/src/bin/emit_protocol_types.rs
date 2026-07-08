@@ -287,6 +287,10 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchCombatTurnOrderDto",
                 },
                 Field {
+                    name: "finalActionResourceLedger",
+                    ty: "RulebenchActionResourceLedgerDto",
+                },
+                Field {
                     name: "currentTurnActionUsage",
                     ty: "RulebenchActionUsageSummaryDto",
                 },

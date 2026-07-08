@@ -387,6 +387,12 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalActionResourceLedger: ");
+    out.push_str(&render_action_resource_ledger(
+        &readout.final_snapshot.action_resource_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      currentTurnActionUsage: ");
     out.push_str(&render_action_usage_summary(
         &readout.final_snapshot.current_turn_action_usage,

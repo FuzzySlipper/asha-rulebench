@@ -800,6 +800,7 @@ impl CombatSessionState {
             action_resource_transition_log: self.action_resource_transition_log.clone(),
             modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
+            action_resource_ledger: self.state.action_resource_ledger(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
             combat_end_condition: combat_end_condition_readout(&current_scenario),

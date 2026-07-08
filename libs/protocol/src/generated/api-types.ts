@@ -112,6 +112,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
   readonly finalTurnOrder: RulebenchCombatTurnOrderDto;
+  readonly finalActionResourceLedger: RulebenchActionResourceLedgerDto;
   readonly currentTurnActionUsage: RulebenchActionUsageSummaryDto;
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;

@@ -846,6 +846,7 @@ pub struct CombatSessionSnapshot {
     pub action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
+    pub action_resource_ledger: ActionResourceLedgerReadout,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
     pub combat_end_condition: CombatEndConditionReadout,

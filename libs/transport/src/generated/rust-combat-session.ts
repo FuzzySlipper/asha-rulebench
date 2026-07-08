@@ -915,6 +915,32 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         participantOrder: ['entity-adept', 'entity-raider'],
         currentActorId: 'entity-adept',
       },
+      finalActionResourceLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+        ],
+      },
       currentTurnActionUsage: {
         roundNumber: 2,
         turnIndex: 0,
