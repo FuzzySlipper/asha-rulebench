@@ -56,6 +56,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';",
         "export type RulebenchModifierTenureDto = 'temporary' | 'permanent';",
         "export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';",
+        "export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';",
     ]
 }
 
@@ -288,6 +289,10 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchActionUsageSummaryDto",
                 },
                 Field {
+                    name: "finalCurrentActorOptions",
+                    ty: "RulebenchCurrentActorOptionSummaryDto",
+                },
+                Field {
                     name: "commandAuditLog",
                     ty: "readonly RulebenchCommandAuditEntryDto[]",
                 },
@@ -352,6 +357,85 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "usedAbilityIds",
                     ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCurrentActorOptionSummaryDto",
+            fields: &[
+                Field {
+                    name: "roundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "turnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "lifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "currentActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "currentActorDefeated",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "available",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "unavailableReason",
+                    ty: "RulebenchCurrentActorOptionsUnavailableReasonDto | null",
+                },
+                Field {
+                    name: "actions",
+                    ty: "readonly RulebenchCurrentActorActionOptionDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCurrentActorActionOptionDto",
+            fields: &[
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actionName",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetOptions",
+                    ty: "readonly RulebenchCurrentActorTargetOptionDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCurrentActorTargetOptionDto",
+            fields: &[
+                Field {
+                    name: "targetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetName",
+                    ty: "string",
+                },
+                Field {
+                    name: "currentHitPoints",
+                    ty: "number",
+                },
+                Field {
+                    name: "maxHitPoints",
+                    ty: "number",
                 },
             ],
         },

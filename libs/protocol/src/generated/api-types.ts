@@ -38,6 +38,8 @@ export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
 
 export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
 
+export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';
+
 export interface RulebenchRulesetCatalogDto {
   readonly selectedRulesetId: string;
   readonly rulesets: readonly RulebenchRulesetSummaryDto[];
@@ -107,6 +109,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
   readonly finalTurnOrder: RulebenchCombatTurnOrderDto;
   readonly currentTurnActionUsage: RulebenchActionUsageSummaryDto;
+  readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
@@ -127,6 +130,31 @@ export interface RulebenchActionUsageSummaryDto {
   readonly usedActionCount: number;
   readonly usedActionIds: readonly string[];
   readonly usedAbilityIds: readonly string[];
+}
+
+export interface RulebenchCurrentActorOptionSummaryDto {
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly lifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly currentActorId: string | null;
+  readonly currentActorDefeated: boolean;
+  readonly available: boolean;
+  readonly unavailableReason: RulebenchCurrentActorOptionsUnavailableReasonDto | null;
+  readonly actions: readonly RulebenchCurrentActorActionOptionDto[];
+}
+
+export interface RulebenchCurrentActorActionOptionDto {
+  readonly actionId: string;
+  readonly abilityId: string;
+  readonly actionName: string;
+  readonly targetOptions: readonly RulebenchCurrentActorTargetOptionDto[];
+}
+
+export interface RulebenchCurrentActorTargetOptionDto {
+  readonly targetId: string;
+  readonly targetName: string;
+  readonly currentHitPoints: number;
+  readonly maxHitPoints: number;
 }
 
 export interface RulebenchActiveModifierDto {

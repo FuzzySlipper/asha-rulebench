@@ -13,8 +13,10 @@ use rulebench_authority::{
     CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptStepReadout,
     CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary, CombatTurnOrder,
     CommandAttempt, CommandAuditEntry, CommandDecisionKind, CommandOutcomeClass,
-    CommandPreflightDecisionKind, ModifierDurationExpirationEntry, ModifierTenure,
-    RulebenchRejection, ScenarioMetadata, ScenarioProjection, StateFingerprint,
+    CommandPreflightDecisionKind, CurrentActorActionOption, CurrentActorOptionSummary,
+    CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
+    ModifierDurationExpirationEntry, ModifierTenure, RulebenchRejection, ScenarioMetadata,
+    ScenarioProjection, StateFingerprint,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -389,6 +391,12 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalCurrentActorOptions: ");
+    out.push_str(&render_current_actor_options(
+        &readout.final_snapshot.current_actor_options,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      commandAuditLog: [\n");
     for entry in &readout.final_snapshot.audit_log {
         out.push_str(&render_command_audit_entry(entry, "        "));
@@ -535,6 +543,94 @@ fn render_action_usage_summary(summary: &ActionUsageSummary, indent: &str) -> St
     ));
     out.push_str(&format!("{indent}}}"));
     out
+}
+
+fn render_current_actor_options(options: &CurrentActorOptionSummary, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!(
+        "{indent}  roundNumber: {},\n",
+        options.round_number
+    ));
+    out.push_str(&format!("{indent}  turnIndex: {},\n", options.turn_index));
+    out.push_str(&format!(
+        "{indent}  lifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(options.lifecycle_phase))
+    ));
+    out.push_str(&format!(
+        "{indent}  currentActorId: {},\n",
+        render_optional_string(&options.current_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  currentActorDefeated: {},\n",
+        options.current_actor_defeated
+    ));
+    out.push_str(&format!("{indent}  available: {},\n", options.available));
+    out.push_str(&format!(
+        "{indent}  unavailableReason: {},\n",
+        render_optional_current_actor_options_unavailable_reason(options.unavailable_reason)
+    ));
+    out.push_str(&format!("{indent}  actions: [\n"));
+    for action in &options.actions {
+        out.push_str(&render_current_actor_action_option(action, indent));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+fn render_current_actor_action_option(action: &CurrentActorActionOption, indent: &str) -> String {
+    let mut out = String::from("");
+    out.push_str(&format!("{indent}    {{\n"));
+    out.push_str(&format!(
+        "{indent}      actionId: {},\n",
+        ts_string(&action.action_id)
+    ));
+    out.push_str(&format!(
+        "{indent}      abilityId: {},\n",
+        ts_string(&action.ability_id)
+    ));
+    out.push_str(&format!(
+        "{indent}      actionName: {},\n",
+        ts_string(&action.action_name)
+    ));
+    out.push_str(&format!("{indent}      targetOptions: [\n"));
+    for target in &action.target_options {
+        out.push_str(&render_current_actor_target_option(target, indent));
+    }
+    out.push_str(&format!("{indent}      ],\n"));
+    out.push_str(&format!("{indent}    }},\n"));
+    out
+}
+
+fn render_current_actor_target_option(target: &CurrentActorTargetOption, indent: &str) -> String {
+    let mut out = String::from("");
+    out.push_str(&format!("{indent}        {{\n"));
+    out.push_str(&format!(
+        "{indent}          targetId: {},\n",
+        ts_string(&target.target_id)
+    ));
+    out.push_str(&format!(
+        "{indent}          targetName: {},\n",
+        ts_string(&target.target_name)
+    ));
+    out.push_str(&format!(
+        "{indent}          currentHitPoints: {},\n",
+        target.current_hit_points
+    ));
+    out.push_str(&format!(
+        "{indent}          maxHitPoints: {},\n",
+        target.max_hit_points
+    ));
+    out.push_str(&format!("{indent}        }},\n"));
+    out
+}
+
+fn render_optional_current_actor_options_unavailable_reason(
+    reason: Option<CurrentActorOptionsUnavailableReason>,
+) -> String {
+    reason
+        .map(|inner| ts_string(inner.code()))
+        .unwrap_or_else(|| "null".to_string())
 }
 
 fn render_optional_preflight_decision_kind(

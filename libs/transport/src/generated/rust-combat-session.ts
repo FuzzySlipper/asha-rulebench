@@ -923,6 +923,17 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         usedActionIds: [],
         usedAbilityIds: [],
       },
+      finalCurrentActorOptions: {
+        roundNumber: 2,
+        turnIndex: 0,
+        lifecyclePhase: 'ended',
+        currentActorId: 'entity-adept',
+        currentActorDefeated: false,
+        available: false,
+        unavailableReason: 'combatEnded',
+        actions: [
+        ],
+      },
       commandAuditLog: [
 {
           id: 'audit-script-selected-runtime-hit',

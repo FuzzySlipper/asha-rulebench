@@ -280,6 +280,16 @@ describe('RulebenchTransport fixtures', () => {
         usedActionIds: [],
         usedAbilityIds: [],
       });
+      expect(result.value.finalCurrentActorOptions).toEqual({
+        roundNumber: 2,
+        turnIndex: 0,
+        lifecyclePhase: 'ended',
+        currentActorId: 'entity-adept',
+        currentActorDefeated: false,
+        available: false,
+        unavailableReason: 'combatEnded',
+        actions: [],
+      });
       expect(result.value.commandAuditLog).toEqual([
         {
           id: 'audit-script-selected-runtime-hit',
