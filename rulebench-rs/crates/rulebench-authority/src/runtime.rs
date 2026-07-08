@@ -293,6 +293,7 @@ pub struct CombatSessionState {
     combat_log: Vec<CombatLogEntry>,
     audit_log: Vec<CommandAuditEntry>,
     action_usage_log: Vec<ActionUsageEntry>,
+    action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
     lifecycle_transition_log: Vec<LifecycleTransitionEntry>,
@@ -318,6 +319,7 @@ impl CombatSessionState {
             combat_log: Vec::new(),
             audit_log: Vec::new(),
             action_usage_log: Vec::new(),
+            action_resource_transition_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
             lifecycle_transition_log: Vec::new(),
@@ -487,12 +489,6 @@ impl CombatSessionState {
                     } else {
                         CommandDecisionKind::RejectedByResolver
                     };
-                    if receipt.accepted {
-                        self.state.spend_action_resource(
-                            &intent.actor_id,
-                            ActionResourceKind::StandardAction,
-                        );
-                    }
 
                     (receipt, state_after, true, decision_kind)
                 }
@@ -541,6 +537,12 @@ impl CombatSessionState {
         if let Some(entry) = action_usage_entry {
             self.action_usage_log.push(entry);
         }
+        if receipt.accepted {
+            let spend = self
+                .state
+                .spend_action_resource(&command.actor_id, ActionResourceKind::StandardAction);
+            self.record_action_resource_spend_transition(&step, &spend);
+        }
         self.next_step_index += 1;
         if should_apply_state {
             self.state.apply_projection(&state_after);
@@ -570,6 +572,10 @@ impl CombatSessionState {
 
     pub fn action_usage_log(&self) -> &[ActionUsageEntry] {
         &self.action_usage_log
+    }
+
+    pub fn action_resource_transition_log(&self) -> &[ActionResourceTransitionEntry] {
+        &self.action_resource_transition_log
     }
 
     pub fn control_history(&self) -> &[CombatControlHistoryEntry] {
@@ -727,16 +733,18 @@ impl CombatSessionState {
         }
 
         self.turn_order.advance_turn();
-        if let Some(current_actor_id) = self.turn_order.current_actor_id.as_deref() {
-            self.state
-                .refresh_action_resource(current_actor_id, ActionResourceKind::StandardAction);
-        }
         let transition = turn_transition_entry(
             self.turn_transition_log.len() as u32,
             &previous_turn_order,
             &self.turn_order,
         );
         self.turn_transition_log.push(transition.clone());
+        if let Some(current_actor_id) = self.turn_order.current_actor_id.clone() {
+            let refresh = self
+                .state
+                .refresh_action_resource(&current_actor_id, ActionResourceKind::StandardAction);
+            self.record_action_resource_refresh_transition(&transition, &refresh);
+        }
         let state_after = self.state.project("State after turn advancement.");
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
 
@@ -766,6 +774,7 @@ impl CombatSessionState {
             combat_log: self.combat_log.clone(),
             audit_log: self.audit_log.clone(),
             action_usage_log: self.action_usage_log.clone(),
+            action_resource_transition_log: self.action_resource_transition_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
@@ -812,6 +821,71 @@ impl CombatSessionState {
                 next_phase: self.lifecycle.phase,
                 started_at_step: self.lifecycle.started_at_step,
                 ended_at_step: self.lifecycle.ended_at_step,
+            });
+    }
+
+    fn record_action_resource_spend_transition(
+        &mut self,
+        step: &CombatSessionStepSummary,
+        spend: &ActionResourceSpendReadout,
+    ) {
+        let (Some(previous_resource), Some(next_resource)) =
+            (spend.previous_resource.clone(), spend.next_resource.clone())
+        else {
+            return;
+        };
+        if !spend.accepted {
+            return;
+        }
+
+        self.action_resource_transition_log
+            .push(ActionResourceTransitionEntry {
+                sequence: self.action_resource_transition_log.len() as u32,
+                transition_kind: ActionResourceTransitionKind::Spent,
+                combatant_id: spend.combatant_id.clone(),
+                resource_kind: spend.resource_kind,
+                previous_resource,
+                next_resource,
+                command_step_id: Some(step.id.clone()),
+                command_step_index: Some(step.index),
+                turn_transition_sequence: None,
+                round_number: Some(self.turn_order.round_number),
+                turn_index: Some(self.turn_order.current_turn_index),
+                current_actor_id: self.turn_order.current_actor_id.clone(),
+                reason: spend.reason.clone(),
+            });
+    }
+
+    fn record_action_resource_refresh_transition(
+        &mut self,
+        transition: &TurnTransitionEntry,
+        refresh: &ActionResourceRefreshReadout,
+    ) {
+        let (Some(previous_resource), Some(next_resource)) = (
+            refresh.previous_resource.clone(),
+            refresh.next_resource.clone(),
+        ) else {
+            return;
+        };
+        if !refresh.accepted {
+            return;
+        }
+
+        self.action_resource_transition_log
+            .push(ActionResourceTransitionEntry {
+                sequence: self.action_resource_transition_log.len() as u32,
+                transition_kind: ActionResourceTransitionKind::Refreshed,
+                combatant_id: refresh.combatant_id.clone(),
+                resource_kind: refresh.resource_kind,
+                previous_resource,
+                next_resource,
+                command_step_id: None,
+                command_step_index: None,
+                turn_transition_sequence: Some(transition.sequence),
+                round_number: Some(transition.next_round_number),
+                turn_index: Some(transition.next_turn_index),
+                current_actor_id: transition.next_actor_id.clone(),
+                reason: refresh.reason.clone(),
             });
     }
 

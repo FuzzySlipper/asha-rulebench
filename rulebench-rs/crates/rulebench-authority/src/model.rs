@@ -357,6 +357,38 @@ pub struct ActionResourceRefreshReadout {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionResourceTransitionKind {
+    Spent,
+    Refreshed,
+}
+
+impl ActionResourceTransitionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ActionResourceTransitionKind::Spent => "spent",
+            ActionResourceTransitionKind::Refreshed => "refreshed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourceTransitionEntry {
+    pub sequence: u32,
+    pub transition_kind: ActionResourceTransitionKind,
+    pub combatant_id: String,
+    pub resource_kind: ActionResourceKind,
+    pub previous_resource: ActionResourceState,
+    pub next_resource: ActionResourceState,
+    pub command_step_id: Option<String>,
+    pub command_step_index: Option<u32>,
+    pub turn_transition_sequence: Option<u32>,
+    pub round_number: Option<u32>,
+    pub turn_index: Option<u32>,
+    pub current_actor_id: Option<String>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatControlCommandKind {
     ExplicitStart,
     ExplicitEnd,
@@ -773,6 +805,7 @@ pub struct CombatSessionSnapshot {
     pub combat_log: Vec<CombatLogEntry>,
     pub audit_log: Vec<CommandAuditEntry>,
     pub action_usage_log: Vec<ActionUsageEntry>,
+    pub action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,

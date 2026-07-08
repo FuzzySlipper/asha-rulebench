@@ -72,6 +72,12 @@ mod tests {
     }
 
     #[test]
+    fn action_resource_transition_kind_codes_are_stable() {
+        assert_eq!(ActionResourceTransitionKind::Spent.code(), "spent");
+        assert_eq!(ActionResourceTransitionKind::Refreshed.code(), "refreshed");
+    }
+
+    #[test]
     fn empty_actor_rejects_without_events() {
         let intent = UseActionIntent::new("", "action.hexing_bolt", "combatant.marauder");
 
@@ -2304,6 +2310,41 @@ mod tests {
                 1
             ))
         );
+        assert_eq!(session.action_resource_transition_log().len(), 1);
+        let transition = &session.action_resource_transition_log()[0];
+        assert_eq!(transition.sequence, 0);
+        assert_eq!(
+            transition.transition_kind,
+            ActionResourceTransitionKind::Spent
+        );
+        assert_eq!(transition.transition_kind.code(), "spent");
+        assert_eq!(transition.combatant_id, "entity-adept");
+        assert_eq!(transition.resource_kind, ActionResourceKind::StandardAction);
+        assert_eq!(
+            transition.previous_resource,
+            ActionResourceState::standard_action_available()
+        );
+        assert_eq!(
+            transition.next_resource,
+            ActionResourceState::new(ActionResourceKind::StandardAction, 0, 1)
+        );
+        assert_eq!(
+            transition.command_step_id,
+            Some("runtime-derived-hit".to_string())
+        );
+        assert_eq!(transition.command_step_index, Some(0));
+        assert_eq!(transition.turn_transition_sequence, None);
+        assert_eq!(transition.round_number, Some(1));
+        assert_eq!(transition.turn_index, Some(0));
+        assert_eq!(
+            transition.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(transition.reason, "Action resource spent.");
+        assert_eq!(
+            session.snapshot().action_resource_transition_log,
+            session.action_resource_transition_log()
+        );
     }
 
     #[test]
@@ -2359,6 +2400,10 @@ mod tests {
         );
         assert_eq!(after.action_usage_log.len(), before.action_usage_log.len());
         assert_eq!(
+            after.action_resource_transition_log,
+            before.action_resource_transition_log
+        );
+        assert_eq!(
             session
                 .action_resource_ledger()
                 .combatants
@@ -2404,6 +2449,7 @@ mod tests {
         );
         assert_eq!(before, after);
         assert!(session.action_usage_log().is_empty());
+        assert!(session.action_resource_transition_log().is_empty());
     }
 
     #[test]
@@ -5965,6 +6011,105 @@ mod tests {
             .candidates
             .iter()
             .any(|candidate| candidate.accepted));
+        assert_eq!(session.action_resource_transition_log().len(), 3);
+        let spend_transition = &session.action_resource_transition_log()[0];
+        assert_eq!(spend_transition.sequence, 0);
+        assert_eq!(
+            spend_transition.transition_kind,
+            ActionResourceTransitionKind::Spent
+        );
+        assert_eq!(spend_transition.combatant_id, "entity-adept");
+        assert_eq!(
+            spend_transition.resource_kind,
+            ActionResourceKind::StandardAction
+        );
+        assert_eq!(
+            spend_transition.previous_resource,
+            ActionResourceState::standard_action_available()
+        );
+        assert_eq!(
+            spend_transition.next_resource,
+            ActionResourceState::new(ActionResourceKind::StandardAction, 0, 1)
+        );
+        assert_eq!(
+            spend_transition.command_step_id,
+            Some("runtime-round-one-action".to_string())
+        );
+        assert_eq!(spend_transition.command_step_index, Some(0));
+        assert_eq!(spend_transition.turn_transition_sequence, None);
+        assert_eq!(spend_transition.round_number, Some(1));
+        assert_eq!(spend_transition.turn_index, Some(0));
+        assert_eq!(
+            spend_transition.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(spend_transition.reason, "Action resource spent.");
+
+        let raider_refresh_transition = &session.action_resource_transition_log()[1];
+        assert_eq!(raider_refresh_transition.sequence, 1);
+        assert_eq!(
+            raider_refresh_transition.transition_kind,
+            ActionResourceTransitionKind::Refreshed
+        );
+        assert_eq!(raider_refresh_transition.combatant_id, "entity-raider");
+        assert_eq!(
+            raider_refresh_transition.resource_kind,
+            ActionResourceKind::StandardAction
+        );
+        assert_eq!(
+            raider_refresh_transition.previous_resource,
+            ActionResourceState::standard_action_available()
+        );
+        assert_eq!(
+            raider_refresh_transition.next_resource,
+            ActionResourceState::standard_action_available()
+        );
+        assert_eq!(raider_refresh_transition.command_step_id, None);
+        assert_eq!(raider_refresh_transition.command_step_index, None);
+        assert_eq!(raider_refresh_transition.turn_transition_sequence, Some(0));
+        assert_eq!(raider_refresh_transition.round_number, Some(1));
+        assert_eq!(raider_refresh_transition.turn_index, Some(1));
+        assert_eq!(
+            raider_refresh_transition.current_actor_id,
+            Some("entity-raider".to_string())
+        );
+        assert_eq!(
+            raider_refresh_transition.reason,
+            "Action resource refreshed."
+        );
+
+        let adept_refresh_transition = &session.action_resource_transition_log()[2];
+        assert_eq!(adept_refresh_transition.sequence, 2);
+        assert_eq!(
+            adept_refresh_transition.transition_kind,
+            ActionResourceTransitionKind::Refreshed
+        );
+        assert_eq!(adept_refresh_transition.combatant_id, "entity-adept");
+        assert_eq!(
+            adept_refresh_transition.resource_kind,
+            ActionResourceKind::StandardAction
+        );
+        assert_eq!(
+            adept_refresh_transition.previous_resource,
+            ActionResourceState::new(ActionResourceKind::StandardAction, 0, 1)
+        );
+        assert_eq!(
+            adept_refresh_transition.next_resource,
+            ActionResourceState::standard_action_available()
+        );
+        assert_eq!(adept_refresh_transition.command_step_id, None);
+        assert_eq!(adept_refresh_transition.command_step_index, None);
+        assert_eq!(adept_refresh_transition.turn_transition_sequence, Some(1));
+        assert_eq!(adept_refresh_transition.round_number, Some(2));
+        assert_eq!(adept_refresh_transition.turn_index, Some(0));
+        assert_eq!(
+            adept_refresh_transition.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(
+            adept_refresh_transition.reason,
+            "Action resource refreshed."
+        );
     }
 
     #[test]
@@ -5980,6 +6125,7 @@ mod tests {
         ));
         session.end_combat();
         let before = session.action_resource_ledger();
+        let before_transition_log = session.action_resource_transition_log().to_vec();
 
         let readout = session.advance_turn();
         let after = session.action_resource_ledger();
@@ -5990,6 +6136,10 @@ mod tests {
             TurnAdvanceDecisionKind::RejectedByLifecycle
         );
         assert_eq!(after, before);
+        assert_eq!(
+            session.action_resource_transition_log(),
+            before_transition_log
+        );
         assert_eq!(
             after
                 .combatants
