@@ -243,6 +243,7 @@ describe('RulebenchTransport fixtures', () => {
         'control',
         'selectedCandidate',
         'control',
+        'control',
       ]);
       expect(result.value.steps.map((step) => step.decisionKind)).toEqual([
         'accepted',
@@ -251,13 +252,35 @@ describe('RulebenchTransport fixtures', () => {
         'accepted',
         'rejectedByUnavailableCandidates',
         'accepted',
+        'accepted',
       ]);
       expect(result.value.steps[2]?.runtimeStepId).toBe('script-selected-runtime-hit');
       expect(result.value.steps[2]?.commandAuditSequence).toBe(0);
       expect(result.value.steps[4]?.runtimeStepId).toBeNull();
       expect(result.value.steps[4]?.commandAuditSequence).toBeNull();
       expect(result.value.steps[1]?.controlHistorySequence).toBe(1);
+      expect(result.value.steps[5]?.id).toBe('script-advance-turn-wrap');
+      expect(result.value.steps[5]?.controlHistorySequence).toBe(3);
       expect(result.value.finalLifecyclePhase).toBe('ended');
+      expect(result.value.modifierDurationExpirationLog).toEqual([
+        {
+          sequence: 0,
+          combatantId: 'entity-raider',
+          modifierId: 'rattled',
+          previousModifier: {
+            modifierId: 'rattled',
+            label: 'rattled',
+            duration: 'until end of next turn',
+            tenure: 'temporary',
+          },
+          nextModifier: null,
+          turnTransitionSequence: 1,
+          roundNumber: 2,
+          turnIndex: 0,
+          currentActorId: 'entity-adept',
+          reason: 'Temporary modifier expired at turn boundary.',
+        },
+      ]);
     }
   });
 

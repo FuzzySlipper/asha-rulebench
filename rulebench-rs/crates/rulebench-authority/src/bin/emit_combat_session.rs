@@ -6,12 +6,13 @@ mod ts_emit;
 use rulebench_authority::{
     combat_session_control_history_readouts, combat_session_script_readouts,
     combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
-    ActionResourceState, CombatControlCommandKind, CombatControlDecisionKind,
+    ActionResourceState, ActiveModifier, CombatControlCommandKind, CombatControlDecisionKind,
     CombatControlHistoryEntry, CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
     CombatSessionSummary, CommandAttempt, CommandDecisionKind, CommandOutcomeClass,
-    ScenarioMetadata, ScenarioProjection, StateFingerprint,
+    ModifierDurationExpirationEntry, ModifierTenure, ScenarioMetadata, ScenarioProjection,
+    StateFingerprint,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -374,8 +375,72 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      finalStateFingerprint: {},\n",
         render_fingerprint(&readout.final_snapshot.current_state_fingerprint, "      ")
     ));
+    out.push_str("      modifierDurationExpirationLog: [\n");
+    for entry in &readout.final_snapshot.modifier_duration_expiration_log {
+        out.push_str(&render_modifier_duration_expiration_entry(
+            entry, "        ",
+        ));
+    }
+    out.push_str("      ],\n");
     out.push_str("    },\n");
     out
+}
+
+fn render_modifier_duration_expiration_entry(
+    entry: &ModifierDurationExpirationEntry,
+    indent: &str,
+) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  combatantId: {},\n",
+        ts_string(&entry.combatant_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  modifierId: {},\n",
+        ts_string(&entry.modifier_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  previousModifier: {},\n",
+        render_active_modifier(&entry.previous_modifier)
+    ));
+    out.push_str(&format!(
+        "{indent}  nextModifier: {},\n",
+        render_optional_active_modifier(&entry.next_modifier)
+    ));
+    out.push_str(&format!(
+        "{indent}  turnTransitionSequence: {},\n",
+        entry.turn_transition_sequence
+    ));
+    out.push_str(&format!("{indent}  roundNumber: {},\n", entry.round_number));
+    out.push_str(&format!("{indent}  turnIndex: {},\n", entry.turn_index));
+    out.push_str(&format!(
+        "{indent}  currentActorId: {},\n",
+        render_optional_string(&entry.current_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&entry.reason)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_active_modifier(modifier: &ActiveModifier) -> String {
+    format!(
+        "{{ modifierId: {}, label: {}, duration: {}, tenure: {} }}",
+        ts_string(&modifier.modifier_id),
+        ts_string(&modifier.label),
+        ts_string(&modifier.duration),
+        ts_string(modifier_tenure(modifier.tenure))
+    )
+}
+
+fn render_optional_active_modifier(modifier: &Option<ActiveModifier>) -> String {
+    modifier
+        .as_ref()
+        .map(render_active_modifier)
+        .unwrap_or_else(|| "null".to_string())
 }
 
 fn render_script_step_readout(step: &CombatSessionScriptStepReadout, indent: &str) -> String {
@@ -551,6 +616,10 @@ fn lifecycle_phase(phase: CombatLifecyclePhase) -> &'static str {
         CombatLifecyclePhase::InProgress => "inProgress",
         CombatLifecyclePhase::Ended => "ended",
     }
+}
+
+fn modifier_tenure(tenure: ModifierTenure) -> &'static str {
+    tenure.code()
 }
 
 fn action_resource_kind(kind: ActionResourceKind) -> &'static str {

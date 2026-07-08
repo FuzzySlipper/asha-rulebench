@@ -53,6 +53,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';",
         "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';",
         "export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';",
+        "export type RulebenchModifierTenureDto = 'temporary' | 'permanent';",
     ]
 }
 
@@ -275,6 +276,76 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "finalStateFingerprint",
                     ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "modifierDurationExpirationLog",
+                    ty: "readonly RulebenchModifierDurationExpirationEntryDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActiveModifierDto",
+            fields: &[
+                Field {
+                    name: "modifierId",
+                    ty: "string",
+                },
+                Field {
+                    name: "label",
+                    ty: "string",
+                },
+                Field {
+                    name: "duration",
+                    ty: "string",
+                },
+                Field {
+                    name: "tenure",
+                    ty: "RulebenchModifierTenureDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchModifierDurationExpirationEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "modifierId",
+                    ty: "string",
+                },
+                Field {
+                    name: "previousModifier",
+                    ty: "RulebenchActiveModifierDto",
+                },
+                Field {
+                    name: "nextModifier",
+                    ty: "RulebenchActiveModifierDto | null",
+                },
+                Field {
+                    name: "turnTransitionSequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "roundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "turnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "currentActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },

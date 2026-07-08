@@ -32,6 +32,8 @@ export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'select
 
 export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';
 
+export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
+
 export interface RulebenchRulesetCatalogDto {
   readonly selectedRulesetId: string;
   readonly rulesets: readonly RulebenchRulesetSummaryDto[];
@@ -99,6 +101,27 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly steps: readonly RulebenchCombatScriptStepReadoutDto[];
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
+}
+
+export interface RulebenchActiveModifierDto {
+  readonly modifierId: string;
+  readonly label: string;
+  readonly duration: string;
+  readonly tenure: RulebenchModifierTenureDto;
+}
+
+export interface RulebenchModifierDurationExpirationEntryDto {
+  readonly sequence: number;
+  readonly combatantId: string;
+  readonly modifierId: string;
+  readonly previousModifier: RulebenchActiveModifierDto;
+  readonly nextModifier: RulebenchActiveModifierDto | null;
+  readonly turnTransitionSequence: number;
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly currentActorId: string | null;
+  readonly reason: string;
 }
 
 export interface RulebenchCombatScriptStepReadoutDto {

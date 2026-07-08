@@ -170,6 +170,12 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
                 ),
             ),
             CombatSessionScriptStepSpec::control(
+                "script-advance-turn-wrap",
+                "Advances back to Adept",
+                "Control command advances from Raider back to Adept and expires Raider's temporary rattled modifier.",
+                CombatControlCommandSpec::advance_turn(),
+            ),
+            CombatSessionScriptStepSpec::control(
                 "script-end",
                 "Explicitly ends combat",
                 "Control command ends the combat lifecycle after mixed command processing.",
