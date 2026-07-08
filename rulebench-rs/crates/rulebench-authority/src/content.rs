@@ -16,6 +16,9 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
         ));
     }
 
+    validate_classes(scenario, &mut diagnostics);
+    validate_stat_definitions(scenario, &mut diagnostics);
+    validate_combatant_class_and_stat_references(scenario, &mut diagnostics);
     validate_items(scenario, &mut diagnostics);
 
     let mut seen_action_ids = HashSet::new();
@@ -56,6 +59,104 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_classes(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
+    let mut seen_class_ids = HashSet::new();
+    for class in &scenario.classes {
+        if class.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyClassId,
+                None,
+                "Class catalog contains a class with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_class_ids.insert(class.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateClassId,
+                Some(class.id.clone()),
+                format!("Class id {} appears more than once.", class.id),
+            ));
+        }
+    }
+
+    if let Some(selected_class_id) = &scenario.selected_class_id {
+        if scenario.class_by_id(selected_class_id).is_none() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::SelectedClassMissingFromCatalog,
+                Some(selected_class_id.clone()),
+                format!(
+                    "Selected class {} is not present in the scenario class catalog.",
+                    selected_class_id
+                ),
+            ));
+        }
+    }
+}
+
+fn validate_stat_definitions(
+    scenario: &RulebenchScenario,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let mut seen_stat_ids = HashSet::new();
+    for stat in &scenario.stat_definitions {
+        if stat.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyStatDefinitionId,
+                None,
+                "Stat catalog contains a stat definition with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_stat_ids.insert(stat.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateStatDefinitionId,
+                Some(stat.id.clone()),
+                format!("Stat definition id {} appears more than once.", stat.id),
+            ));
+        }
+    }
+}
+
+fn validate_combatant_class_and_stat_references(
+    scenario: &RulebenchScenario,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    for combatant in &scenario.combatants {
+        for class_id in &combatant.class_ids {
+            if scenario.class_by_id(class_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingCombatantClass,
+                    Some(class_id.clone()),
+                    format!(
+                        "Combatant {} references class {} that is not present in the scenario class catalog.",
+                        combatant.id, class_id
+                    ),
+                ));
+            }
+        }
+
+        for stat in combatant
+            .stats
+            .base_stats
+            .iter()
+            .chain(combatant.stats.derived_stats.iter())
+        {
+            if scenario.stat_definition_by_id(&stat.id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingCombatantStatDefinition,
+                    Some(stat.id.clone()),
+                    format!(
+                        "Combatant {} has stat {} that is not present in the scenario stat catalog.",
+                        combatant.id, stat.id
+                    ),
+                ));
+            }
+        }
+    }
 }
 
 fn validate_items(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {

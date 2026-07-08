@@ -30,6 +30,9 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             ],
         },
         combatants: vec![adept_initial(), raider_initial()],
+        classes: hexing_bolt_classes(),
+        selected_class_id: Some("class.hex-adept".to_string()),
+        stat_definitions: hexing_bolt_stat_definitions(),
         items: hexing_bolt_items(),
         selected_item_id: Some("item.hex-focus".to_string()),
         actions: vec![selected_action.clone()],
@@ -102,6 +105,47 @@ fn hexing_bolt_items() -> Vec<ItemDefinition> {
     ]
 }
 
+fn hexing_bolt_classes() -> Vec<ClassDefinition> {
+    vec![
+        ClassDefinition {
+            id: "class.hex-adept".to_string(),
+            name: "Hex Adept".to_string(),
+            summary: "A focused caster class marker; structural content only.".to_string(),
+            tags: vec!["caster".to_string()],
+        },
+        ClassDefinition {
+            id: "class.raider".to_string(),
+            name: "Raider".to_string(),
+            summary: "A hostile skirmisher class marker; structural content only.".to_string(),
+            tags: vec!["martial".to_string()],
+        },
+    ]
+}
+
+fn hexing_bolt_stat_definitions() -> Vec<StatDefinition> {
+    vec![
+        StatDefinition {
+            id: "mind".to_string(),
+            label: "Mind".to_string(),
+            kind: StatDefinitionKind::Base,
+            summary: "Mental force used by Hexing Bolt attack rolls.".to_string(),
+        },
+        StatDefinition {
+            id: "body".to_string(),
+            label: "Body".to_string(),
+            kind: StatDefinitionKind::Base,
+            summary: "Physical force for future melee and durability checks.".to_string(),
+        },
+        StatDefinition {
+            id: "initiative".to_string(),
+            label: "Initiative".to_string(),
+            kind: StatDefinitionKind::Derived,
+            summary: "Turn-order readiness value; formula intentionally not modeled here."
+                .to_string(),
+        },
+    ]
+}
+
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
     resolve_use_action(
         &hexing_bolt_fixture_scenario(),
@@ -128,6 +172,7 @@ fn adept_initial() -> Combatant {
             current: 24,
             max: 24,
         },
+        class_ids: vec!["class.hex-adept".to_string()],
         stats: StatBlock {
             base_stats: vec![
                 NamedNumber {
@@ -176,6 +221,7 @@ fn raider_initial() -> Combatant {
             current: 18,
             max: 18,
         },
+        class_ids: vec!["class.raider".to_string()],
         stats: StatBlock {
             base_stats: vec![
                 NamedNumber {

@@ -278,15 +278,22 @@ pub enum ContentDiagnosticCode {
     EmptyRulesetId,
     EmptyActionId,
     DuplicateActionId,
+    EmptyClassId,
+    DuplicateClassId,
+    EmptyStatDefinitionId,
+    DuplicateStatDefinitionId,
     EmptyItemId,
     DuplicateItemId,
     SelectedActionMissingFromCatalog,
+    SelectedClassMissingFromCatalog,
     SelectedItemMissingFromCatalog,
     MissingActionActor,
     MissingActionTarget,
     VisibleTargetOutsideTargetIds,
     MissingAttackModifierStat,
     MissingTargetDefense,
+    MissingCombatantClass,
+    MissingCombatantStatDefinition,
     MissingEquippedItem,
 }
 
@@ -296,10 +303,17 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
             ContentDiagnosticCode::EmptyActionId => "emptyActionId",
             ContentDiagnosticCode::DuplicateActionId => "duplicateActionId",
+            ContentDiagnosticCode::EmptyClassId => "emptyClassId",
+            ContentDiagnosticCode::DuplicateClassId => "duplicateClassId",
+            ContentDiagnosticCode::EmptyStatDefinitionId => "emptyStatDefinitionId",
+            ContentDiagnosticCode::DuplicateStatDefinitionId => "duplicateStatDefinitionId",
             ContentDiagnosticCode::EmptyItemId => "emptyItemId",
             ContentDiagnosticCode::DuplicateItemId => "duplicateItemId",
             ContentDiagnosticCode::SelectedActionMissingFromCatalog => {
                 "selectedActionMissingFromCatalog"
+            }
+            ContentDiagnosticCode::SelectedClassMissingFromCatalog => {
+                "selectedClassMissingFromCatalog"
             }
             ContentDiagnosticCode::SelectedItemMissingFromCatalog => {
                 "selectedItemMissingFromCatalog"
@@ -309,6 +323,10 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
             ContentDiagnosticCode::MissingAttackModifierStat => "missingAttackModifierStat",
             ContentDiagnosticCode::MissingTargetDefense => "missingTargetDefense",
+            ContentDiagnosticCode::MissingCombatantClass => "missingCombatantClass",
+            ContentDiagnosticCode::MissingCombatantStatDefinition => {
+                "missingCombatantStatDefinition"
+            }
             ContentDiagnosticCode::MissingEquippedItem => "missingEquippedItem",
         }
     }
@@ -360,6 +378,29 @@ pub struct NamedNumber {
     pub value: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatDefinitionKind {
+    Base,
+    Derived,
+}
+
+impl StatDefinitionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            StatDefinitionKind::Base => "base",
+            StatDefinitionKind::Derived => "derived",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatDefinition {
+    pub id: String,
+    pub label: String,
+    pub kind: StatDefinitionKind,
+    pub summary: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatBlock {
     pub base_stats: Vec<NamedNumber>,
@@ -382,6 +423,7 @@ pub struct Combatant {
     pub team: Team,
     pub position: GridPosition,
     pub hit_points: BoundedValue,
+    pub class_ids: Vec<String>,
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
     pub equipped_item_ids: Vec<String>,
@@ -402,6 +444,9 @@ pub struct RulebenchScenario {
     pub ruleset: RulesetMetadata,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
+    pub classes: Vec<ClassDefinition>,
+    pub selected_class_id: Option<String>,
+    pub stat_definitions: Vec<StatDefinition>,
     pub items: Vec<ItemDefinition>,
     pub selected_item_id: Option<String>,
     pub actions: Vec<ActionDefinition>,
@@ -413,8 +458,18 @@ impl RulebenchScenario {
         self.actions.iter().find(|action| action.id == action_id)
     }
 
+    pub fn class_by_id(&self, class_id: &str) -> Option<&ClassDefinition> {
+        self.classes.iter().find(|class| class.id == class_id)
+    }
+
     pub fn item_by_id(&self, item_id: &str) -> Option<&ItemDefinition> {
         self.items.iter().find(|item| item.id == item_id)
+    }
+
+    pub fn stat_definition_by_id(&self, stat_id: &str) -> Option<&StatDefinition> {
+        self.stat_definitions
+            .iter()
+            .find(|definition| definition.id == stat_id)
     }
 }
 
@@ -456,6 +511,14 @@ pub struct ActionDefinition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemDefinition {
+    pub id: String,
+    pub name: String,
+    pub summary: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassDefinition {
     pub id: String,
     pub name: String,
     pub summary: String,

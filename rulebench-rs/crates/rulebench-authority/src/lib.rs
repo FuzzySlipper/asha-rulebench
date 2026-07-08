@@ -164,6 +164,53 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_class_catalog_and_stat_definitions() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(validate_scenario_content(&scenario).is_empty());
+        assert_eq!(
+            scenario
+                .classes
+                .iter()
+                .map(|class| class.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["class.hex-adept", "class.raider"]
+        );
+        assert_eq!(
+            scenario
+                .class_by_id("class.hex-adept")
+                .map(|class| class.name.as_str()),
+            Some("Hex Adept")
+        );
+        assert_eq!(
+            scenario.selected_class_id.as_deref(),
+            Some("class.hex-adept")
+        );
+        assert_eq!(
+            scenario.combatants[0].class_ids,
+            vec!["class.hex-adept".to_string()]
+        );
+        assert_eq!(
+            scenario.stat_definition_by_id("mind").map(|stat| stat.kind),
+            Some(StatDefinitionKind::Base)
+        );
+        assert_eq!(
+            scenario
+                .stat_definition_by_id("initiative")
+                .map(|stat| stat.kind.code()),
+            Some("derived")
+        );
+    }
+
+    #[test]
+    fn scenario_class_and_stat_catalog_reject_unknown_lookup() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(scenario.class_by_id("class.missing").is_none());
+        assert!(scenario.stat_definition_by_id("luck").is_none());
+    }
+
+    #[test]
     fn content_diagnostics_report_empty_ruleset_id() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.ruleset.id.clear();
@@ -210,6 +257,128 @@ mod tests {
         assert_eq!(diagnostics[0].severity, ContentDiagnosticSeverity::Error);
         assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyItemId);
         assert_eq!(ContentDiagnosticCode::EmptyItemId.code(), "emptyItemId");
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_class_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.classes.push(ClassDefinition {
+            id: String::new(),
+            name: "Nameless".to_string(),
+            summary: "Invalid class fixture.".to_string(),
+            tags: Vec::new(),
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, ContentDiagnosticSeverity::Error);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyClassId);
+        assert_eq!(ContentDiagnosticCode::EmptyClassId.code(), "emptyClassId");
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_class_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.classes.push(scenario.classes[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::DuplicateClassId);
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("class.hex-adept".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_selected_class_missing_from_catalog() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.selected_class_id = Some("class.missing".to_string());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::SelectedClassMissingFromCatalog
+        );
+        assert_eq!(diagnostics[0].content_id, Some("class.missing".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_combatant_class() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].class_ids = vec!["class.missing".to_string()];
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingCombatantClass
+        );
+        assert_eq!(diagnostics[0].content_id, Some("class.missing".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_stat_definition_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.stat_definitions.push(StatDefinition {
+            id: String::new(),
+            label: "Empty".to_string(),
+            kind: StatDefinitionKind::Base,
+            summary: "Invalid stat definition fixture.".to_string(),
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::EmptyStatDefinitionId
+        );
+        assert_eq!(
+            ContentDiagnosticCode::EmptyStatDefinitionId.code(),
+            "emptyStatDefinitionId"
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_stat_definition_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario
+            .stat_definitions
+            .push(scenario.stat_definitions[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::DuplicateStatDefinitionId
+        );
+        assert_eq!(diagnostics[0].content_id, Some("mind".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_combatant_stat_definition() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].stats.base_stats.push(NamedNumber {
+            id: "luck".to_string(),
+            label: "Luck".to_string(),
+            value: 2,
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingCombatantStatDefinition
+        );
+        assert_eq!(diagnostics[0].content_id, Some("luck".to_string()));
     }
 
     #[test]
@@ -493,6 +662,28 @@ mod tests {
                 .map(|projection| projection.combatants[1].conditions.as_slice()),
             Some(&["rattled".to_string()][..])
         );
+    }
+
+    #[test]
+    fn class_stat_content_does_not_change_hexing_bolt_resolution() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.modifier),
+            Some(4)
+        );
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.total),
+            Some(21)
+        );
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
     }
 
     #[test]
