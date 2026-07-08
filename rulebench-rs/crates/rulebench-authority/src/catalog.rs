@@ -17,6 +17,14 @@ pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
     ]
 }
 
+pub fn ruleset_catalog_readout() -> RulesetCatalogReadout {
+    let scenario = hexing_bolt_fixture_scenario();
+    RulesetCatalogReadout {
+        selected_ruleset_id: scenario.selected_ruleset_id,
+        rulesets: scenario.rulesets,
+    }
+}
+
 pub fn resolve_catalog_scenario(
     id: &str,
 ) -> Result<ScenarioCatalogResolution, ScenarioCatalogError> {

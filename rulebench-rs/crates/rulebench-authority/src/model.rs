@@ -41,6 +41,12 @@ pub struct ScenarioCatalogResolution {
     pub receipt: RulebenchReceipt,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetCatalogReadout {
+    pub selected_ruleset_id: String,
+    pub rulesets: Vec<RulesetMetadata>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScenarioCatalogError {
     UnknownScenarioId,

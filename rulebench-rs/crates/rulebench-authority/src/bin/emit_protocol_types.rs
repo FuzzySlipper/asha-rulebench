@@ -54,6 +54,40 @@ fn aliases() -> &'static [&'static str] {
 fn interfaces() -> &'static [Interface] {
     &[
         Interface {
+            name: "RulebenchRulesetCatalogDto",
+            fields: &[
+                Field {
+                    name: "selectedRulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesets",
+                    ty: "readonly RulebenchRulesetSummaryDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchRulesetSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchCombatSessionCatalogDto",
             fields: &[
                 Field {

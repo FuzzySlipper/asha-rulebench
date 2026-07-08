@@ -4,14 +4,16 @@ import type {
   RulebenchCombatSessionCatalogDto,
   RulebenchCombatSessionStepReadoutDto,
   RulebenchCombatSessionSummaryDto,
+  RulebenchRulesetCatalogDto,
   RulebenchScenarioCatalogDto,
   RulebenchScenarioCatalogSummaryDto,
   RulebenchScenarioReadoutDto,
 } from '@asha-rulebench/protocol';
 import { rustBackedCombatSessionCatalog } from './generated/rust-combat-session';
-import { rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
+import { rustBackedRulesetCatalog, rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
 
 export interface RulebenchTransport {
+  readonly loadRulesetCatalog: () => Promise<Result<RulebenchRulesetCatalogDto>>;
   readonly loadCatalog: () => Promise<Result<readonly RulebenchScenarioCatalogSummaryDto[]>>;
   readonly loadScenario: (scenarioId?: string) => Promise<Result<RulebenchScenarioReadoutDto>>;
   readonly loadSessionCatalog: () => Promise<Result<readonly RulebenchCombatSessionSummaryDto[]>>;
@@ -24,6 +26,7 @@ export interface RulebenchTransport {
   ) => Promise<Result<RulebenchCombatControlHistoryReadoutDto>>;
 }
 
+export const defaultRulesetCatalog: RulebenchRulesetCatalogDto = rustBackedRulesetCatalog;
 export const defaultScenarioCatalog: RulebenchScenarioCatalogDto = rustBackedScenarioCatalog;
 export const defaultScenarioId: string = firstScenarioId(defaultScenarioCatalog);
 export const defaultScenarioReadout: RulebenchScenarioReadoutDto = requireScenarioReadout(
@@ -45,7 +48,9 @@ export const defaultCombatControlHistoryReadout: RulebenchCombatControlHistoryRe
 export const createFakeRulebenchTransport = (
   catalog: RulebenchScenarioCatalogDto = defaultScenarioCatalog,
   sessionCatalog: RulebenchCombatSessionCatalogDto = defaultCombatSessionCatalog,
+  rulesetCatalog: RulebenchRulesetCatalogDto = defaultRulesetCatalog,
 ): RulebenchTransport => ({
+  loadRulesetCatalog: async () => ({ ok: true, value: rulesetCatalog }),
   loadCatalog: async () => ({ ok: true, value: catalog.summaries }),
   loadScenario: async (scenarioId: string = firstScenarioId(catalog)) => {
     const readout = scenarioReadout(catalog, scenarioId);

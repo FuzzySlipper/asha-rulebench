@@ -22,6 +22,18 @@ export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEn
 
 export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';
 
+export interface RulebenchRulesetCatalogDto {
+  readonly selectedRulesetId: string;
+  readonly rulesets: readonly RulebenchRulesetSummaryDto[];
+}
+
+export interface RulebenchRulesetSummaryDto {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly summary: string;
+}
+
 export interface RulebenchCombatSessionCatalogDto {
   readonly summaries: readonly RulebenchCombatSessionSummaryDto[];
   readonly readouts: readonly RulebenchCombatSessionStepReadoutDto[];

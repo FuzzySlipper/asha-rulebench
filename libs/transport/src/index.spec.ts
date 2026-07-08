@@ -2,15 +2,37 @@ import { describe, expect, it } from 'vitest';
 import {
   createFakeRulebenchTransport,
   defaultCombatSessionCatalog,
-  defaultCombatSessionStepReadout,
   defaultCombatControlHistoryReadout,
+  defaultCombatSessionStepReadout,
+  defaultRulesetCatalog,
   defaultScenarioCatalog,
   defaultScenarioReadout,
 } from './index';
 import { rustBackedCombatSessionCatalog } from './generated/rust-combat-session';
-import { rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
+import { rustBackedRulesetCatalog, rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
 
 describe('RulebenchTransport fixtures', () => {
+  it('uses the checked Rust-backed ruleset catalog as the default transport payload', async () => {
+    expect(defaultRulesetCatalog).toBe(rustBackedRulesetCatalog);
+
+    const transport = createFakeRulebenchTransport();
+    const result = await transport.loadRulesetCatalog();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(defaultRulesetCatalog);
+      expect(result.value.selectedRulesetId).toBe('asha-rulebench.hexing-bolt.v0');
+      expect(result.value.rulesets).toEqual([
+        {
+          id: 'asha-rulebench.hexing-bolt.v0',
+          name: 'Hexing Bolt Fixture Rules',
+          version: '0.0.0',
+          summary: 'Local single-action fixture ruleset for authority incubation.',
+        },
+      ]);
+    }
+  });
+
   it('uses the checked Rust-backed scenario catalog as the default transport payload', async () => {
     expect(defaultScenarioCatalog).toBe(rustBackedScenarioCatalog);
 

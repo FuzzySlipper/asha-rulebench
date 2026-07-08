@@ -22,7 +22,10 @@ pub use audit::{
     fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
     STATE_FINGERPRINT_ALGORITHM,
 };
-pub use catalog::{resolve_catalog_scenario, scenario_catalog_cases, scenario_catalog_summaries};
+pub use catalog::{
+    resolve_catalog_scenario, ruleset_catalog_readout, scenario_catalog_cases,
+    scenario_catalog_summaries,
+};
 pub use content::{validate_scenario_content, validate_scenario_content_report};
 pub use fixtures::{
     accepted_hexing_bolt_fixture_receipt, hexing_bolt_fixture_scenario,
