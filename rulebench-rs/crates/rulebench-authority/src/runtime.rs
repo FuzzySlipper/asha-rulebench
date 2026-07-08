@@ -280,6 +280,66 @@ pub struct CombatSessionAutomaticStepExecutionReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticRunSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub max_steps: u32,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionAutomaticRunSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        max_steps: u32,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            max_steps,
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticRunDecisionKind {
+    CompletedCombatEnded,
+    StoppedAtMaxSteps,
+    RejectedByLifecycle,
+    RejectedByStepLimit,
+}
+
+impl CombatSessionAutomaticRunDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded => "completedCombatEnded",
+            CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps => "stoppedAtMaxSteps",
+            CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit => "rejectedByStepLimit",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticRunReadout {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutomaticRunDecisionKind,
+    pub max_steps: u32,
+    pub executed_step_count: u32,
+    pub steps: Vec<CombatSessionAutomaticStepExecutionReadout>,
+    pub final_snapshot: CombatSessionSnapshot,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionScriptSpec {
     pub id: String,
     pub title: String,
@@ -903,6 +963,83 @@ impl CombatSessionState {
         }
     }
 
+    pub fn run_automatic_combat(
+        &mut self,
+        spec: CombatSessionAutomaticRunSpec,
+    ) -> CombatSessionAutomaticRunReadout {
+        if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+            return combat_session_automatic_run_readout(
+                spec.id,
+                spec.title,
+                spec.summary,
+                false,
+                CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle,
+                spec.max_steps,
+                Vec::new(),
+                self.snapshot(),
+                "Automatic combat run rejected because combat is already ended.",
+            );
+        }
+
+        if spec.max_steps == 0 {
+            return combat_session_automatic_run_readout(
+                spec.id,
+                spec.title,
+                spec.summary,
+                false,
+                CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit,
+                spec.max_steps,
+                Vec::new(),
+                self.snapshot(),
+                "Automatic combat run rejected because max steps is zero.",
+            );
+        }
+
+        let mut steps = Vec::new();
+        for step_index in 0..spec.max_steps {
+            if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+                break;
+            }
+
+            steps.push(
+                self.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+                    format!("{}-step-{step_index}", spec.id),
+                    format!("{} step {}", spec.title, step_index + 1),
+                    spec.summary.clone(),
+                    spec.roll_stream.clone(),
+                )),
+            );
+        }
+
+        let final_snapshot = self.snapshot();
+        let combat_ended = final_snapshot.lifecycle.phase == CombatLifecyclePhase::Ended;
+        let (accepted, decision_kind, reason) = if combat_ended {
+            (
+                true,
+                CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded,
+                "Automatic combat run completed because combat reached ended lifecycle.",
+            )
+        } else {
+            (
+                false,
+                CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps,
+                "Automatic combat run stopped at the max-step guard before combat ended.",
+            )
+        };
+
+        combat_session_automatic_run_readout(
+            spec.id,
+            spec.title,
+            spec.summary,
+            accepted,
+            decision_kind,
+            spec.max_steps,
+            steps,
+            final_snapshot,
+            reason,
+        )
+    }
+
     pub fn preflight_command(&self, intent: UseActionIntent) -> CommandPreflightReadout {
         let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
         command_preflight_readout(
@@ -1311,6 +1448,31 @@ impl CombatSessionState {
             turn_advance.state_after_fingerprint,
             turn_advance.reason,
         )
+    }
+}
+
+fn combat_session_automatic_run_readout(
+    id: String,
+    title: String,
+    summary: String,
+    accepted: bool,
+    decision_kind: CombatSessionAutomaticRunDecisionKind,
+    max_steps: u32,
+    steps: Vec<CombatSessionAutomaticStepExecutionReadout>,
+    final_snapshot: CombatSessionSnapshot,
+    reason: impl Into<String>,
+) -> CombatSessionAutomaticRunReadout {
+    CombatSessionAutomaticRunReadout {
+        id,
+        title,
+        summary,
+        accepted,
+        decision_kind,
+        max_steps,
+        executed_step_count: steps.len() as u32,
+        steps,
+        final_snapshot,
+        reason: reason.into(),
     }
 }
 

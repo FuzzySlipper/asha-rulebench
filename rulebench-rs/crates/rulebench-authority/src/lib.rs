@@ -39,14 +39,16 @@ pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
     CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
     CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
-    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
-    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
-    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
-    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
-    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
-    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
-    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
-    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
+    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
+    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
+    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
+    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
+    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
+    CombatSessionState,
 };
 pub use session::{
     combat_session_control_history_readouts, combat_session_script_readouts,
@@ -4141,6 +4143,148 @@ mod tests {
             session.snapshot().combat_end_condition.condition_kind,
             CombatEndConditionKind::NoActiveEnemies
         );
+    }
+
+    #[test]
+    fn session_runtime_automatic_run_completes_fixture_combat_within_bound() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
+            "auto-run",
+            "Auto run",
+            "Rust runs bounded automatic combat.",
+            8,
+            vec![17, 5],
+        ));
+
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded
+        );
+        assert_eq!(readout.decision_kind.code(), "completedCombatEnded");
+        assert_eq!(readout.max_steps, 8);
+        assert_eq!(readout.executed_step_count, 5);
+        assert_eq!(
+            readout
+                .steps
+                .iter()
+                .map(|step| step.plan.decision_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
+                CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
+                CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
+                CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
+                CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
+            ]
+        );
+        assert_eq!(
+            readout.final_snapshot.lifecycle.phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(readout.final_snapshot.combat_log.len(), 2);
+        assert_eq!(readout.final_snapshot.audit_log.len(), 2);
+        assert_eq!(session.control_history().len(), 3);
+        assert_eq!(
+            readout.final_snapshot.current_state.combatants[1]
+                .hit_points
+                .current,
+            0
+        );
+        assert_eq!(session.snapshot(), readout.final_snapshot);
+    }
+
+    #[test]
+    fn session_runtime_automatic_run_stops_at_max_steps_before_completion() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
+            "auto-run-short",
+            "Auto run short",
+            "Rust stops bounded automatic combat at max steps.",
+            2,
+            vec![17, 5],
+        ));
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps
+        );
+        assert_eq!(readout.decision_kind.code(), "stoppedAtMaxSteps");
+        assert_eq!(readout.executed_step_count, 2);
+        assert_eq!(
+            readout.final_snapshot.lifecycle.phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(
+            readout
+                .final_snapshot
+                .turn_order
+                .current_actor_id
+                .as_deref(),
+            Some("entity-raider")
+        );
+        assert_eq!(readout.final_snapshot.combat_log.len(), 1);
+        assert_eq!(session.control_history().len(), 1);
+        assert_eq!(session.snapshot(), readout.final_snapshot);
+    }
+
+    #[test]
+    fn session_runtime_automatic_run_rejects_already_ended_combat_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+        let before_run = session.snapshot();
+
+        let readout = session.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
+            "auto-run-ended",
+            "Auto run ended",
+            "Rust rejects bounded automatic combat after end.",
+            8,
+            vec![17, 5],
+        ));
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(readout.decision_kind.code(), "rejectedByLifecycle");
+        assert_eq!(readout.executed_step_count, 0);
+        assert!(readout.steps.is_empty());
+        assert_eq!(readout.final_snapshot, before_run);
+        assert_eq!(session.snapshot(), before_run);
+    }
+
+    #[test]
+    fn session_runtime_automatic_run_rejects_zero_step_limit_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_run = session.snapshot();
+
+        let readout = session.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
+            "auto-run-zero",
+            "Auto run zero",
+            "Rust rejects bounded automatic combat with no allowed steps.",
+            0,
+            vec![17, 5],
+        ));
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit
+        );
+        assert_eq!(readout.decision_kind.code(), "rejectedByStepLimit");
+        assert_eq!(readout.max_steps, 0);
+        assert_eq!(readout.executed_step_count, 0);
+        assert!(readout.steps.is_empty());
+        assert_eq!(readout.final_snapshot, before_run);
+        assert_eq!(session.snapshot(), before_run);
     }
 
     #[test]
