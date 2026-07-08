@@ -211,6 +211,40 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_modifier_catalog() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(validate_scenario_content(&scenario).is_empty());
+        assert_eq!(
+            scenario
+                .modifiers
+                .iter()
+                .map(|modifier| modifier.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rattled"]
+        );
+        assert_eq!(
+            scenario
+                .modifier_by_id("rattled")
+                .map(|modifier| modifier.label.as_str()),
+            Some("rattled")
+        );
+        assert_eq!(
+            scenario
+                .modifier_by_id("rattled")
+                .map(|modifier| modifier.default_tenure.code()),
+            Some("temporary")
+        );
+    }
+
+    #[test]
+    fn scenario_modifier_catalog_rejects_unknown_lookup() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(scenario.modifier_by_id("stunned").is_none());
+    }
+
+    #[test]
     fn content_diagnostics_report_empty_ruleset_id() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.ruleset.id.clear();
@@ -379,6 +413,87 @@ mod tests {
             ContentDiagnosticCode::MissingCombatantStatDefinition
         );
         assert_eq!(diagnostics[0].content_id, Some("luck".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_modifier_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.modifiers.push(ModifierDefinition {
+            id: String::new(),
+            label: "empty".to_string(),
+            summary: "Invalid modifier fixture.".to_string(),
+            default_tenure: ModifierTenure::Temporary,
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyModifierId);
+        assert_eq!(
+            ContentDiagnosticCode::EmptyModifierId.code(),
+            "emptyModifierId"
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_modifier_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.modifiers.push(scenario.modifiers[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::DuplicateModifierId
+        );
+        assert_eq!(diagnostics[0].content_id, Some("rattled".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_hit_modifier_definition() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        if let HitEffectOperation::ApplyModifier(modifier) =
+            &mut scenario.actions[0].hit.operations[1]
+        {
+            modifier.modifier_id = "missing-rattle".to_string();
+        }
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingHitModifierDefinition
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("missing-rattle".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_active_modifier_definition() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0]
+            .active_modifiers
+            .push(ActiveModifier::temporary(
+                "missing-active",
+                "missing active",
+                "until reviewed",
+            ));
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingActiveModifierDefinition
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("missing-active".to_string())
+        );
     }
 
     #[test]
@@ -684,6 +799,33 @@ mod tests {
             Some(21)
         );
         assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+    }
+
+    #[test]
+    fn modifier_content_does_not_change_hexing_bolt_resolution() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt
+                .modifier
+                .as_ref()
+                .map(|modifier| modifier.modifier_id.as_str()),
+            Some("rattled")
+        );
+        assert_eq!(
+            receipt
+                .projection
+                .as_ref()
+                .map(|projection| projection.combatants[1].conditions.as_slice()),
+            Some(&["rattled".to_string()][..])
+        );
     }
 
     #[test]

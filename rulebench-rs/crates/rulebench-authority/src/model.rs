@@ -282,6 +282,8 @@ pub enum ContentDiagnosticCode {
     DuplicateClassId,
     EmptyStatDefinitionId,
     DuplicateStatDefinitionId,
+    EmptyModifierId,
+    DuplicateModifierId,
     EmptyItemId,
     DuplicateItemId,
     SelectedActionMissingFromCatalog,
@@ -294,6 +296,8 @@ pub enum ContentDiagnosticCode {
     MissingTargetDefense,
     MissingCombatantClass,
     MissingCombatantStatDefinition,
+    MissingHitModifierDefinition,
+    MissingActiveModifierDefinition,
     MissingEquippedItem,
 }
 
@@ -307,6 +311,8 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::DuplicateClassId => "duplicateClassId",
             ContentDiagnosticCode::EmptyStatDefinitionId => "emptyStatDefinitionId",
             ContentDiagnosticCode::DuplicateStatDefinitionId => "duplicateStatDefinitionId",
+            ContentDiagnosticCode::EmptyModifierId => "emptyModifierId",
+            ContentDiagnosticCode::DuplicateModifierId => "duplicateModifierId",
             ContentDiagnosticCode::EmptyItemId => "emptyItemId",
             ContentDiagnosticCode::DuplicateItemId => "duplicateItemId",
             ContentDiagnosticCode::SelectedActionMissingFromCatalog => {
@@ -326,6 +332,10 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::MissingCombatantClass => "missingCombatantClass",
             ContentDiagnosticCode::MissingCombatantStatDefinition => {
                 "missingCombatantStatDefinition"
+            }
+            ContentDiagnosticCode::MissingHitModifierDefinition => "missingHitModifierDefinition",
+            ContentDiagnosticCode::MissingActiveModifierDefinition => {
+                "missingActiveModifierDefinition"
             }
             ContentDiagnosticCode::MissingEquippedItem => "missingEquippedItem",
         }
@@ -447,6 +457,7 @@ pub struct RulebenchScenario {
     pub classes: Vec<ClassDefinition>,
     pub selected_class_id: Option<String>,
     pub stat_definitions: Vec<StatDefinition>,
+    pub modifiers: Vec<ModifierDefinition>,
     pub items: Vec<ItemDefinition>,
     pub selected_item_id: Option<String>,
     pub actions: Vec<ActionDefinition>,
@@ -464,6 +475,12 @@ impl RulebenchScenario {
 
     pub fn item_by_id(&self, item_id: &str) -> Option<&ItemDefinition> {
         self.items.iter().find(|item| item.id == item_id)
+    }
+
+    pub fn modifier_by_id(&self, modifier_id: &str) -> Option<&ModifierDefinition> {
+        self.modifiers
+            .iter()
+            .find(|modifier| modifier.id == modifier_id)
     }
 
     pub fn stat_definition_by_id(&self, stat_id: &str) -> Option<&StatDefinition> {
@@ -523,6 +540,14 @@ pub struct ClassDefinition {
     pub name: String,
     pub summary: String,
     pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModifierDefinition {
+    pub id: String,
+    pub label: String,
+    pub summary: String,
+    pub default_tenure: ModifierTenure,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

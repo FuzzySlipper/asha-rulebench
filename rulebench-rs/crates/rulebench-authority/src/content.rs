@@ -18,6 +18,7 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
 
     validate_classes(scenario, &mut diagnostics);
     validate_stat_definitions(scenario, &mut diagnostics);
+    validate_modifiers(scenario, &mut diagnostics);
     validate_combatant_class_and_stat_references(scenario, &mut diagnostics);
     validate_items(scenario, &mut diagnostics);
 
@@ -121,6 +122,28 @@ fn validate_stat_definitions(
     }
 }
 
+fn validate_modifiers(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
+    let mut seen_modifier_ids = HashSet::new();
+    for modifier in &scenario.modifiers {
+        if modifier.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyModifierId,
+                None,
+                "Modifier catalog contains a modifier with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_modifier_ids.insert(modifier.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateModifierId,
+                Some(modifier.id.clone()),
+                format!("Modifier id {} appears more than once.", modifier.id),
+            ));
+        }
+    }
+}
+
 fn validate_combatant_class_and_stat_references(
     scenario: &RulebenchScenario,
     diagnostics: &mut Vec<ContentDiagnostic>,
@@ -152,6 +175,19 @@ fn validate_combatant_class_and_stat_references(
                     format!(
                         "Combatant {} has stat {} that is not present in the scenario stat catalog.",
                         combatant.id, stat.id
+                    ),
+                ));
+            }
+        }
+
+        for modifier in &combatant.active_modifiers {
+            if scenario.modifier_by_id(&modifier.modifier_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingActiveModifierDefinition,
+                    Some(modifier.modifier_id.clone()),
+                    format!(
+                        "Combatant {} has active modifier {} that is not present in the scenario modifier catalog.",
+                        combatant.id, modifier.modifier_id
                     ),
                 ));
             }
@@ -267,6 +303,7 @@ fn validate_action_references(
     if let Some(actor) = actor {
         validate_actor_attack_stat(action, actor, diagnostics);
     }
+    validate_hit_modifier(scenario, action, diagnostics);
 
     for target_id in &action.target_ids {
         if let Some(target) = scenario
@@ -275,6 +312,25 @@ fn validate_action_references(
             .find(|combatant| combatant.id == *target_id)
         {
             validate_target_defense(action, target, diagnostics);
+        }
+    }
+}
+
+fn validate_hit_modifier(
+    scenario: &RulebenchScenario,
+    action: &ActionDefinition,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    if let Some(modifier) = action.hit.modifier_operation() {
+        if scenario.modifier_by_id(&modifier.modifier_id).is_none() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::MissingHitModifierDefinition,
+                Some(modifier.modifier_id.clone()),
+                format!(
+                    "Action {} applies modifier {} that is not present in the scenario modifier catalog.",
+                    action.id, modifier.modifier_id
+                ),
+            ));
         }
     }
 }

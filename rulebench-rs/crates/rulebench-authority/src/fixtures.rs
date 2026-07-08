@@ -33,6 +33,7 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
         classes: hexing_bolt_classes(),
         selected_class_id: Some("class.hex-adept".to_string()),
         stat_definitions: hexing_bolt_stat_definitions(),
+        modifiers: hexing_bolt_modifiers(),
         items: hexing_bolt_items(),
         selected_item_id: Some("item.hex-focus".to_string()),
         actions: vec![selected_action.clone()],
@@ -144,6 +145,15 @@ fn hexing_bolt_stat_definitions() -> Vec<StatDefinition> {
                 .to_string(),
         },
     ]
+}
+
+fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
+    vec![ModifierDefinition {
+        id: "rattled".to_string(),
+        label: "rattled".to_string(),
+        summary: "A temporary condition-like modifier applied by Hexing Bolt.".to_string(),
+        default_tenure: ModifierTenure::Temporary,
+    }]
 }
 
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
