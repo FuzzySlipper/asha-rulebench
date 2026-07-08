@@ -290,6 +290,35 @@ describe('RulebenchTransport fixtures', () => {
         unavailableReason: 'combatEnded',
         actions: [],
       });
+      expect(result.value.finalCombatantVitality).toEqual({
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            currentHitPoints: 24,
+            maxHitPoints: 24,
+            defeated: false,
+          },
+          {
+            combatantId: 'entity-raider',
+            currentHitPoints: 9,
+            maxHitPoints: 18,
+            defeated: false,
+          },
+        ],
+        activeCombatantIds: ['entity-adept', 'entity-raider'],
+        defeatedCombatantIds: [],
+        activeCount: 2,
+        defeatedCount: 0,
+      });
+      expect(result.value.finalCombatEndCondition).toEqual({
+        combatShouldEnd: false,
+        conditionKind: 'ongoing',
+        activeAllyCount: 1,
+        activeEnemyCount: 1,
+        defeatedAllyCount: 0,
+        defeatedEnemyCount: 0,
+        reason: 'Combat can continue because both sides have active combatants.',
+      });
       expect(result.value.commandAuditLog).toEqual([
         {
           id: 'audit-script-selected-runtime-hit',

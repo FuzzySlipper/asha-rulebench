@@ -40,6 +40,8 @@ export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
 
 export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';
 
+export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';
+
 export interface RulebenchRulesetCatalogDto {
   readonly selectedRulesetId: string;
   readonly rulesets: readonly RulebenchRulesetSummaryDto[];
@@ -110,6 +112,8 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalTurnOrder: RulebenchCombatTurnOrderDto;
   readonly currentTurnActionUsage: RulebenchActionUsageSummaryDto;
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
+  readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
+  readonly finalCombatEndCondition: RulebenchCombatEndConditionDto;
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
@@ -155,6 +159,31 @@ export interface RulebenchCurrentActorTargetOptionDto {
   readonly targetName: string;
   readonly currentHitPoints: number;
   readonly maxHitPoints: number;
+}
+
+export interface RulebenchCombatantVitalitySummaryDto {
+  readonly combatants: readonly RulebenchCombatantVitalityEntryDto[];
+  readonly activeCombatantIds: readonly string[];
+  readonly defeatedCombatantIds: readonly string[];
+  readonly activeCount: number;
+  readonly defeatedCount: number;
+}
+
+export interface RulebenchCombatantVitalityEntryDto {
+  readonly combatantId: string;
+  readonly currentHitPoints: number;
+  readonly maxHitPoints: number;
+  readonly defeated: boolean;
+}
+
+export interface RulebenchCombatEndConditionDto {
+  readonly combatShouldEnd: boolean;
+  readonly conditionKind: RulebenchCombatEndConditionKindDto;
+  readonly activeAllyCount: number;
+  readonly activeEnemyCount: number;
+  readonly defeatedAllyCount: number;
+  readonly defeatedEnemyCount: number;
+  readonly reason: string;
 }
 
 export interface RulebenchActiveModifierDto {

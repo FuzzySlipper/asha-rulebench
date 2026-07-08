@@ -934,6 +934,35 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         actions: [
         ],
       },
+      finalCombatantVitality: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            currentHitPoints: 24,
+            maxHitPoints: 24,
+            defeated: false,
+          },
+          {
+            combatantId: 'entity-raider',
+            currentHitPoints: 9,
+            maxHitPoints: 18,
+            defeated: false,
+          },
+        ],
+        activeCombatantIds: ['entity-adept', 'entity-raider'],
+        defeatedCombatantIds: [],
+        activeCount: 2,
+        defeatedCount: 0,
+      },
+      finalCombatEndCondition: {
+        combatShouldEnd: false,
+        conditionKind: 'ongoing',
+        activeAllyCount: 1,
+        activeEnemyCount: 1,
+        defeatedAllyCount: 0,
+        defeatedEnemyCount: 0,
+        reason: 'Combat can continue because both sides have active combatants.',
+      },
       commandAuditLog: [
 {
           id: 'audit-script-selected-runtime-hit',

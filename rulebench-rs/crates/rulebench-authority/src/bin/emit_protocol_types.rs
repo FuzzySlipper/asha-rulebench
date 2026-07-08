@@ -57,6 +57,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchModifierTenureDto = 'temporary' | 'permanent';",
         "export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';",
         "export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';",
+        "export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';",
     ]
 }
 
@@ -293,6 +294,14 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchCurrentActorOptionSummaryDto",
                 },
                 Field {
+                    name: "finalCombatantVitality",
+                    ty: "RulebenchCombatantVitalitySummaryDto",
+                },
+                Field {
+                    name: "finalCombatEndCondition",
+                    ty: "RulebenchCombatEndConditionDto",
+                },
+                Field {
                     name: "commandAuditLog",
                     ty: "readonly RulebenchCommandAuditEntryDto[]",
                 },
@@ -436,6 +445,85 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "maxHitPoints",
                     ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatantVitalitySummaryDto",
+            fields: &[
+                Field {
+                    name: "combatants",
+                    ty: "readonly RulebenchCombatantVitalityEntryDto[]",
+                },
+                Field {
+                    name: "activeCombatantIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "defeatedCombatantIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "activeCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "defeatedCount",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatantVitalityEntryDto",
+            fields: &[
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "currentHitPoints",
+                    ty: "number",
+                },
+                Field {
+                    name: "maxHitPoints",
+                    ty: "number",
+                },
+                Field {
+                    name: "defeated",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatEndConditionDto",
+            fields: &[
+                Field {
+                    name: "combatShouldEnd",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "conditionKind",
+                    ty: "RulebenchCombatEndConditionKindDto",
+                },
+                Field {
+                    name: "activeAllyCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "activeEnemyCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "defeatedAllyCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "defeatedEnemyCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },

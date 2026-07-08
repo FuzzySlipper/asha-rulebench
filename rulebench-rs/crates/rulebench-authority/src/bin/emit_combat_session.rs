@@ -9,9 +9,10 @@ use rulebench_authority::{
     ActionResourceState, ActionResourceTransitionEntry, ActionResourceTransitionKind,
     ActionUsageEntry, ActionUsageSummary, ActiveModifier, CombatControlCommandKind,
     CombatControlDecisionKind, CombatControlHistoryEntry, CombatControlHistoryReadout,
-    CombatLifecyclePhase, CombatLogEntry, CombatSessionScriptCommandKind,
-    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptStepReadout,
-    CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary, CombatTurnOrder,
+    CombatEndConditionKind, CombatEndConditionReadout, CombatLifecyclePhase, CombatLogEntry,
+    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
+    CombatSessionSummary, CombatTurnOrder, CombatantVitalityEntry, CombatantVitalitySummary,
     CommandAttempt, CommandAuditEntry, CommandDecisionKind, CommandOutcomeClass,
     CommandPreflightDecisionKind, CurrentActorActionOption, CurrentActorOptionSummary,
     CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
@@ -397,6 +398,18 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalCombatantVitality: ");
+    out.push_str(&render_combatant_vitality(
+        &readout.final_snapshot.combatant_vitality,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      finalCombatEndCondition: ");
+    out.push_str(&render_combat_end_condition(
+        &readout.final_snapshot.combat_end_condition,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      commandAuditLog: [\n");
     for entry in &readout.final_snapshot.audit_log {
         out.push_str(&render_command_audit_entry(entry, "        "));
@@ -631,6 +644,87 @@ fn render_optional_current_actor_options_unavailable_reason(
     reason
         .map(|inner| ts_string(inner.code()))
         .unwrap_or_else(|| "null".to_string())
+}
+
+fn render_combatant_vitality(summary: &CombatantVitalitySummary, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  combatants: [\n"));
+    for combatant in &summary.combatants {
+        out.push_str(&render_combatant_vitality_entry(combatant, indent));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!(
+        "{indent}  activeCombatantIds: {},\n",
+        ts_string_array(&summary.active_combatant_ids)
+    ));
+    out.push_str(&format!(
+        "{indent}  defeatedCombatantIds: {},\n",
+        ts_string_array(&summary.defeated_combatant_ids)
+    ));
+    out.push_str(&format!(
+        "{indent}  activeCount: {},\n",
+        summary.active_count
+    ));
+    out.push_str(&format!(
+        "{indent}  defeatedCount: {},\n",
+        summary.defeated_count
+    ));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+fn render_combatant_vitality_entry(entry: &CombatantVitalityEntry, indent: &str) -> String {
+    let mut out = String::from("");
+    out.push_str(&format!("{indent}    {{\n"));
+    out.push_str(&format!(
+        "{indent}      combatantId: {},\n",
+        ts_string(&entry.combatant_id)
+    ));
+    out.push_str(&format!(
+        "{indent}      currentHitPoints: {},\n",
+        entry.current_hit_points
+    ));
+    out.push_str(&format!(
+        "{indent}      maxHitPoints: {},\n",
+        entry.max_hit_points
+    ));
+    out.push_str(&format!("{indent}      defeated: {},\n", entry.defeated));
+    out.push_str(&format!("{indent}    }},\n"));
+    out
+}
+
+fn render_combat_end_condition(readout: &CombatEndConditionReadout, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!(
+        "{indent}  combatShouldEnd: {},\n",
+        readout.combat_should_end
+    ));
+    out.push_str(&format!(
+        "{indent}  conditionKind: {},\n",
+        ts_string(combat_end_condition_kind(readout.condition_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  activeAllyCount: {},\n",
+        readout.active_ally_count
+    ));
+    out.push_str(&format!(
+        "{indent}  activeEnemyCount: {},\n",
+        readout.active_enemy_count
+    ));
+    out.push_str(&format!(
+        "{indent}  defeatedAllyCount: {},\n",
+        readout.defeated_ally_count
+    ));
+    out.push_str(&format!(
+        "{indent}  defeatedEnemyCount: {},\n",
+        readout.defeated_enemy_count
+    ));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&readout.reason)
+    ));
+    out.push_str(&format!("{indent}}}"));
+    out
 }
 
 fn render_optional_preflight_decision_kind(
@@ -953,6 +1047,10 @@ fn lifecycle_phase(phase: CombatLifecyclePhase) -> &'static str {
 
 fn modifier_tenure(tenure: ModifierTenure) -> &'static str {
     tenure.code()
+}
+
+fn combat_end_condition_kind(kind: CombatEndConditionKind) -> &'static str {
+    kind.code()
 }
 
 fn action_resource_kind(kind: ActionResourceKind) -> &'static str {
