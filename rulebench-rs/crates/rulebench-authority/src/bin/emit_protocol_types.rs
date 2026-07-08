@@ -284,6 +284,10 @@ fn interfaces() -> &'static [Interface] {
                     ty: "readonly RulebenchCommandAuditEntryDto[]",
                 },
                 Field {
+                    name: "actionUsageLog",
+                    ty: "readonly RulebenchActionUsageEntryDto[]",
+                },
+                Field {
                     name: "actionResourceTransitionLog",
                     ty: "readonly RulebenchActionResourceTransitionEntryDto[]",
                 },
@@ -409,6 +413,51 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "stateAfterFingerprint",
                     ty: "RulebenchStateFingerprintDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActionUsageEntryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "stepId",
+                    ty: "string",
+                },
+                Field {
+                    name: "stepIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "roundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "turnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "actorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "outcomeClass",
+                    ty: "RulebenchCommandOutcomeClassDto",
                 },
             ],
         },

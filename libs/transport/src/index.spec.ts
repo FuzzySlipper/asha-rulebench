@@ -308,6 +308,20 @@ describe('RulebenchTransport fixtures', () => {
           },
         },
       ]);
+      expect(result.value.actionUsageLog).toEqual([
+        {
+          id: 'action-usage-script-selected-runtime-hit',
+          stepId: 'script-selected-runtime-hit',
+          stepIndex: 0,
+          roundNumber: 1,
+          turnIndex: 0,
+          actorId: 'entity-adept',
+          actionId: 'hexing_bolt',
+          abilityId: 'ability.hexing-bolt',
+          targetId: 'entity-raider',
+          outcomeClass: 'acceptedHit',
+        },
+      ]);
       expect(result.value.actionResourceTransitionLog).toEqual([
         {
           sequence: 0,

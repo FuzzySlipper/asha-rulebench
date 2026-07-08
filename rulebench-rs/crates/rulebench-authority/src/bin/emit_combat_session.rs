@@ -7,8 +7,8 @@ use rulebench_authority::{
     combat_session_control_history_readouts, combat_session_script_readouts,
     combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
     ActionResourceState, ActionResourceTransitionEntry, ActionResourceTransitionKind,
-    ActiveModifier, CombatControlCommandKind, CombatControlDecisionKind, CombatControlHistoryEntry,
-    CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
+    ActionUsageEntry, ActiveModifier, CombatControlCommandKind, CombatControlDecisionKind,
+    CombatControlHistoryEntry, CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
     CombatSessionSummary, CommandAttempt, CommandAuditEntry, CommandDecisionKind,
@@ -381,6 +381,11 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         out.push_str(&render_command_audit_entry(entry, "        "));
     }
     out.push_str("      ],\n");
+    out.push_str("      actionUsageLog: [\n");
+    for entry in &readout.final_snapshot.action_usage_log {
+        out.push_str(&render_action_usage_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str("      actionResourceTransitionLog: [\n");
     for entry in &readout.final_snapshot.action_resource_transition_log {
         out.push_str(&render_action_resource_transition_entry(entry, "        "));
@@ -431,6 +436,40 @@ fn render_command_audit_entry(entry: &CommandAuditEntry, indent: &str) -> String
     out.push_str(&format!(
         "{indent}  stateAfterFingerprint: {},\n",
         render_fingerprint(&entry.state_after_fingerprint, indent)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_action_usage_entry(entry: &ActionUsageEntry, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  id: {},\n", ts_string(&entry.id)));
+    out.push_str(&format!(
+        "{indent}  stepId: {},\n",
+        ts_string(&entry.step_id)
+    ));
+    out.push_str(&format!("{indent}  stepIndex: {},\n", entry.step_index));
+    out.push_str(&format!("{indent}  roundNumber: {},\n", entry.round_number));
+    out.push_str(&format!("{indent}  turnIndex: {},\n", entry.turn_index));
+    out.push_str(&format!(
+        "{indent}  actorId: {},\n",
+        ts_string(&entry.actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  actionId: {},\n",
+        ts_string(&entry.action_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  abilityId: {},\n",
+        ts_string(&entry.ability_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  targetId: {},\n",
+        ts_string(&entry.target_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  outcomeClass: {},\n",
+        ts_string(outcome_class(entry.outcome_class))
     ));
     out.push_str(&format!("{indent}}},\n"));
     out

@@ -939,6 +939,20 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           stateAfterFingerprint: { algorithm: 'fnv1a64.rulebench-state.v0', value: '1872b66dd0de303a' },
         },
       ],
+      actionUsageLog: [
+{
+          id: 'action-usage-script-selected-runtime-hit',
+          stepId: 'script-selected-runtime-hit',
+          stepIndex: 0,
+          roundNumber: 1,
+          turnIndex: 0,
+          actorId: 'entity-adept',
+          actionId: 'hexing_bolt',
+          abilityId: 'ability.hexing-bolt',
+          targetId: 'entity-raider',
+          outcomeClass: 'acceptedHit',
+        },
+      ],
       actionResourceTransitionLog: [
 {
           sequence: 0,

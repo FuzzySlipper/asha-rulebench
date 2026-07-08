@@ -106,6 +106,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
+  readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
 }
@@ -143,6 +144,19 @@ export interface RulebenchCommandAuditEntryDto {
   readonly traceCount: number;
   readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
   readonly stateAfterFingerprint: RulebenchStateFingerprintDto;
+}
+
+export interface RulebenchActionUsageEntryDto {
+  readonly id: string;
+  readonly stepId: string;
+  readonly stepIndex: number;
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly actorId: string;
+  readonly actionId: string;
+  readonly abilityId: string;
+  readonly targetId: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
 }
 
 export interface RulebenchActionResourceTransitionEntryDto {
