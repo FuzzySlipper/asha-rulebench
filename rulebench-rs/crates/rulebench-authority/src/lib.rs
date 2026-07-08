@@ -37,9 +37,11 @@ pub use modifiers::{
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
-    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
-    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
-    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    verify_automatic_run_replay, CombatSessionAutoCandidateCommandSpec,
+    CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
+    CombatSessionAutoCandidatePlanReadout, CombatSessionAutomaticRunDecisionKind,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunReplayDecisionKind,
+    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
     CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
     CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
     CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,

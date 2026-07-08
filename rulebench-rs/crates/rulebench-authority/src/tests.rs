@@ -4307,6 +4307,102 @@ fn session_runtime_automatic_run_rejects_zero_step_limit_read_only() {
 }
 
 #[test]
+fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
+    let scenario = hexing_bolt_fixture_scenario();
+    let run_spec = CombatSessionAutomaticRunSpec::new(
+        "auto-run-replay",
+        "Auto run replay",
+        "Rust replays bounded automatic combat.",
+        8,
+        vec![17, 5],
+    );
+    let mut expected_session =
+        CombatSessionState::new("runtime-hexing-bolt-expected", scenario.clone());
+    let expected_run = expected_session.run_automatic_combat(run_spec.clone());
+
+    let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+        "auto-run-replay-verification",
+        "Auto run replay verification",
+        "Rust verifies that replayed automatic combat matches expected final evidence.",
+        "runtime-hexing-bolt-replay",
+        scenario,
+        run_spec,
+        expected_run
+            .final_snapshot
+            .current_state_fingerprint
+            .clone(),
+        expected_run.decision_kind,
+        expected_run.executed_step_count,
+    ));
+
+    assert!(readout.accepted);
+    assert_eq!(
+        readout.decision_kind,
+        CombatSessionAutomaticRunReplayDecisionKind::Verified
+    );
+    assert_eq!(readout.decision_kind.code(), "verified");
+    assert!(readout.final_state_fingerprint_matches);
+    assert!(readout.run_decision_kind_matches);
+    assert!(readout.executed_step_count_matches);
+    assert_eq!(
+        readout.actual_final_state_fingerprint,
+        expected_run.final_snapshot.current_state_fingerprint
+    );
+    assert_eq!(
+        readout.replayed_run.decision_kind,
+        CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded
+    );
+}
+
+#[test]
+fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
+    let scenario = hexing_bolt_fixture_scenario();
+    let run_spec = CombatSessionAutomaticRunSpec::new(
+        "auto-run-replay-mismatch",
+        "Auto run replay mismatch",
+        "Rust replays bounded automatic combat for mismatch evidence.",
+        8,
+        vec![17, 5],
+    );
+    let mut expected_session =
+        CombatSessionState::new("runtime-hexing-bolt-expected", scenario.clone());
+    let expected_run = expected_session.run_automatic_combat(run_spec.clone());
+
+    let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+        "auto-run-replay-mismatch-verification",
+        "Auto run replay mismatch verification",
+        "Rust reports mismatched expected automatic combat evidence.",
+        "runtime-hexing-bolt-replay",
+        scenario,
+        run_spec,
+        expected_run
+            .final_snapshot
+            .current_state_fingerprint
+            .clone(),
+        expected_run.decision_kind,
+        expected_run.executed_step_count + 1,
+    ));
+
+    assert!(!readout.accepted);
+    assert_eq!(
+        readout.decision_kind,
+        CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence
+    );
+    assert_eq!(readout.decision_kind.code(), "mismatchedEvidence");
+    assert!(readout.final_state_fingerprint_matches);
+    assert!(readout.run_decision_kind_matches);
+    assert!(!readout.executed_step_count_matches);
+    assert_eq!(
+        readout.actual_executed_step_count,
+        expected_run.executed_step_count
+    );
+    assert_eq!(
+        readout.reason,
+        "Automatic run replay produced evidence that does not match expected final evidence."
+    );
+}
+
+#[test]
 fn session_runtime_selected_candidate_submission_accepts_hit() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
