@@ -42,6 +42,7 @@ pub struct CombatSessionState {
     audit_log: Vec<CommandAuditEntry>,
     action_usage_log: Vec<ActionUsageEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
+    lifecycle_transition_log: Vec<LifecycleTransitionEntry>,
     next_step_index: u32,
     lifecycle: CombatLifecycle,
     turn_order: CombatTurnOrder,
@@ -65,6 +66,7 @@ impl CombatSessionState {
             audit_log: Vec::new(),
             action_usage_log: Vec::new(),
             turn_transition_log: Vec::new(),
+            lifecycle_transition_log: Vec::new(),
             next_step_index: 0,
             lifecycle: CombatLifecycle::ready(),
             turn_order,
@@ -105,7 +107,7 @@ impl CombatSessionState {
                     )
                 }
                 _ => {
-                    self.lifecycle.start_at_step(self.next_step_index);
+                    self.start_lifecycle(LifecycleTransitionTrigger::CommandStart);
                     let receipt =
                         resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
                     let state_after = receipt
@@ -196,6 +198,10 @@ impl CombatSessionState {
         &self.turn_transition_log
     }
 
+    pub fn lifecycle_transition_log(&self) -> &[LifecycleTransitionEntry] {
+        &self.lifecycle_transition_log
+    }
+
     pub fn current_turn_action_usage(&self) -> ActionUsageSummary {
         current_turn_action_usage(&self.turn_order, &self.action_usage_log)
     }
@@ -214,11 +220,11 @@ impl CombatSessionState {
     }
 
     pub fn start_combat(&mut self) {
-        self.lifecycle.start_at_step(self.next_step_index);
+        self.start_lifecycle(LifecycleTransitionTrigger::ExplicitStart);
     }
 
     pub fn end_combat(&mut self) {
-        self.lifecycle.end_at_step(self.next_step_index);
+        self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
     }
 
     pub fn turn_order(&self) -> &CombatTurnOrder {
@@ -250,6 +256,7 @@ impl CombatSessionState {
             session_id: self.session_id.clone(),
             next_step_index: self.next_step_index,
             lifecycle: self.lifecycle.clone(),
+            lifecycle_transition_log: self.lifecycle_transition_log.clone(),
             turn_order: self.turn_order.clone(),
             combat_log: self.combat_log.clone(),
             audit_log: self.audit_log.clone(),
@@ -260,6 +267,40 @@ impl CombatSessionState {
             current_state,
             current_state_fingerprint,
         }
+    }
+
+    fn start_lifecycle(&mut self, trigger: LifecycleTransitionTrigger) {
+        let previous_lifecycle = self.lifecycle.clone();
+        self.lifecycle.start_at_step(self.next_step_index);
+        self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
+    }
+
+    fn end_lifecycle(&mut self, trigger: LifecycleTransitionTrigger) {
+        let previous_lifecycle = self.lifecycle.clone();
+        self.lifecycle.end_at_step(self.next_step_index);
+        self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
+    }
+
+    fn record_lifecycle_transition(
+        &mut self,
+        trigger: LifecycleTransitionTrigger,
+        step_index: u32,
+        previous_lifecycle: CombatLifecycle,
+    ) {
+        if self.lifecycle == previous_lifecycle {
+            return;
+        }
+
+        self.lifecycle_transition_log
+            .push(LifecycleTransitionEntry {
+                sequence: self.lifecycle_transition_log.len() as u32,
+                trigger,
+                step_index,
+                previous_phase: previous_lifecycle.phase,
+                next_phase: self.lifecycle.phase,
+                started_at_step: self.lifecycle.started_at_step,
+                ended_at_step: self.lifecycle.ended_at_step,
+            });
     }
 }
 

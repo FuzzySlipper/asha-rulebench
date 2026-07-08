@@ -2752,6 +2752,39 @@ mod tests {
         assert_eq!(session.lifecycle().started_at_step, Some(0));
         assert_eq!(session.lifecycle().ended_at_step, Some(2));
         assert_eq!(session.next_step_index(), 2);
+        assert_eq!(session.lifecycle_transition_log().len(), 2);
+        assert_eq!(
+            session.lifecycle_transition_log()[0].trigger,
+            LifecycleTransitionTrigger::CommandStart
+        );
+        assert_eq!(
+            session.lifecycle_transition_log()[1].trigger,
+            LifecycleTransitionTrigger::ExplicitEnd
+        );
+        assert_eq!(session.lifecycle_transition_log()[1].sequence, 1);
+        assert_eq!(session.lifecycle_transition_log()[1].step_index, 2);
+        assert_eq!(
+            session.lifecycle_transition_log()[1].previous_phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(
+            session.lifecycle_transition_log()[1].next_phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(
+            session.lifecycle_transition_log()[1].started_at_step,
+            Some(0)
+        );
+        assert_eq!(session.lifecycle_transition_log()[1].ended_at_step, Some(2));
+    }
+
+    #[test]
+    fn session_runtime_lifecycle_transition_history_is_empty_initially() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        assert!(session.lifecycle_transition_log().is_empty());
+        assert!(session.snapshot().lifecycle_transition_log.is_empty());
     }
 
     #[test]
@@ -2771,6 +2804,30 @@ mod tests {
         assert_eq!(after_start.lifecycle.started_at_step, Some(0));
         assert_eq!(after_start.lifecycle.ended_at_step, None);
         assert_eq!(after_start.next_step_index, before_start.next_step_index);
+        assert_eq!(after_start.lifecycle_transition_log.len(), 1);
+        assert_eq!(after_start.lifecycle_transition_log[0].sequence, 0);
+        assert_eq!(
+            after_start.lifecycle_transition_log[0].trigger,
+            LifecycleTransitionTrigger::ExplicitStart
+        );
+        assert_eq!(
+            after_start.lifecycle_transition_log[0].trigger.code(),
+            "explicitStart"
+        );
+        assert_eq!(after_start.lifecycle_transition_log[0].step_index, 0);
+        assert_eq!(
+            after_start.lifecycle_transition_log[0].previous_phase,
+            CombatLifecyclePhase::Ready
+        );
+        assert_eq!(
+            after_start.lifecycle_transition_log[0].next_phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(
+            after_start.lifecycle_transition_log[0].started_at_step,
+            Some(0)
+        );
+        assert_eq!(after_start.lifecycle_transition_log[0].ended_at_step, None);
         assert_eq!(after_start.turn_order, before_start.turn_order);
         assert_eq!(after_start.combat_log, before_start.combat_log);
         assert_eq!(after_start.audit_log, before_start.audit_log);
@@ -2778,6 +2835,32 @@ mod tests {
             after_start.current_state_fingerprint,
             before_start.current_state_fingerprint
         );
+    }
+
+    #[test]
+    fn session_runtime_command_start_records_lifecycle_transition() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.lifecycle_transition_log().len(), 1);
+        let transition = &session.lifecycle_transition_log()[0];
+        assert_eq!(transition.sequence, 0);
+        assert_eq!(transition.trigger, LifecycleTransitionTrigger::CommandStart);
+        assert_eq!(transition.trigger.code(), "commandStart");
+        assert_eq!(transition.step_index, 0);
+        assert_eq!(transition.previous_phase, CombatLifecyclePhase::Ready);
+        assert_eq!(transition.next_phase, CombatLifecyclePhase::InProgress);
+        assert_eq!(transition.started_at_step, Some(0));
+        assert_eq!(transition.ended_at_step, None);
     }
 
     #[test]
@@ -2799,6 +2882,10 @@ mod tests {
         );
         assert_eq!(after_repeat.combat_log, before_repeat.combat_log);
         assert_eq!(after_repeat.audit_log, before_repeat.audit_log);
+        assert_eq!(
+            after_repeat.lifecycle_transition_log,
+            before_repeat.lifecycle_transition_log
+        );
     }
 
     #[test]
@@ -2840,10 +2927,14 @@ mod tests {
             after_start_attempt.audit_log,
             before_start_attempt.audit_log
         );
+        assert_eq!(
+            after_start_attempt.lifecycle_transition_log,
+            before_start_attempt.lifecycle_transition_log
+        );
     }
 
     #[test]
-    fn session_runtime_explicit_start_preserves_command_start_marker() {
+    fn session_runtime_command_after_explicit_start_does_not_duplicate_lifecycle_transition() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
         session.start_combat();
@@ -2861,6 +2952,12 @@ mod tests {
         assert_eq!(session.lifecycle().started_at_step, Some(0));
         assert_eq!(session.lifecycle().ended_at_step, None);
         assert_eq!(session.next_step_index(), 1);
+        assert_eq!(session.lifecycle_transition_log().len(), 1);
+        assert_eq!(
+            session.lifecycle_transition_log()[0].trigger,
+            LifecycleTransitionTrigger::ExplicitStart
+        );
+        assert_eq!(session.lifecycle_transition_log()[0].step_index, 0);
     }
 
     #[test]
@@ -2882,6 +2979,25 @@ mod tests {
         assert_eq!(in_progress_lifecycle.phase, CombatLifecyclePhase::Ended);
         assert_eq!(in_progress_lifecycle.started_at_step, Some(1));
         assert_eq!(in_progress_lifecycle.ended_at_step, Some(4));
+    }
+
+    #[test]
+    fn session_runtime_end_from_ready_records_lifecycle_transition() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.end_combat();
+
+        assert_eq!(session.lifecycle_transition_log().len(), 1);
+        let transition = &session.lifecycle_transition_log()[0];
+        assert_eq!(transition.sequence, 0);
+        assert_eq!(transition.trigger, LifecycleTransitionTrigger::ExplicitEnd);
+        assert_eq!(transition.trigger.code(), "explicitEnd");
+        assert_eq!(transition.step_index, 0);
+        assert_eq!(transition.previous_phase, CombatLifecyclePhase::Ready);
+        assert_eq!(transition.next_phase, CombatLifecyclePhase::Ended);
+        assert_eq!(transition.started_at_step, Some(0));
+        assert_eq!(transition.ended_at_step, Some(0));
     }
 
     #[test]
@@ -2923,6 +3039,10 @@ mod tests {
         );
         assert_eq!(after_repeat.combat_log, before_repeat.combat_log);
         assert_eq!(after_repeat.audit_log, before_repeat.audit_log);
+        assert_eq!(
+            after_repeat.lifecycle_transition_log,
+            before_repeat.lifecycle_transition_log
+        );
     }
 
     #[test]
@@ -3493,6 +3613,7 @@ mod tests {
         assert_eq!(snapshot.session_id, "runtime-hexing-bolt");
         assert_eq!(snapshot.next_step_index, 0);
         assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ready);
+        assert!(snapshot.lifecycle_transition_log.is_empty());
         assert_eq!(
             snapshot.turn_order.current_actor_id,
             Some("entity-adept".to_string())
@@ -3541,6 +3662,20 @@ mod tests {
 
         assert_eq!(snapshot.next_step_index, 1);
         assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::InProgress);
+        assert_eq!(snapshot.lifecycle_transition_log.len(), 1);
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].trigger,
+            LifecycleTransitionTrigger::CommandStart
+        );
+        assert_eq!(snapshot.lifecycle_transition_log[0].step_index, 0);
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].previous_phase,
+            CombatLifecyclePhase::Ready
+        );
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].next_phase,
+            CombatLifecyclePhase::InProgress
+        );
         assert_eq!(snapshot.combat_log.len(), 1);
         assert_eq!(snapshot.combat_log[0].step_id, "runtime-hit");
         assert_eq!(snapshot.audit_log.len(), 1);
@@ -3683,6 +3818,25 @@ mod tests {
         assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ended);
         assert_eq!(snapshot.lifecycle.started_at_step, Some(0));
         assert_eq!(snapshot.lifecycle.ended_at_step, Some(0));
+        assert_eq!(snapshot.lifecycle_transition_log.len(), 1);
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].trigger,
+            LifecycleTransitionTrigger::ExplicitEnd
+        );
+        assert_eq!(snapshot.lifecycle_transition_log[0].step_index, 0);
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].previous_phase,
+            CombatLifecyclePhase::Ready
+        );
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].next_phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(
+            snapshot.lifecycle_transition_log[0].started_at_step,
+            Some(0)
+        );
+        assert_eq!(snapshot.lifecycle_transition_log[0].ended_at_step, Some(0));
         assert_eq!(snapshot.turn_order.round_number, 1);
         assert_eq!(snapshot.turn_order.current_turn_index, 1);
         assert_eq!(

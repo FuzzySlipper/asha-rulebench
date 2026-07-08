@@ -116,6 +116,34 @@ impl CombatLifecycle {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LifecycleTransitionTrigger {
+    ExplicitStart,
+    CommandStart,
+    ExplicitEnd,
+}
+
+impl LifecycleTransitionTrigger {
+    pub const fn code(self) -> &'static str {
+        match self {
+            LifecycleTransitionTrigger::ExplicitStart => "explicitStart",
+            LifecycleTransitionTrigger::CommandStart => "commandStart",
+            LifecycleTransitionTrigger::ExplicitEnd => "explicitEnd",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LifecycleTransitionEntry {
+    pub sequence: u32,
+    pub trigger: LifecycleTransitionTrigger,
+    pub step_index: u32,
+    pub previous_phase: CombatLifecyclePhase,
+    pub next_phase: CombatLifecyclePhase,
+    pub started_at_step: Option<u32>,
+    pub ended_at_step: Option<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatTurnOrder {
     pub round_number: u32,
@@ -307,6 +335,7 @@ pub struct CombatSessionSnapshot {
     pub session_id: String,
     pub next_step_index: u32,
     pub lifecycle: CombatLifecycle,
+    pub lifecycle_transition_log: Vec<LifecycleTransitionEntry>,
     pub turn_order: CombatTurnOrder,
     pub combat_log: Vec<CombatLogEntry>,
     pub audit_log: Vec<CommandAuditEntry>,
