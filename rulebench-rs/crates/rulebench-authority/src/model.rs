@@ -276,6 +276,8 @@ impl ContentDiagnosticSeverity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentDiagnosticCode {
     EmptyRulesetId,
+    EmptyAbilityId,
+    DuplicateAbilityId,
     EmptyActionId,
     DuplicateActionId,
     EmptyClassId,
@@ -286,9 +288,11 @@ pub enum ContentDiagnosticCode {
     DuplicateModifierId,
     EmptyItemId,
     DuplicateItemId,
+    SelectedAbilityMissingFromCatalog,
     SelectedActionMissingFromCatalog,
     SelectedClassMissingFromCatalog,
     SelectedItemMissingFromCatalog,
+    MissingActionAbility,
     MissingActionActor,
     MissingActionTarget,
     VisibleTargetOutsideTargetIds,
@@ -305,6 +309,8 @@ impl ContentDiagnosticCode {
     pub const fn code(self) -> &'static str {
         match self {
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
+            ContentDiagnosticCode::EmptyAbilityId => "emptyAbilityId",
+            ContentDiagnosticCode::DuplicateAbilityId => "duplicateAbilityId",
             ContentDiagnosticCode::EmptyActionId => "emptyActionId",
             ContentDiagnosticCode::DuplicateActionId => "duplicateActionId",
             ContentDiagnosticCode::EmptyClassId => "emptyClassId",
@@ -315,6 +321,9 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::DuplicateModifierId => "duplicateModifierId",
             ContentDiagnosticCode::EmptyItemId => "emptyItemId",
             ContentDiagnosticCode::DuplicateItemId => "duplicateItemId",
+            ContentDiagnosticCode::SelectedAbilityMissingFromCatalog => {
+                "selectedAbilityMissingFromCatalog"
+            }
             ContentDiagnosticCode::SelectedActionMissingFromCatalog => {
                 "selectedActionMissingFromCatalog"
             }
@@ -324,6 +333,7 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::SelectedItemMissingFromCatalog => {
                 "selectedItemMissingFromCatalog"
             }
+            ContentDiagnosticCode::MissingActionAbility => "missingActionAbility",
             ContentDiagnosticCode::MissingActionActor => "missingActionActor",
             ContentDiagnosticCode::MissingActionTarget => "missingActionTarget",
             ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
@@ -454,6 +464,8 @@ pub struct RulebenchScenario {
     pub ruleset: RulesetMetadata,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
+    pub abilities: Vec<AbilityDefinition>,
+    pub selected_ability_id: Option<String>,
     pub classes: Vec<ClassDefinition>,
     pub selected_class_id: Option<String>,
     pub stat_definitions: Vec<StatDefinition>,
@@ -465,6 +477,12 @@ pub struct RulebenchScenario {
 }
 
 impl RulebenchScenario {
+    pub fn ability_by_id(&self, ability_id: &str) -> Option<&AbilityDefinition> {
+        self.abilities
+            .iter()
+            .find(|ability| ability.id == ability_id)
+    }
+
     pub fn action_by_id(&self, action_id: &str) -> Option<&ActionDefinition> {
         self.actions.iter().find(|action| action.id == action_id)
     }
@@ -514,6 +532,7 @@ impl UseActionIntent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDefinition {
     pub id: String,
+    pub ability_id: String,
     pub name: String,
     pub actor_id: String,
     pub target_ids: Vec<String>,
@@ -524,6 +543,30 @@ pub struct ActionDefinition {
     pub hit: HitEffect,
     pub action_text: String,
     pub effect_text: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbilityDefinitionKind {
+    Ability,
+    Spell,
+}
+
+impl AbilityDefinitionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            AbilityDefinitionKind::Ability => "ability",
+            AbilityDefinitionKind::Spell => "spell",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AbilityDefinition {
+    pub id: String,
+    pub name: String,
+    pub kind: AbilityDefinitionKind,
+    pub summary: String,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

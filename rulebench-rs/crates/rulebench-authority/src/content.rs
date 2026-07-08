@@ -16,6 +16,7 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
         ));
     }
 
+    validate_abilities(scenario, &mut diagnostics);
     validate_classes(scenario, &mut diagnostics);
     validate_stat_definitions(scenario, &mut diagnostics);
     validate_modifiers(scenario, &mut diagnostics);
@@ -60,6 +61,41 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_abilities(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
+    let mut seen_ability_ids = HashSet::new();
+    for ability in &scenario.abilities {
+        if ability.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyAbilityId,
+                None,
+                "Ability catalog contains an ability with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_ability_ids.insert(ability.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateAbilityId,
+                Some(ability.id.clone()),
+                format!("Ability id {} appears more than once.", ability.id),
+            ));
+        }
+    }
+
+    if let Some(selected_ability_id) = &scenario.selected_ability_id {
+        if scenario.ability_by_id(selected_ability_id).is_none() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::SelectedAbilityMissingFromCatalog,
+                Some(selected_ability_id.clone()),
+                format!(
+                    "Selected ability {} is not present in the scenario ability catalog.",
+                    selected_ability_id
+                ),
+            ));
+        }
+    }
 }
 
 fn validate_classes(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
@@ -250,6 +286,17 @@ fn validate_action_references(
     action: &ActionDefinition,
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
+    if scenario.ability_by_id(&action.ability_id).is_none() {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::MissingActionAbility,
+            Some(action.ability_id.clone()),
+            format!(
+                "Action {} references ability {} that is not present in the scenario ability catalog.",
+                action.id, action.ability_id
+            ),
+        ));
+    }
+
     let actor = scenario
         .combatants
         .iter()

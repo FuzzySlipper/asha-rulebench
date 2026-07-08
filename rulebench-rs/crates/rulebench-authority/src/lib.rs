@@ -127,6 +127,50 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_ability_spell_catalog_and_action_reference() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(validate_scenario_content(&scenario).is_empty());
+        assert_eq!(
+            scenario
+                .abilities
+                .iter()
+                .map(|ability| ability.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ability.hexing-bolt"]
+        );
+        assert_eq!(
+            scenario
+                .ability_by_id("ability.hexing-bolt")
+                .map(|ability| ability.kind),
+            Some(AbilityDefinitionKind::Spell)
+        );
+        assert_eq!(
+            scenario
+                .ability_by_id("ability.hexing-bolt")
+                .map(|ability| ability.kind.code()),
+            Some("spell")
+        );
+        assert_eq!(
+            scenario.selected_ability_id.as_deref(),
+            Some("ability.hexing-bolt")
+        );
+        assert_eq!(
+            scenario
+                .action_by_id("hexing_bolt")
+                .map(|action| action.ability_id.as_str()),
+            Some("ability.hexing-bolt")
+        );
+    }
+
+    #[test]
+    fn scenario_ability_catalog_rejects_unknown_lookup() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(scenario.ability_by_id("ability.missing").is_none());
+    }
+
+    #[test]
     fn scenario_carries_item_catalog_and_equipped_item_references() {
         let scenario = hexing_bolt_fixture_scenario();
 
@@ -276,6 +320,82 @@ mod tests {
                 ContentDiagnosticCode::EmptyActionId,
                 ContentDiagnosticCode::SelectedActionMissingFromCatalog,
             ]
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_ability_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.abilities.push(AbilityDefinition {
+            id: String::new(),
+            name: "Nameless".to_string(),
+            kind: AbilityDefinitionKind::Ability,
+            summary: "Invalid ability fixture.".to_string(),
+            tags: Vec::new(),
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, ContentDiagnosticSeverity::Error);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyAbilityId);
+        assert_eq!(
+            ContentDiagnosticCode::EmptyAbilityId.code(),
+            "emptyAbilityId"
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_ability_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.abilities.push(scenario.abilities[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::DuplicateAbilityId
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("ability.hexing-bolt".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_selected_ability_missing_from_catalog() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.selected_ability_id = Some("ability.missing".to_string());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::SelectedAbilityMissingFromCatalog
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("ability.missing".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_action_ability() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].ability_id = "ability.missing".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingActionAbility
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("ability.missing".to_string())
         );
     }
 
@@ -826,6 +946,25 @@ mod tests {
                 .map(|projection| projection.combatants[1].conditions.as_slice()),
             Some(&["rattled".to_string()][..])
         );
+    }
+
+    #[test]
+    fn ability_spell_content_does_not_change_hexing_bolt_resolution() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(receipt.rejection, None);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.total),
+            Some(21)
+        );
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
     }
 
     #[test]

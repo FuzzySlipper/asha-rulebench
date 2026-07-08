@@ -30,6 +30,8 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             ],
         },
         combatants: vec![adept_initial(), raider_initial()],
+        abilities: hexing_bolt_abilities(),
+        selected_ability_id: Some("ability.hexing-bolt".to_string()),
         classes: hexing_bolt_classes(),
         selected_class_id: Some("class.hex-adept".to_string()),
         stat_definitions: hexing_bolt_stat_definitions(),
@@ -53,6 +55,7 @@ fn hexing_bolt_ruleset() -> RulesetMetadata {
 fn hexing_bolt_action() -> ActionDefinition {
     ActionDefinition {
         id: "hexing_bolt".to_string(),
+        ability_id: "ability.hexing-bolt".to_string(),
         name: "Hexing Bolt".to_string(),
         actor_id: "entity-adept".to_string(),
         target_ids: vec!["entity-raider".to_string()],
@@ -87,6 +90,20 @@ fn hexing_bolt_action() -> ActionDefinition {
         effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
             .to_string(),
     }
+}
+
+fn hexing_bolt_abilities() -> Vec<AbilityDefinition> {
+    vec![AbilityDefinition {
+        id: "ability.hexing-bolt".to_string(),
+        name: "Hexing Bolt".to_string(),
+        kind: AbilityDefinitionKind::Spell,
+        summary: "A focused spell entry that owns the Hexing Bolt action content.".to_string(),
+        tags: vec![
+            "spell".to_string(),
+            "attack".to_string(),
+            "psychic".to_string(),
+        ],
+    }]
 }
 
 fn hexing_bolt_items() -> Vec<ItemDefinition> {
