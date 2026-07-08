@@ -300,6 +300,57 @@ pub struct CombatantVitalitySummary {
     pub defeated_count: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurrentActorOptionsUnavailableReason {
+    CombatEnded,
+    NoCurrentActor,
+    CurrentActorDefeated,
+    NoMatchingActions,
+    NoVisibleActiveTargets,
+}
+
+impl CurrentActorOptionsUnavailableReason {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CurrentActorOptionsUnavailableReason::CombatEnded => "combatEnded",
+            CurrentActorOptionsUnavailableReason::NoCurrentActor => "noCurrentActor",
+            CurrentActorOptionsUnavailableReason::CurrentActorDefeated => "currentActorDefeated",
+            CurrentActorOptionsUnavailableReason::NoMatchingActions => "noMatchingActions",
+            CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets => {
+                "noVisibleActiveTargets"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentActorTargetOption {
+    pub target_id: String,
+    pub target_name: String,
+    pub current_hit_points: i32,
+    pub max_hit_points: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentActorActionOption {
+    pub action_id: String,
+    pub ability_id: String,
+    pub action_name: String,
+    pub target_options: Vec<CurrentActorTargetOption>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentActorOptionSummary {
+    pub round_number: u32,
+    pub turn_index: u32,
+    pub lifecycle_phase: CombatLifecyclePhase,
+    pub current_actor_id: Option<String>,
+    pub current_actor_defeated: bool,
+    pub available: bool,
+    pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
+    pub actions: Vec<CurrentActorActionOption>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatLogEntry {
     pub id: String,
@@ -343,6 +394,7 @@ pub struct CombatSessionSnapshot {
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
+    pub current_actor_options: CurrentActorOptionSummary,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,
 }

@@ -2206,6 +2206,154 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_current_actor_options_read_initial_action_and_target() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let options = session.current_actor_options();
+
+        assert_eq!(options.round_number, 1);
+        assert_eq!(options.turn_index, 0);
+        assert_eq!(options.lifecycle_phase, CombatLifecyclePhase::Ready);
+        assert_eq!(options.current_actor_id, Some("entity-adept".to_string()));
+        assert!(!options.current_actor_defeated);
+        assert!(options.available);
+        assert_eq!(options.unavailable_reason, None);
+        assert_eq!(options.actions.len(), 1);
+        assert_eq!(options.actions[0].action_id, "hexing_bolt");
+        assert_eq!(options.actions[0].ability_id, "ability.hexing-bolt");
+        assert_eq!(options.actions[0].action_name, "Hexing Bolt");
+        assert_eq!(options.actions[0].target_options.len(), 1);
+        assert_eq!(
+            options.actions[0].target_options[0].target_id,
+            "entity-raider"
+        );
+        assert_eq!(options.actions[0].target_options[0].target_name, "Raider");
+        assert_eq!(options.actions[0].target_options[0].current_hit_points, 18);
+        assert_eq!(options.actions[0].target_options[0].max_hit_points, 18);
+    }
+
+    #[test]
+    fn session_runtime_current_actor_options_snapshot_readback_uses_current_state() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let snapshot = session.snapshot();
+
+        assert!(snapshot.current_actor_options.available);
+        assert_eq!(
+            snapshot.current_actor_options.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(snapshot.current_actor_options.actions.len(), 1);
+        assert_eq!(
+            snapshot.current_actor_options.actions[0].target_options[0].target_id,
+            "entity-raider"
+        );
+        assert_eq!(
+            snapshot.current_actor_options.actions[0].target_options[0].current_hit_points,
+            9
+        );
+    }
+
+    #[test]
+    fn session_runtime_current_actor_options_report_no_actions_after_turn_advance() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+
+        let options = session.current_actor_options();
+
+        assert!(!options.available);
+        assert_eq!(options.current_actor_id, Some("entity-raider".to_string()));
+        assert_eq!(
+            options.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
+        );
+        assert_eq!(
+            options.unavailable_reason.map(|reason| reason.code()),
+            Some("noMatchingActions")
+        );
+        assert!(options.actions.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_current_actor_options_report_ended_combat_unavailable() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+
+        let options = session.current_actor_options();
+
+        assert_eq!(options.lifecycle_phase, CombatLifecyclePhase::Ended);
+        assert!(!options.available);
+        assert_eq!(
+            options.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::CombatEnded)
+        );
+        assert_eq!(
+            options.unavailable_reason.map(|reason| reason.code()),
+            Some("combatEnded")
+        );
+        assert!(options.actions.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_current_actor_options_report_defeated_current_actor_unavailable() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].hit_points.current = 0;
+        let session = CombatSessionState::new("runtime-defeated-actor", scenario);
+
+        let options = session.current_actor_options();
+
+        assert_eq!(options.current_actor_id, Some("entity-adept".to_string()));
+        assert!(options.current_actor_defeated);
+        assert!(!options.available);
+        assert_eq!(
+            options.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::CurrentActorDefeated)
+        );
+        assert_eq!(
+            options.unavailable_reason.map(|reason| reason.code()),
+            Some("currentActorDefeated")
+        );
+        assert!(options.actions.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_current_actor_options_filter_defeated_visible_targets() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1].hit_points.current = 0;
+        let session = CombatSessionState::new("runtime-defeated-target", scenario);
+
+        let options = session.current_actor_options();
+
+        assert_eq!(options.current_actor_id, Some("entity-adept".to_string()));
+        assert!(!options.current_actor_defeated);
+        assert!(!options.available);
+        assert_eq!(
+            options.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets)
+        );
+        assert_eq!(
+            options.unavailable_reason.map(|reason| reason.code()),
+            Some("noVisibleActiveTargets")
+        );
+        assert_eq!(options.actions.len(), 1);
+        assert_eq!(options.actions[0].action_id, "hexing_bolt");
+        assert!(options.actions[0].target_options.is_empty());
+    }
+
+    #[test]
     fn session_runtime_current_turn_action_usage_summarizes_accepted_hit() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -3593,6 +3741,19 @@ mod tests {
                 defeated_count: 0,
             }
         );
+        assert_eq!(
+            session.current_actor_options(),
+            CurrentActorOptionSummary {
+                round_number: 0,
+                turn_index: 0,
+                lifecycle_phase: CombatLifecyclePhase::Ready,
+                current_actor_id: None,
+                current_actor_defeated: false,
+                available: false,
+                unavailable_reason: Some(CurrentActorOptionsUnavailableReason::NoCurrentActor),
+                actions: Vec::new(),
+            }
+        );
         assert!(session.turn_transition_log().is_empty());
 
         session.advance_turn();
@@ -3614,6 +3775,11 @@ mod tests {
         assert_eq!(snapshot.next_step_index, 0);
         assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ready);
         assert!(snapshot.lifecycle_transition_log.is_empty());
+        assert!(snapshot.current_actor_options.available);
+        assert_eq!(
+            snapshot.current_actor_options.current_actor_id,
+            Some("entity-adept".to_string())
+        );
         assert_eq!(
             snapshot.turn_order.current_actor_id,
             Some("entity-adept".to_string())
@@ -3703,6 +3869,11 @@ mod tests {
         assert_eq!(
             snapshot.combatant_vitality.active_combatant_ids,
             vec!["entity-adept".to_string(), "entity-raider".to_string()]
+        );
+        assert!(snapshot.current_actor_options.available);
+        assert_eq!(
+            snapshot.current_actor_options.actions[0].target_options[0].current_hit_points,
+            9
         );
         assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
         assert_eq!(

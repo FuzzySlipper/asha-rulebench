@@ -211,6 +211,16 @@ impl CombatSessionState {
         combatant_vitality_summary(&current_state)
     }
 
+    pub fn current_actor_options(&self) -> CurrentActorOptionSummary {
+        let current_state = self.state.project("Current session state.");
+        current_actor_option_summary(
+            &self.lifecycle,
+            &self.turn_order,
+            &self.scenario,
+            &current_state,
+        )
+    }
+
     pub fn next_step_index(&self) -> u32 {
         self.next_step_index
     }
@@ -264,6 +274,12 @@ impl CombatSessionState {
             turn_transition_log: self.turn_transition_log.clone(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
+            current_actor_options: current_actor_option_summary(
+                &self.lifecycle,
+                &self.turn_order,
+                &self.scenario,
+                &current_state,
+            ),
             current_state,
             current_state_fingerprint,
         }
@@ -506,6 +522,145 @@ fn combatant_vitality_summary(projection: &ScenarioProjection) -> CombatantVital
         active_combatant_ids,
         defeated_combatant_ids,
     }
+}
+
+fn current_actor_option_summary(
+    lifecycle: &CombatLifecycle,
+    turn_order: &CombatTurnOrder,
+    scenario: &RulebenchScenario,
+    projection: &ScenarioProjection,
+) -> CurrentActorOptionSummary {
+    let current_actor_id = turn_order.current_actor_id.clone();
+    let current_actor_defeated = current_actor_id
+        .as_deref()
+        .and_then(|actor_id| projected_combatant_by_id(projection, actor_id))
+        .is_some_and(|actor| actor.hit_points.current <= 0);
+
+    if lifecycle.phase == CombatLifecyclePhase::Ended {
+        return unavailable_current_actor_options(
+            lifecycle,
+            turn_order,
+            current_actor_id,
+            current_actor_defeated,
+            CurrentActorOptionsUnavailableReason::CombatEnded,
+            Vec::new(),
+        );
+    }
+
+    let Some(actor_id) = current_actor_id.as_deref() else {
+        return unavailable_current_actor_options(
+            lifecycle,
+            turn_order,
+            current_actor_id,
+            current_actor_defeated,
+            CurrentActorOptionsUnavailableReason::NoCurrentActor,
+            Vec::new(),
+        );
+    };
+
+    if current_actor_defeated {
+        return unavailable_current_actor_options(
+            lifecycle,
+            turn_order,
+            current_actor_id,
+            current_actor_defeated,
+            CurrentActorOptionsUnavailableReason::CurrentActorDefeated,
+            Vec::new(),
+        );
+    }
+
+    let actions = scenario
+        .actions
+        .iter()
+        .filter(|action| action.actor_id == actor_id)
+        .map(|action| current_actor_action_option(action, projection))
+        .collect::<Vec<_>>();
+
+    if actions.is_empty() {
+        return unavailable_current_actor_options(
+            lifecycle,
+            turn_order,
+            current_actor_id,
+            current_actor_defeated,
+            CurrentActorOptionsUnavailableReason::NoMatchingActions,
+            actions,
+        );
+    }
+
+    let available = actions
+        .iter()
+        .any(|action| !action.target_options.is_empty());
+    let unavailable_reason = if available {
+        None
+    } else {
+        Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets)
+    };
+
+    CurrentActorOptionSummary {
+        round_number: turn_order.round_number,
+        turn_index: turn_order.current_turn_index,
+        lifecycle_phase: lifecycle.phase,
+        current_actor_id,
+        current_actor_defeated,
+        available,
+        unavailable_reason,
+        actions,
+    }
+}
+
+fn unavailable_current_actor_options(
+    lifecycle: &CombatLifecycle,
+    turn_order: &CombatTurnOrder,
+    current_actor_id: Option<String>,
+    current_actor_defeated: bool,
+    reason: CurrentActorOptionsUnavailableReason,
+    actions: Vec<CurrentActorActionOption>,
+) -> CurrentActorOptionSummary {
+    CurrentActorOptionSummary {
+        round_number: turn_order.round_number,
+        turn_index: turn_order.current_turn_index,
+        lifecycle_phase: lifecycle.phase,
+        current_actor_id,
+        current_actor_defeated,
+        available: false,
+        unavailable_reason: Some(reason),
+        actions,
+    }
+}
+
+fn current_actor_action_option(
+    action: &ActionDefinition,
+    projection: &ScenarioProjection,
+) -> CurrentActorActionOption {
+    let target_options = action
+        .visible_target_ids
+        .iter()
+        .filter_map(|target_id| projected_combatant_by_id(projection, target_id))
+        .filter(|target| target.hit_points.current > 0)
+        .map(|target| CurrentActorTargetOption {
+            target_id: target.id.clone(),
+            target_name: target.name.clone(),
+            current_hit_points: target.hit_points.current,
+            max_hit_points: target.hit_points.max,
+        })
+        .collect();
+
+    CurrentActorActionOption {
+        action_id: action.id.clone(),
+        ability_id: action.ability_id.clone(),
+        action_name: action.name.clone(),
+        target_options,
+    }
+}
+
+fn projected_combatant_by_id<'a>(
+    projection: &'a ScenarioProjection,
+    combatant_id: &str,
+) -> Option<&'a FinalCombatantState> {
+    projection
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == combatant_id)
 }
 
 fn domain_event_type(event: &DomainEvent) -> String {
