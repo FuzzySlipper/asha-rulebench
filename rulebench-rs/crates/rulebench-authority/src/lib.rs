@@ -4280,11 +4280,22 @@ mod tests {
     fn session_runtime_records_successful_turn_transition() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let previous_turn_order = session.turn_order().clone();
 
-        session.advance_turn();
+        let readout = session.advance_turn();
 
         assert_eq!(session.turn_transition_log().len(), 1);
         let transition = &session.turn_transition_log()[0];
+        assert!(readout.accepted);
+        assert_eq!(readout.decision_kind, TurnAdvanceDecisionKind::Advanced);
+        assert_eq!(readout.previous_turn_order, previous_turn_order);
+        assert_eq!(readout.next_turn_order, session.turn_order().clone());
+        assert_eq!(readout.transition, Some(transition.clone()));
+        assert_eq!(
+            readout.state_before_fingerprint,
+            readout.state_after_fingerprint
+        );
+        assert_eq!(readout.reason, "Turn advanced to the next participant.");
         assert_eq!(transition.sequence, 0);
         assert_eq!(transition.previous_round_number, 1);
         assert_eq!(transition.previous_turn_index, 0);
@@ -4304,10 +4315,18 @@ mod tests {
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
 
         session.advance_turn();
-        session.advance_turn();
+        let readout = session.advance_turn();
 
         assert_eq!(session.turn_transition_log().len(), 2);
         let transition = &session.turn_transition_log()[1];
+        assert!(readout.accepted);
+        assert_eq!(readout.decision_kind, TurnAdvanceDecisionKind::Advanced);
+        assert_eq!(readout.next_turn_order, session.turn_order().clone());
+        assert_eq!(readout.transition, Some(transition.clone()));
+        assert_eq!(
+            readout.state_before_fingerprint,
+            readout.state_after_fingerprint
+        );
         assert_eq!(transition.sequence, 1);
         assert_eq!(transition.previous_round_number, 1);
         assert_eq!(transition.previous_turn_index, 1);
@@ -4403,10 +4422,29 @@ mod tests {
         session.advance_turn();
         session.end_combat();
         let before_attempt = session.snapshot();
+        let before_attempt_state_fingerprint =
+            fingerprint_projected_state(&before_attempt.current_state);
 
-        session.advance_turn();
+        let readout = session.advance_turn();
         let after_attempt = session.snapshot();
 
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            TurnAdvanceDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(readout.previous_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.next_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.transition, None);
+        assert_eq!(
+            readout.state_before_fingerprint,
+            before_attempt_state_fingerprint
+        );
+        assert_eq!(
+            readout.state_after_fingerprint,
+            before_attempt_state_fingerprint
+        );
+        assert_eq!(readout.reason, "Combat is already ended.");
         assert_eq!(before_attempt.lifecycle.phase, CombatLifecyclePhase::Ended);
         assert_eq!(before_attempt.lifecycle.ended_at_step, Some(1));
         assert_eq!(after_attempt.lifecycle, before_attempt.lifecycle);
@@ -4472,13 +4510,43 @@ mod tests {
             }
         );
         assert!(session.turn_transition_log().is_empty());
+        let before_attempt = session.snapshot();
+        let before_attempt_state_fingerprint =
+            fingerprint_projected_state(&before_attempt.current_state);
 
-        session.advance_turn();
+        let readout = session.advance_turn();
+        let after_attempt = session.snapshot();
 
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder
+        );
+        assert_eq!(readout.previous_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.next_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.transition, None);
+        assert_eq!(
+            readout.state_before_fingerprint,
+            before_attempt_state_fingerprint
+        );
+        assert_eq!(
+            readout.state_after_fingerprint,
+            before_attempt_state_fingerprint
+        );
+        assert_eq!(readout.reason, "Turn order has no participants.");
         assert_eq!(session.turn_order().round_number, 0);
         assert_eq!(session.turn_order().current_turn_index, 0);
         assert_eq!(session.turn_order().current_actor_id, None);
         assert!(session.turn_transition_log().is_empty());
+        assert_eq!(after_attempt.turn_order, before_attempt.turn_order);
+        assert_eq!(
+            after_attempt.turn_transition_log,
+            before_attempt.turn_transition_log
+        );
+        assert_eq!(
+            after_attempt.current_state_fingerprint,
+            before_attempt.current_state_fingerprint
+        );
     }
 
     #[test]

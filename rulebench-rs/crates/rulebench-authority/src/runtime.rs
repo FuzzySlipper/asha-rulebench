@@ -352,20 +352,50 @@ impl CombatSessionState {
         &self.turn_order
     }
 
-    pub fn advance_turn(&mut self) {
+    pub fn advance_turn(&mut self) -> TurnAdvanceReadout {
+        let previous_turn_order = self.turn_order.clone();
+        let state_before = self.state.project("State before turn advancement.");
+        let state_before_fingerprint = fingerprint_projected_state(&state_before);
+
         if self.lifecycle.phase == CombatLifecyclePhase::Ended {
-            return;
+            return rejected_turn_advance_readout(
+                TurnAdvanceDecisionKind::RejectedByLifecycle,
+                previous_turn_order,
+                self.turn_order.clone(),
+                state_before_fingerprint,
+                "Combat is already ended.",
+            );
         }
 
-        let previous_turn_order = self.turn_order.clone();
-        self.turn_order.advance_turn();
-        if self.turn_order != previous_turn_order {
-            let transition = turn_transition_entry(
-                self.turn_transition_log.len() as u32,
-                &previous_turn_order,
-                &self.turn_order,
+        if self.turn_order.participant_order.is_empty() {
+            return rejected_turn_advance_readout(
+                TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder,
+                previous_turn_order,
+                self.turn_order.clone(),
+                state_before_fingerprint,
+                "Turn order has no participants.",
             );
-            self.turn_transition_log.push(transition);
+        }
+
+        self.turn_order.advance_turn();
+        let transition = turn_transition_entry(
+            self.turn_transition_log.len() as u32,
+            &previous_turn_order,
+            &self.turn_order,
+        );
+        self.turn_transition_log.push(transition.clone());
+        let state_after = self.state.project("State after turn advancement.");
+        let state_after_fingerprint = fingerprint_projected_state(&state_after);
+
+        TurnAdvanceReadout {
+            accepted: true,
+            decision_kind: TurnAdvanceDecisionKind::Advanced,
+            previous_turn_order,
+            next_turn_order: self.turn_order.clone(),
+            transition: Some(transition),
+            state_before_fingerprint,
+            state_after_fingerprint,
+            reason: "Turn advanced to the next participant.".to_string(),
         }
     }
 
@@ -804,6 +834,25 @@ fn turn_transition_entry(
         next_turn_index: next_turn_order.current_turn_index,
         next_actor_id: next_turn_order.current_actor_id.clone(),
         wrapped_round: next_turn_order.round_number > previous_turn_order.round_number,
+    }
+}
+
+fn rejected_turn_advance_readout(
+    decision_kind: TurnAdvanceDecisionKind,
+    previous_turn_order: CombatTurnOrder,
+    next_turn_order: CombatTurnOrder,
+    state_fingerprint: StateFingerprint,
+    reason: impl Into<String>,
+) -> TurnAdvanceReadout {
+    TurnAdvanceReadout {
+        accepted: false,
+        decision_kind,
+        previous_turn_order,
+        next_turn_order,
+        transition: None,
+        state_before_fingerprint: state_fingerprint.clone(),
+        state_after_fingerprint: state_fingerprint,
+        reason: reason.into(),
     }
 }
 

@@ -197,6 +197,35 @@ pub struct TurnTransitionEntry {
     pub wrapped_round: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TurnAdvanceDecisionKind {
+    Advanced,
+    RejectedByLifecycle,
+    RejectedByEmptyTurnOrder,
+}
+
+impl TurnAdvanceDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            TurnAdvanceDecisionKind::Advanced => "advanced",
+            TurnAdvanceDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TurnAdvanceReadout {
+    pub accepted: bool,
+    pub decision_kind: TurnAdvanceDecisionKind,
+    pub previous_turn_order: CombatTurnOrder,
+    pub next_turn_order: CombatTurnOrder,
+    pub transition: Option<TurnTransitionEntry>,
+    pub state_before_fingerprint: StateFingerprint,
+    pub state_after_fingerprint: StateFingerprint,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
     pub id: String,
