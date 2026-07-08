@@ -130,6 +130,7 @@ fn adept_initial() -> Combatant {
                 value: 15,
             },
         ],
+        active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: true,
     }
@@ -176,6 +177,7 @@ fn raider_initial() -> Combatant {
                 value: 13,
             },
         ],
+        active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: false,
     }

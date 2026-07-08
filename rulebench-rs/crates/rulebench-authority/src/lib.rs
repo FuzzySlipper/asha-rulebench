@@ -650,10 +650,19 @@ mod tests {
         let modifier = receipt.modifier.as_ref().expect("fixture hit has modifier");
         let mut state = crate::state::CombatState::from_scenario(&scenario);
 
+        assert_eq!(state.active_modifiers_for("entity-raider"), Some(&[][..]));
         state.apply_hit(damage, modifier);
         state.apply_hit(damage, modifier);
         let projection = state.project("After accepted hit.");
+        let active_modifiers = state
+            .active_modifiers_for("entity-raider")
+            .expect("raider state exists");
 
+        assert_eq!(active_modifiers.len(), 1);
+        assert_eq!(active_modifiers[0].modifier_id, "rattled");
+        assert_eq!(active_modifiers[0].label, "rattled");
+        assert_eq!(active_modifiers[0].duration, "until end of next turn");
+        assert_eq!(active_modifiers[0].tenure, ModifierTenure::Temporary);
         assert_eq!(projection.combatants[1].hit_points.current, 9);
         assert_eq!(
             projection.combatants[1].conditions,

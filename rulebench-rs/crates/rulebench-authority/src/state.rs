@@ -1,5 +1,5 @@
 use crate::model::{
-    BoundedValue, Combatant, DamageOutcome, FinalCombatantState, ModifierOutcome,
+    ActiveModifier, BoundedValue, Combatant, DamageOutcome, FinalCombatantState, ModifierOutcome,
     RulebenchScenario, ScenarioProjection,
 };
 
@@ -45,11 +45,18 @@ impl CombatState {
             if combatant.id == damage.target_id {
                 combatant.hit_points = damage.after;
             }
-            if combatant.id == modifier.target_id && !combatant.conditions.contains(&modifier.label)
-            {
-                combatant.conditions.push(modifier.label.clone());
+            if combatant.id == modifier.target_id {
+                combatant.apply_modifier(modifier);
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn active_modifiers_for(&self, combatant_id: &str) -> Option<&[ActiveModifier]> {
+        self.combatants
+            .iter()
+            .find(|combatant| combatant.id == combatant_id)
+            .map(|combatant| combatant.active_modifiers.as_slice())
     }
 
     pub(crate) fn apply_to_scenario(&self, mut scenario: RulebenchScenario) -> RulebenchScenario {
@@ -72,6 +79,7 @@ struct CombatantState {
     id: String,
     name: String,
     hit_points: BoundedValue,
+    active_modifiers: Vec<ActiveModifier>,
     conditions: Vec<String>,
 }
 
@@ -81,6 +89,7 @@ impl CombatantState {
             id: combatant.id.clone(),
             name: combatant.name.clone(),
             hit_points: combatant.hit_points,
+            active_modifiers: combatant.active_modifiers.clone(),
             conditions: combatant.conditions.clone(),
         }
     }
@@ -90,7 +99,7 @@ impl CombatantState {
             id: self.id.clone(),
             name: self.name.clone(),
             hit_points: self.hit_points,
-            conditions: self.conditions.clone(),
+            conditions: self.condition_labels(),
         }
     }
 
@@ -99,7 +108,32 @@ impl CombatantState {
             id: combatant.id.clone(),
             name: combatant.name.clone(),
             hit_points: combatant.hit_points,
+            active_modifiers: Vec::new(),
             conditions: combatant.conditions.clone(),
         }
+    }
+
+    fn apply_modifier(&mut self, modifier: &ModifierOutcome) {
+        if self.active_modifiers.iter().any(|active| {
+            active.modifier_id == modifier.modifier_id || active.label == modifier.label
+        }) {
+            return;
+        }
+
+        self.active_modifiers.push(ActiveModifier::temporary(
+            modifier.modifier_id.clone(),
+            modifier.label.clone(),
+            modifier.duration.clone(),
+        ));
+    }
+
+    fn condition_labels(&self) -> Vec<String> {
+        let mut labels = self.conditions.clone();
+        for modifier in &self.active_modifiers {
+            if !labels.contains(&modifier.label) {
+                labels.push(modifier.label.clone());
+            }
+        }
+        labels
     }
 }

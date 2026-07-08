@@ -198,6 +198,7 @@ pub struct Combatant {
     pub hit_points: BoundedValue,
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
+    pub active_modifiers: Vec<ActiveModifier>,
     pub conditions: Vec<String>,
     pub is_actor: bool,
 }
@@ -314,6 +315,44 @@ pub struct ModifierEffectOperation {
     pub modifier_id: String,
     pub modifier_label: String,
     pub modifier_duration: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModifierTenure {
+    Temporary,
+    Permanent,
+}
+
+impl ModifierTenure {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ModifierTenure::Temporary => "temporary",
+            ModifierTenure::Permanent => "permanent",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActiveModifier {
+    pub modifier_id: String,
+    pub label: String,
+    pub duration: String,
+    pub tenure: ModifierTenure,
+}
+
+impl ActiveModifier {
+    pub fn temporary(
+        modifier_id: impl Into<String>,
+        label: impl Into<String>,
+        duration: impl Into<String>,
+    ) -> Self {
+        Self {
+            modifier_id: modifier_id.into(),
+            label: label.into(),
+            duration: duration.into(),
+            tenure: ModifierTenure::Temporary,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
