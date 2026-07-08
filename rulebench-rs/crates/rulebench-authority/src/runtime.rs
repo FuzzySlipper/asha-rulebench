@@ -201,6 +201,85 @@ pub struct CombatSessionAutoCandidateExecutionReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticStepSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionAutomaticStepSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticStepOperationKind {
+    ConditionalEnd,
+    SubmitCandidate,
+    AdvanceTurn,
+}
+
+impl CombatSessionAutomaticStepOperationKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticStepOperationKind::ConditionalEnd => "conditionalEnd",
+            CombatSessionAutomaticStepOperationKind::SubmitCandidate => "submitCandidate",
+            CombatSessionAutomaticStepOperationKind::AdvanceTurn => "advanceTurn",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticStepDecisionKind {
+    ConditionalEnd,
+    SubmitCandidate,
+    AdvanceTurn,
+    RejectedByLifecycle,
+}
+
+impl CombatSessionAutomaticStepDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticStepDecisionKind::ConditionalEnd => "conditionalEnd",
+            CombatSessionAutomaticStepDecisionKind::SubmitCandidate => "submitCandidate",
+            CombatSessionAutomaticStepDecisionKind::AdvanceTurn => "advanceTurn",
+            CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticStepPlanReadout {
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutomaticStepDecisionKind,
+    pub operation_kind: Option<CombatSessionAutomaticStepOperationKind>,
+    pub lifecycle_phase: CombatLifecyclePhase,
+    pub current_actor_id: Option<String>,
+    pub combat_end_condition: CombatEndConditionReadout,
+    pub auto_candidate_plan: Option<CombatSessionAutoCandidatePlanReadout>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticStepExecutionReadout {
+    pub plan: CombatSessionAutomaticStepPlanReadout,
+    pub control: Option<CombatControlReadout>,
+    pub auto_candidate: Option<CombatSessionAutoCandidateExecutionReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionScriptSpec {
     pub id: String,
     pub title: String,
@@ -769,6 +848,61 @@ impl CombatSessionState {
         }
     }
 
+    pub fn plan_automatic_step(
+        &self,
+        spec: CombatSessionAutomaticStepSpec,
+    ) -> CombatSessionAutomaticStepPlanReadout {
+        let end_condition = self.combat_end_condition();
+        plan_automatic_step(
+            self.lifecycle.phase,
+            self.turn_order.current_actor_id.clone(),
+            end_condition,
+            || {
+                self.plan_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+                    spec.id,
+                    spec.title,
+                    spec.summary,
+                    spec.roll_stream,
+                ))
+            },
+        )
+    }
+
+    pub fn submit_automatic_step(
+        &mut self,
+        spec: CombatSessionAutomaticStepSpec,
+    ) -> CombatSessionAutomaticStepExecutionReadout {
+        let plan = self.plan_automatic_step(spec.clone());
+        let (control, auto_candidate) = match plan.operation_kind {
+            Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd) => (
+                Some(self.submit_control_command(CombatControlCommandSpec::end_if_condition_met())),
+                None,
+            ),
+            Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate) => (
+                None,
+                Some(self.submit_auto_candidate_command(
+                    CombatSessionAutoCandidateCommandSpec::new(
+                        spec.id,
+                        spec.title,
+                        spec.summary,
+                        spec.roll_stream,
+                    ),
+                )),
+            ),
+            Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn) => (
+                Some(self.submit_control_command(CombatControlCommandSpec::advance_turn())),
+                None,
+            ),
+            None => (None, None),
+        };
+
+        CombatSessionAutomaticStepExecutionReadout {
+            plan,
+            control,
+            auto_candidate,
+        }
+    }
+
     pub fn preflight_command(&self, intent: UseActionIntent) -> CommandPreflightReadout {
         let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
         command_preflight_readout(
@@ -1177,6 +1311,65 @@ impl CombatSessionState {
             turn_advance.state_after_fingerprint,
             turn_advance.reason,
         )
+    }
+}
+
+fn plan_automatic_step(
+    lifecycle_phase: CombatLifecyclePhase,
+    current_actor_id: Option<String>,
+    combat_end_condition: CombatEndConditionReadout,
+    auto_candidate_plan: impl FnOnce() -> CombatSessionAutoCandidatePlanReadout,
+) -> CombatSessionAutomaticStepPlanReadout {
+    if lifecycle_phase == CombatLifecyclePhase::Ended {
+        return CombatSessionAutomaticStepPlanReadout {
+            accepted: false,
+            decision_kind: CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle,
+            operation_kind: None,
+            lifecycle_phase,
+            current_actor_id,
+            combat_end_condition,
+            auto_candidate_plan: None,
+            reason: "Automatic combat step rejected because combat is already ended.".to_string(),
+        };
+    }
+
+    if combat_end_condition.combat_should_end {
+        return CombatSessionAutomaticStepPlanReadout {
+            accepted: true,
+            decision_kind: CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
+            operation_kind: Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd),
+            lifecycle_phase,
+            current_actor_id,
+            combat_end_condition,
+            auto_candidate_plan: None,
+            reason: "Automatic combat step planned conditional combat end.".to_string(),
+        };
+    }
+
+    let candidate_plan = auto_candidate_plan();
+    if candidate_plan.accepted {
+        return CombatSessionAutomaticStepPlanReadout {
+            accepted: true,
+            decision_kind: CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
+            operation_kind: Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate),
+            lifecycle_phase,
+            current_actor_id,
+            combat_end_condition,
+            auto_candidate_plan: Some(candidate_plan),
+            reason: "Automatic combat step planned first accepted command candidate.".to_string(),
+        };
+    }
+
+    CombatSessionAutomaticStepPlanReadout {
+        accepted: true,
+        decision_kind: CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
+        operation_kind: Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn),
+        lifecycle_phase,
+        current_actor_id,
+        combat_end_condition,
+        auto_candidate_plan: Some(candidate_plan),
+        reason: "Automatic combat step planned turn advancement because no accepted command candidate is available."
+            .to_string(),
     }
 }
 

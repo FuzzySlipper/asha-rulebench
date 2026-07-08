@@ -39,12 +39,14 @@ pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
     CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
     CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
-    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
-    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
-    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
-    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
-    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
-    CombatSessionState,
+    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
+    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
+    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
+    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
+    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
+    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
+    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
+    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
 };
 pub use session::{
     combat_session_control_history_readouts, combat_session_script_readouts,
@@ -3857,6 +3859,288 @@ mod tests {
         assert!(session.combat_log().is_empty());
         assert!(session.audit_log().is_empty());
         assert_eq!(session.turn_transition_log().len(), 1);
+    }
+
+    #[test]
+    fn session_runtime_automatic_step_plans_candidate_submission_read_only() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-hit",
+            "Auto step hit",
+            "Rust plans one automatic combat step.",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::SubmitCandidate
+        );
+        assert_eq!(plan.decision_kind.code(), "submitCandidate");
+        assert_eq!(
+            plan.operation_kind,
+            Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate)
+        );
+        assert_eq!(
+            plan.operation_kind.map(|operation| operation.code()),
+            Some("submitCandidate")
+        );
+        assert_eq!(plan.lifecycle_phase, CombatLifecyclePhase::Ready);
+        assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(
+            plan.combat_end_condition.condition_kind,
+            CombatEndConditionKind::Ongoing
+        );
+        assert_eq!(
+            plan.auto_candidate_plan
+                .as_ref()
+                .map(|candidate| candidate.accepted),
+            Some(true)
+        );
+        assert_eq!(
+            plan.reason,
+            "Automatic combat step planned first accepted command candidate."
+        );
+        assert_eq!(after_plan, before_plan);
+    }
+
+    #[test]
+    fn session_runtime_automatic_step_executes_candidate_submission() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-hit",
+            "Auto step hit",
+            "Rust executes one automatic command candidate step.",
+            vec![17, 5],
+        ));
+
+        assert_eq!(
+            execution.plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::SubmitCandidate
+        );
+        assert_eq!(execution.control, None);
+        let auto_candidate = execution
+            .auto_candidate
+            .as_ref()
+            .expect("candidate step has auto candidate execution");
+        assert!(auto_candidate.plan.accepted);
+        let submitted_step = auto_candidate
+            .submitted_step
+            .as_ref()
+            .expect("accepted auto candidate submits command");
+        assert_eq!(submitted_step.step.id, "auto-step-hit");
+        assert!(submitted_step.receipt.accepted);
+        assert_eq!(session.combat_log().len(), 1);
+        assert_eq!(session.audit_log().len(), 1);
+        assert_eq!(
+            session.snapshot().current_state.combatants[1]
+                .hit_points
+                .current,
+            9
+        );
+    }
+
+    #[test]
+    fn session_runtime_automatic_step_advances_turn_when_no_candidate_is_accepted() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let first_hit =
+            session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+                "auto-hit",
+                "Auto hit",
+                "Rust spends the current actor standard action.",
+                vec![17, 5],
+            ));
+        assert!(first_hit.plan.accepted);
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-advance",
+            "Auto step advance",
+            "Rust advances turn when no accepted candidate remains.",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::AdvanceTurn
+        );
+        assert_eq!(
+            plan.operation_kind,
+            Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn)
+        );
+        assert_eq!(
+            plan.auto_candidate_plan
+                .as_ref()
+                .map(|candidate| candidate.decision_kind),
+            Some(CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate)
+        );
+        assert_eq!(after_plan, before_plan);
+
+        let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-advance",
+            "Auto step advance",
+            "Rust advances turn when no accepted candidate remains.",
+            vec![17, 5],
+        ));
+
+        assert_eq!(
+            execution.plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::AdvanceTurn
+        );
+        assert_eq!(execution.auto_candidate, None);
+        let control = execution
+            .control
+            .as_ref()
+            .expect("advance step has control readout");
+        assert!(control.accepted);
+        assert_eq!(control.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert_eq!(control.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(
+            session.turn_order().current_actor_id,
+            Some("entity-raider".to_string())
+        );
+        assert_eq!(session.control_history().len(), 1);
+        assert_eq!(session.combat_log().len(), 1);
+    }
+
+    #[test]
+    fn session_runtime_automatic_step_prioritizes_conditional_end_when_met() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+            "first-hit",
+            "First hit",
+            "Adept hits Raider once.",
+            vec![17, 5],
+        ));
+        session.advance_turn();
+        session.advance_turn();
+        session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
+            "second-hit",
+            "Second hit",
+            "Adept hits Raider a second time.",
+            vec![17, 5],
+        ));
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-end",
+            "Auto step end",
+            "Rust conditionally ends combat when the end condition is met.",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::ConditionalEnd
+        );
+        assert_eq!(
+            plan.operation_kind,
+            Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd)
+        );
+        assert_eq!(
+            plan.combat_end_condition.condition_kind,
+            CombatEndConditionKind::NoActiveEnemies
+        );
+        assert_eq!(plan.auto_candidate_plan, None);
+        assert_eq!(after_plan, before_plan);
+
+        let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-end",
+            "Auto step end",
+            "Rust conditionally ends combat when the end condition is met.",
+            vec![17, 5],
+        ));
+
+        assert_eq!(
+            execution.plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::ConditionalEnd
+        );
+        assert_eq!(execution.auto_candidate, None);
+        let control = execution
+            .control
+            .as_ref()
+            .expect("conditional end step has control readout");
+        assert!(control.accepted);
+        assert_eq!(
+            control.command_kind,
+            CombatControlCommandKind::EndIfConditionMet
+        );
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
+        assert_eq!(session.lifecycle_transition_log().len(), 2);
+    }
+
+    #[test]
+    fn session_runtime_automatic_step_rejects_ended_combat_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+        let before_execution = session.snapshot();
+
+        let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "auto-step-ended",
+            "Auto step ended",
+            "Rust rejects automatic stepping after combat is ended.",
+            vec![17, 5],
+        ));
+        let after_execution = session.snapshot();
+
+        assert!(!execution.plan.accepted);
+        assert_eq!(
+            execution.plan.decision_kind,
+            CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(execution.plan.operation_kind, None);
+        assert_eq!(execution.control, None);
+        assert_eq!(execution.auto_candidate, None);
+        assert_eq!(after_execution, before_execution);
+    }
+
+    #[test]
+    fn session_runtime_automatic_step_can_be_invoked_until_combat_ends() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let mut decisions = Vec::new();
+
+        for index in 0..5 {
+            let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+                format!("auto-step-{index}"),
+                format!("Auto step {index}"),
+                "Rust applies one automatic combat step.",
+                vec![17, 5],
+            ));
+            decisions.push(execution.plan.decision_kind);
+        }
+
+        assert_eq!(
+            decisions,
+            vec![
+                CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
+                CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
+                CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
+                CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
+                CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
+            ]
+        );
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
+        assert_eq!(session.combat_log().len(), 2);
+        assert_eq!(session.audit_log().len(), 2);
+        assert_eq!(session.control_history().len(), 3);
+        assert_eq!(
+            session.snapshot().combat_end_condition.condition_kind,
+            CombatEndConditionKind::NoActiveEnemies
+        );
     }
 
     #[test]
