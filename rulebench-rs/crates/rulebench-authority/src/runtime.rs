@@ -585,6 +585,11 @@ impl CombatSessionState {
         combatant_vitality_summary(&current_state)
     }
 
+    pub fn combat_end_condition(&self) -> CombatEndConditionReadout {
+        let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
+        combat_end_condition_readout(&current_scenario)
+    }
+
     pub fn current_actor_options(&self) -> CurrentActorOptionSummary {
         let current_state = self.state.project("Current session state.");
         current_actor_option_summary(
@@ -727,6 +732,7 @@ impl CombatSessionState {
     pub fn snapshot(&self) -> CombatSessionSnapshot {
         let current_state = self.state.project("Current session state.");
         let current_state_fingerprint = fingerprint_projection(&current_state);
+        let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
 
         CombatSessionSnapshot {
             session_id: self.session_id.clone(),
@@ -740,10 +746,11 @@ impl CombatSessionState {
             turn_transition_log: self.turn_transition_log.clone(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
+            combat_end_condition: combat_end_condition_readout(&current_scenario),
             current_actor_options: current_actor_option_summary(
                 &self.lifecycle,
                 &self.turn_order,
-                &self.scenario,
+                &current_scenario,
                 &current_state,
             ),
             current_state,
@@ -1554,6 +1561,61 @@ fn combatant_vitality_summary(projection: &ScenarioProjection) -> CombatantVital
         active_combatant_ids,
         defeated_combatant_ids,
     }
+}
+
+fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndConditionReadout {
+    let mut active_ally_count = 0;
+    let mut active_enemy_count = 0;
+    let mut defeated_ally_count = 0;
+    let mut defeated_enemy_count = 0;
+
+    for combatant in &scenario.combatants {
+        let defeated = combatant.hit_points.current <= 0;
+        match (combatant.team, defeated) {
+            (Team::Ally, false) => active_ally_count += 1,
+            (Team::Ally, true) => defeated_ally_count += 1,
+            (Team::Enemy, false) => active_enemy_count += 1,
+            (Team::Enemy, true) => defeated_enemy_count += 1,
+        }
+    }
+
+    let condition_kind = if active_ally_count == 0 && active_enemy_count == 0 {
+        CombatEndConditionKind::NoActiveCombatants
+    } else if active_enemy_count == 0 {
+        CombatEndConditionKind::NoActiveEnemies
+    } else if active_ally_count == 0 {
+        CombatEndConditionKind::NoActiveAllies
+    } else {
+        CombatEndConditionKind::Ongoing
+    };
+
+    CombatEndConditionReadout {
+        combat_should_end: condition_kind != CombatEndConditionKind::Ongoing,
+        condition_kind,
+        active_ally_count,
+        active_enemy_count,
+        defeated_ally_count,
+        defeated_enemy_count,
+        reason: combat_end_condition_reason(condition_kind),
+    }
+}
+
+fn combat_end_condition_reason(kind: CombatEndConditionKind) -> String {
+    match kind {
+        CombatEndConditionKind::Ongoing => {
+            "Combat can continue because both sides have active combatants."
+        }
+        CombatEndConditionKind::NoActiveEnemies => {
+            "Combat should end because no active enemies remain."
+        }
+        CombatEndConditionKind::NoActiveAllies => {
+            "Combat should end because no active allies remain."
+        }
+        CombatEndConditionKind::NoActiveCombatants => {
+            "Combat should end because no active combatants remain."
+        }
+    }
+    .to_string()
 }
 
 fn current_actor_option_summary(

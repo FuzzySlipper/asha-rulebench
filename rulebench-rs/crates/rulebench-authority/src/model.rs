@@ -486,6 +486,36 @@ pub struct CombatantVitalitySummary {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatEndConditionKind {
+    Ongoing,
+    NoActiveEnemies,
+    NoActiveAllies,
+    NoActiveCombatants,
+}
+
+impl CombatEndConditionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatEndConditionKind::Ongoing => "ongoing",
+            CombatEndConditionKind::NoActiveEnemies => "noActiveEnemies",
+            CombatEndConditionKind::NoActiveAllies => "noActiveAllies",
+            CombatEndConditionKind::NoActiveCombatants => "noActiveCombatants",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatEndConditionReadout {
+    pub combat_should_end: bool,
+    pub condition_kind: CombatEndConditionKind,
+    pub active_ally_count: u32,
+    pub active_enemy_count: u32,
+    pub defeated_ally_count: u32,
+    pub defeated_enemy_count: u32,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CurrentActorOptionsUnavailableReason {
     CombatEnded,
     NoCurrentActor,
@@ -615,6 +645,7 @@ pub struct CombatSessionSnapshot {
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
+    pub combat_end_condition: CombatEndConditionReadout,
     pub current_actor_options: CurrentActorOptionSummary,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,

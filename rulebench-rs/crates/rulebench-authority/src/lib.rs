@@ -3971,6 +3971,100 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_combat_end_condition_reads_ongoing_combat() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.combat_end_condition();
+
+        assert!(!readout.combat_should_end);
+        assert_eq!(readout.condition_kind, CombatEndConditionKind::Ongoing);
+        assert_eq!(readout.condition_kind.code(), "ongoing");
+        assert_eq!(readout.active_ally_count, 1);
+        assert_eq!(readout.active_enemy_count, 1);
+        assert_eq!(readout.defeated_ally_count, 0);
+        assert_eq!(readout.defeated_enemy_count, 0);
+        assert_eq!(
+            readout.reason,
+            "Combat can continue because both sides have active combatants."
+        );
+        assert_eq!(session.snapshot().combat_end_condition, readout);
+    }
+
+    #[test]
+    fn session_runtime_combat_end_condition_reports_no_active_enemies() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1].hit_points.current = 0;
+        let session = CombatSessionState::new("runtime-no-active-enemies", scenario);
+
+        let readout = session.combat_end_condition();
+
+        assert!(readout.combat_should_end);
+        assert_eq!(
+            readout.condition_kind,
+            CombatEndConditionKind::NoActiveEnemies
+        );
+        assert_eq!(readout.condition_kind.code(), "noActiveEnemies");
+        assert_eq!(readout.active_ally_count, 1);
+        assert_eq!(readout.active_enemy_count, 0);
+        assert_eq!(readout.defeated_ally_count, 0);
+        assert_eq!(readout.defeated_enemy_count, 1);
+        assert_eq!(
+            readout.reason,
+            "Combat should end because no active enemies remain."
+        );
+    }
+
+    #[test]
+    fn session_runtime_combat_end_condition_reports_no_active_allies() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].hit_points.current = -1;
+        let session = CombatSessionState::new("runtime-no-active-allies", scenario);
+
+        let readout = session.combat_end_condition();
+
+        assert!(readout.combat_should_end);
+        assert_eq!(
+            readout.condition_kind,
+            CombatEndConditionKind::NoActiveAllies
+        );
+        assert_eq!(readout.condition_kind.code(), "noActiveAllies");
+        assert_eq!(readout.active_ally_count, 0);
+        assert_eq!(readout.active_enemy_count, 1);
+        assert_eq!(readout.defeated_ally_count, 1);
+        assert_eq!(readout.defeated_enemy_count, 0);
+        assert_eq!(
+            readout.reason,
+            "Combat should end because no active allies remain."
+        );
+    }
+
+    #[test]
+    fn session_runtime_combat_end_condition_reports_no_active_combatants() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants.clear();
+        let session = CombatSessionState::new("runtime-no-active-combatants", scenario);
+
+        let readout = session.combat_end_condition();
+
+        assert!(readout.combat_should_end);
+        assert_eq!(
+            readout.condition_kind,
+            CombatEndConditionKind::NoActiveCombatants
+        );
+        assert_eq!(readout.condition_kind.code(), "noActiveCombatants");
+        assert_eq!(readout.active_ally_count, 0);
+        assert_eq!(readout.active_enemy_count, 0);
+        assert_eq!(readout.defeated_ally_count, 0);
+        assert_eq!(readout.defeated_enemy_count, 0);
+        assert_eq!(
+            readout.reason,
+            "Combat should end because no active combatants remain."
+        );
+        assert_eq!(session.snapshot().combat_end_condition, readout);
+    }
+
+    #[test]
     fn session_runtime_records_miss_noop_audit_entry() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
