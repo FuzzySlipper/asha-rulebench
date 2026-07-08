@@ -750,6 +750,10 @@ mod tests {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
 
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ready);
+        assert_eq!(session.lifecycle().started_at_step, None);
+        assert_eq!(session.lifecycle().ended_at_step, None);
+
         let readout = session.submit_command(CombatSessionCommandSpec::new(
             "runtime-hit",
             "Runtime hit",
@@ -773,6 +777,9 @@ mod tests {
         assert_eq!(readout.combat_log.len(), 1);
         assert_eq!(session.next_step_index(), 1);
         assert_eq!(session.combat_log().len(), 1);
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::InProgress);
+        assert_eq!(session.lifecycle().started_at_step, Some(0));
+        assert_eq!(session.lifecycle().ended_at_step, None);
     }
 
     #[test]
@@ -896,6 +903,7 @@ mod tests {
         }
 
         assert_eq!(session.next_step_index(), 3);
+        assert_eq!(session.lifecycle().started_at_step, Some(0));
         assert_eq!(
             session
                 .combat_log()
@@ -912,6 +920,36 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![4, 2, 0]
         );
+    }
+
+    #[test]
+    fn session_runtime_can_end_combat_lifecycle() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-miss",
+            "Runtime miss",
+            "Adept misses Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        session.end_combat();
+
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
+        assert_eq!(session.lifecycle().started_at_step, Some(0));
+        assert_eq!(session.lifecycle().ended_at_step, Some(2));
+        assert_eq!(session.next_step_index(), 2);
     }
 
     #[test]

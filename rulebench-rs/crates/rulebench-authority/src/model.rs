@@ -63,6 +63,55 @@ impl CommandOutcomeClass {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatLifecyclePhase {
+    Ready,
+    InProgress,
+    Ended,
+}
+
+impl CombatLifecyclePhase {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatLifecyclePhase::Ready => "ready",
+            CombatLifecyclePhase::InProgress => "inProgress",
+            CombatLifecyclePhase::Ended => "ended",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatLifecycle {
+    pub phase: CombatLifecyclePhase,
+    pub started_at_step: Option<u32>,
+    pub ended_at_step: Option<u32>,
+}
+
+impl CombatLifecycle {
+    pub const fn ready() -> Self {
+        Self {
+            phase: CombatLifecyclePhase::Ready,
+            started_at_step: None,
+            ended_at_step: None,
+        }
+    }
+
+    pub fn start_at_step(&mut self, step_index: u32) {
+        if self.phase == CombatLifecyclePhase::Ready {
+            self.phase = CombatLifecyclePhase::InProgress;
+            self.started_at_step = Some(step_index);
+        }
+    }
+
+    pub fn end_at_step(&mut self, step_index: u32) {
+        if self.started_at_step.is_none() {
+            self.started_at_step = Some(step_index);
+        }
+        self.phase = CombatLifecyclePhase::Ended;
+        self.ended_at_step = Some(step_index);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
     pub id: String,

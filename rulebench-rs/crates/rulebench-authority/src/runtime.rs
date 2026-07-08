@@ -39,6 +39,7 @@ pub struct CombatSessionState {
     state: CombatState,
     combat_log: Vec<CombatLogEntry>,
     next_step_index: u32,
+    lifecycle: CombatLifecycle,
 }
 
 impl CombatSessionState {
@@ -50,10 +51,12 @@ impl CombatSessionState {
             state,
             combat_log: Vec::new(),
             next_step_index: 0,
+            lifecycle: CombatLifecycle::ready(),
         }
     }
 
     pub fn submit_command(&mut self, spec: CombatSessionCommandSpec) -> CombatSessionStepReadout {
+        self.lifecycle.start_at_step(self.next_step_index);
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let state_before = self.state.project("State before command resolution.");
         let receipt = resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
@@ -103,6 +106,14 @@ impl CombatSessionState {
 
     pub fn next_step_index(&self) -> u32 {
         self.next_step_index
+    }
+
+    pub fn lifecycle(&self) -> &CombatLifecycle {
+        &self.lifecycle
+    }
+
+    pub fn end_combat(&mut self) {
+        self.lifecycle.end_at_step(self.next_step_index);
     }
 }
 
