@@ -11,6 +11,7 @@ mod catalog;
 mod fixtures;
 mod model;
 mod resolver;
+mod runtime;
 mod session;
 mod state;
 
@@ -21,6 +22,7 @@ pub use fixtures::{
 };
 pub use model::*;
 pub use resolver::{resolve_use_action, validate_intent_shape};
+pub use runtime::{CombatSessionCommandSpec, CombatSessionState};
 pub use session::{
     combat_session_summaries, combat_session_transcripts, resolve_combat_session_step,
 };
@@ -482,6 +484,175 @@ mod tests {
         assert_eq!(
             next_scenario.combatants[1].conditions,
             vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_accepts_hit_command_and_advances_state() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(readout.session_id, "runtime-hexing-bolt");
+        assert_eq!(readout.step.index, 0);
+        assert_eq!(readout.step.log_index, 1);
+        assert_eq!(readout.command.step_index, 0);
+        assert!(readout.receipt.accepted);
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 18);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.state_after.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+        assert_eq!(readout.combat_log.len(), 1);
+        assert_eq!(session.next_step_index(), 1);
+        assert_eq!(session.combat_log().len(), 1);
+    }
+
+    #[test]
+    fn session_runtime_miss_preserves_prior_state() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-miss",
+            "Runtime miss",
+            "Adept misses Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        assert_eq!(readout.step.index, 1);
+        assert!(readout.receipt.accepted);
+        assert_eq!(
+            readout
+                .receipt
+                .attack_roll
+                .as_ref()
+                .map(|roll| roll.outcome),
+            Some(AttackOutcome::Miss)
+        );
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 9);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.state_after.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_rejection_preserves_prior_state() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-miss",
+            "Runtime miss",
+            "Adept misses Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-rejected",
+            "Runtime rejected",
+            "Adept targets themself through the command runtime.",
+            CommandOutcomeClass::RejectedTargetLegality,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(readout.step.index, 2);
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
+        assert!(readout.receipt.events.is_empty());
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 9);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.state_after.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_accumulates_log_entries_and_step_index() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        for (id, outcome_class, intent, rolls) in [
+            (
+                "runtime-hit",
+                CommandOutcomeClass::AcceptedHit,
+                UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                vec![17, 5],
+            ),
+            (
+                "runtime-miss",
+                CommandOutcomeClass::AcceptedMiss,
+                UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                vec![2, 5],
+            ),
+            (
+                "runtime-rejected",
+                CommandOutcomeClass::RejectedTargetLegality,
+                UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+                vec![17, 5],
+            ),
+        ] {
+            session.submit_command(CombatSessionCommandSpec::new(
+                id,
+                id,
+                id,
+                outcome_class,
+                intent,
+                rolls,
+            ));
+        }
+
+        assert_eq!(session.next_step_index(), 3);
+        assert_eq!(
+            session
+                .combat_log()
+                .iter()
+                .map(|entry| entry.log_index)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            session
+                .combat_log()
+                .iter()
+                .map(|entry| entry.event_types.len())
+                .collect::<Vec<_>>(),
+            vec![4, 2, 0]
         );
     }
 
