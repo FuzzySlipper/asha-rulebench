@@ -34,6 +34,33 @@ impl CombatSessionCommandSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionIntentCommandSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub intent: UseActionIntent,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionIntentCommandSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        intent: UseActionIntent,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            intent,
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionState {
     session_id: String,
     scenario: RulebenchScenario,
@@ -74,6 +101,39 @@ impl CombatSessionState {
     }
 
     pub fn submit_command(&mut self, spec: CombatSessionCommandSpec) -> CombatSessionStepReadout {
+        self.submit_command_parts(
+            spec.id,
+            spec.title,
+            spec.summary,
+            Some(spec.outcome_class),
+            spec.intent,
+            spec.roll_stream,
+        )
+    }
+
+    pub fn submit_intent_command(
+        &mut self,
+        spec: CombatSessionIntentCommandSpec,
+    ) -> CombatSessionStepReadout {
+        self.submit_command_parts(
+            spec.id,
+            spec.title,
+            spec.summary,
+            None,
+            spec.intent,
+            spec.roll_stream,
+        )
+    }
+
+    fn submit_command_parts(
+        &mut self,
+        id: String,
+        title: String,
+        summary: String,
+        outcome_class: Option<CommandOutcomeClass>,
+        intent: UseActionIntent,
+        roll_stream: Vec<i32>,
+    ) -> CombatSessionStepReadout {
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let turn_context = self.turn_order.clone();
         let state_before = self.state.project("State before command resolution.");
@@ -84,20 +144,20 @@ impl CombatSessionState {
                 .state
                 .project("No authority state changed; combat already ended.");
             (
-                ended_combat_receipt(spec.intent.clone(), state_after.clone()),
+                ended_combat_receipt(intent.clone(), state_after.clone()),
                 state_after,
                 false,
                 CommandDecisionKind::RejectedByLifecycle,
             )
         } else {
             match self.turn_order.current_actor_id.as_deref() {
-                Some(current_actor_id) if spec.intent.actor_id != current_actor_id => {
+                Some(current_actor_id) if intent.actor_id != current_actor_id => {
                     let state_after = self.state.project(
                         "No authority state changed; actor is not the current turn actor.",
                     );
                     (
                         non_current_actor_receipt(
-                            spec.intent.clone(),
+                            intent.clone(),
                             current_actor_id,
                             state_after.clone(),
                         ),
@@ -108,8 +168,7 @@ impl CombatSessionState {
                 }
                 _ => {
                     self.start_lifecycle(LifecycleTransitionTrigger::CommandStart);
-                    let receipt =
-                        resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
+                    let receipt = resolve_use_action(&self.scenario, intent.clone(), &roll_stream);
                     let state_after = receipt
                         .projection
                         .clone()
@@ -125,22 +184,24 @@ impl CombatSessionState {
             }
         };
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
+        let outcome_class =
+            outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt, decision_kind));
 
         let step = CombatSessionStepSummary {
-            id: spec.id,
+            id,
             index: self.next_step_index,
-            title: spec.title,
-            summary: spec.summary,
-            outcome_class: spec.outcome_class,
+            title,
+            summary,
+            outcome_class,
             log_index: self.next_step_index + 1,
         };
         let command = CommandAttempt {
             step_id: step.id.clone(),
             step_index: step.index,
-            actor_id: spec.intent.actor_id,
-            action_id: spec.intent.action_id,
-            target_id: spec.intent.target_id,
-            roll_stream: spec.roll_stream,
+            actor_id: intent.actor_id,
+            action_id: intent.action_id,
+            target_id: intent.target_id,
+            roll_stream,
             outcome_class: step.outcome_class,
         };
         let log_entry = combat_log_entry(&step, &receipt);
@@ -580,6 +641,39 @@ fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt)
         outcome_class: step.outcome_class,
         event_types: receipt.events.iter().map(domain_event_type).collect(),
     }
+}
+
+fn derive_command_outcome_class(
+    receipt: &RulebenchReceipt,
+    decision_kind: CommandDecisionKind,
+) -> CommandOutcomeClass {
+    if receipt.accepted {
+        if receipt.events.iter().any(domain_event_is_damage_applied) {
+            CommandOutcomeClass::AcceptedHit
+        } else {
+            CommandOutcomeClass::AcceptedMiss
+        }
+    } else if decision_kind == CommandDecisionKind::RejectedByResolver
+        && receipt.rejection.is_some_and(is_target_legality_rejection)
+    {
+        CommandOutcomeClass::RejectedTargetLegality
+    } else {
+        CommandOutcomeClass::RejectedInvalidCommand
+    }
+}
+
+fn domain_event_is_damage_applied(event: &DomainEvent) -> bool {
+    matches!(event, DomainEvent::DamageApplied { .. })
+}
+
+fn is_target_legality_rejection(rejection: RulebenchRejection) -> bool {
+    matches!(
+        rejection,
+        RulebenchRejection::TargetLegalityFailed
+            | RulebenchRejection::TargetOutOfRange
+            | RulebenchRejection::TargetNotVisible
+            | RulebenchRejection::InvalidTarget
+    )
 }
 
 fn command_audit_entry(

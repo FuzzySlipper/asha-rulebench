@@ -51,6 +51,7 @@ pub enum CommandOutcomeClass {
     AcceptedHit,
     AcceptedMiss,
     RejectedTargetLegality,
+    RejectedInvalidCommand,
 }
 
 impl CommandOutcomeClass {
@@ -59,6 +60,7 @@ impl CommandOutcomeClass {
             CommandOutcomeClass::AcceptedHit => "acceptedHit",
             CommandOutcomeClass::AcceptedMiss => "acceptedMiss",
             CommandOutcomeClass::RejectedTargetLegality => "rejectedTargetLegality",
+            CommandOutcomeClass::RejectedInvalidCommand => "rejectedInvalidCommand",
         }
     }
 }

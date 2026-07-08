@@ -14,7 +14,7 @@ export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'empt
 
 export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
 
-export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
+export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';
 
 export interface RulebenchCombatSessionCatalogDto {
   readonly summaries: readonly RulebenchCombatSessionSummaryDto[];

@@ -233,6 +233,7 @@ fn outcome_class(outcome_class: CommandOutcomeClass) -> &'static str {
         CommandOutcomeClass::AcceptedHit => "acceptedHit",
         CommandOutcomeClass::AcceptedMiss => "acceptedMiss",
         CommandOutcomeClass::RejectedTargetLegality => "rejectedTargetLegality",
+        CommandOutcomeClass::RejectedInvalidCommand => "rejectedInvalidCommand",
     }
 }
 

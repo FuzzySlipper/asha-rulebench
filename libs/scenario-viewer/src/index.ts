@@ -380,6 +380,8 @@ export class ScenarioViewerFeatureComponent implements OnInit {
         return 'Accepted miss';
       case 'rejectedTargetLegality':
         return 'Rejected target';
+      case 'rejectedInvalidCommand':
+        return 'Rejected invalid command';
     }
   }
 

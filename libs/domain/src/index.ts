@@ -322,6 +322,8 @@ function labelOutcomeClass(outcomeClass: RulebenchCombatSessionStepReadoutDto['s
       return 'Accepted miss';
     case 'rejectedTargetLegality':
       return 'Rejected target';
+    case 'rejectedInvalidCommand':
+      return 'Rejected invalid command';
   }
 }
 

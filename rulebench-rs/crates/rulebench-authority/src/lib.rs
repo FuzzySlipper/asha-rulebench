@@ -33,7 +33,7 @@ pub use modifiers::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
-pub use runtime::{CombatSessionCommandSpec, CombatSessionState};
+pub use runtime::{CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionState};
 pub use session::{
     combat_session_summaries, combat_session_transcripts, resolve_combat_session_step,
 };
@@ -2113,6 +2113,201 @@ mod tests {
         assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::InProgress);
         assert_eq!(session.lifecycle().started_at_step, Some(0));
         assert_eq!(session.lifecycle().ended_at_step, None);
+    }
+
+    #[test]
+    fn session_runtime_intent_command_derives_accepted_hit_outcome() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-hit",
+            "Runtime derived hit",
+            "Rust derives accepted hit outcome from receipt evidence.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert!(readout.receipt.accepted);
+        assert_eq!(readout.step.outcome_class, CommandOutcomeClass::AcceptedHit);
+        assert_eq!(
+            readout.command.outcome_class,
+            CommandOutcomeClass::AcceptedHit
+        );
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::AcceptedHit
+        );
+        assert_eq!(
+            readout.combat_log[0].outcome_class,
+            CommandOutcomeClass::AcceptedHit
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
+    }
+
+    #[test]
+    fn session_runtime_intent_command_derives_accepted_miss_outcome() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-miss",
+            "Runtime derived miss",
+            "Rust derives accepted miss outcome from receipt evidence.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        assert!(readout.receipt.accepted);
+        assert_eq!(
+            readout
+                .receipt
+                .attack_roll
+                .as_ref()
+                .map(|roll| roll.outcome),
+            Some(AttackOutcome::Miss)
+        );
+        assert_eq!(
+            readout.step.outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+        assert_eq!(
+            readout.command.outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+        assert_eq!(readout.audit_entry.event_count, 2);
+    }
+
+    #[test]
+    fn session_runtime_intent_command_derives_target_legality_rejection_outcome() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-target-rejected",
+            "Runtime derived target rejection",
+            "Rust derives target legality rejection outcome from receipt evidence.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
+        assert_eq!(
+            readout.step.outcome_class,
+            CommandOutcomeClass::RejectedTargetLegality
+        );
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::RejectedTargetLegality
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByResolver
+        );
+    }
+
+    #[test]
+    fn session_runtime_intent_command_derives_lifecycle_invalid_outcome() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-ended-rejected",
+            "Runtime derived ended rejection",
+            "Rust derives invalid command outcome after combat end.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
+        assert_eq!(
+            readout.step.outcome_class,
+            CommandOutcomeClass::RejectedInvalidCommand
+        );
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::RejectedInvalidCommand
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByLifecycle
+        );
+    }
+
+    #[test]
+    fn session_runtime_intent_command_derives_turn_order_invalid_outcome() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-turn-rejected",
+            "Runtime derived turn rejection",
+            "Rust derives invalid command outcome for the wrong turn actor.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
+        assert_eq!(
+            readout.step.outcome_class,
+            CommandOutcomeClass::RejectedInvalidCommand
+        );
+        assert_eq!(
+            readout.command.outcome_class,
+            CommandOutcomeClass::RejectedInvalidCommand
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByTurnOrder
+        );
+    }
+
+    #[test]
+    fn session_runtime_existing_command_spec_preserves_supplied_outcome_class() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-compat-ended-rejected",
+            "Runtime compatibility ended rejection",
+            "Existing transcript spec preserves caller-supplied outcome class.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(readout.step.outcome_class, CommandOutcomeClass::AcceptedHit);
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::AcceptedHit
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByLifecycle
+        );
     }
 
     #[test]
