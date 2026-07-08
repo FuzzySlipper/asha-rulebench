@@ -37,11 +37,12 @@ pub use modifiers::{
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
-    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
-    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
-    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
-    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
-    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
+    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
+    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
+    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
+    CombatSessionState,
 };
 pub use session::{
     combat_session_control_history_readouts, combat_session_script_readouts,
@@ -3347,6 +3348,141 @@ mod tests {
                 .current,
             9
         );
+    }
+
+    #[test]
+    fn session_runtime_selected_candidate_submission_accepts_hit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let execution = session.submit_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "selected-hit",
+            "Selected hit",
+            "Caller selected Hexing Bolt through the selected-candidate submission path.",
+            "hexing_bolt",
+            "entity-raider",
+            vec![17, 5],
+        ));
+
+        assert!(execution.selection.accepted);
+        assert_eq!(
+            execution.selection.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::Accepted
+        );
+        assert_eq!(
+            execution
+                .selection
+                .command
+                .as_ref()
+                .map(|command| command.intent.clone()),
+            Some(UseActionIntent::new(
+                "entity-adept",
+                "hexing_bolt",
+                "entity-raider"
+            ))
+        );
+        let submitted_step = execution
+            .submitted_step
+            .as_ref()
+            .expect("accepted selection submits command");
+        assert!(submitted_step.receipt.accepted);
+        assert_eq!(submitted_step.step.id, "selected-hit");
+        assert_eq!(
+            submitted_step.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
+        assert_eq!(
+            submitted_step.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
+        assert_ne!(
+            submitted_step.audit_entry.state_before_fingerprint,
+            submitted_step.audit_entry.state_after_fingerprint
+        );
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.next_step_index, 1);
+        assert_eq!(snapshot.combat_log.len(), 1);
+        assert_eq!(snapshot.audit_log.len(), 1);
+        assert_eq!(snapshot.action_usage_log.len(), 1);
+        assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            snapshot.current_state.combatants[1].conditions,
+            vec!["rattled"]
+        );
+    }
+
+    #[test]
+    fn session_runtime_selected_candidate_submission_accepts_miss_noop() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let execution = session.submit_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "selected-miss",
+            "Selected miss",
+            "Caller selected Hexing Bolt with deterministic miss rolls.",
+            "hexing_bolt",
+            "entity-raider",
+            vec![2, 5],
+        ));
+
+        assert!(execution.selection.accepted);
+        let submitted_step = execution
+            .submitted_step
+            .as_ref()
+            .expect("accepted selection submits command");
+        assert!(submitted_step.receipt.accepted);
+        assert_eq!(
+            submitted_step.step.outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+        assert_eq!(
+            submitted_step.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
+        assert_eq!(
+            submitted_step.audit_entry.state_before_fingerprint,
+            submitted_step.audit_entry.state_after_fingerprint
+        );
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 18);
+        assert!(snapshot.current_state.combatants[1].conditions.is_empty());
+        assert_eq!(snapshot.action_usage_log.len(), 1);
+        assert_eq!(
+            snapshot.action_usage_log[0].outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+    }
+
+    #[test]
+    fn session_runtime_selected_candidate_submission_rejected_plan_is_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+        let before_execution = session.snapshot();
+
+        let execution = session.submit_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "selected-unavailable",
+            "Selected unavailable",
+            "Raider has no command candidates in this fixture.",
+            "hexing_bolt",
+            "entity-raider",
+            vec![17, 5],
+        ));
+        let after_execution = session.snapshot();
+
+        assert!(!execution.selection.accepted);
+        assert_eq!(
+            execution.selection.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates
+        );
+        assert_eq!(execution.submitted_step, None);
+        assert_eq!(after_execution, before_execution);
+        assert!(session.combat_log().is_empty());
+        assert!(session.audit_log().is_empty());
+        assert!(session.action_usage_log().is_empty());
+        assert_eq!(session.turn_transition_log().len(), 1);
     }
 
     #[test]

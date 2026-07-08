@@ -130,6 +130,12 @@ pub struct CombatSessionCandidateSelectionReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionCandidateExecutionReadout {
+    pub selection: CombatSessionCandidateSelectionReadout,
+    pub submitted_step: Option<CombatSessionStepReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionScriptSpec {
     pub id: String,
     pub title: String,
@@ -571,6 +577,22 @@ impl CombatSessionState {
     ) -> CombatSessionCandidateSelectionReadout {
         let candidates = self.current_actor_command_candidates();
         plan_candidate_command(spec, candidates)
+    }
+
+    pub fn submit_candidate_command(
+        &mut self,
+        spec: CombatSessionCandidateSelectionSpec,
+    ) -> CombatSessionCandidateExecutionReadout {
+        let selection = self.plan_candidate_command(spec);
+        let submitted_step = selection
+            .command
+            .clone()
+            .map(|command| self.submit_intent_command(command));
+
+        CombatSessionCandidateExecutionReadout {
+            selection,
+            submitted_step,
+        }
     }
 
     pub fn preflight_command(&self, intent: UseActionIntent) -> CommandPreflightReadout {
