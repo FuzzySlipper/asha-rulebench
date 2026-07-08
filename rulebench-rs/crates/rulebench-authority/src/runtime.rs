@@ -1754,6 +1754,7 @@ fn ended_combat_receipt(
         attack_roll: None,
         damage: None,
         modifier: None,
+        roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![
             TraceEntry::new(
@@ -2003,6 +2004,7 @@ fn non_current_actor_receipt(
         attack_roll: None,
         damage: None,
         modifier: None,
+        roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![
             TraceEntry::new(
@@ -2037,6 +2039,7 @@ fn preflight_rejected_receipt(
         attack_roll: None,
         damage: None,
         modifier: None,
+        roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![
             TraceEntry::new(
@@ -2131,6 +2134,7 @@ fn command_audit_entry(
         rejection: receipt.rejection,
         event_count: receipt.events.len() as u32,
         trace_count: receipt.trace.len() as u32,
+        roll_consumption: receipt.roll_consumption.clone(),
         state_before_fingerprint,
         state_after_fingerprint,
     }

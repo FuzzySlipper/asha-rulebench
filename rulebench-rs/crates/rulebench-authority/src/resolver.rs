@@ -148,21 +148,39 @@ pub fn resolve_use_action(
     }
 
     if roll_stream.is_empty() {
-        return rejected_with_projection(
+        return rejected_with_projection_and_rolls(
             scenario,
             intent,
             RulebenchRejection::MissingAttackRoll,
             Some(target_legality),
             trace,
+            vec![missing_roll_consumption(
+                0,
+                RollRequestKind::AttackRoll,
+                "Attack roll was requested but no roll value was supplied.",
+            )],
         );
     }
     if roll_stream.len() < 2 {
-        return rejected_with_projection(
+        return rejected_with_projection_and_rolls(
             scenario,
             intent,
             RulebenchRejection::MissingDamageRoll,
             Some(target_legality),
             trace,
+            vec![
+                consumed_roll(
+                    0,
+                    RollRequestKind::AttackRoll,
+                    roll_stream[0],
+                    "Attack roll value was consumed for hit resolution.",
+                ),
+                missing_roll_consumption(
+                    1,
+                    RollRequestKind::DamageRoll,
+                    "Damage roll was requested after a hit but no roll value was supplied.",
+                ),
+            ],
         );
     }
 
@@ -241,12 +259,33 @@ fn resolve_accepted_action(
             "DomainEvents committed.",
             "ActionUsed and AttackRolled became accepted facts.",
         ));
-        return accepted_miss_receipt(scenario, intent, target_legality, attack_roll, trace);
+        return accepted_miss_receipt(
+            scenario,
+            intent,
+            target_legality,
+            attack_roll,
+            trace,
+            vec![
+                consumed_roll(
+                    0,
+                    RollRequestKind::AttackRoll,
+                    roll_stream[0],
+                    "Attack roll value was consumed for miss resolution.",
+                ),
+                unconsumed_roll(
+                    1,
+                    RollRequestKind::DamageRoll,
+                    roll_stream.get(1).copied(),
+                    "Damage roll value was supplied but not consumed because the attack missed.",
+                ),
+            ],
+        );
     }
 
+    let damage_roll = roll_stream[1];
     let damage = apply_damage(
         target,
-        roll_stream[1] + hit_operations.damage.damage_bonus,
+        damage_roll + hit_operations.damage.damage_bonus,
         &hit_operations.damage.damage_type,
     );
     let modifier = ModifierOutcome {
@@ -282,6 +321,20 @@ fn resolve_accepted_action(
         damage,
         modifier,
         trace,
+        vec![
+            consumed_roll(
+                0,
+                RollRequestKind::AttackRoll,
+                roll_stream[0],
+                "Attack roll value was consumed for hit resolution.",
+            ),
+            consumed_roll(
+                1,
+                RollRequestKind::DamageRoll,
+                damage_roll,
+                "Damage roll value was consumed for damage resolution.",
+            ),
+        ],
     )
 }
 
@@ -302,6 +355,7 @@ fn accepted_shape(intent: UseActionIntent, mut trace: Vec<TraceEntry>) -> Rulebe
         attack_roll: None,
         damage: None,
         modifier: None,
+        roll_consumption: Vec::new(),
         events: vec![DomainEvent::IntentShapeAccepted {
             actor_id: intent.actor_id,
             action_id: intent.action_id,
@@ -333,6 +387,7 @@ fn rejected(
         attack_roll: None,
         damage: None,
         modifier: None,
+        roll_consumption: Vec::new(),
         events: Vec::new(),
         trace,
         projection: None,
@@ -347,6 +402,7 @@ fn accepted_hit_receipt(
     damage: DamageOutcome,
     modifier: ModifierOutcome,
     trace: Vec<TraceEntry>,
+    roll_consumption: Vec<RollConsumptionEntry>,
 ) -> RulebenchReceipt {
     let mut state = CombatState::from_scenario(scenario);
     state.apply_hit(&damage, &modifier);
@@ -360,6 +416,7 @@ fn accepted_hit_receipt(
         attack_roll: Some(attack_roll.clone()),
         damage: Some(damage.clone()),
         modifier: Some(modifier.clone()),
+        roll_consumption,
         events: accepted_hit_events(&intent, &attack_roll, &damage, &modifier),
         trace,
         projection: Some(state.project("Raider is damaged and rattled; Adept is unchanged.")),
@@ -372,6 +429,7 @@ fn accepted_miss_receipt(
     target_legality: TargetLegality,
     attack_roll: AttackRollResult,
     trace: Vec<TraceEntry>,
+    roll_consumption: Vec<RollConsumptionEntry>,
 ) -> RulebenchReceipt {
     RulebenchReceipt {
         accepted: true,
@@ -382,6 +440,7 @@ fn accepted_miss_receipt(
         attack_roll: Some(attack_roll.clone()),
         damage: None,
         modifier: None,
+        roll_consumption,
         events: vec![
             DomainEvent::ActionUsed {
                 actor_id: intent.actor_id.clone(),
@@ -443,7 +502,25 @@ fn rejected_with_projection(
     intent: UseActionIntent,
     rejection: RulebenchRejection,
     target_legality: Option<TargetLegality>,
+    trace: Vec<TraceEntry>,
+) -> RulebenchReceipt {
+    rejected_with_projection_and_rolls(
+        scenario,
+        intent,
+        rejection,
+        target_legality,
+        trace,
+        Vec::new(),
+    )
+}
+
+fn rejected_with_projection_and_rolls(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    rejection: RulebenchRejection,
+    target_legality: Option<TargetLegality>,
     mut trace: Vec<TraceEntry>,
+    roll_consumption: Vec<RollConsumptionEntry>,
 ) -> RulebenchReceipt {
     let detail = target_legality.as_ref().map_or_else(
         || rejection.code().to_string(),
@@ -465,6 +542,7 @@ fn rejected_with_projection(
         attack_roll: None,
         damage: None,
         modifier: None,
+        roll_consumption,
         events: Vec::new(),
         trace,
         projection: Some(
@@ -472,6 +550,44 @@ fn rejected_with_projection(
                 .project("No authority state changed; intent rejected."),
         ),
     }
+}
+
+fn consumed_roll(
+    sequence: u32,
+    request_kind: RollRequestKind,
+    supplied_value: i32,
+    reason: impl Into<String>,
+) -> RollConsumptionEntry {
+    RollConsumptionEntry {
+        sequence,
+        request_kind,
+        supplied_value: Some(supplied_value),
+        consumed: true,
+        reason: reason.into(),
+    }
+}
+
+fn unconsumed_roll(
+    sequence: u32,
+    request_kind: RollRequestKind,
+    supplied_value: Option<i32>,
+    reason: impl Into<String>,
+) -> RollConsumptionEntry {
+    RollConsumptionEntry {
+        sequence,
+        request_kind,
+        supplied_value,
+        consumed: false,
+        reason: reason.into(),
+    }
+}
+
+fn missing_roll_consumption(
+    sequence: u32,
+    request_kind: RollRequestKind,
+    reason: impl Into<String>,
+) -> RollConsumptionEntry {
+    unconsumed_roll(sequence, request_kind, None, reason)
 }
 
 pub(crate) fn validate_target_legality(

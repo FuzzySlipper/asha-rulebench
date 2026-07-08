@@ -1495,6 +1495,22 @@ mod tests {
         assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
         assert_eq!(
             receipt
+                .roll_consumption
+                .iter()
+                .map(|entry| (
+                    entry.sequence,
+                    entry.request_kind,
+                    entry.supplied_value,
+                    entry.consumed
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, RollRequestKind::AttackRoll, Some(17), true),
+                (1, RollRequestKind::DamageRoll, Some(5), true),
+            ]
+        );
+        assert_eq!(
+            receipt
                 .projection
                 .as_ref()
                 .map(|projection| projection.combatants[1].hit_points.current),
@@ -1703,6 +1719,22 @@ mod tests {
         assert!(receipt.damage.is_none());
         assert!(receipt.modifier.is_none());
         assert_eq!(receipt.events.len(), 2);
+        assert_eq!(
+            receipt
+                .roll_consumption
+                .iter()
+                .map(|entry| (
+                    entry.sequence,
+                    entry.request_kind,
+                    entry.supplied_value,
+                    entry.consumed
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, RollRequestKind::AttackRoll, Some(9), true),
+                (1, RollRequestKind::DamageRoll, Some(5), false),
+            ]
+        );
     }
 
     #[test]
@@ -1844,6 +1876,52 @@ mod tests {
         );
         assert!(receipt.events.is_empty());
         assert!(receipt.damage.is_none());
+        assert_eq!(
+            receipt
+                .roll_consumption
+                .iter()
+                .map(|entry| (
+                    entry.sequence,
+                    entry.request_kind,
+                    entry.supplied_value,
+                    entry.consumed
+                ))
+                .collect::<Vec<_>>(),
+            vec![(0, RollRequestKind::AttackRoll, None, false)]
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_missing_damage_roll_with_consumption_evidence() {
+        let receipt = resolve_use_action(
+            &hexing_bolt_fixture_scenario(),
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17],
+        );
+
+        assert!(!receipt.accepted);
+        assert_eq!(
+            receipt.rejection,
+            Some(RulebenchRejection::MissingDamageRoll)
+        );
+        assert!(receipt.events.is_empty());
+        assert!(receipt.damage.is_none());
+        assert_eq!(
+            receipt
+                .roll_consumption
+                .iter()
+                .map(|entry| (
+                    entry.sequence,
+                    entry.request_kind,
+                    entry.supplied_value,
+                    entry.consumed
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, RollRequestKind::AttackRoll, Some(17), true),
+                (1, RollRequestKind::DamageRoll, None, false),
+            ]
+        );
     }
 
     #[test]
@@ -3109,6 +3187,10 @@ mod tests {
             readout.receipt.trace.len() as u32
         );
         assert_eq!(
+            readout.audit_entry.roll_consumption,
+            readout.receipt.roll_consumption
+        );
+        assert_eq!(
             readout.audit_entry.state_before_fingerprint.algorithm,
             STATE_FINGERPRINT_ALGORITHM
         );
@@ -3117,6 +3199,10 @@ mod tests {
             readout.audit_entry.state_after_fingerprint
         );
         assert_eq!(session.audit_log(), &[readout.audit_entry]);
+        assert_eq!(
+            session.snapshot().audit_log[0].roll_consumption,
+            readout.receipt.roll_consumption
+        );
     }
 
     #[test]
@@ -4934,6 +5020,10 @@ mod tests {
         assert_eq!(
             readout.audit_entry.trace_count,
             readout.receipt.trace.len() as u32
+        );
+        assert_eq!(
+            readout.audit_entry.roll_consumption,
+            readout.receipt.roll_consumption
         );
         assert_eq!(
             readout.audit_entry.state_before_fingerprint,
