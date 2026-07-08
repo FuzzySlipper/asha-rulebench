@@ -68,15 +68,28 @@ impl CombatSessionState {
     }
 
     pub fn submit_command(&mut self, spec: CombatSessionCommandSpec) -> CombatSessionStepReadout {
-        self.lifecycle.start_at_step(self.next_step_index);
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let state_before = self.state.project("State before command resolution.");
         let state_before_fingerprint = fingerprint_projected_state(&state_before);
-        let receipt = resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
-        let state_after = receipt
-            .projection
-            .clone()
-            .expect("session runtime resolver always produces projection");
+        let (receipt, state_after) = if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+            let state_after = self
+                .state
+                .project("No authority state changed; combat already ended.");
+            (
+                ended_combat_receipt(spec.intent.clone(), state_after.clone()),
+                state_after,
+            )
+        } else {
+            self.lifecycle.start_at_step(self.next_step_index);
+            let receipt =
+                resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
+            let state_after = receipt
+                .projection
+                .clone()
+                .expect("session runtime resolver always produces projection");
+
+            (receipt, state_after)
+        };
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
 
         let step = CombatSessionStepSummary {
@@ -107,7 +120,9 @@ impl CombatSessionState {
         self.combat_log.push(log_entry.clone());
         self.audit_log.push(audit_entry.clone());
         self.next_step_index += 1;
-        self.state = CombatState::from_projection(&state_after);
+        if self.lifecycle.phase != CombatLifecyclePhase::Ended {
+            self.state = CombatState::from_projection(&state_after);
+        }
 
         CombatSessionStepReadout {
             session_id: self.session_id.clone(),
@@ -164,6 +179,40 @@ impl CombatSessionState {
             current_state,
             current_state_fingerprint,
         }
+    }
+}
+
+fn ended_combat_receipt(
+    intent: UseActionIntent,
+    projection: ScenarioProjection,
+) -> RulebenchReceipt {
+    RulebenchReceipt {
+        accepted: false,
+        authority_surface: AUTHORITY_SURFACE,
+        intent,
+        rejection: Some(RulebenchRejection::InvalidAction),
+        target_legality: None,
+        attack_roll: None,
+        damage: None,
+        modifier: None,
+        events: Vec::new(),
+        trace: vec![
+            TraceEntry::new(
+                1,
+                TracePhase::Proposal,
+                TraceStatus::Info,
+                "UseActionIntent received.",
+                "Session command submitted after combat ended.",
+            ),
+            TraceEntry::new(
+                2,
+                TracePhase::Validation,
+                TraceStatus::Rejected,
+                "Command rejected by lifecycle.",
+                "Combat is already ended.",
+            ),
+        ],
+        projection: Some(projection),
     }
 }
 

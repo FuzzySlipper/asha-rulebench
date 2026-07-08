@@ -2471,6 +2471,89 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_rejects_commands_after_combat_end() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.end_combat();
+        let ended_at_step = session.lifecycle().ended_at_step;
+        let state_before_attempt = session.snapshot().current_state_fingerprint;
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-post-end",
+            "Runtime post-end command",
+            "A command submitted after combat ended.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let state_after_attempt = session.snapshot().current_state_fingerprint;
+
+        assert_eq!(readout.step.index, 1);
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
+        assert!(readout.receipt.events.is_empty());
+        assert!(readout.receipt.attack_roll.is_none());
+        assert!(readout.receipt.damage.is_none());
+        assert!(readout.receipt.modifier.is_none());
+        assert_eq!(readout.state_before.combatants[1].hit_points.current, 9);
+        assert_eq!(readout.state_after.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            readout.audit_entry.state_before_fingerprint,
+            readout.audit_entry.state_after_fingerprint
+        );
+        assert_eq!(state_before_attempt, state_after_attempt);
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
+        assert_eq!(session.lifecycle().ended_at_step, ended_at_step);
+        assert_eq!(session.next_step_index(), 2);
+    }
+
+    #[test]
+    fn session_runtime_records_post_end_attempt_in_log_and_audit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.end_combat();
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-post-end",
+            "Runtime post-end command",
+            "A command submitted after combat ended.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(readout.combat_log[0].id, "log-runtime-post-end");
+        assert!(readout.combat_log[0].event_types.is_empty());
+        assert_eq!(session.combat_log().len(), 2);
+        assert_eq!(session.audit_log().len(), 2);
+        assert_eq!(readout.audit_entry.id, "audit-runtime-post-end");
+        assert_eq!(readout.audit_entry.sequence, 1);
+        assert!(!readout.audit_entry.accepted);
+        assert_eq!(readout.audit_entry.event_count, 0);
+        assert_eq!(readout.audit_entry.trace_count, 2);
+        assert_eq!(session.audit_log()[1], readout.audit_entry);
+    }
+
+    #[test]
     fn session_runtime_initializes_turn_order_from_scenario_combatants() {
         let session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
