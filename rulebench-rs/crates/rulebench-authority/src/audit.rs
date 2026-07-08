@@ -3,13 +3,34 @@ use crate::model::{ScenarioProjection, StateFingerprint};
 const FNV_OFFSET: u64 = 0xcbf29ce484222325;
 const FNV_PRIME: u64 = 0x100000001b3;
 pub const PROJECTION_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-projection.v0";
+pub const STATE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-state.v0";
 
 pub fn fingerprint_projection(projection: &ScenarioProjection) -> StateFingerprint {
     let mut builder = FingerprintBuilder::new();
 
     builder.feed_str("summary");
     builder.feed_str(&projection.summary);
+    feed_projected_combatants(&mut builder, projection);
 
+    StateFingerprint {
+        algorithm: PROJECTION_FINGERPRINT_ALGORITHM.to_string(),
+        value: format!("{:016x}", builder.finish()),
+    }
+}
+
+pub fn fingerprint_projected_state(projection: &ScenarioProjection) -> StateFingerprint {
+    let mut builder = FingerprintBuilder::new();
+
+    feed_projected_combatants(&mut builder, projection);
+
+    StateFingerprint {
+        algorithm: STATE_FINGERPRINT_ALGORITHM.to_string(),
+        value: format!("{:016x}", builder.finish()),
+    }
+}
+
+fn feed_projected_combatants(builder: &mut FingerprintBuilder, projection: &ScenarioProjection) {
+    builder.feed_u32(projection.combatants.len() as u32);
     for combatant in &projection.combatants {
         builder.feed_str("combatant");
         builder.feed_str(&combatant.id);
@@ -21,11 +42,6 @@ pub fn fingerprint_projection(projection: &ScenarioProjection) -> StateFingerpri
         for condition in &combatant.conditions {
             builder.feed_str(condition);
         }
-    }
-
-    StateFingerprint {
-        algorithm: PROJECTION_FINGERPRINT_ALGORITHM.to_string(),
-        value: format!("{:016x}", builder.finish()),
     }
 }
 

@@ -182,6 +182,19 @@ pub struct CommandAttempt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandAuditEntry {
+    pub id: String,
+    pub step_id: String,
+    pub sequence: u32,
+    pub outcome_class: CommandOutcomeClass,
+    pub accepted: bool,
+    pub event_count: u32,
+    pub trace_count: u32,
+    pub state_before_fingerprint: StateFingerprint,
+    pub state_after_fingerprint: StateFingerprint,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatLogEntry {
     pub id: String,
     pub step_id: String,
@@ -206,6 +219,7 @@ pub struct CombatSessionStepReadout {
     pub scenario: RulebenchScenario,
     pub receipt: RulebenchReceipt,
     pub combat_log: Vec<CombatLogEntry>,
+    pub audit_entry: CommandAuditEntry,
     pub state_before: ScenarioProjection,
     pub state_after: ScenarioProjection,
 }
@@ -217,6 +231,7 @@ pub struct CombatSessionSnapshot {
     pub lifecycle: CombatLifecycle,
     pub turn_order: CombatTurnOrder,
     pub combat_log: Vec<CombatLogEntry>,
+    pub audit_log: Vec<CommandAuditEntry>,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,
 }

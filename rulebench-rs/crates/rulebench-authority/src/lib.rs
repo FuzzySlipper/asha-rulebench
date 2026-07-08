@@ -17,7 +17,10 @@ mod runtime;
 mod session;
 mod state;
 
-pub use audit::{fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM};
+pub use audit::{
+    fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
+    STATE_FINGERPRINT_ALGORITHM,
+};
 pub use catalog::{resolve_catalog_scenario, scenario_catalog_cases, scenario_catalog_summaries};
 pub use content::validate_scenario_content;
 pub use fixtures::{
@@ -941,6 +944,44 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_records_accepted_hit_audit_entry() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(readout.audit_entry.id, "audit-runtime-hit");
+        assert_eq!(readout.audit_entry.step_id, "runtime-hit");
+        assert_eq!(readout.audit_entry.sequence, 0);
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::AcceptedHit
+        );
+        assert!(readout.audit_entry.accepted);
+        assert_eq!(readout.audit_entry.event_count, 4);
+        assert_eq!(
+            readout.audit_entry.trace_count,
+            readout.receipt.trace.len() as u32
+        );
+        assert_eq!(
+            readout.audit_entry.state_before_fingerprint.algorithm,
+            STATE_FINGERPRINT_ALGORITHM
+        );
+        assert_ne!(
+            readout.audit_entry.state_before_fingerprint,
+            readout.audit_entry.state_after_fingerprint
+        );
+        assert_eq!(session.audit_log(), &[readout.audit_entry]);
+    }
+
+    #[test]
     fn session_runtime_miss_preserves_prior_state() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -977,6 +1018,46 @@ mod tests {
         assert_eq!(
             readout.state_after.combatants[1].conditions,
             vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_records_miss_noop_audit_entry() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-miss",
+            "Runtime miss",
+            "Adept misses Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        assert_eq!(readout.audit_entry.id, "audit-runtime-miss");
+        assert_eq!(readout.audit_entry.sequence, 1);
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::AcceptedMiss
+        );
+        assert!(readout.audit_entry.accepted);
+        assert_eq!(readout.audit_entry.event_count, 2);
+        assert_eq!(
+            readout.audit_entry.trace_count,
+            readout.receipt.trace.len() as u32
+        );
+        assert_eq!(
+            readout.audit_entry.state_before_fingerprint,
+            readout.audit_entry.state_after_fingerprint
         );
     }
 
@@ -1022,6 +1103,46 @@ mod tests {
         assert_eq!(
             readout.state_after.combatants[1].conditions,
             vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_records_rejected_command_audit_entry() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let readout = session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-rejected",
+            "Runtime rejected",
+            "Adept targets themself through the command runtime.",
+            CommandOutcomeClass::RejectedTargetLegality,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(readout.audit_entry.id, "audit-runtime-rejected");
+        assert_eq!(readout.audit_entry.sequence, 1);
+        assert_eq!(
+            readout.audit_entry.outcome_class,
+            CommandOutcomeClass::RejectedTargetLegality
+        );
+        assert!(!readout.audit_entry.accepted);
+        assert_eq!(readout.audit_entry.event_count, 0);
+        assert_eq!(
+            readout.audit_entry.trace_count,
+            readout.receipt.trace.len() as u32
+        );
+        assert_eq!(
+            readout.audit_entry.state_before_fingerprint,
+            readout.audit_entry.state_after_fingerprint
         );
     }
 
@@ -1075,6 +1196,73 @@ mod tests {
                 .combat_log()
                 .iter()
                 .map(|entry| entry.event_types.len())
+                .collect::<Vec<_>>(),
+            vec![4, 2, 0]
+        );
+    }
+
+    #[test]
+    fn session_runtime_accumulates_audit_entries_separately_from_combat_log() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        for (id, outcome_class, intent, rolls) in [
+            (
+                "runtime-hit",
+                CommandOutcomeClass::AcceptedHit,
+                UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                vec![17, 5],
+            ),
+            (
+                "runtime-miss",
+                CommandOutcomeClass::AcceptedMiss,
+                UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                vec![2, 5],
+            ),
+            (
+                "runtime-rejected",
+                CommandOutcomeClass::RejectedTargetLegality,
+                UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+                vec![17, 5],
+            ),
+        ] {
+            session.submit_command(CombatSessionCommandSpec::new(
+                id,
+                id,
+                id,
+                outcome_class,
+                intent,
+                rolls,
+            ));
+        }
+
+        assert_eq!(session.combat_log().len(), 3);
+        assert_eq!(session.audit_log().len(), 3);
+        assert_eq!(
+            session
+                .audit_log()
+                .iter()
+                .map(|entry| entry.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "audit-runtime-hit",
+                "audit-runtime-miss",
+                "audit-runtime-rejected"
+            ]
+        );
+        assert_eq!(
+            session
+                .audit_log()
+                .iter()
+                .map(|entry| entry.accepted)
+                .collect::<Vec<_>>(),
+            vec![true, true, false]
+        );
+        assert_eq!(
+            session
+                .audit_log()
+                .iter()
+                .map(|entry| entry.event_count)
                 .collect::<Vec<_>>(),
             vec![4, 2, 0]
         );
@@ -1229,6 +1417,9 @@ mod tests {
         assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::InProgress);
         assert_eq!(snapshot.combat_log.len(), 1);
         assert_eq!(snapshot.combat_log[0].step_id, "runtime-hit");
+        assert_eq!(snapshot.audit_log.len(), 1);
+        assert_eq!(snapshot.audit_log[0].step_id, "runtime-hit");
+        assert!(snapshot.audit_log[0].accepted);
         assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
         assert_eq!(
             snapshot.current_state.combatants[1].conditions,

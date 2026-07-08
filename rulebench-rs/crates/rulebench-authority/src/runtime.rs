@@ -1,7 +1,7 @@
-use crate::fingerprint_projection;
 use crate::model::*;
 use crate::resolver::resolve_use_action;
 use crate::state::CombatState;
+use crate::{fingerprint_projected_state, fingerprint_projection};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionCommandSpec {
@@ -39,6 +39,7 @@ pub struct CombatSessionState {
     scenario: RulebenchScenario,
     state: CombatState,
     combat_log: Vec<CombatLogEntry>,
+    audit_log: Vec<CommandAuditEntry>,
     next_step_index: u32,
     lifecycle: CombatLifecycle,
     turn_order: CombatTurnOrder,
@@ -59,6 +60,7 @@ impl CombatSessionState {
             scenario,
             state,
             combat_log: Vec::new(),
+            audit_log: Vec::new(),
             next_step_index: 0,
             lifecycle: CombatLifecycle::ready(),
             turn_order,
@@ -69,11 +71,13 @@ impl CombatSessionState {
         self.lifecycle.start_at_step(self.next_step_index);
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let state_before = self.state.project("State before command resolution.");
+        let state_before_fingerprint = fingerprint_projected_state(&state_before);
         let receipt = resolve_use_action(&self.scenario, spec.intent.clone(), &spec.roll_stream);
         let state_after = receipt
             .projection
             .clone()
             .expect("session runtime resolver always produces projection");
+        let state_after_fingerprint = fingerprint_projected_state(&state_after);
 
         let step = CombatSessionStepSummary {
             id: spec.id,
@@ -93,8 +97,15 @@ impl CombatSessionState {
             outcome_class: step.outcome_class,
         };
         let log_entry = combat_log_entry(&step, &receipt);
+        let audit_entry = command_audit_entry(
+            &step,
+            &receipt,
+            state_before_fingerprint,
+            state_after_fingerprint,
+        );
 
         self.combat_log.push(log_entry.clone());
+        self.audit_log.push(audit_entry.clone());
         self.next_step_index += 1;
         self.state = CombatState::from_projection(&state_after);
 
@@ -105,6 +116,7 @@ impl CombatSessionState {
             scenario: self.scenario.clone(),
             receipt,
             combat_log: vec![log_entry],
+            audit_entry,
             state_before,
             state_after,
         }
@@ -112,6 +124,10 @@ impl CombatSessionState {
 
     pub fn combat_log(&self) -> &[CombatLogEntry] {
         &self.combat_log
+    }
+
+    pub fn audit_log(&self) -> &[CommandAuditEntry] {
+        &self.audit_log
     }
 
     pub fn next_step_index(&self) -> u32 {
@@ -144,6 +160,7 @@ impl CombatSessionState {
             lifecycle: self.lifecycle.clone(),
             turn_order: self.turn_order.clone(),
             combat_log: self.combat_log.clone(),
+            audit_log: self.audit_log.clone(),
             current_state,
             current_state_fingerprint,
         }
@@ -159,6 +176,25 @@ fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt)
         summary: step.summary.clone(),
         outcome_class: step.outcome_class,
         event_types: receipt.events.iter().map(domain_event_type).collect(),
+    }
+}
+
+fn command_audit_entry(
+    step: &CombatSessionStepSummary,
+    receipt: &RulebenchReceipt,
+    state_before_fingerprint: StateFingerprint,
+    state_after_fingerprint: StateFingerprint,
+) -> CommandAuditEntry {
+    CommandAuditEntry {
+        id: format!("audit-{}", step.id),
+        step_id: step.id.clone(),
+        sequence: step.index,
+        outcome_class: step.outcome_class,
+        accepted: receipt.accepted,
+        event_count: receipt.events.len() as u32,
+        trace_count: receipt.trace.len() as u32,
+        state_before_fingerprint,
+        state_after_fingerprint,
     }
 }
 
