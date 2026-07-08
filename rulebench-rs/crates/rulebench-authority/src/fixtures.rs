@@ -55,6 +55,17 @@ fn hexing_bolt_action() -> ActionDefinition {
             modifier_id: "rattled".to_string(),
             modifier_label: "rattled".to_string(),
             modifier_duration: "until end of next turn".to_string(),
+            operations: vec![
+                HitEffectOperation::Damage(DamageEffectOperation {
+                    damage_bonus: 4,
+                    damage_type: "psychic".to_string(),
+                }),
+                HitEffectOperation::ApplyModifier(ModifierEffectOperation {
+                    modifier_id: "rattled".to_string(),
+                    modifier_label: "rattled".to_string(),
+                    modifier_duration: "until end of next turn".to_string(),
+                }),
+            ],
         },
         action_text: "Mind vs Nerve at range 10".to_string(),
         effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"

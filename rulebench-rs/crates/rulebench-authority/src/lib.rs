@@ -152,6 +152,37 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_hexing_bolt_hit_operations() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let action = scenario
+            .action_by_id("hexing_bolt")
+            .expect("fixture has hexing bolt");
+
+        let damage = action.hit.damage_operation().expect("damage operation");
+        let modifier = action.hit.modifier_operation().expect("modifier operation");
+
+        assert_eq!(action.hit.operations.len(), 2);
+        assert_eq!(damage.damage_bonus, 4);
+        assert_eq!(damage.damage_type, "psychic");
+        assert_eq!(modifier.modifier_id, "rattled");
+        assert_eq!(modifier.modifier_label, "rattled");
+        assert_eq!(modifier.modifier_duration, "until end of next turn");
+    }
+
+    #[test]
+    fn hit_effect_operation_lookup_rejects_missing_operations() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let action = scenario
+            .action_by_id("hexing_bolt")
+            .expect("fixture has hexing bolt");
+        let mut hit = action.hit.clone();
+        hit.operations.clear();
+
+        assert!(hit.damage_operation().is_none());
+        assert!(hit.modifier_operation().is_none());
+    }
+
+    #[test]
     fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
         let receipt = resolve_use_action(
             &hexing_bolt_fixture_scenario(),

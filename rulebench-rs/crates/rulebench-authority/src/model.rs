@@ -274,6 +274,46 @@ pub struct HitEffect {
     pub modifier_id: String,
     pub modifier_label: String,
     pub modifier_duration: String,
+    pub operations: Vec<HitEffectOperation>,
+}
+
+impl HitEffect {
+    pub fn damage_operation(&self) -> Option<&DamageEffectOperation> {
+        self.operations
+            .iter()
+            .find_map(|operation| match operation {
+                HitEffectOperation::Damage(damage) => Some(damage),
+                HitEffectOperation::ApplyModifier(_) => None,
+            })
+    }
+
+    pub fn modifier_operation(&self) -> Option<&ModifierEffectOperation> {
+        self.operations
+            .iter()
+            .find_map(|operation| match operation {
+                HitEffectOperation::Damage(_) => None,
+                HitEffectOperation::ApplyModifier(modifier) => Some(modifier),
+            })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HitEffectOperation {
+    Damage(DamageEffectOperation),
+    ApplyModifier(ModifierEffectOperation),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DamageEffectOperation {
+    pub damage_bonus: i32,
+    pub damage_type: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModifierEffectOperation {
+    pub modifier_id: String,
+    pub modifier_label: String,
+    pub modifier_duration: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
