@@ -14,6 +14,8 @@ export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'empt
 
 export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
 
+export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';
+
 export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';
 
 export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
@@ -122,6 +124,30 @@ export interface RulebenchCombatSessionStepReadoutDto {
 export interface RulebenchScenarioCatalogDto {
   readonly summaries: readonly RulebenchScenarioCatalogSummaryDto[];
   readonly readouts: readonly RulebenchScenarioReadoutDto[];
+}
+
+export interface RulebenchContentValidationCatalogDto {
+  readonly reports: readonly RulebenchContentValidationReadoutDto[];
+}
+
+export interface RulebenchContentValidationReadoutDto {
+  readonly scenarioId: string;
+  readonly scenarioTitle: string;
+  readonly report: RulebenchContentValidationReportDto;
+}
+
+export interface RulebenchContentValidationReportDto {
+  readonly accepted: boolean;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly diagnostics: readonly RulebenchContentDiagnosticDto[];
+}
+
+export interface RulebenchContentDiagnosticDto {
+  readonly severity: RulebenchContentDiagnosticSeverityDto;
+  readonly code: string;
+  readonly contentId: string | null;
+  readonly message: string;
 }
 
 export interface RulebenchScenarioCatalogSummaryDto {

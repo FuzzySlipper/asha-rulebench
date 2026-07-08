@@ -4,16 +4,25 @@ import type {
   RulebenchCombatSessionCatalogDto,
   RulebenchCombatSessionStepReadoutDto,
   RulebenchCombatSessionSummaryDto,
+  RulebenchContentValidationCatalogDto,
+  RulebenchContentValidationReadoutDto,
   RulebenchRulesetCatalogDto,
   RulebenchScenarioCatalogDto,
   RulebenchScenarioCatalogSummaryDto,
   RulebenchScenarioReadoutDto,
 } from '@asha-rulebench/protocol';
 import { rustBackedCombatSessionCatalog } from './generated/rust-combat-session';
-import { rustBackedRulesetCatalog, rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
+import {
+  rustBackedContentValidationCatalog,
+  rustBackedRulesetCatalog,
+  rustBackedScenarioCatalog,
+} from './generated/rust-scenario-catalog';
 
 export interface RulebenchTransport {
   readonly loadRulesetCatalog: () => Promise<Result<RulebenchRulesetCatalogDto>>;
+  readonly loadContentValidationReport: (
+    scenarioId?: string,
+  ) => Promise<Result<RulebenchContentValidationReadoutDto>>;
   readonly loadCatalog: () => Promise<Result<readonly RulebenchScenarioCatalogSummaryDto[]>>;
   readonly loadScenario: (scenarioId?: string) => Promise<Result<RulebenchScenarioReadoutDto>>;
   readonly loadSessionCatalog: () => Promise<Result<readonly RulebenchCombatSessionSummaryDto[]>>;
@@ -27,6 +36,14 @@ export interface RulebenchTransport {
 }
 
 export const defaultRulesetCatalog: RulebenchRulesetCatalogDto = rustBackedRulesetCatalog;
+export const defaultContentValidationCatalog: RulebenchContentValidationCatalogDto = rustBackedContentValidationCatalog;
+export const defaultContentValidationScenarioId: string = firstContentValidationScenarioId(
+  defaultContentValidationCatalog,
+);
+export const defaultContentValidationReport: RulebenchContentValidationReadoutDto = requireContentValidationReport(
+  defaultContentValidationCatalog,
+  defaultContentValidationScenarioId,
+);
 export const defaultScenarioCatalog: RulebenchScenarioCatalogDto = rustBackedScenarioCatalog;
 export const defaultScenarioId: string = firstScenarioId(defaultScenarioCatalog);
 export const defaultScenarioReadout: RulebenchScenarioReadoutDto = requireScenarioReadout(
@@ -49,8 +66,22 @@ export const createFakeRulebenchTransport = (
   catalog: RulebenchScenarioCatalogDto = defaultScenarioCatalog,
   sessionCatalog: RulebenchCombatSessionCatalogDto = defaultCombatSessionCatalog,
   rulesetCatalog: RulebenchRulesetCatalogDto = defaultRulesetCatalog,
+  validationCatalog: RulebenchContentValidationCatalogDto = defaultContentValidationCatalog,
 ): RulebenchTransport => ({
   loadRulesetCatalog: async () => ({ ok: true, value: rulesetCatalog }),
+  loadContentValidationReport: async (scenarioId: string = firstContentValidationScenarioId(validationCatalog)) => {
+    const report = contentValidationReport(validationCatalog, scenarioId);
+    return report === null
+      ? {
+          ok: false,
+          error: {
+            kind: 'not-found',
+            message: `Content validation report not found: ${scenarioId}`,
+            retryable: false,
+          },
+        }
+      : { ok: true, value: report };
+  },
   loadCatalog: async () => ({ ok: true, value: catalog.summaries }),
   loadScenario: async (scenarioId: string = firstScenarioId(catalog)) => {
     const readout = scenarioReadout(catalog, scenarioId);
@@ -96,6 +127,29 @@ export const createFakeRulebenchTransport = (
       : { ok: true, value: readout };
   },
 });
+
+function firstContentValidationScenarioId(catalog: RulebenchContentValidationCatalogDto): string {
+  const firstReport = catalog.reports[0];
+  return firstReport?.scenarioId ?? '';
+}
+
+function requireContentValidationReport(
+  catalog: RulebenchContentValidationCatalogDto,
+  scenarioId: string,
+): RulebenchContentValidationReadoutDto {
+  const report = contentValidationReport(catalog, scenarioId);
+  if (report === null) {
+    throw new Error(`Default content validation report is missing: ${scenarioId}`);
+  }
+  return report;
+}
+
+function contentValidationReport(
+  catalog: RulebenchContentValidationCatalogDto,
+  scenarioId: string,
+): RulebenchContentValidationReadoutDto | null {
+  return catalog.reports.find((report) => report.scenarioId === scenarioId) ?? null;
+}
 
 function firstScenarioId(catalog: RulebenchScenarioCatalogDto): string {
   const firstSummary = catalog.summaries[0];

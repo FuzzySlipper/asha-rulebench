@@ -4,12 +4,18 @@ import {
   defaultCombatSessionCatalog,
   defaultCombatControlHistoryReadout,
   defaultCombatSessionStepReadout,
+  defaultContentValidationCatalog,
+  defaultContentValidationReport,
   defaultRulesetCatalog,
   defaultScenarioCatalog,
   defaultScenarioReadout,
 } from './index';
 import { rustBackedCombatSessionCatalog } from './generated/rust-combat-session';
-import { rustBackedRulesetCatalog, rustBackedScenarioCatalog } from './generated/rust-scenario-catalog';
+import {
+  rustBackedContentValidationCatalog,
+  rustBackedRulesetCatalog,
+  rustBackedScenarioCatalog,
+} from './generated/rust-scenario-catalog';
 
 describe('RulebenchTransport fixtures', () => {
   it('uses the checked Rust-backed ruleset catalog as the default transport payload', async () => {
@@ -30,6 +36,26 @@ describe('RulebenchTransport fixtures', () => {
           summary: 'Local single-action fixture ruleset for authority incubation.',
         },
       ]);
+    }
+  });
+
+  it('uses the checked Rust-backed content validation catalog as the default transport payload', async () => {
+    expect(defaultContentValidationCatalog).toBe(rustBackedContentValidationCatalog);
+
+    const transport = createFakeRulebenchTransport();
+    const result = await transport.loadContentValidationReport('hexing-bolt-hit');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(defaultContentValidationReport);
+      expect(result.value.scenarioId).toBe('hexing-bolt-hit');
+      expect(result.value.scenarioTitle).toBe('Hexing Bolt Hit');
+      expect(result.value.report).toEqual({
+        accepted: true,
+        errorCount: 0,
+        warningCount: 0,
+        diagnostics: [],
+      });
     }
   });
 
@@ -61,6 +87,21 @@ describe('RulebenchTransport fixtures', () => {
       expect(result.value.trace.at(-1)?.phase).toBe('commit');
       expect(result.value.finalState.combatants[1]?.conditions).toEqual(['rattled']);
     }
+  });
+
+  it('classifies missing content validation report ids as not found', async () => {
+    const transport = createFakeRulebenchTransport();
+
+    const result = await transport.loadContentValidationReport('missing-scenario');
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: 'not-found',
+        message: 'Content validation report not found: missing-scenario',
+        retryable: false,
+      },
+    });
   });
 
   it('classifies missing scenario ids as not found', async () => {

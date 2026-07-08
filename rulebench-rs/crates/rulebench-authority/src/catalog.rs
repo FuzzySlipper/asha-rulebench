@@ -1,3 +1,4 @@
+use crate::content::validate_scenario_content_report;
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
 use crate::resolver::resolve_use_action;
@@ -23,6 +24,17 @@ pub fn ruleset_catalog_readout() -> RulesetCatalogReadout {
         selected_ruleset_id: scenario.selected_ruleset_id,
         rulesets: scenario.rulesets,
     }
+}
+
+pub fn content_validation_readouts() -> Vec<ContentValidationReadout> {
+    scenario_catalog_cases()
+        .into_iter()
+        .map(|case| ContentValidationReadout {
+            scenario_id: case.summary.id,
+            scenario_title: case.summary.title,
+            report: validate_scenario_content_report(&case.scenario),
+        })
+        .collect()
 }
 
 pub fn resolve_catalog_scenario(

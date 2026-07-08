@@ -44,6 +44,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';",
         "export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';",
         "export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
+        "export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
         "export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn';",
@@ -374,6 +375,72 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "readouts",
                     ty: "readonly RulebenchScenarioReadoutDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentValidationCatalogDto",
+            fields: &[Field {
+                name: "reports",
+                ty: "readonly RulebenchContentValidationReadoutDto[]",
+            }],
+        },
+        Interface {
+            name: "RulebenchContentValidationReadoutDto",
+            fields: &[
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioTitle",
+                    ty: "string",
+                },
+                Field {
+                    name: "report",
+                    ty: "RulebenchContentValidationReportDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentValidationReportDto",
+            fields: &[
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "errorCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "warningCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "diagnostics",
+                    ty: "readonly RulebenchContentDiagnosticDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentDiagnosticDto",
+            fields: &[
+                Field {
+                    name: "severity",
+                    ty: "RulebenchContentDiagnosticSeverityDto",
+                },
+                Field {
+                    name: "code",
+                    ty: "string",
+                },
+                Field {
+                    name: "contentId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "message",
+                    ty: "string",
                 },
             ],
         },

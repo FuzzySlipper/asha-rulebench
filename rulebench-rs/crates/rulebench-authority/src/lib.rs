@@ -23,8 +23,8 @@ pub use audit::{
     STATE_FINGERPRINT_ALGORITHM,
 };
 pub use catalog::{
-    resolve_catalog_scenario, ruleset_catalog_readout, scenario_catalog_cases,
-    scenario_catalog_summaries,
+    content_validation_readouts, resolve_catalog_scenario, ruleset_catalog_readout,
+    scenario_catalog_cases, scenario_catalog_summaries,
 };
 pub use content::{validate_scenario_content, validate_scenario_content_report};
 pub use fixtures::{

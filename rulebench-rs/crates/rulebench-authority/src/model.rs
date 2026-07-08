@@ -47,6 +47,13 @@ pub struct RulesetCatalogReadout {
     pub rulesets: Vec<RulesetMetadata>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentValidationReadout {
+    pub scenario_id: String,
+    pub scenario_title: String,
+    pub report: ContentValidationReport,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScenarioCatalogError {
     UnknownScenarioId,
