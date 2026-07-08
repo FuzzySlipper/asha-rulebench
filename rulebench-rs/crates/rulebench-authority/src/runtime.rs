@@ -348,6 +348,17 @@ impl CombatSessionState {
         self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
     }
 
+    pub fn submit_control_command(
+        &mut self,
+        spec: CombatControlCommandSpec,
+    ) -> CombatControlReadout {
+        match spec.kind {
+            CombatControlCommandKind::ExplicitStart => self.submit_explicit_start_control(),
+            CombatControlCommandKind::ExplicitEnd => self.submit_explicit_end_control(),
+            CombatControlCommandKind::AdvanceTurn => self.submit_advance_turn_control(),
+        }
+    }
+
     pub fn turn_order(&self) -> &CombatTurnOrder {
         &self.turn_order
     }
@@ -458,6 +469,162 @@ impl CombatSessionState {
                 started_at_step: self.lifecycle.started_at_step,
                 ended_at_step: self.lifecycle.ended_at_step,
             });
+    }
+
+    fn submit_explicit_start_control(&mut self) -> CombatControlReadout {
+        let previous_lifecycle = self.lifecycle.clone();
+        let previous_turn_order = self.turn_order.clone();
+        let state_before = self.state.project("State before explicit start control.");
+        let state_before_fingerprint = fingerprint_projected_state(&state_before);
+        let lifecycle_transition_count = self.lifecycle_transition_log.len();
+
+        let (accepted, decision_kind, reason) = match self.lifecycle.phase {
+            CombatLifecyclePhase::Ready => {
+                self.start_lifecycle(LifecycleTransitionTrigger::ExplicitStart);
+                (
+                    true,
+                    CombatControlDecisionKind::Accepted,
+                    "Combat explicitly started.",
+                )
+            }
+            CombatLifecyclePhase::InProgress => (
+                false,
+                CombatControlDecisionKind::RejectedNoop,
+                "Combat is already in progress.",
+            ),
+            CombatLifecyclePhase::Ended => (
+                false,
+                CombatControlDecisionKind::RejectedByLifecycle,
+                "Combat is already ended.",
+            ),
+        };
+
+        combat_control_readout(
+            CombatControlCommandKind::ExplicitStart,
+            accepted,
+            decision_kind,
+            previous_lifecycle,
+            self.lifecycle.clone(),
+            previous_turn_order,
+            self.turn_order.clone(),
+            lifecycle_transition_since(&self.lifecycle_transition_log, lifecycle_transition_count),
+            None,
+            state_before_fingerprint,
+            fingerprint_projected_state(&self.state.project("State after explicit start control.")),
+            reason,
+        )
+    }
+
+    fn submit_explicit_end_control(&mut self) -> CombatControlReadout {
+        let previous_lifecycle = self.lifecycle.clone();
+        let previous_turn_order = self.turn_order.clone();
+        let state_before = self.state.project("State before explicit end control.");
+        let state_before_fingerprint = fingerprint_projected_state(&state_before);
+        let lifecycle_transition_count = self.lifecycle_transition_log.len();
+
+        let (accepted, decision_kind, reason) =
+            if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+                (
+                    false,
+                    CombatControlDecisionKind::RejectedByLifecycle,
+                    "Combat is already ended.",
+                )
+            } else {
+                self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
+                (
+                    true,
+                    CombatControlDecisionKind::Accepted,
+                    "Combat explicitly ended.",
+                )
+            };
+
+        combat_control_readout(
+            CombatControlCommandKind::ExplicitEnd,
+            accepted,
+            decision_kind,
+            previous_lifecycle,
+            self.lifecycle.clone(),
+            previous_turn_order,
+            self.turn_order.clone(),
+            lifecycle_transition_since(&self.lifecycle_transition_log, lifecycle_transition_count),
+            None,
+            state_before_fingerprint,
+            fingerprint_projected_state(&self.state.project("State after explicit end control.")),
+            reason,
+        )
+    }
+
+    fn submit_advance_turn_control(&mut self) -> CombatControlReadout {
+        let previous_lifecycle = self.lifecycle.clone();
+        let previous_turn_order = self.turn_order.clone();
+        let turn_advance = self.advance_turn();
+        let decision_kind = combat_control_decision_kind_for_turn_advance(&turn_advance);
+
+        combat_control_readout(
+            CombatControlCommandKind::AdvanceTurn,
+            turn_advance.accepted,
+            decision_kind,
+            previous_lifecycle,
+            self.lifecycle.clone(),
+            previous_turn_order,
+            self.turn_order.clone(),
+            None,
+            Some(turn_advance.clone()),
+            turn_advance.state_before_fingerprint,
+            turn_advance.state_after_fingerprint,
+            turn_advance.reason,
+        )
+    }
+}
+
+fn combat_control_readout(
+    command_kind: CombatControlCommandKind,
+    accepted: bool,
+    decision_kind: CombatControlDecisionKind,
+    previous_lifecycle: CombatLifecycle,
+    next_lifecycle: CombatLifecycle,
+    previous_turn_order: CombatTurnOrder,
+    next_turn_order: CombatTurnOrder,
+    lifecycle_transition: Option<LifecycleTransitionEntry>,
+    turn_advance: Option<TurnAdvanceReadout>,
+    state_before_fingerprint: StateFingerprint,
+    state_after_fingerprint: StateFingerprint,
+    reason: impl Into<String>,
+) -> CombatControlReadout {
+    CombatControlReadout {
+        command_kind,
+        accepted,
+        decision_kind,
+        previous_lifecycle,
+        next_lifecycle,
+        previous_turn_order,
+        next_turn_order,
+        lifecycle_transition,
+        turn_advance,
+        state_before_fingerprint,
+        state_after_fingerprint,
+        reason: reason.into(),
+    }
+}
+
+fn lifecycle_transition_since(
+    lifecycle_transition_log: &[LifecycleTransitionEntry],
+    previous_len: usize,
+) -> Option<LifecycleTransitionEntry> {
+    lifecycle_transition_log.get(previous_len).cloned()
+}
+
+fn combat_control_decision_kind_for_turn_advance(
+    turn_advance: &TurnAdvanceReadout,
+) -> CombatControlDecisionKind {
+    match turn_advance.decision_kind {
+        TurnAdvanceDecisionKind::Advanced => CombatControlDecisionKind::Accepted,
+        TurnAdvanceDecisionKind::RejectedByLifecycle => {
+            CombatControlDecisionKind::RejectedByLifecycle
+        }
+        TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder => {
+            CombatControlDecisionKind::RejectedByEmptyTurnOrder
+        }
     }
 }
 

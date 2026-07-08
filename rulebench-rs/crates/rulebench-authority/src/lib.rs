@@ -3703,6 +3703,79 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_control_command_starts_combat_with_readout() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_start = session.snapshot();
+        let before_state_fingerprint = fingerprint_projected_state(&before_start.current_state);
+
+        let readout = session.submit_control_command(CombatControlCommandSpec::explicit_start());
+        let after_start = session.snapshot();
+
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.command_kind,
+            CombatControlCommandKind::ExplicitStart
+        );
+        assert_eq!(readout.command_kind.code(), "explicitStart");
+        assert_eq!(readout.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(readout.decision_kind.code(), "accepted");
+        assert_eq!(readout.previous_lifecycle, before_start.lifecycle);
+        assert_eq!(readout.next_lifecycle, after_start.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_start.turn_order);
+        assert_eq!(readout.next_turn_order, before_start.turn_order);
+        assert_eq!(
+            readout.lifecycle_transition,
+            Some(after_start.lifecycle_transition_log[0].clone())
+        );
+        assert_eq!(readout.turn_advance, None);
+        assert_eq!(readout.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.reason, "Combat explicitly started.");
+        assert_eq!(
+            after_start.lifecycle.phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(after_start.lifecycle_transition_log.len(), 1);
+    }
+
+    #[test]
+    fn session_runtime_control_command_rejects_repeated_start_without_transition() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.start_combat();
+        let before_repeat = session.snapshot();
+        let before_state_fingerprint = fingerprint_projected_state(&before_repeat.current_state);
+
+        let readout = session.submit_control_command(CombatControlCommandSpec::explicit_start());
+        let after_repeat = session.snapshot();
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.command_kind,
+            CombatControlCommandKind::ExplicitStart
+        );
+        assert_eq!(
+            readout.decision_kind,
+            CombatControlDecisionKind::RejectedNoop
+        );
+        assert_eq!(readout.decision_kind.code(), "rejectedNoop");
+        assert_eq!(readout.previous_lifecycle, before_repeat.lifecycle);
+        assert_eq!(readout.next_lifecycle, before_repeat.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_repeat.turn_order);
+        assert_eq!(readout.next_turn_order, before_repeat.turn_order);
+        assert_eq!(readout.lifecycle_transition, None);
+        assert_eq!(readout.turn_advance, None);
+        assert_eq!(readout.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.reason, "Combat is already in progress.");
+        assert_eq!(
+            after_repeat.lifecycle_transition_log,
+            before_repeat.lifecycle_transition_log
+        );
+    }
+
+    #[test]
     fn session_runtime_command_start_records_lifecycle_transition() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -3823,6 +3896,67 @@ mod tests {
             LifecycleTransitionTrigger::ExplicitStart
         );
         assert_eq!(session.lifecycle_transition_log()[0].step_index, 0);
+    }
+
+    #[test]
+    fn session_runtime_control_command_ends_combat_and_rejects_repeated_end() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_end = session.snapshot();
+        let before_state_fingerprint = fingerprint_projected_state(&before_end.current_state);
+
+        let accepted = session.submit_control_command(CombatControlCommandSpec::explicit_end());
+        let after_end = session.snapshot();
+
+        assert!(accepted.accepted);
+        assert_eq!(accepted.command_kind, CombatControlCommandKind::ExplicitEnd);
+        assert_eq!(accepted.command_kind.code(), "explicitEnd");
+        assert_eq!(accepted.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(accepted.previous_lifecycle, before_end.lifecycle);
+        assert_eq!(accepted.next_lifecycle, after_end.lifecycle);
+        assert_eq!(accepted.previous_turn_order, before_end.turn_order);
+        assert_eq!(accepted.next_turn_order, before_end.turn_order);
+        assert_eq!(
+            accepted.lifecycle_transition,
+            Some(after_end.lifecycle_transition_log[0].clone())
+        );
+        assert_eq!(accepted.turn_advance, None);
+        assert_eq!(accepted.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(accepted.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(accepted.reason, "Combat explicitly ended.");
+        assert_eq!(after_end.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(after_end.lifecycle.started_at_step, Some(0));
+        assert_eq!(after_end.lifecycle.ended_at_step, Some(0));
+
+        let before_repeat = session.snapshot();
+        let before_repeat_state_fingerprint =
+            fingerprint_projected_state(&before_repeat.current_state);
+        let rejected = session.submit_control_command(CombatControlCommandSpec::explicit_end());
+        let after_repeat = session.snapshot();
+
+        assert!(!rejected.accepted);
+        assert_eq!(rejected.command_kind, CombatControlCommandKind::ExplicitEnd);
+        assert_eq!(
+            rejected.decision_kind,
+            CombatControlDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(rejected.reason, "Combat is already ended.");
+        assert_eq!(rejected.lifecycle_transition, None);
+        assert_eq!(rejected.turn_advance, None);
+        assert_eq!(rejected.previous_lifecycle, before_repeat.lifecycle);
+        assert_eq!(rejected.next_lifecycle, before_repeat.lifecycle);
+        assert_eq!(
+            rejected.state_before_fingerprint,
+            before_repeat_state_fingerprint
+        );
+        assert_eq!(
+            rejected.state_after_fingerprint,
+            before_repeat_state_fingerprint
+        );
+        assert_eq!(
+            after_repeat.lifecycle_transition_log,
+            before_repeat.lifecycle_transition_log
+        );
     }
 
     #[test]
@@ -4310,6 +4444,48 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_control_command_advances_turn_with_readout() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_advance = session.snapshot();
+
+        let readout = session.submit_control_command(CombatControlCommandSpec::advance_turn());
+        let after_advance = session.snapshot();
+
+        assert!(readout.accepted);
+        assert_eq!(readout.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert_eq!(readout.command_kind.code(), "advanceTurn");
+        assert_eq!(readout.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(readout.lifecycle_transition, None);
+        let turn_advance = readout
+            .turn_advance
+            .as_ref()
+            .expect("advance turn control returns turn readout");
+        assert!(turn_advance.accepted);
+        assert_eq!(
+            turn_advance.decision_kind,
+            TurnAdvanceDecisionKind::Advanced
+        );
+        assert_eq!(
+            turn_advance.transition,
+            Some(after_advance.turn_transition_log[0].clone())
+        );
+        assert_eq!(readout.previous_lifecycle, before_advance.lifecycle);
+        assert_eq!(readout.next_lifecycle, before_advance.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_advance.turn_order);
+        assert_eq!(readout.next_turn_order, after_advance.turn_order);
+        assert_eq!(
+            readout.state_before_fingerprint,
+            turn_advance.state_before_fingerprint
+        );
+        assert_eq!(
+            readout.state_after_fingerprint,
+            turn_advance.state_after_fingerprint
+        );
+        assert_eq!(readout.reason, "Turn advanced to the next participant.");
+    }
+
+    #[test]
     fn session_runtime_records_turn_transition_round_wrap() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -4466,6 +4642,45 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_control_command_rejects_turn_advance_after_end() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+        let before_attempt = session.snapshot();
+
+        let readout = session.submit_control_command(CombatControlCommandSpec::advance_turn());
+        let after_attempt = session.snapshot();
+
+        assert!(!readout.accepted);
+        assert_eq!(readout.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert_eq!(
+            readout.decision_kind,
+            CombatControlDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(readout.lifecycle_transition, None);
+        let turn_advance = readout
+            .turn_advance
+            .as_ref()
+            .expect("advance turn control returns turn readout");
+        assert!(!turn_advance.accepted);
+        assert_eq!(
+            turn_advance.decision_kind,
+            TurnAdvanceDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(turn_advance.transition, None);
+        assert_eq!(readout.previous_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.next_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.next_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.reason, "Combat is already ended.");
+        assert_eq!(after_attempt.turn_order, before_attempt.turn_order);
+        assert_eq!(
+            after_attempt.turn_transition_log,
+            before_attempt.turn_transition_log
+        );
+    }
+
+    #[test]
     fn session_runtime_turn_order_represents_empty_participants() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.combatants.clear();
@@ -4547,6 +4762,42 @@ mod tests {
             after_attempt.current_state_fingerprint,
             before_attempt.current_state_fingerprint
         );
+    }
+
+    #[test]
+    fn session_runtime_control_command_rejects_turn_advance_with_empty_participants() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants.clear();
+        let mut session = CombatSessionState::new("runtime-empty", scenario);
+        let before_attempt = session.snapshot();
+
+        let readout = session.submit_control_command(CombatControlCommandSpec::advance_turn());
+        let after_attempt = session.snapshot();
+
+        assert!(!readout.accepted);
+        assert_eq!(readout.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert_eq!(
+            readout.decision_kind,
+            CombatControlDecisionKind::RejectedByEmptyTurnOrder
+        );
+        assert_eq!(readout.lifecycle_transition, None);
+        let turn_advance = readout
+            .turn_advance
+            .as_ref()
+            .expect("advance turn control returns turn readout");
+        assert!(!turn_advance.accepted);
+        assert_eq!(
+            turn_advance.decision_kind,
+            TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder
+        );
+        assert_eq!(turn_advance.transition, None);
+        assert_eq!(readout.previous_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.next_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.next_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.reason, "Turn order has no participants.");
+        assert_eq!(after_attempt.turn_order, before_attempt.turn_order);
+        assert!(after_attempt.turn_transition_log.is_empty());
     }
 
     #[test]
