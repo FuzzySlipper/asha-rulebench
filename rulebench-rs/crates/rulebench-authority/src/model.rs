@@ -191,7 +191,14 @@ pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
+    pub actions: Vec<ActionDefinition>,
     pub selected_action: ActionDefinition,
+}
+
+impl RulebenchScenario {
+    pub fn action_by_id(&self, action_id: &str) -> Option<&ActionDefinition> {
+        self.actions.iter().find(|action| action.id == action_id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

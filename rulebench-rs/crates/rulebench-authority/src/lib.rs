@@ -96,6 +96,28 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_hexing_bolt_action_catalog_entry() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert_eq!(scenario.actions.len(), 1);
+        assert_eq!(scenario.actions[0].id, "hexing_bolt");
+        assert_eq!(scenario.actions[0], scenario.selected_action);
+        assert_eq!(
+            scenario
+                .action_by_id("hexing_bolt")
+                .map(|action| action.name.as_str()),
+            Some("Hexing Bolt")
+        );
+    }
+
+    #[test]
+    fn scenario_action_catalog_rejects_unknown_action_lookup() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(scenario.action_by_id("not_hexing_bolt").is_none());
+    }
+
+    #[test]
     fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
         let receipt = resolve_use_action(
             &hexing_bolt_fixture_scenario(),

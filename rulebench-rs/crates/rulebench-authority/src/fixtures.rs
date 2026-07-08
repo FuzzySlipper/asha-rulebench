@@ -2,6 +2,7 @@ use crate::model::*;
 use crate::resolver::resolve_use_action;
 
 pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
+    let selected_action = hexing_bolt_action();
     RulebenchScenario {
         metadata: ScenarioMetadata {
             id: "two-combatant-hexing-bolt".to_string(),
@@ -28,30 +29,35 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             ],
         },
         combatants: vec![adept_initial(), raider_initial()],
-        selected_action: ActionDefinition {
-            id: "hexing_bolt".to_string(),
-            name: "Hexing Bolt".to_string(),
-            actor_id: "entity-adept".to_string(),
-            target_ids: vec!["entity-raider".to_string()],
-            range: 10,
-            line_of_sight_required: true,
-            visible_target_ids: vec!["entity-raider".to_string()],
-            attack: AttackSpec {
-                modifier: 4,
-                defense_id: "nerve".to_string(),
-                defense_label: "Nerve".to_string(),
-            },
-            hit: HitEffect {
-                damage_bonus: 4,
-                damage_type: "psychic".to_string(),
-                modifier_id: "rattled".to_string(),
-                modifier_label: "rattled".to_string(),
-                modifier_duration: "until end of next turn".to_string(),
-            },
-            action_text: "Mind vs Nerve at range 10".to_string(),
-            effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
-                .to_string(),
+        actions: vec![selected_action.clone()],
+        selected_action,
+    }
+}
+
+fn hexing_bolt_action() -> ActionDefinition {
+    ActionDefinition {
+        id: "hexing_bolt".to_string(),
+        name: "Hexing Bolt".to_string(),
+        actor_id: "entity-adept".to_string(),
+        target_ids: vec!["entity-raider".to_string()],
+        range: 10,
+        line_of_sight_required: true,
+        visible_target_ids: vec!["entity-raider".to_string()],
+        attack: AttackSpec {
+            modifier: 4,
+            defense_id: "nerve".to_string(),
+            defense_label: "Nerve".to_string(),
         },
+        hit: HitEffect {
+            damage_bonus: 4,
+            damage_type: "psychic".to_string(),
+            modifier_id: "rattled".to_string(),
+            modifier_label: "rattled".to_string(),
+            modifier_duration: "until end of next turn".to_string(),
+        },
+        action_text: "Mind vs Nerve at range 10".to_string(),
+        effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
+            .to_string(),
     }
 }
 
