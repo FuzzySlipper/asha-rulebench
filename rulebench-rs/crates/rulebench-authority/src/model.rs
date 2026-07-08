@@ -104,6 +104,10 @@ impl CombatLifecycle {
     }
 
     pub fn end_at_step(&mut self, step_index: u32) {
+        if self.phase == CombatLifecyclePhase::Ended {
+            return;
+        }
+
         if self.started_at_step.is_none() {
             self.started_at_step = Some(step_index);
         }

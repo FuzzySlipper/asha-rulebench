@@ -2471,6 +2471,68 @@ mod tests {
     }
 
     #[test]
+    fn combat_lifecycle_preserves_first_end_marker() {
+        let mut lifecycle = CombatLifecycle::ready();
+
+        lifecycle.end_at_step(3);
+        lifecycle.end_at_step(9);
+
+        assert_eq!(lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(lifecycle.started_at_step, Some(3));
+        assert_eq!(lifecycle.ended_at_step, Some(3));
+
+        let mut in_progress_lifecycle = CombatLifecycle::ready();
+        in_progress_lifecycle.start_at_step(1);
+        in_progress_lifecycle.end_at_step(4);
+        in_progress_lifecycle.end_at_step(9);
+
+        assert_eq!(in_progress_lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(in_progress_lifecycle.started_at_step, Some(1));
+        assert_eq!(in_progress_lifecycle.ended_at_step, Some(4));
+    }
+
+    #[test]
+    fn session_runtime_repeated_end_combat_preserves_first_end_snapshot() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.end_combat();
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-post-end",
+            "Runtime post-end command",
+            "A command submitted after combat ended.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let before_repeat = session.snapshot();
+
+        session.end_combat();
+        let after_repeat = session.snapshot();
+
+        assert_eq!(before_repeat.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(before_repeat.lifecycle.started_at_step, Some(0));
+        assert_eq!(before_repeat.lifecycle.ended_at_step, Some(1));
+        assert_eq!(before_repeat.next_step_index, 2);
+        assert_eq!(after_repeat.lifecycle, before_repeat.lifecycle);
+        assert_eq!(after_repeat.turn_order, before_repeat.turn_order);
+        assert_eq!(after_repeat.next_step_index, before_repeat.next_step_index);
+        assert_eq!(
+            after_repeat.current_state_fingerprint,
+            before_repeat.current_state_fingerprint
+        );
+        assert_eq!(after_repeat.combat_log, before_repeat.combat_log);
+        assert_eq!(after_repeat.audit_log, before_repeat.audit_log);
+    }
+
+    #[test]
     fn session_runtime_rejects_commands_after_combat_end() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
