@@ -404,6 +404,88 @@ mod tests {
     }
 
     #[test]
+    fn combat_state_projects_initial_scenario_facts() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let state = crate::state::CombatState::from_scenario(&scenario);
+
+        let projection = state.project("Initial combat state.");
+
+        assert_eq!(projection.summary, "Initial combat state.");
+        assert_eq!(projection.combatants.len(), 2);
+        assert_eq!(projection.combatants[0].id, "entity-adept");
+        assert_eq!(projection.combatants[0].hit_points.current, 24);
+        assert_eq!(projection.combatants[1].id, "entity-raider");
+        assert_eq!(projection.combatants[1].hit_points.current, 18);
+        assert!(projection.combatants[1].conditions.is_empty());
+    }
+
+    #[test]
+    fn combat_state_applies_hit_damage_and_condition() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let receipt = accepted_hexing_bolt_fixture_receipt();
+        let damage = receipt.damage.as_ref().expect("fixture hit has damage");
+        let modifier = receipt.modifier.as_ref().expect("fixture hit has modifier");
+        let mut state = crate::state::CombatState::from_scenario(&scenario);
+
+        state.apply_hit(damage, modifier);
+        state.apply_hit(damage, modifier);
+        let projection = state.project("After accepted hit.");
+
+        assert_eq!(projection.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            projection.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_state_preserves_prior_state_for_miss_noop_projection() {
+        let first_step =
+            resolve_combat_session_step("hexing-bolt-opening-exchange", "adept-hexing-bolt-hit")
+                .expect("hit step exists");
+        let state = crate::state::CombatState::from_projection(&first_step.state_after);
+
+        let projection = state.project("Attack missed; no authority state changed.");
+
+        assert_eq!(projection.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            projection.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_state_preserves_prior_state_for_rejection_projection() {
+        let miss_step =
+            resolve_combat_session_step("hexing-bolt-opening-exchange", "adept-hexing-bolt-miss")
+                .expect("miss step exists");
+        let state = crate::state::CombatState::from_projection(&miss_step.state_after);
+
+        let projection = state.project("No authority state changed; intent rejected.");
+
+        assert_eq!(projection.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            projection.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_state_applies_projected_state_back_to_scenario() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let receipt = accepted_hexing_bolt_fixture_receipt();
+        let projection = receipt.projection.as_ref().expect("fixture has projection");
+
+        let next_scenario = crate::projection::scenario_with_projection(scenario, projection);
+
+        assert_eq!(next_scenario.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            next_scenario.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
     fn combat_session_rejects_unknown_session_id() {
         let error = resolve_combat_session_step("not-a-session", "adept-hexing-bolt-hit")
             .expect_err("unknown session fails");
