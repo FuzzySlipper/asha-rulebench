@@ -10,6 +10,7 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             summary: "A focused two-combatant fixture for proving board, event, trace, and final-state readouts.".to_string(),
             seed_label: "roll-stream:17,5".to_string(),
         },
+        ruleset: hexing_bolt_ruleset(),
         grid: Grid {
             width: 6,
             height: 4,
@@ -31,6 +32,15 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
         combatants: vec![adept_initial(), raider_initial()],
         actions: vec![selected_action.clone()],
         selected_action,
+    }
+}
+
+fn hexing_bolt_ruleset() -> RulesetMetadata {
+    RulesetMetadata {
+        id: "asha-rulebench.hexing-bolt.v0".to_string(),
+        name: "Hexing Bolt Fixture Rules".to_string(),
+        version: "0.0.0".to_string(),
+        summary: "Local single-action fixture ruleset for authority incubation.".to_string(),
     }
 }
 

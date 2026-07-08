@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 mod catalog;
+mod content;
 mod fixtures;
 mod model;
 mod resolver;
@@ -16,6 +17,7 @@ mod session;
 mod state;
 
 pub use catalog::{resolve_catalog_scenario, scenario_catalog_cases, scenario_catalog_summaries};
+pub use content::validate_scenario_content;
 pub use fixtures::{
     accepted_hexing_bolt_fixture_receipt, hexing_bolt_fixture_scenario,
     rejected_target_fixture_receipt,
@@ -67,6 +69,7 @@ mod tests {
         let receipt = accepted_hexing_bolt_fixture_receipt();
 
         assert_eq!(scenario.metadata.id, "two-combatant-hexing-bolt");
+        assert_eq!(scenario.ruleset.id, "asha-rulebench.hexing-bolt.v0");
         assert_eq!(scenario.grid.width, 6);
         assert_eq!(scenario.combatants.len(), 2);
         assert!(receipt.accepted);
@@ -99,6 +102,7 @@ mod tests {
     fn scenario_carries_hexing_bolt_action_catalog_entry() {
         let scenario = hexing_bolt_fixture_scenario();
 
+        assert!(validate_scenario_content(&scenario).is_empty());
         assert_eq!(scenario.actions.len(), 1);
         assert_eq!(scenario.actions[0].id, "hexing_bolt");
         assert_eq!(scenario.actions[0], scenario.selected_action);
@@ -115,6 +119,74 @@ mod tests {
         let scenario = hexing_bolt_fixture_scenario();
 
         assert!(scenario.action_by_id("not_hexing_bolt").is_none());
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_ruleset_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.ruleset.id.clear();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, ContentDiagnosticSeverity::Error);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyRulesetId);
+        assert_eq!(
+            ContentDiagnosticCode::EmptyRulesetId.code(),
+            "emptyRulesetId"
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_action_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].id.clear();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code)
+                .collect::<Vec<_>>(),
+            vec![
+                ContentDiagnosticCode::EmptyActionId,
+                ContentDiagnosticCode::SelectedActionMissingFromCatalog,
+            ]
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_action_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions.push(scenario.actions[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::DuplicateActionId
+        );
+        assert_eq!(diagnostics[0].content_id, Some("hexing_bolt".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_selected_action_missing_from_catalog() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.selected_action.id = "unlisted_action".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::SelectedActionMissingFromCatalog
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("unlisted_action".to_string())
+        );
     }
 
     #[test]

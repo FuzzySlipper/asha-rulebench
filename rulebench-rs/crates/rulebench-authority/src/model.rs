@@ -235,6 +235,58 @@ pub struct ScenarioMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetMetadata {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentDiagnosticSeverity {
+    Error,
+    Warning,
+}
+
+impl ContentDiagnosticSeverity {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ContentDiagnosticSeverity::Error => "error",
+            ContentDiagnosticSeverity::Warning => "warning",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentDiagnosticCode {
+    EmptyRulesetId,
+    EmptyActionId,
+    DuplicateActionId,
+    SelectedActionMissingFromCatalog,
+}
+
+impl ContentDiagnosticCode {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
+            ContentDiagnosticCode::EmptyActionId => "emptyActionId",
+            ContentDiagnosticCode::DuplicateActionId => "duplicateActionId",
+            ContentDiagnosticCode::SelectedActionMissingFromCatalog => {
+                "selectedActionMissingFromCatalog"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentDiagnostic {
+    pub severity: ContentDiagnosticSeverity,
+    pub code: ContentDiagnosticCode,
+    pub content_id: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grid {
     pub width: u32,
     pub height: u32,
@@ -310,6 +362,7 @@ impl Combatant {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
+    pub ruleset: RulesetMetadata,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
     pub actions: Vec<ActionDefinition>,
