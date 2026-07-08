@@ -113,6 +113,45 @@ impl CombatLifecycle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatTurnOrder {
+    pub round_number: u32,
+    pub current_turn_index: u32,
+    pub participant_order: Vec<String>,
+    pub current_actor_id: Option<String>,
+}
+
+impl CombatTurnOrder {
+    pub fn from_participant_order(participant_order: Vec<String>) -> Self {
+        let current_actor_id = participant_order.first().cloned();
+        let round_number = if participant_order.is_empty() { 0 } else { 1 };
+
+        Self {
+            round_number,
+            current_turn_index: 0,
+            participant_order,
+            current_actor_id,
+        }
+    }
+
+    pub fn advance_turn(&mut self) {
+        if self.participant_order.is_empty() {
+            return;
+        }
+
+        let next_turn_index = (self.current_turn_index + 1) % self.participant_order.len() as u32;
+        if next_turn_index == 0 {
+            self.round_number += 1;
+        }
+
+        self.current_turn_index = next_turn_index;
+        self.current_actor_id = self
+            .participant_order
+            .get(next_turn_index as usize)
+            .cloned();
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
     pub id: String,
     pub title: String,

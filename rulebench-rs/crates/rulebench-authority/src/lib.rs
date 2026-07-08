@@ -953,6 +953,65 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_initializes_turn_order_from_scenario_combatants() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        assert_eq!(session.turn_order().round_number, 1);
+        assert_eq!(session.turn_order().current_turn_index, 0);
+        assert_eq!(
+            session.turn_order().participant_order,
+            vec!["entity-adept".to_string(), "entity-raider".to_string()]
+        );
+        assert_eq!(
+            session.turn_order().current_actor_id,
+            Some("entity-adept".to_string())
+        );
+    }
+
+    #[test]
+    fn session_runtime_advances_turns_and_rounds() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.advance_turn();
+
+        assert_eq!(session.turn_order().round_number, 1);
+        assert_eq!(session.turn_order().current_turn_index, 1);
+        assert_eq!(
+            session.turn_order().current_actor_id,
+            Some("entity-raider".to_string())
+        );
+
+        session.advance_turn();
+
+        assert_eq!(session.turn_order().round_number, 2);
+        assert_eq!(session.turn_order().current_turn_index, 0);
+        assert_eq!(
+            session.turn_order().current_actor_id,
+            Some("entity-adept".to_string())
+        );
+    }
+
+    #[test]
+    fn session_runtime_turn_order_represents_empty_participants() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants.clear();
+        let mut session = CombatSessionState::new("runtime-empty", scenario);
+
+        assert_eq!(session.turn_order().round_number, 0);
+        assert_eq!(session.turn_order().current_turn_index, 0);
+        assert!(session.turn_order().participant_order.is_empty());
+        assert_eq!(session.turn_order().current_actor_id, None);
+
+        session.advance_turn();
+
+        assert_eq!(session.turn_order().round_number, 0);
+        assert_eq!(session.turn_order().current_turn_index, 0);
+        assert_eq!(session.turn_order().current_actor_id, None);
+    }
+
+    #[test]
     fn combat_session_rejects_unknown_session_id() {
         let error = resolve_combat_session_step("not-a-session", "adept-hexing-bolt-hit")
             .expect_err("unknown session fails");

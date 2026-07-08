@@ -40,11 +40,19 @@ pub struct CombatSessionState {
     combat_log: Vec<CombatLogEntry>,
     next_step_index: u32,
     lifecycle: CombatLifecycle,
+    turn_order: CombatTurnOrder,
 }
 
 impl CombatSessionState {
     pub fn new(session_id: impl Into<String>, scenario: RulebenchScenario) -> Self {
         let state = CombatState::from_scenario(&scenario);
+        let turn_order = CombatTurnOrder::from_participant_order(
+            scenario
+                .combatants
+                .iter()
+                .map(|combatant| combatant.id.clone())
+                .collect(),
+        );
         Self {
             session_id: session_id.into(),
             scenario,
@@ -52,6 +60,7 @@ impl CombatSessionState {
             combat_log: Vec::new(),
             next_step_index: 0,
             lifecycle: CombatLifecycle::ready(),
+            turn_order,
         }
     }
 
@@ -114,6 +123,14 @@ impl CombatSessionState {
 
     pub fn end_combat(&mut self) {
         self.lifecycle.end_at_step(self.next_step_index);
+    }
+
+    pub fn turn_order(&self) -> &CombatTurnOrder {
+        &self.turn_order
+    }
+
+    pub fn advance_turn(&mut self) {
+        self.turn_order.advance_turn();
     }
 }
 
