@@ -4932,6 +4932,204 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_control_command_conditionally_ends_when_end_condition_is_met() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1].hit_points.current = 0;
+        let mut session = CombatSessionState::new("runtime-conditional-end", scenario);
+        session.start_combat();
+        let before_end = session.snapshot();
+        let before_state_fingerprint = fingerprint_projected_state(&before_end.current_state);
+
+        let readout =
+            session.submit_control_command(CombatControlCommandSpec::end_if_condition_met());
+        let after_end = session.snapshot();
+
+        assert!(before_end.combat_end_condition.combat_should_end);
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.command_kind,
+            CombatControlCommandKind::EndIfConditionMet
+        );
+        assert_eq!(readout.command_kind.code(), "endIfConditionMet");
+        assert_eq!(readout.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(readout.decision_kind.code(), "accepted");
+        assert_eq!(readout.previous_lifecycle, before_end.lifecycle);
+        assert_eq!(readout.next_lifecycle, after_end.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_end.turn_order);
+        assert_eq!(readout.next_turn_order, before_end.turn_order);
+        assert_eq!(
+            readout.lifecycle_transition,
+            Some(after_end.lifecycle_transition_log[1].clone())
+        );
+        assert_eq!(readout.turn_advance, None);
+        assert_eq!(readout.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(
+            readout.reason,
+            "Combat conditionally ended. Combat should end because no active enemies remain."
+        );
+        assert_eq!(after_end.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(after_end.lifecycle.started_at_step, Some(0));
+        assert_eq!(after_end.lifecycle.ended_at_step, Some(0));
+        assert_eq!(after_end.lifecycle_transition_log.len(), 2);
+        assert_eq!(
+            after_end.lifecycle_transition_log[1].trigger,
+            LifecycleTransitionTrigger::ConditionalEnd
+        );
+        assert_eq!(
+            after_end.lifecycle_transition_log[1].trigger.code(),
+            "conditionalEnd"
+        );
+        assert_eq!(session.control_history().len(), 1);
+        let history = &session.control_history()[0];
+        assert_eq!(
+            history.command_kind,
+            CombatControlCommandKind::EndIfConditionMet
+        );
+        assert!(history.accepted);
+        assert_eq!(history.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(history.lifecycle_transition_sequence, Some(1));
+        assert_eq!(history.turn_transition_sequence, None);
+        assert_eq!(history.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(history.state_after_fingerprint, before_state_fingerprint);
+    }
+
+    #[test]
+    fn session_runtime_control_command_rejects_conditional_end_while_combat_can_continue() {
+        let mut session =
+            CombatSessionState::new("runtime-conditional-end", hexing_bolt_fixture_scenario());
+        session.start_combat();
+        let before_attempt = session.snapshot();
+        let before_state_fingerprint = fingerprint_projected_state(&before_attempt.current_state);
+
+        let readout =
+            session.submit_control_command(CombatControlCommandSpec::end_if_condition_met());
+        let after_attempt = session.snapshot();
+
+        assert!(!before_attempt.combat_end_condition.combat_should_end);
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.command_kind,
+            CombatControlCommandKind::EndIfConditionMet
+        );
+        assert_eq!(
+            readout.decision_kind,
+            CombatControlDecisionKind::RejectedByEndCondition
+        );
+        assert_eq!(readout.decision_kind.code(), "rejectedByEndCondition");
+        assert_eq!(
+            readout.reason,
+            "Combat end condition is not met. Combat can continue because both sides have active combatants."
+        );
+        assert_eq!(readout.previous_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.next_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.previous_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.next_turn_order, before_attempt.turn_order);
+        assert_eq!(readout.lifecycle_transition, None);
+        assert_eq!(readout.turn_advance, None);
+        assert_eq!(readout.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(after_attempt.lifecycle, before_attempt.lifecycle);
+        assert_eq!(
+            after_attempt.lifecycle_transition_log,
+            before_attempt.lifecycle_transition_log
+        );
+        assert_eq!(session.control_history().len(), 1);
+        assert_eq!(
+            session.control_history()[0].decision_kind,
+            CombatControlDecisionKind::RejectedByEndCondition
+        );
+        assert_eq!(
+            session.control_history()[0].lifecycle_transition_sequence,
+            None
+        );
+    }
+
+    #[test]
+    fn session_runtime_control_command_rejects_conditional_end_after_combat_already_ended() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1].hit_points.current = 0;
+        let mut session = CombatSessionState::new("runtime-conditional-end", scenario);
+        session.end_combat();
+        let before_attempt = session.snapshot();
+        let before_state_fingerprint = fingerprint_projected_state(&before_attempt.current_state);
+
+        let readout =
+            session.submit_control_command(CombatControlCommandSpec::end_if_condition_met());
+        let after_attempt = session.snapshot();
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.command_kind,
+            CombatControlCommandKind::EndIfConditionMet
+        );
+        assert_eq!(
+            readout.decision_kind,
+            CombatControlDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(readout.reason, "Combat is already ended.");
+        assert_eq!(readout.lifecycle_transition, None);
+        assert_eq!(readout.turn_advance, None);
+        assert_eq!(readout.previous_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.next_lifecycle, before_attempt.lifecycle);
+        assert_eq!(readout.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(readout.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(after_attempt.lifecycle, before_attempt.lifecycle);
+        assert_eq!(
+            after_attempt.lifecycle_transition_log,
+            before_attempt.lifecycle_transition_log
+        );
+        assert_eq!(session.control_history().len(), 1);
+        assert_eq!(
+            session.control_history()[0].decision_kind,
+            CombatControlDecisionKind::RejectedByLifecycle
+        );
+    }
+
+    #[test]
+    fn session_runtime_script_runs_conditional_end_control_step() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1].hit_points.current = 0;
+        let mut session = CombatSessionState::new("runtime-conditional-end-script", scenario);
+
+        let readout = session.run_script(CombatSessionScriptSpec::new(
+            "conditional-end-script",
+            "Conditional end script",
+            "Script runs the Rust conditional end control.",
+            vec![CombatSessionScriptStepSpec::control(
+                "script-conditional-end",
+                "Conditionally end combat",
+                "Ends only because the Rust end condition is met.",
+                CombatControlCommandSpec::end_if_condition_met(),
+            )],
+        ));
+
+        assert_eq!(readout.steps.len(), 1);
+        let step = &readout.steps[0];
+        assert_eq!(step.command_kind, CombatSessionScriptCommandKind::Control);
+        assert!(step.accepted);
+        assert_eq!(
+            step.decision_kind,
+            CombatSessionScriptDecisionKind::Control(CombatControlDecisionKind::Accepted)
+        );
+        assert_eq!(
+            step.reason,
+            "Combat conditionally ended. Combat should end because no active enemies remain."
+        );
+        assert_eq!(step.control_history_sequence, Some(0));
+        assert_eq!(step.command_audit_sequence, None);
+        assert_eq!(step.runtime_step_id, None);
+        assert_eq!(
+            readout.final_snapshot.lifecycle.phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(
+            session.lifecycle_transition_log()[0].trigger,
+            LifecycleTransitionTrigger::ConditionalEnd
+        );
+    }
+
+    #[test]
     fn session_runtime_direct_control_methods_do_not_record_control_history() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());

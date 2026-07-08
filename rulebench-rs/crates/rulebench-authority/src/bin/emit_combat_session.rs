@@ -431,6 +431,7 @@ fn control_command_kind(kind: CombatControlCommandKind) -> &'static str {
         CombatControlCommandKind::ExplicitStart => "explicitStart",
         CombatControlCommandKind::ExplicitEnd => "explicitEnd",
         CombatControlCommandKind::AdvanceTurn => "advanceTurn",
+        CombatControlCommandKind::EndIfConditionMet => "endIfConditionMet",
     }
 }
 
@@ -440,6 +441,7 @@ fn control_decision_kind(kind: CombatControlDecisionKind) -> &'static str {
         CombatControlDecisionKind::RejectedNoop => "rejectedNoop",
         CombatControlDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
         CombatControlDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
+        CombatControlDecisionKind::RejectedByEndCondition => "rejectedByEndCondition",
     }
 }
 

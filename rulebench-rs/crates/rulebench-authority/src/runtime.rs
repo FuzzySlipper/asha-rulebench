@@ -671,6 +671,7 @@ impl CombatSessionState {
             CombatControlCommandKind::ExplicitStart => self.submit_explicit_start_control(),
             CombatControlCommandKind::ExplicitEnd => self.submit_explicit_end_control(),
             CombatControlCommandKind::AdvanceTurn => self.submit_advance_turn_control(),
+            CombatControlCommandKind::EndIfConditionMet => self.submit_conditional_end_control(),
         };
         let history_entry =
             combat_control_history_entry(self.control_history.len() as u32, &readout);
@@ -871,6 +872,54 @@ impl CombatSessionState {
             None,
             state_before_fingerprint,
             fingerprint_projected_state(&self.state.project("State after explicit end control.")),
+            reason,
+        )
+    }
+
+    fn submit_conditional_end_control(&mut self) -> CombatControlReadout {
+        let previous_lifecycle = self.lifecycle.clone();
+        let previous_turn_order = self.turn_order.clone();
+        let state_before = self.state.project("State before conditional end control.");
+        let state_before_fingerprint = fingerprint_projected_state(&state_before);
+        let lifecycle_transition_count = self.lifecycle_transition_log.len();
+        let end_condition = self.combat_end_condition();
+
+        let (accepted, decision_kind, reason) =
+            if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+                (
+                    false,
+                    CombatControlDecisionKind::RejectedByLifecycle,
+                    "Combat is already ended.".to_string(),
+                )
+            } else if end_condition.combat_should_end {
+                self.end_lifecycle(LifecycleTransitionTrigger::ConditionalEnd);
+                (
+                    true,
+                    CombatControlDecisionKind::Accepted,
+                    format!("Combat conditionally ended. {}", end_condition.reason),
+                )
+            } else {
+                (
+                    false,
+                    CombatControlDecisionKind::RejectedByEndCondition,
+                    format!("Combat end condition is not met. {}", end_condition.reason),
+                )
+            };
+
+        combat_control_readout(
+            CombatControlCommandKind::EndIfConditionMet,
+            accepted,
+            decision_kind,
+            previous_lifecycle,
+            self.lifecycle.clone(),
+            previous_turn_order,
+            self.turn_order.clone(),
+            lifecycle_transition_since(&self.lifecycle_transition_log, lifecycle_transition_count),
+            None,
+            state_before_fingerprint,
+            fingerprint_projected_state(
+                &self.state.project("State after conditional end control."),
+            ),
             reason,
         )
     }

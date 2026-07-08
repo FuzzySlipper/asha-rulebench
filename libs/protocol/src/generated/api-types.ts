@@ -20,9 +20,9 @@ export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | '
 
 export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
 
-export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn';
+export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn' | 'endIfConditionMet';
 
-export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder';
+export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';
 
 export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';
 

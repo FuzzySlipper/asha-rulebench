@@ -136,6 +136,7 @@ pub enum LifecycleTransitionTrigger {
     ExplicitStart,
     CommandStart,
     ExplicitEnd,
+    ConditionalEnd,
 }
 
 impl LifecycleTransitionTrigger {
@@ -144,6 +145,7 @@ impl LifecycleTransitionTrigger {
             LifecycleTransitionTrigger::ExplicitStart => "explicitStart",
             LifecycleTransitionTrigger::CommandStart => "commandStart",
             LifecycleTransitionTrigger::ExplicitEnd => "explicitEnd",
+            LifecycleTransitionTrigger::ConditionalEnd => "conditionalEnd",
         }
     }
 }
@@ -244,6 +246,7 @@ pub enum CombatControlCommandKind {
     ExplicitStart,
     ExplicitEnd,
     AdvanceTurn,
+    EndIfConditionMet,
 }
 
 impl CombatControlCommandKind {
@@ -252,6 +255,7 @@ impl CombatControlCommandKind {
             CombatControlCommandKind::ExplicitStart => "explicitStart",
             CombatControlCommandKind::ExplicitEnd => "explicitEnd",
             CombatControlCommandKind::AdvanceTurn => "advanceTurn",
+            CombatControlCommandKind::EndIfConditionMet => "endIfConditionMet",
         }
     }
 }
@@ -262,6 +266,7 @@ pub enum CombatControlDecisionKind {
     RejectedNoop,
     RejectedByLifecycle,
     RejectedByEmptyTurnOrder,
+    RejectedByEndCondition,
 }
 
 impl CombatControlDecisionKind {
@@ -271,6 +276,7 @@ impl CombatControlDecisionKind {
             CombatControlDecisionKind::RejectedNoop => "rejectedNoop",
             CombatControlDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
             CombatControlDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
+            CombatControlDecisionKind::RejectedByEndCondition => "rejectedByEndCondition",
         }
     }
 }
@@ -296,6 +302,12 @@ impl CombatControlCommandSpec {
     pub const fn advance_turn() -> Self {
         Self {
             kind: CombatControlCommandKind::AdvanceTurn,
+        }
+    }
+
+    pub const fn end_if_condition_met() -> Self {
+        Self {
+            kind: CombatControlCommandKind::EndIfConditionMet,
         }
     }
 }
