@@ -262,6 +262,7 @@ pub struct ActionDefinition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttackSpec {
     pub modifier: i32,
+    pub modifier_stat_id: String,
     pub defense_id: String,
     pub defense_label: String,
 }

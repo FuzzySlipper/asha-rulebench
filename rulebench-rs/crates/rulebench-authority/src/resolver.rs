@@ -106,6 +106,16 @@ pub fn resolve_use_action(
         );
     }
 
+    let Some(attack_modifier) = attack_modifier(actor, action) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
+
     let Some(target) = scenario
         .combatants
         .iter()
@@ -148,9 +158,9 @@ pub fn resolve_use_action(
     resolve_accepted_action(
         scenario,
         intent,
-        actor,
         target,
         action,
+        attack_modifier,
         target_legality,
         roll_stream,
     )
@@ -159,17 +169,17 @@ pub fn resolve_use_action(
 fn resolve_accepted_action(
     scenario: &RulebenchScenario,
     intent: UseActionIntent,
-    _actor: &Combatant,
     target: &Combatant,
     action: &ActionDefinition,
+    attack_modifier: i32,
     target_legality: TargetLegality,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
     let defense_value = defense_value(target, &action.attack.defense_id);
-    let total = roll_stream[0] + action.attack.modifier;
+    let total = roll_stream[0] + attack_modifier;
     let attack_roll = AttackRollResult {
         roll: roll_stream[0],
-        modifier: action.attack.modifier,
+        modifier: attack_modifier,
         total,
         defense_id: action.attack.defense_id.clone(),
         defense_value,
@@ -502,6 +512,12 @@ fn defense_value(target: &Combatant, defense_id: &str) -> i32 {
         .iter()
         .find(|defense| defense.id == defense_id)
         .map_or(0, |defense| defense.value)
+}
+
+fn attack_modifier(actor: &Combatant, action: &ActionDefinition) -> Option<i32> {
+    actor
+        .stat_by_id(&action.attack.modifier_stat_id)
+        .map(|stat| stat.value)
 }
 
 fn apply_damage(target: &Combatant, amount: i32, damage_type: &str) -> DamageOutcome {

@@ -45,6 +45,7 @@ fn hexing_bolt_action() -> ActionDefinition {
         visible_target_ids: vec!["entity-raider".to_string()],
         attack: AttackSpec {
             modifier: 4,
+            modifier_stat_id: "mind".to_string(),
             defense_id: "nerve".to_string(),
             defense_label: "Nerve".to_string(),
         },
