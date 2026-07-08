@@ -12,6 +12,7 @@ mod catalog;
 mod content;
 mod fixtures;
 mod model;
+mod modifiers;
 mod resolver;
 mod runtime;
 mod session;
@@ -28,6 +29,7 @@ pub use fixtures::{
     rejected_target_fixture_receipt,
 };
 pub use model::*;
+pub use modifiers::active_modifier_stat_adjustments_for_combatant;
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{CombatSessionCommandSpec, CombatSessionState};
 pub use session::{
@@ -328,6 +330,92 @@ mod tests {
         let scenario = hexing_bolt_fixture_scenario();
 
         assert!(scenario.modifier_by_id("stunned").is_none());
+    }
+
+    #[test]
+    fn active_modifier_stat_adjustment_readout_is_empty_without_active_modifiers() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let readout = active_modifier_stat_adjustments_for_combatant(&scenario, "entity-raider")
+            .expect("fixture has raider");
+
+        assert_eq!(readout.combatant_id, "entity-raider");
+        assert!(readout.contributions.is_empty());
+    }
+
+    #[test]
+    fn active_modifier_stat_adjustment_readout_resolves_rattled_contribution() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1]
+            .active_modifiers
+            .push(ActiveModifier::temporary(
+                "rattled",
+                "rattled",
+                "until end of next turn",
+            ));
+
+        let readout = active_modifier_stat_adjustments_for_combatant(&scenario, "entity-raider")
+            .expect("fixture has raider");
+
+        assert_eq!(readout.combatant_id, "entity-raider");
+        assert_eq!(
+            readout.contributions,
+            vec![ModifierStatAdjustmentContribution {
+                modifier_id: "rattled".to_string(),
+                modifier_label: "rattled".to_string(),
+                tenure: ModifierTenure::Temporary,
+                stat_id: "mind".to_string(),
+                stat_label: "Mind".to_string(),
+                delta: -1,
+            }]
+        );
+    }
+
+    #[test]
+    fn active_modifier_stat_adjustment_readout_rejects_missing_combatant() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let readout = active_modifier_stat_adjustments_for_combatant(&scenario, "entity-missing");
+
+        assert!(readout.is_none());
+    }
+
+    #[test]
+    fn active_modifier_stat_adjustment_readout_does_not_change_hexing_bolt_resolution() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0]
+            .active_modifiers
+            .push(ActiveModifier::temporary(
+                "rattled",
+                "rattled",
+                "until end of next turn",
+            ));
+
+        let readout = active_modifier_stat_adjustments_for_combatant(&scenario, "entity-adept")
+            .expect("fixture has adept");
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert_eq!(
+            readout
+                .contributions
+                .iter()
+                .map(|contribution| contribution.delta)
+                .collect::<Vec<_>>(),
+            vec![-1]
+        );
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.modifier),
+            Some(4)
+        );
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.total),
+            Some(21)
+        );
     }
 
     #[test]

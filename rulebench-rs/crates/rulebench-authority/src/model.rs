@@ -654,6 +654,22 @@ pub struct ModifierStatAdjustment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatantModifierStatAdjustmentReadout {
+    pub combatant_id: String,
+    pub contributions: Vec<ModifierStatAdjustmentContribution>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModifierStatAdjustmentContribution {
+    pub modifier_id: String,
+    pub modifier_label: String,
+    pub tenure: ModifierTenure,
+    pub stat_id: String,
+    pub stat_label: String,
+    pub delta: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttackSpec {
     pub modifier: i32,
     pub modifier_stat_id: String,
