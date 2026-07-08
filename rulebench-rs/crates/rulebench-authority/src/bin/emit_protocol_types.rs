@@ -409,6 +409,22 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchFinalStateDto",
                 },
                 Field {
+                    name: "finalActionResourceLedger",
+                    ty: "RulebenchActionResourceLedgerDto",
+                },
+                Field {
+                    name: "finalCurrentActorOptions",
+                    ty: "RulebenchCurrentActorOptionSummaryDto",
+                },
+                Field {
+                    name: "finalCombatantVitality",
+                    ty: "RulebenchCombatantVitalitySummaryDto",
+                },
+                Field {
+                    name: "finalCombatEndCondition",
+                    ty: "RulebenchCombatEndConditionDto",
+                },
+                Field {
                     name: "combatLog",
                     ty: "readonly RulebenchCombatLogEntryDto[]",
                 },

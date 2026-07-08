@@ -693,6 +693,46 @@ describe("RulebenchTransport fixtures", () => {
       ]);
       expect(result.value.finalLifecyclePhase).toBe("ended");
       expect(result.value.finalState.combatants[1]?.hitPoints.current).toBe(0);
+      expect(
+        result.value.finalActionResourceLedger.combatants.map(
+          (combatant) => combatant.combatantId,
+        ),
+      ).toEqual(["entity-adept", "entity-raider"]);
+      expect(
+        result.value.finalActionResourceLedger.combatants.map(
+          (combatant) => combatant.resources[0]?.available,
+        ),
+      ).toEqual([false, true]);
+      expect(result.value.finalCurrentActorOptions).toMatchObject({
+        roundNumber: 2,
+        turnIndex: 0,
+        lifecyclePhase: "ended",
+        currentActorId: "entity-adept",
+        currentActorDefeated: false,
+        available: false,
+        unavailableReason: "combatEnded",
+        actions: [],
+      });
+      expect(result.value.finalCombatantVitality).toMatchObject({
+        activeCombatantIds: ["entity-adept"],
+        defeatedCombatantIds: ["entity-raider"],
+        activeCount: 1,
+        defeatedCount: 1,
+      });
+      expect(
+        result.value.finalCombatantVitality.combatants.map(
+          (combatant) => combatant.defeated,
+        ),
+      ).toEqual([false, true]);
+      expect(result.value.finalCombatEndCondition).toEqual({
+        combatShouldEnd: true,
+        conditionKind: "noActiveEnemies",
+        activeAllyCount: 1,
+        activeEnemyCount: 0,
+        defeatedAllyCount: 0,
+        defeatedEnemyCount: 1,
+        reason: "Combat should end because no active enemies remain.",
+      });
       expect(result.value.combatLogEntryCount).toBe(2);
       expect(result.value.auditEntryCount).toBe(2);
       expect(result.value.combatLog).toHaveLength(2);

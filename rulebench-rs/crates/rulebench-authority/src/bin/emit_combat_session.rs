@@ -513,6 +513,30 @@ fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunReadout) -> S
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalActionResourceLedger: ");
+    out.push_str(&render_action_resource_ledger(
+        &readout.final_snapshot.action_resource_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      finalCurrentActorOptions: ");
+    out.push_str(&render_current_actor_options(
+        &readout.final_snapshot.current_actor_options,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      finalCombatantVitality: ");
+    out.push_str(&render_combatant_vitality(
+        &readout.final_snapshot.combatant_vitality,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      finalCombatEndCondition: ");
+    out.push_str(&render_combat_end_condition(
+        &readout.final_snapshot.combat_end_condition,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      combatLog: [\n");
     for entry in &readout.final_snapshot.combat_log {
         out.push_str(&render_log_entry(entry, "        "));

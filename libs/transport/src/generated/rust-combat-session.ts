@@ -1282,6 +1282,72 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
       },
+      finalActionResourceLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 0,
+                max: 1,
+                available: false,
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            resources: [
+              {
+                kind: 'standardAction',
+                current: 1,
+                max: 1,
+                available: true,
+              },
+            ],
+          },
+        ],
+      },
+      finalCurrentActorOptions: {
+        roundNumber: 2,
+        turnIndex: 0,
+        lifecyclePhase: 'ended',
+        currentActorId: 'entity-adept',
+        currentActorDefeated: false,
+        available: false,
+        unavailableReason: 'combatEnded',
+        actions: [
+        ],
+      },
+      finalCombatantVitality: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            currentHitPoints: 24,
+            maxHitPoints: 24,
+            defeated: false,
+          },
+          {
+            combatantId: 'entity-raider',
+            currentHitPoints: 0,
+            maxHitPoints: 18,
+            defeated: true,
+          },
+        ],
+        activeCombatantIds: ['entity-adept'],
+        defeatedCombatantIds: ['entity-raider'],
+        activeCount: 1,
+        defeatedCount: 1,
+      },
+      finalCombatEndCondition: {
+        combatShouldEnd: true,
+        conditionKind: 'noActiveEnemies',
+        activeAllyCount: 1,
+        activeEnemyCount: 0,
+        defeatedAllyCount: 0,
+        defeatedEnemyCount: 1,
+        reason: 'Combat should end because no active enemies remain.',
+      },
       combatLog: [
 {
           id: 'log-hexing-bolt-bounded-automatic-run-step-0',
