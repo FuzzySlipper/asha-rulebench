@@ -297,7 +297,7 @@ mod tests {
                 .iter()
                 .map(|modifier| modifier.id.as_str())
                 .collect::<Vec<_>>(),
-            vec!["rattled"]
+            vec!["rattled", "battle-drilled"]
         );
         assert_eq!(
             scenario
@@ -320,6 +320,24 @@ mod tests {
                     stat_id: "mind".to_string(),
                     stat_label: "Mind".to_string(),
                     delta: -1,
+                }][..]
+            )
+        );
+        assert_eq!(
+            scenario
+                .modifier_by_id("battle-drilled")
+                .map(|modifier| modifier.default_tenure.code()),
+            Some("permanent")
+        );
+        assert_eq!(
+            scenario
+                .modifier_by_id("battle-drilled")
+                .map(|modifier| modifier.stat_adjustments.as_slice()),
+            Some(
+                &[ModifierStatAdjustment {
+                    stat_id: "initiative".to_string(),
+                    stat_label: "Initiative".to_string(),
+                    delta: 1,
                 }][..]
             )
         );
@@ -378,6 +396,36 @@ mod tests {
         let readout = active_modifier_stat_adjustments_for_combatant(&scenario, "entity-missing");
 
         assert!(readout.is_none());
+    }
+
+    #[test]
+    fn active_modifier_stat_adjustment_readout_preserves_permanent_tenure() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0]
+            .active_modifiers
+            .push(ActiveModifier::permanent(
+                "battle-drilled",
+                "battle drilled",
+            ));
+
+        let readout = active_modifier_stat_adjustments_for_combatant(&scenario, "entity-adept")
+            .expect("fixture has adept");
+
+        assert_eq!(
+            readout.contributions,
+            vec![ModifierStatAdjustmentContribution {
+                modifier_id: "battle-drilled".to_string(),
+                modifier_label: "battle drilled".to_string(),
+                tenure: ModifierTenure::Permanent,
+                stat_id: "initiative".to_string(),
+                stat_label: "Initiative".to_string(),
+                delta: 1,
+            }]
+        );
+        assert_eq!(
+            readout.contributions[0].tenure.code(),
+            ModifierTenure::Permanent.code()
+        );
     }
 
     #[test]

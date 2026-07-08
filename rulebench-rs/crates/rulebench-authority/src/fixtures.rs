@@ -183,17 +183,30 @@ fn hexing_bolt_stat_definitions() -> Vec<StatDefinition> {
 }
 
 fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
-    vec![ModifierDefinition {
-        id: "rattled".to_string(),
-        label: "rattled".to_string(),
-        summary: "A temporary condition-like modifier applied by Hexing Bolt.".to_string(),
-        default_tenure: ModifierTenure::Temporary,
-        stat_adjustments: vec![ModifierStatAdjustment {
-            stat_id: "mind".to_string(),
-            stat_label: "Mind".to_string(),
-            delta: -1,
-        }],
-    }]
+    vec![
+        ModifierDefinition {
+            id: "rattled".to_string(),
+            label: "rattled".to_string(),
+            summary: "A temporary condition-like modifier applied by Hexing Bolt.".to_string(),
+            default_tenure: ModifierTenure::Temporary,
+            stat_adjustments: vec![ModifierStatAdjustment {
+                stat_id: "mind".to_string(),
+                stat_label: "Mind".to_string(),
+                delta: -1,
+            }],
+        },
+        ModifierDefinition {
+            id: "battle-drilled".to_string(),
+            label: "battle drilled".to_string(),
+            summary: "A permanent training marker for stat-adjustment readouts.".to_string(),
+            default_tenure: ModifierTenure::Permanent,
+            stat_adjustments: vec![ModifierStatAdjustment {
+                stat_id: "initiative".to_string(),
+                stat_label: "Initiative".to_string(),
+                delta: 1,
+            }],
+        },
+    ]
 }
 
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
