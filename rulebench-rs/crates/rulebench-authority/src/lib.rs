@@ -2471,6 +2471,115 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_can_start_combat_explicitly() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_start = session.snapshot();
+
+        session.start_combat();
+        let after_start = session.snapshot();
+
+        assert_eq!(before_start.lifecycle.phase, CombatLifecyclePhase::Ready);
+        assert_eq!(
+            after_start.lifecycle.phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(after_start.lifecycle.started_at_step, Some(0));
+        assert_eq!(after_start.lifecycle.ended_at_step, None);
+        assert_eq!(after_start.next_step_index, before_start.next_step_index);
+        assert_eq!(after_start.turn_order, before_start.turn_order);
+        assert_eq!(after_start.combat_log, before_start.combat_log);
+        assert_eq!(after_start.audit_log, before_start.audit_log);
+        assert_eq!(
+            after_start.current_state_fingerprint,
+            before_start.current_state_fingerprint
+        );
+    }
+
+    #[test]
+    fn session_runtime_explicit_start_is_idempotent_while_in_progress() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.start_combat();
+        let before_repeat = session.snapshot();
+
+        session.start_combat();
+        let after_repeat = session.snapshot();
+
+        assert_eq!(after_repeat.lifecycle, before_repeat.lifecycle);
+        assert_eq!(after_repeat.turn_order, before_repeat.turn_order);
+        assert_eq!(after_repeat.next_step_index, before_repeat.next_step_index);
+        assert_eq!(
+            after_repeat.current_state_fingerprint,
+            before_repeat.current_state_fingerprint
+        );
+        assert_eq!(after_repeat.combat_log, before_repeat.combat_log);
+        assert_eq!(after_repeat.audit_log, before_repeat.audit_log);
+    }
+
+    #[test]
+    fn session_runtime_explicit_start_after_end_is_noop() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.start_combat();
+        session.end_combat();
+        let before_start_attempt = session.snapshot();
+
+        session.start_combat();
+        let after_start_attempt = session.snapshot();
+
+        assert_eq!(
+            before_start_attempt.lifecycle.phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(
+            after_start_attempt.lifecycle,
+            before_start_attempt.lifecycle
+        );
+        assert_eq!(
+            after_start_attempt.turn_order,
+            before_start_attempt.turn_order
+        );
+        assert_eq!(
+            after_start_attempt.next_step_index,
+            before_start_attempt.next_step_index
+        );
+        assert_eq!(
+            after_start_attempt.current_state_fingerprint,
+            before_start_attempt.current_state_fingerprint
+        );
+        assert_eq!(
+            after_start_attempt.combat_log,
+            before_start_attempt.combat_log
+        );
+        assert_eq!(
+            after_start_attempt.audit_log,
+            before_start_attempt.audit_log
+        );
+    }
+
+    #[test]
+    fn session_runtime_explicit_start_preserves_command_start_marker() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.start_combat();
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::InProgress);
+        assert_eq!(session.lifecycle().started_at_step, Some(0));
+        assert_eq!(session.lifecycle().ended_at_step, None);
+        assert_eq!(session.next_step_index(), 1);
+    }
+
+    #[test]
     fn combat_lifecycle_preserves_first_end_marker() {
         let mut lifecycle = CombatLifecycle::ready();
 

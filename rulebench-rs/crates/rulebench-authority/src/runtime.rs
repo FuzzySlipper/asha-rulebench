@@ -173,6 +173,10 @@ impl CombatSessionState {
         &self.lifecycle
     }
 
+    pub fn start_combat(&mut self) {
+        self.lifecycle.start_at_step(self.next_step_index);
+    }
+
     pub fn end_combat(&mut self) {
         self.lifecycle.end_at_step(self.next_step_index);
     }
