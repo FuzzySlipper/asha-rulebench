@@ -132,6 +132,17 @@ impl CombatSessionState {
     pub fn advance_turn(&mut self) {
         self.turn_order.advance_turn();
     }
+
+    pub fn snapshot(&self) -> CombatSessionSnapshot {
+        CombatSessionSnapshot {
+            session_id: self.session_id.clone(),
+            next_step_index: self.next_step_index,
+            lifecycle: self.lifecycle.clone(),
+            turn_order: self.turn_order.clone(),
+            combat_log: self.combat_log.clone(),
+            current_state: self.state.project("Current session state."),
+        }
+    }
 }
 
 fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt) -> CombatLogEntry {

@@ -1012,6 +1012,72 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_snapshot_reads_initial_state() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let snapshot = session.snapshot();
+
+        assert_eq!(snapshot.session_id, "runtime-hexing-bolt");
+        assert_eq!(snapshot.next_step_index, 0);
+        assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ready);
+        assert_eq!(
+            snapshot.turn_order.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert!(snapshot.combat_log.is_empty());
+        assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 18);
+    }
+
+    #[test]
+    fn session_runtime_snapshot_reads_command_updates() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let snapshot = session.snapshot();
+
+        assert_eq!(snapshot.next_step_index, 1);
+        assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::InProgress);
+        assert_eq!(snapshot.combat_log.len(), 1);
+        assert_eq!(snapshot.combat_log[0].step_id, "runtime-hit");
+        assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
+        assert_eq!(
+            snapshot.current_state.combatants[1].conditions,
+            vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_snapshot_reads_turn_and_end_state() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.advance_turn();
+        session.end_combat();
+
+        let snapshot = session.snapshot();
+
+        assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(snapshot.lifecycle.started_at_step, Some(0));
+        assert_eq!(snapshot.lifecycle.ended_at_step, Some(0));
+        assert_eq!(snapshot.turn_order.round_number, 1);
+        assert_eq!(snapshot.turn_order.current_turn_index, 1);
+        assert_eq!(
+            snapshot.turn_order.current_actor_id,
+            Some("entity-raider".to_string())
+        );
+    }
+
+    #[test]
     fn combat_session_rejects_unknown_session_id() {
         let error = resolve_combat_session_step("not-a-session", "adept-hexing-bolt-hit")
             .expect_err("unknown session fails");

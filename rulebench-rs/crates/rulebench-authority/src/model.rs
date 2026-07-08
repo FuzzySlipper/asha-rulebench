@@ -210,6 +210,16 @@ pub struct CombatSessionStepReadout {
     pub state_after: ScenarioProjection,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionSnapshot {
+    pub session_id: String,
+    pub next_step_index: u32,
+    pub lifecycle: CombatLifecycle,
+    pub turn_order: CombatTurnOrder,
+    pub combat_log: Vec<CombatLogEntry>,
+    pub current_state: ScenarioProjection,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatSessionError {
     UnknownSessionId,
