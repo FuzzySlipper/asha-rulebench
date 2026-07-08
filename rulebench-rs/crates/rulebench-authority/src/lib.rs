@@ -2136,7 +2136,16 @@ mod tests {
             readout.audit_entry.outcome_class,
             CommandOutcomeClass::AcceptedHit
         );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind.code(),
+            "acceptedByResolver"
+        );
         assert!(readout.audit_entry.accepted);
+        assert_eq!(readout.audit_entry.rejection, None);
         assert_eq!(readout.audit_entry.event_count, 4);
         assert_eq!(
             readout.audit_entry.trace_count,
@@ -2338,7 +2347,12 @@ mod tests {
             readout.audit_entry.outcome_class,
             CommandOutcomeClass::AcceptedMiss
         );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
         assert!(readout.audit_entry.accepted);
+        assert_eq!(readout.audit_entry.rejection, None);
         assert_eq!(readout.audit_entry.event_count, 2);
         assert_eq!(
             readout.audit_entry.trace_count,
@@ -2496,7 +2510,15 @@ mod tests {
             readout.audit_entry.outcome_class,
             CommandOutcomeClass::RejectedTargetLegality
         );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByResolver
+        );
         assert!(!readout.audit_entry.accepted);
+        assert_eq!(
+            readout.audit_entry.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
         assert_eq!(readout.audit_entry.event_count, 0);
         assert_eq!(
             readout.audit_entry.trace_count,
@@ -2671,6 +2693,26 @@ mod tests {
                 .map(|entry| entry.accepted)
                 .collect::<Vec<_>>(),
             vec![true, true, false]
+        );
+        assert_eq!(
+            session
+                .audit_log()
+                .iter()
+                .map(|entry| entry.decision_kind)
+                .collect::<Vec<_>>(),
+            vec![
+                CommandDecisionKind::AcceptedByResolver,
+                CommandDecisionKind::AcceptedByResolver,
+                CommandDecisionKind::RejectedByResolver
+            ]
+        );
+        assert_eq!(
+            session
+                .audit_log()
+                .iter()
+                .map(|entry| entry.rejection)
+                .collect::<Vec<_>>(),
+            vec![None, None, Some(RulebenchRejection::TargetLegalityFailed)]
         );
         assert_eq!(
             session
@@ -2960,7 +3002,19 @@ mod tests {
         assert_eq!(session.audit_log().len(), 2);
         assert_eq!(readout.audit_entry.id, "audit-runtime-post-end");
         assert_eq!(readout.audit_entry.sequence, 1);
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind.code(),
+            "rejectedByLifecycle"
+        );
         assert!(!readout.audit_entry.accepted);
+        assert_eq!(
+            readout.audit_entry.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
         assert_eq!(readout.audit_entry.event_count, 0);
         assert_eq!(readout.audit_entry.trace_count, 2);
         assert_eq!(session.audit_log()[1], readout.audit_entry);
@@ -3071,7 +3125,19 @@ mod tests {
         assert_eq!(session.audit_log().len(), 2);
         assert_eq!(readout.audit_entry.id, "audit-runtime-wrong-actor");
         assert_eq!(readout.audit_entry.sequence, 1);
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByTurnOrder
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind.code(),
+            "rejectedByTurnOrder"
+        );
         assert!(!readout.audit_entry.accepted);
+        assert_eq!(
+            readout.audit_entry.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
         assert_eq!(readout.audit_entry.event_count, 0);
         assert_eq!(readout.audit_entry.trace_count, 2);
         assert_eq!(session.audit_log()[1], readout.audit_entry);
@@ -3415,7 +3481,12 @@ mod tests {
         assert_eq!(snapshot.combat_log[0].step_id, "runtime-hit");
         assert_eq!(snapshot.audit_log.len(), 1);
         assert_eq!(snapshot.audit_log[0].step_id, "runtime-hit");
+        assert_eq!(
+            snapshot.audit_log[0].decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
         assert!(snapshot.audit_log[0].accepted);
+        assert_eq!(snapshot.audit_log[0].rejection, None);
         assert_eq!(snapshot.action_usage_log.len(), 1);
         assert_eq!(snapshot.action_usage_log[0].step_id, "runtime-hit");
         assert_eq!(

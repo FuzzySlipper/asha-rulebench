@@ -75,7 +75,7 @@ impl CombatSessionState {
         let state_before = self.state.project("State before command resolution.");
         let state_before_fingerprint = fingerprint_projected_state(&state_before);
         let combat_has_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
-        let (receipt, state_after, should_apply_state) = if combat_has_ended {
+        let (receipt, state_after, should_apply_state, decision_kind) = if combat_has_ended {
             let state_after = self
                 .state
                 .project("No authority state changed; combat already ended.");
@@ -83,6 +83,7 @@ impl CombatSessionState {
                 ended_combat_receipt(spec.intent.clone(), state_after.clone()),
                 state_after,
                 false,
+                CommandDecisionKind::RejectedByLifecycle,
             )
         } else {
             match self.turn_order.current_actor_id.as_deref() {
@@ -98,6 +99,7 @@ impl CombatSessionState {
                         ),
                         state_after,
                         false,
+                        CommandDecisionKind::RejectedByTurnOrder,
                     )
                 }
                 _ => {
@@ -108,8 +110,13 @@ impl CombatSessionState {
                         .projection
                         .clone()
                         .expect("session runtime resolver always produces projection");
+                    let decision_kind = if receipt.accepted {
+                        CommandDecisionKind::AcceptedByResolver
+                    } else {
+                        CommandDecisionKind::RejectedByResolver
+                    };
 
-                    (receipt, state_after, true)
+                    (receipt, state_after, true, decision_kind)
                 }
             }
         };
@@ -136,6 +143,7 @@ impl CombatSessionState {
         let audit_entry = command_audit_entry(
             &step,
             &receipt,
+            decision_kind,
             state_before_fingerprint,
             state_after_fingerprint,
         );
@@ -323,6 +331,7 @@ fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt)
 fn command_audit_entry(
     step: &CombatSessionStepSummary,
     receipt: &RulebenchReceipt,
+    decision_kind: CommandDecisionKind,
     state_before_fingerprint: StateFingerprint,
     state_after_fingerprint: StateFingerprint,
 ) -> CommandAuditEntry {
@@ -331,7 +340,9 @@ fn command_audit_entry(
         step_id: step.id.clone(),
         sequence: step.index,
         outcome_class: step.outcome_class,
+        decision_kind,
         accepted: receipt.accepted,
+        rejection: receipt.rejection,
         event_count: receipt.events.len() as u32,
         trace_count: receipt.trace.len() as u32,
         state_before_fingerprint,

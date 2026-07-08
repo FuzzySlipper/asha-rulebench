@@ -185,13 +185,34 @@ pub struct CommandAttempt {
     pub outcome_class: CommandOutcomeClass,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandDecisionKind {
+    AcceptedByResolver,
+    RejectedByResolver,
+    RejectedByLifecycle,
+    RejectedByTurnOrder,
+}
+
+impl CommandDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CommandDecisionKind::AcceptedByResolver => "acceptedByResolver",
+            CommandDecisionKind::RejectedByResolver => "rejectedByResolver",
+            CommandDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            CommandDecisionKind::RejectedByTurnOrder => "rejectedByTurnOrder",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandAuditEntry {
     pub id: String,
     pub step_id: String,
     pub sequence: u32,
     pub outcome_class: CommandOutcomeClass,
+    pub decision_kind: CommandDecisionKind,
     pub accepted: bool,
+    pub rejection: Option<RulebenchRejection>,
     pub event_count: u32,
     pub trace_count: u32,
     pub state_before_fingerprint: StateFingerprint,
