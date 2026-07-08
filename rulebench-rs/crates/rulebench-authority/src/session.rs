@@ -1,7 +1,7 @@
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
-use crate::projection::{project_initial_state, scenario_with_projection};
 use crate::resolver::resolve_use_action;
+use crate::state::CombatState;
 
 pub fn combat_session_summaries() -> Vec<CombatSessionSummary> {
     combat_session_transcripts()
@@ -77,9 +77,11 @@ fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
         seed_label: session_seed_label.to_string(),
     };
 
+    let mut state = CombatState::from_scenario(&scenario);
     let mut steps = Vec::new();
     for spec in step_specs {
-        let state_before = project_initial_state(&scenario, "State before command resolution.");
+        scenario = state.apply_to_scenario(scenario);
+        let state_before = state.project("State before command resolution.");
         let receipt = resolve_use_action(&scenario, spec.intent.clone(), &spec.roll_stream);
         let state_after = receipt
             .projection
@@ -115,7 +117,7 @@ fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
             state_after: state_after.clone(),
         });
 
-        scenario = scenario_with_projection(scenario, &state_after);
+        state = CombatState::from_projection(&state_after);
     }
 
     CombatSessionTranscript {

@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::projection::{project_final_state, project_initial_state};
+use crate::state::CombatState;
 
 pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     let trace = vec![TraceEntry::new(
@@ -316,6 +316,9 @@ fn accepted_hit_receipt(
     modifier: ModifierOutcome,
     trace: Vec<TraceEntry>,
 ) -> RulebenchReceipt {
+    let mut state = CombatState::from_scenario(scenario);
+    state.apply_hit(&damage, &modifier);
+
     RulebenchReceipt {
         accepted: true,
         authority_surface: AUTHORITY_SURFACE,
@@ -327,11 +330,7 @@ fn accepted_hit_receipt(
         modifier: Some(modifier.clone()),
         events: accepted_hit_events(&intent, &attack_roll, &damage, &modifier),
         trace,
-        projection: Some(project_final_state(
-            scenario,
-            "Raider is damaged and rattled; Adept is unchanged.",
-            Some((&damage, &modifier)),
-        )),
+        projection: Some(state.project("Raider is damaged and rattled; Adept is unchanged.")),
     }
 }
 
@@ -367,10 +366,10 @@ fn accepted_miss_receipt(
             },
         ],
         trace,
-        projection: Some(project_initial_state(
-            scenario,
-            "Attack missed; no authority state changed.",
-        )),
+        projection: Some(
+            CombatState::from_scenario(scenario)
+                .project("Attack missed; no authority state changed."),
+        ),
     }
 }
 
@@ -436,10 +435,10 @@ fn rejected_with_projection(
         modifier: None,
         events: Vec::new(),
         trace,
-        projection: Some(project_initial_state(
-            scenario,
-            "No authority state changed; intent rejected.",
-        )),
+        projection: Some(
+            CombatState::from_scenario(scenario)
+                .project("No authority state changed; intent rejected."),
+        ),
     }
 }
 

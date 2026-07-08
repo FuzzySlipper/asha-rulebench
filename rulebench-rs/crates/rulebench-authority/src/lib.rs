@@ -10,7 +10,6 @@
 mod catalog;
 mod fixtures;
 mod model;
-mod projection;
 mod resolver;
 mod session;
 mod state;
@@ -476,7 +475,8 @@ mod tests {
         let receipt = accepted_hexing_bolt_fixture_receipt();
         let projection = receipt.projection.as_ref().expect("fixture has projection");
 
-        let next_scenario = crate::projection::scenario_with_projection(scenario, projection);
+        let next_scenario =
+            crate::state::CombatState::from_projection(projection).apply_to_scenario(scenario);
 
         assert_eq!(next_scenario.combatants[1].hit_points.current, 9);
         assert_eq!(
