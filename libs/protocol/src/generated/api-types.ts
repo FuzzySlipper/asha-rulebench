@@ -34,6 +34,8 @@ export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejec
 
 export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
 
+export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
+
 export interface RulebenchRulesetCatalogDto {
   readonly selectedRulesetId: string;
   readonly rulesets: readonly RulebenchRulesetSummaryDto[];
@@ -101,6 +103,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly steps: readonly RulebenchCombatScriptStepReadoutDto[];
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
 }
 
@@ -120,6 +123,22 @@ export interface RulebenchModifierDurationExpirationEntryDto {
   readonly turnTransitionSequence: number;
   readonly roundNumber: number;
   readonly turnIndex: number;
+  readonly currentActorId: string | null;
+  readonly reason: string;
+}
+
+export interface RulebenchActionResourceTransitionEntryDto {
+  readonly sequence: number;
+  readonly transitionKind: RulebenchActionResourceTransitionKindDto;
+  readonly combatantId: string;
+  readonly resourceKind: RulebenchActionResourceKindDto;
+  readonly previousResource: RulebenchActionResourceStateDto;
+  readonly nextResource: RulebenchActionResourceStateDto;
+  readonly commandStepId: string | null;
+  readonly commandStepIndex: number | null;
+  readonly turnTransitionSequence: number | null;
+  readonly roundNumber: number | null;
+  readonly turnIndex: number | null;
   readonly currentActorId: string | null;
   readonly reason: string;
 }

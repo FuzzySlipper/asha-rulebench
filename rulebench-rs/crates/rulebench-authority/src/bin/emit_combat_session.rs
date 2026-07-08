@@ -6,8 +6,9 @@ mod ts_emit;
 use rulebench_authority::{
     combat_session_control_history_readouts, combat_session_script_readouts,
     combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
-    ActionResourceState, ActiveModifier, CombatControlCommandKind, CombatControlDecisionKind,
-    CombatControlHistoryEntry, CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
+    ActionResourceState, ActionResourceTransitionEntry, ActionResourceTransitionKind,
+    ActiveModifier, CombatControlCommandKind, CombatControlDecisionKind, CombatControlHistoryEntry,
+    CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
     CombatSessionSummary, CommandAttempt, CommandDecisionKind, CommandOutcomeClass,
@@ -375,6 +376,11 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      finalStateFingerprint: {},\n",
         render_fingerprint(&readout.final_snapshot.current_state_fingerprint, "      ")
     ));
+    out.push_str("      actionResourceTransitionLog: [\n");
+    for entry in &readout.final_snapshot.action_resource_transition_log {
+        out.push_str(&render_action_resource_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str("      modifierDurationExpirationLog: [\n");
     for entry in &readout.final_snapshot.modifier_duration_expiration_log {
         out.push_str(&render_modifier_duration_expiration_entry(
@@ -384,6 +390,74 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
     out.push_str("      ],\n");
     out.push_str("    },\n");
     out
+}
+
+fn render_action_resource_transition_entry(
+    entry: &ActionResourceTransitionEntry,
+    indent: &str,
+) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  transitionKind: {},\n",
+        ts_string(action_resource_transition_kind(entry.transition_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  combatantId: {},\n",
+        ts_string(&entry.combatant_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  resourceKind: {},\n",
+        ts_string(action_resource_kind(entry.resource_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  previousResource: {},\n",
+        render_action_resource_state_inline(&entry.previous_resource)
+    ));
+    out.push_str(&format!(
+        "{indent}  nextResource: {},\n",
+        render_action_resource_state_inline(&entry.next_resource)
+    ));
+    out.push_str(&format!(
+        "{indent}  commandStepId: {},\n",
+        render_optional_string(&entry.command_step_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  commandStepIndex: {},\n",
+        render_optional_u32(entry.command_step_index)
+    ));
+    out.push_str(&format!(
+        "{indent}  turnTransitionSequence: {},\n",
+        render_optional_u32(entry.turn_transition_sequence)
+    ));
+    out.push_str(&format!(
+        "{indent}  roundNumber: {},\n",
+        render_optional_u32(entry.round_number)
+    ));
+    out.push_str(&format!(
+        "{indent}  turnIndex: {},\n",
+        render_optional_u32(entry.turn_index)
+    ));
+    out.push_str(&format!(
+        "{indent}  currentActorId: {},\n",
+        render_optional_string(&entry.current_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&entry.reason)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_action_resource_state_inline(resource: &ActionResourceState) -> String {
+    format!(
+        "{{ kind: {}, current: {}, max: {}, available: {} }}",
+        ts_string(action_resource_kind(resource.kind)),
+        resource.current,
+        resource.max,
+        resource.available
+    )
 }
 
 fn render_modifier_duration_expiration_entry(
@@ -626,6 +700,10 @@ fn action_resource_kind(kind: ActionResourceKind) -> &'static str {
     match kind {
         ActionResourceKind::StandardAction => "standardAction",
     }
+}
+
+fn action_resource_transition_kind(kind: ActionResourceTransitionKind) -> &'static str {
+    kind.code()
 }
 
 fn outcome_class(outcome_class: CommandOutcomeClass) -> &'static str {

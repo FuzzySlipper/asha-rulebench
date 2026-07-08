@@ -262,6 +262,83 @@ describe('RulebenchTransport fixtures', () => {
       expect(result.value.steps[5]?.id).toBe('script-advance-turn-wrap');
       expect(result.value.steps[5]?.controlHistorySequence).toBe(3);
       expect(result.value.finalLifecyclePhase).toBe('ended');
+      expect(result.value.actionResourceTransitionLog).toEqual([
+        {
+          sequence: 0,
+          transitionKind: 'spent',
+          combatantId: 'entity-adept',
+          resourceKind: 'standardAction',
+          previousResource: {
+            kind: 'standardAction',
+            current: 1,
+            max: 1,
+            available: true,
+          },
+          nextResource: {
+            kind: 'standardAction',
+            current: 0,
+            max: 1,
+            available: false,
+          },
+          commandStepId: 'script-selected-runtime-hit',
+          commandStepIndex: 0,
+          turnTransitionSequence: null,
+          roundNumber: 1,
+          turnIndex: 0,
+          currentActorId: 'entity-adept',
+          reason: 'Action resource spent.',
+        },
+        {
+          sequence: 1,
+          transitionKind: 'refreshed',
+          combatantId: 'entity-raider',
+          resourceKind: 'standardAction',
+          previousResource: {
+            kind: 'standardAction',
+            current: 1,
+            max: 1,
+            available: true,
+          },
+          nextResource: {
+            kind: 'standardAction',
+            current: 1,
+            max: 1,
+            available: true,
+          },
+          commandStepId: null,
+          commandStepIndex: null,
+          turnTransitionSequence: 0,
+          roundNumber: 1,
+          turnIndex: 1,
+          currentActorId: 'entity-raider',
+          reason: 'Action resource refreshed.',
+        },
+        {
+          sequence: 2,
+          transitionKind: 'refreshed',
+          combatantId: 'entity-adept',
+          resourceKind: 'standardAction',
+          previousResource: {
+            kind: 'standardAction',
+            current: 0,
+            max: 1,
+            available: false,
+          },
+          nextResource: {
+            kind: 'standardAction',
+            current: 1,
+            max: 1,
+            available: true,
+          },
+          commandStepId: null,
+          commandStepIndex: null,
+          turnTransitionSequence: 1,
+          roundNumber: 2,
+          turnIndex: 0,
+          currentActorId: 'entity-adept',
+          reason: 'Action resource refreshed.',
+        },
+      ]);
       expect(result.value.modifierDurationExpirationLog).toEqual([
         {
           sequence: 0,

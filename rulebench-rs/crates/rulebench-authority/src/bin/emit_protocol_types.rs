@@ -54,6 +54,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';",
         "export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';",
         "export type RulebenchModifierTenureDto = 'temporary' | 'permanent';",
+        "export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';",
     ]
 }
 
@@ -278,6 +279,10 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchStateFingerprintDto",
                 },
                 Field {
+                    name: "actionResourceTransitionLog",
+                    ty: "readonly RulebenchActionResourceTransitionEntryDto[]",
+                },
+                Field {
                     name: "modifierDurationExpirationLog",
                     ty: "readonly RulebenchModifierDurationExpirationEntryDto[]",
                 },
@@ -338,6 +343,63 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "turnIndex",
                     ty: "number",
+                },
+                Field {
+                    name: "currentActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActionResourceTransitionEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "transitionKind",
+                    ty: "RulebenchActionResourceTransitionKindDto",
+                },
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "resourceKind",
+                    ty: "RulebenchActionResourceKindDto",
+                },
+                Field {
+                    name: "previousResource",
+                    ty: "RulebenchActionResourceStateDto",
+                },
+                Field {
+                    name: "nextResource",
+                    ty: "RulebenchActionResourceStateDto",
+                },
+                Field {
+                    name: "commandStepId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "commandStepIndex",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "turnTransitionSequence",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "roundNumber",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "turnIndex",
+                    ty: "number | null",
                 },
                 Field {
                     name: "currentActorId",
