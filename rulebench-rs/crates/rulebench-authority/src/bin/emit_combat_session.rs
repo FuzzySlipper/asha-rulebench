@@ -4,21 +4,22 @@
 mod ts_emit;
 
 use rulebench_authority::{
-    combat_session_control_history_readouts, combat_session_script_readouts,
-    combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
-    ActionResourceState, ActionResourceTransitionEntry, ActionResourceTransitionKind,
-    ActionUsageEntry, ActionUsageSummary, ActiveModifier, CombatControlCommandKind,
-    CombatControlDecisionKind, CombatControlHistoryEntry, CombatControlHistoryReadout,
-    CombatEndConditionKind, CombatEndConditionReadout, CombatLifecyclePhase, CombatLogEntry,
-    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
-    CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
-    CombatSessionSummary, CombatTurnOrder, CombatantVitalityEntry, CombatantVitalitySummary,
-    CommandAttempt, CommandAuditEntry, CommandDecisionKind, CommandOutcomeClass,
-    CommandPreflightDecisionKind, CurrentActorActionOption, CurrentActorOptionSummary,
-    CurrentActorOptionsUnavailableReason, CurrentActorTargetOption, LifecycleTransitionEntry,
-    LifecycleTransitionTrigger, ModifierDurationExpirationEntry, ModifierTenure,
-    RulebenchRejection, ScenarioMetadata, ScenarioProjection, StateFingerprint,
-    TurnTransitionEntry,
+    combat_session_automatic_run_readouts, combat_session_control_history_readouts,
+    combat_session_script_readouts, combat_session_transcripts, ActionResourceKind,
+    ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
+    ActionResourceTransitionKind, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
+    CombatControlCommandKind, CombatControlDecisionKind, CombatControlHistoryEntry,
+    CombatControlHistoryReadout, CombatEndConditionKind, CombatEndConditionReadout,
+    CombatLifecyclePhase, CombatLogEntry, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticStepOperationKind, CombatSessionScriptCommandKind,
+    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptStepReadout,
+    CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary, CombatTurnOrder,
+    CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt, CommandAuditEntry,
+    CommandDecisionKind, CommandOutcomeClass, CommandPreflightDecisionKind,
+    CurrentActorActionOption, CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason,
+    CurrentActorTargetOption, LifecycleTransitionEntry, LifecycleTransitionTrigger,
+    ModifierDurationExpirationEntry, ModifierTenure, RulebenchRejection, ScenarioMetadata,
+    ScenarioProjection, StateFingerprint, TurnTransitionEntry,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -57,6 +58,11 @@ fn render_combat_session_catalog() -> String {
     out.push_str("  scriptReadouts: [\n");
     for readout in combat_session_script_readouts() {
         out.push_str(&render_script_readout(&readout));
+    }
+    out.push_str("  ],\n");
+    out.push_str("  automaticRunReadouts: [\n");
+    for readout in combat_session_automatic_run_readouts() {
+        out.push_str(&render_automatic_run_readout(&readout));
     }
     out.push_str("  ],\n");
     out.push_str("};\n");
@@ -455,6 +461,67 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         ));
     }
     out.push_str("      ],\n");
+    out.push_str("    },\n");
+    out
+}
+
+fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunReadout) -> String {
+    let mut out = String::from("    {\n");
+    out.push_str(&format!("      id: {},\n", ts_string(&readout.id)));
+    out.push_str(&format!("      title: {},\n", ts_string(&readout.title)));
+    out.push_str(&format!(
+        "      summary: {},\n",
+        ts_string(&readout.summary)
+    ));
+    out.push_str(&format!("      accepted: {},\n", readout.accepted));
+    out.push_str(&format!(
+        "      decisionKind: {},\n",
+        ts_string(readout.decision_kind.code())
+    ));
+    out.push_str(&format!("      maxSteps: {},\n", readout.max_steps));
+    out.push_str(&format!(
+        "      executedStepCount: {},\n",
+        readout.executed_step_count
+    ));
+    out.push_str("      stepDecisions: [\n");
+    for (sequence, step) in readout.steps.iter().enumerate() {
+        out.push_str("        {\n");
+        out.push_str(&format!("          sequence: {sequence},\n"));
+        out.push_str(&format!("          accepted: {},\n", step.plan.accepted));
+        out.push_str(&format!(
+            "          decisionKind: {},\n",
+            ts_string(step.plan.decision_kind.code())
+        ));
+        out.push_str(&format!(
+            "          operationKind: {},\n",
+            render_optional_automatic_step_operation_kind(step.plan.operation_kind)
+        ));
+        out.push_str(&format!(
+            "          reason: {},\n",
+            ts_string(&step.plan.reason)
+        ));
+        out.push_str("        },\n");
+    }
+    out.push_str("      ],\n");
+    out.push_str(&format!(
+        "      finalLifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(readout.final_snapshot.lifecycle.phase))
+    ));
+    out.push_str("      finalState: ");
+    out.push_str(&render_state(
+        &readout.final_snapshot.current_state,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str(&format!(
+        "      combatLogEntryCount: {},\n",
+        readout.final_snapshot.combat_log.len()
+    ));
+    out.push_str(&format!(
+        "      auditEntryCount: {},\n",
+        readout.final_snapshot.audit_log.len()
+    ));
+    out.push_str(&format!("      reason: {},\n", ts_string(&readout.reason)));
     out.push_str("    },\n");
     out
 }
@@ -1045,6 +1112,14 @@ fn render_optional_string(value: &Option<String>) -> String {
 fn render_optional_u32(value: Option<u32>) -> String {
     value
         .map(|inner| inner.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn render_optional_automatic_step_operation_kind(
+    value: Option<CombatSessionAutomaticStepOperationKind>,
+) -> String {
+    value
+        .map(|kind| ts_string(kind.code()))
         .unwrap_or_else(|| "null".to_string())
 }
 

@@ -36,6 +36,12 @@ export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'select
 
 export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';
 
+export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';
+
+export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle';
+
+export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';
+
 export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
 
 export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
@@ -61,6 +67,7 @@ export interface RulebenchCombatSessionCatalogDto {
   readonly readouts: readonly RulebenchCombatSessionStepReadoutDto[];
   readonly controlHistoryReadouts: readonly RulebenchCombatControlHistoryReadoutDto[];
   readonly scriptReadouts: readonly RulebenchCombatScriptReadoutDto[];
+  readonly automaticRunReadouts: readonly RulebenchAutomaticRunReadoutDto[];
 }
 
 export interface RulebenchStateFingerprintDto {
@@ -131,6 +138,30 @@ export interface RulebenchCombatTurnOrderDto {
   readonly currentTurnIndex: number;
   readonly participantOrder: readonly string[];
   readonly currentActorId: string | null;
+}
+
+export interface RulebenchAutomaticRunReadoutDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchAutomaticRunDecisionKindDto;
+  readonly maxSteps: number;
+  readonly executedStepCount: number;
+  readonly stepDecisions: readonly RulebenchAutomaticStepDecisionDto[];
+  readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly finalState: RulebenchFinalStateDto;
+  readonly combatLogEntryCount: number;
+  readonly auditEntryCount: number;
+  readonly reason: string;
+}
+
+export interface RulebenchAutomaticStepDecisionDto {
+  readonly sequence: number;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchAutomaticStepDecisionKindDto;
+  readonly operationKind: RulebenchAutomaticStepOperationKindDto | null;
+  readonly reason: string;
 }
 
 export interface RulebenchLifecycleTransitionEntryDto {

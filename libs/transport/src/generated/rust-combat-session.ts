@@ -1155,4 +1155,73 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       ],
     },
   ],
+  automaticRunReadouts: [
+    {
+      id: 'hexing-bolt-bounded-automatic-run',
+      title: 'Hexing Bolt Bounded Automatic Run',
+      summary: 'A generated Rust automatic run readout that drives the fixture to ended combat within a max-step guard.',
+      accepted: true,
+      decisionKind: 'completedCombatEnded',
+      maxSteps: 8,
+      executedStepCount: 5,
+      stepDecisions: [
+        {
+          sequence: 0,
+          accepted: true,
+          decisionKind: 'submitCandidate',
+          operationKind: 'submitCandidate',
+          reason: 'Automatic combat step planned first accepted command candidate.',
+        },
+        {
+          sequence: 1,
+          accepted: true,
+          decisionKind: 'advanceTurn',
+          operationKind: 'advanceTurn',
+          reason: 'Automatic combat step planned turn advancement because no accepted command candidate is available.',
+        },
+        {
+          sequence: 2,
+          accepted: true,
+          decisionKind: 'advanceTurn',
+          operationKind: 'advanceTurn',
+          reason: 'Automatic combat step planned turn advancement because no accepted command candidate is available.',
+        },
+        {
+          sequence: 3,
+          accepted: true,
+          decisionKind: 'submitCandidate',
+          operationKind: 'submitCandidate',
+          reason: 'Automatic combat step planned first accepted command candidate.',
+        },
+        {
+          sequence: 4,
+          accepted: true,
+          decisionKind: 'conditionalEnd',
+          operationKind: 'conditionalEnd',
+          reason: 'Automatic combat step planned conditional combat end.',
+        },
+      ],
+      finalLifecyclePhase: 'ended',
+      finalState: {
+        summary: 'Current session state.',
+        combatants: [
+          {
+            id: 'entity-adept',
+            name: 'Adept',
+            hitPoints: { current: 24, max: 24 },
+            conditions: [],
+          },
+          {
+            id: 'entity-raider',
+            name: 'Raider',
+            hitPoints: { current: 0, max: 18 },
+            conditions: ['rattled'],
+          },
+        ],
+      },
+      combatLogEntryCount: 2,
+      auditEntryCount: 2,
+      reason: 'Automatic combat run completed because combat reached ended lifecycle.',
+    },
+  ],
 };

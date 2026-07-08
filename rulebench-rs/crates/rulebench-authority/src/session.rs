@@ -1,6 +1,7 @@
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
 use crate::runtime::{
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
     CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
     CombatSessionScriptReadout, CombatSessionScriptSpec, CombatSessionScriptStepSpec,
     CombatSessionState,
@@ -41,6 +42,26 @@ pub fn combat_session_control_history_readouts() -> Vec<CombatControlHistoryRead
 
 pub fn combat_session_script_readouts() -> Vec<CombatSessionScriptReadout> {
     vec![hexing_bolt_mixed_script_readout()]
+}
+
+pub fn combat_session_automatic_run_readouts() -> Vec<CombatSessionAutomaticRunReadout> {
+    vec![hexing_bolt_bounded_automatic_run_readout()]
+}
+
+fn hexing_bolt_bounded_automatic_run_readout() -> CombatSessionAutomaticRunReadout {
+    let session_id = "hexing-bolt-bounded-automatic-run";
+    let title = "Hexing Bolt Bounded Automatic Run";
+    let summary = "A generated Rust automatic run readout that drives the fixture to ended combat within a max-step guard.";
+
+    let mut session_state = CombatSessionState::new(session_id, hexing_bolt_fixture_scenario());
+
+    session_state.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
+        session_id,
+        title,
+        summary,
+        8,
+        vec![17, 5],
+    ))
 }
 
 fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {

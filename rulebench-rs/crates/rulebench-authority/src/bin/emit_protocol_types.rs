@@ -55,6 +55,9 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';",
         "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';",
         "export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';",
+        "export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';",
+        "export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle';",
+        "export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';",
         "export type RulebenchModifierTenureDto = 'temporary' | 'permanent';",
         "export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';",
         "export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';",
@@ -116,6 +119,10 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "scriptReadouts",
                     ty: "readonly RulebenchCombatScriptReadoutDto[]",
+                },
+                Field {
+                    name: "automaticRunReadouts",
+                    ty: "readonly RulebenchAutomaticRunReadoutDto[]",
                 },
             ],
         },
@@ -354,6 +361,88 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "currentActorId",
                     ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAutomaticRunReadoutDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchAutomaticRunDecisionKindDto",
+                },
+                Field {
+                    name: "maxSteps",
+                    ty: "number",
+                },
+                Field {
+                    name: "executedStepCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "stepDecisions",
+                    ty: "readonly RulebenchAutomaticStepDecisionDto[]",
+                },
+                Field {
+                    name: "finalLifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "finalState",
+                    ty: "RulebenchFinalStateDto",
+                },
+                Field {
+                    name: "combatLogEntryCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "auditEntryCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAutomaticStepDecisionDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchAutomaticStepDecisionKindDto",
+                },
+                Field {
+                    name: "operationKind",
+                    ty: "RulebenchAutomaticStepOperationKindDto | null",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },
