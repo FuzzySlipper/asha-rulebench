@@ -155,6 +155,11 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly finalState: RulebenchFinalStateDto;
   readonly combatLog: readonly RulebenchCombatLogEntryDto[];
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
+  readonly lifecycleTransitionLog: readonly RulebenchLifecycleTransitionEntryDto[];
+  readonly turnTransitionLog: readonly RulebenchTurnTransitionEntryDto[];
+  readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
+  readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
+  readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
   readonly combatLogEntryCount: number;
   readonly auditEntryCount: number;
   readonly reason: string;

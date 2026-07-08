@@ -523,6 +523,33 @@ fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunReadout) -> S
         out.push_str(&render_command_audit_entry(entry, "        "));
     }
     out.push_str("      ],\n");
+    out.push_str("      lifecycleTransitionLog: [\n");
+    for entry in &readout.final_snapshot.lifecycle_transition_log {
+        out.push_str(&render_lifecycle_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      turnTransitionLog: [\n");
+    for entry in &readout.final_snapshot.turn_transition_log {
+        out.push_str(&render_turn_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      actionUsageLog: [\n");
+    for entry in &readout.final_snapshot.action_usage_log {
+        out.push_str(&render_action_usage_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      actionResourceTransitionLog: [\n");
+    for entry in &readout.final_snapshot.action_resource_transition_log {
+        out.push_str(&render_action_resource_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      modifierDurationExpirationLog: [\n");
+    for entry in &readout.final_snapshot.modifier_duration_expiration_log {
+        out.push_str(&render_modifier_duration_expiration_entry(
+            entry, "        ",
+        ));
+    }
+    out.push_str("      ],\n");
     out.push_str(&format!(
         "      combatLogEntryCount: {},\n",
         readout.final_snapshot.combat_log.len()

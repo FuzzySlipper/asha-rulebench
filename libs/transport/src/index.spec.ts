@@ -750,6 +750,63 @@ describe("RulebenchTransport fixtures", () => {
           reason: "Damage roll value was consumed for damage resolution.",
         },
       ]);
+      expect(
+        result.value.lifecycleTransitionLog.map((entry) => entry.trigger),
+      ).toEqual(["commandStart", "conditionalEnd"]);
+      expect(
+        result.value.lifecycleTransitionLog.map(
+          (entry) => entry.nextLifecyclePhase,
+        ),
+      ).toEqual(["inProgress", "ended"]);
+      expect(
+        result.value.turnTransitionLog.map((entry) => entry.nextActorId),
+      ).toEqual(["entity-raider", "entity-adept"]);
+      expect(
+        result.value.turnTransitionLog.map((entry) => entry.wrappedRound),
+      ).toEqual([false, true]);
+      expect(
+        result.value.actionUsageLog.map((entry) => entry.stepId),
+      ).toEqual([
+        "hexing-bolt-bounded-automatic-run-step-0",
+        "hexing-bolt-bounded-automatic-run-step-3",
+      ]);
+      expect(
+        result.value.actionUsageLog.map((entry) => entry.abilityId),
+      ).toEqual(["ability.hexing-bolt", "ability.hexing-bolt"]);
+      expect(
+        result.value.actionResourceTransitionLog.map(
+          (entry) => entry.transitionKind,
+        ),
+      ).toEqual(["spent", "refreshed", "refreshed", "spent"]);
+      expect(
+        result.value.actionResourceTransitionLog.map(
+          (entry) => entry.combatantId,
+        ),
+      ).toEqual([
+        "entity-adept",
+        "entity-raider",
+        "entity-adept",
+        "entity-adept",
+      ]);
+      expect(result.value.modifierDurationExpirationLog).toEqual([
+        {
+          sequence: 0,
+          combatantId: "entity-raider",
+          modifierId: "rattled",
+          previousModifier: {
+            modifierId: "rattled",
+            label: "rattled",
+            duration: "until end of next turn",
+            tenure: "temporary",
+          },
+          nextModifier: null,
+          turnTransitionSequence: 1,
+          roundNumber: 2,
+          turnIndex: 0,
+          currentActorId: "entity-adept",
+          reason: "Temporary modifier expired at turn boundary.",
+        },
+      ]);
       expect(result.value.reason).toBe(
         "Automatic combat run completed because combat reached ended lifecycle.",
       );

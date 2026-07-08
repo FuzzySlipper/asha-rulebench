@@ -417,6 +417,26 @@ fn interfaces() -> &'static [Interface] {
                     ty: "readonly RulebenchCommandAuditEntryDto[]",
                 },
                 Field {
+                    name: "lifecycleTransitionLog",
+                    ty: "readonly RulebenchLifecycleTransitionEntryDto[]",
+                },
+                Field {
+                    name: "turnTransitionLog",
+                    ty: "readonly RulebenchTurnTransitionEntryDto[]",
+                },
+                Field {
+                    name: "actionUsageLog",
+                    ty: "readonly RulebenchActionUsageEntryDto[]",
+                },
+                Field {
+                    name: "actionResourceTransitionLog",
+                    ty: "readonly RulebenchActionResourceTransitionEntryDto[]",
+                },
+                Field {
+                    name: "modifierDurationExpirationLog",
+                    ty: "readonly RulebenchModifierDurationExpirationEntryDto[]",
+                },
+                Field {
                     name: "combatLogEntryCount",
                     ty: "number",
                 },
