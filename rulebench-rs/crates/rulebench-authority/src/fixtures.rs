@@ -188,6 +188,11 @@ fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
         label: "rattled".to_string(),
         summary: "A temporary condition-like modifier applied by Hexing Bolt.".to_string(),
         default_tenure: ModifierTenure::Temporary,
+        stat_adjustments: vec![ModifierStatAdjustment {
+            stat_id: "mind".to_string(),
+            stat_label: "Mind".to_string(),
+            delta: -1,
+        }],
     }]
 }
 

@@ -304,6 +304,7 @@ pub enum ContentDiagnosticCode {
     MissingCombatantClass,
     MissingCombatantStatDefinition,
     MissingHitModifierDefinition,
+    MissingModifierStatAdjustmentTarget,
     MissingActiveModifierDefinition,
     MissingEquippedItem,
 }
@@ -350,6 +351,9 @@ impl ContentDiagnosticCode {
                 "missingCombatantStatDefinition"
             }
             ContentDiagnosticCode::MissingHitModifierDefinition => "missingHitModifierDefinition",
+            ContentDiagnosticCode::MissingModifierStatAdjustmentTarget => {
+                "missingModifierStatAdjustmentTarget"
+            }
             ContentDiagnosticCode::MissingActiveModifierDefinition => {
                 "missingActiveModifierDefinition"
             }
@@ -639,6 +643,14 @@ pub struct ModifierDefinition {
     pub label: String,
     pub summary: String,
     pub default_tenure: ModifierTenure,
+    pub stat_adjustments: Vec<ModifierStatAdjustment>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModifierStatAdjustment {
+    pub stat_id: String,
+    pub stat_label: String,
+    pub delta: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -204,6 +204,22 @@ fn validate_modifiers(scenario: &RulebenchScenario, diagnostics: &mut Vec<Conten
                 format!("Modifier id {} appears more than once.", modifier.id),
             ));
         }
+
+        for adjustment in &modifier.stat_adjustments {
+            if scenario
+                .stat_definition_by_id(&adjustment.stat_id)
+                .is_none()
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingModifierStatAdjustmentTarget,
+                    Some(adjustment.stat_id.clone()),
+                    format!(
+                        "Modifier {} adjusts stat {} that is not present in the scenario stat catalog.",
+                        modifier.id, adjustment.stat_id
+                    ),
+                ));
+            }
+        }
     }
 }
 

@@ -309,6 +309,18 @@ mod tests {
                 .map(|modifier| modifier.default_tenure.code()),
             Some("temporary")
         );
+        assert_eq!(
+            scenario
+                .modifier_by_id("rattled")
+                .map(|modifier| modifier.stat_adjustments.as_slice()),
+            Some(
+                &[ModifierStatAdjustment {
+                    stat_id: "mind".to_string(),
+                    stat_label: "Mind".to_string(),
+                    delta: -1,
+                }][..]
+            )
+        );
     }
 
     #[test]
@@ -624,6 +636,7 @@ mod tests {
             label: "empty".to_string(),
             summary: "Invalid modifier fixture.".to_string(),
             default_tenure: ModifierTenure::Temporary,
+            stat_adjustments: Vec::new(),
         });
 
         let diagnostics = validate_scenario_content(&scenario);
@@ -649,6 +662,41 @@ mod tests {
             ContentDiagnosticCode::DuplicateModifierId
         );
         assert_eq!(diagnostics[0].content_id, Some("rattled".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_modifier_stat_adjustment_target() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.modifiers[0].stat_adjustments[0].stat_id = "missing-mind".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingModifierStatAdjustmentTarget
+        );
+        assert_eq!(diagnostics[0].content_id, Some("missing-mind".to_string()));
+        assert_eq!(
+            ContentDiagnosticCode::MissingModifierStatAdjustmentTarget.code(),
+            "missingModifierStatAdjustmentTarget"
+        );
+    }
+
+    #[test]
+    fn content_validation_report_counts_modifier_stat_adjustment_target_errors() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.modifiers[0].stat_adjustments[0].stat_id = "missing-mind".to_string();
+
+        let report = validate_scenario_content_report(&scenario);
+
+        assert!(!report.accepted);
+        assert_eq!(report.error_count, 1);
+        assert_eq!(report.warning_count, 0);
+        assert_eq!(
+            report.diagnostics[0].code,
+            ContentDiagnosticCode::MissingModifierStatAdjustmentTarget
+        );
     }
 
     #[test]
@@ -1099,6 +1147,14 @@ mod tests {
                 .as_ref()
                 .map(|projection| projection.combatants[1].conditions.as_slice()),
             Some(&["rattled".to_string()][..])
+        );
+        assert_eq!(
+            scenario.modifiers[0].stat_adjustments[0],
+            ModifierStatAdjustment {
+                stat_id: "mind".to_string(),
+                stat_label: "Mind".to_string(),
+                delta: -1,
+            }
         );
     }
 
