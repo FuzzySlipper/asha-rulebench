@@ -171,6 +171,36 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_entity_catalog_and_combatant_references() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(validate_scenario_content(&scenario).is_empty());
+        assert_eq!(
+            scenario
+                .entities
+                .iter()
+                .map(|entity| entity.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["entity.adept", "entity.raider"]
+        );
+        assert_eq!(
+            scenario
+                .entity_by_id("entity.adept")
+                .map(|entity| entity.name.as_str()),
+            Some("Adept")
+        );
+        assert_eq!(scenario.combatants[0].entity_id, "entity.adept");
+        assert_eq!(scenario.combatants[1].entity_id, "entity.raider");
+    }
+
+    #[test]
+    fn scenario_entity_catalog_rejects_unknown_lookup() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(scenario.entity_by_id("entity.missing").is_none());
+    }
+
+    #[test]
     fn scenario_carries_item_catalog_and_equipped_item_references() {
         let scenario = hexing_bolt_fixture_scenario();
 
@@ -378,6 +408,57 @@ mod tests {
         assert_eq!(
             diagnostics[0].content_id,
             Some("ability.missing".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_entity_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.entities.push(EntityDefinition {
+            id: String::new(),
+            name: "Nameless".to_string(),
+            summary: "Invalid entity fixture.".to_string(),
+            tags: Vec::new(),
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, ContentDiagnosticSeverity::Error);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyEntityId);
+        assert_eq!(ContentDiagnosticCode::EmptyEntityId.code(), "emptyEntityId");
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_entity_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.entities.push(scenario.entities[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::DuplicateEntityId
+        );
+        assert_eq!(diagnostics[0].content_id, Some("entity.adept".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_combatant_entity() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].entity_id = "entity.missing".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingCombatantEntity
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("entity.missing".to_string())
         );
     }
 
@@ -963,6 +1044,24 @@ mod tests {
         assert_eq!(
             receipt.attack_roll.as_ref().map(|roll| roll.total),
             Some(21)
+        );
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+    }
+
+    #[test]
+    fn entity_content_does_not_change_hexing_bolt_resolution() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.outcome),
+            Some(AttackOutcome::Hit)
         );
         assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
     }

@@ -278,6 +278,8 @@ pub enum ContentDiagnosticCode {
     EmptyRulesetId,
     EmptyAbilityId,
     DuplicateAbilityId,
+    EmptyEntityId,
+    DuplicateEntityId,
     EmptyActionId,
     DuplicateActionId,
     EmptyClassId,
@@ -292,6 +294,7 @@ pub enum ContentDiagnosticCode {
     SelectedActionMissingFromCatalog,
     SelectedClassMissingFromCatalog,
     SelectedItemMissingFromCatalog,
+    MissingCombatantEntity,
     MissingActionAbility,
     MissingActionActor,
     MissingActionTarget,
@@ -311,6 +314,8 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
             ContentDiagnosticCode::EmptyAbilityId => "emptyAbilityId",
             ContentDiagnosticCode::DuplicateAbilityId => "duplicateAbilityId",
+            ContentDiagnosticCode::EmptyEntityId => "emptyEntityId",
+            ContentDiagnosticCode::DuplicateEntityId => "duplicateEntityId",
             ContentDiagnosticCode::EmptyActionId => "emptyActionId",
             ContentDiagnosticCode::DuplicateActionId => "duplicateActionId",
             ContentDiagnosticCode::EmptyClassId => "emptyClassId",
@@ -333,6 +338,7 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::SelectedItemMissingFromCatalog => {
                 "selectedItemMissingFromCatalog"
             }
+            ContentDiagnosticCode::MissingCombatantEntity => "missingCombatantEntity",
             ContentDiagnosticCode::MissingActionAbility => "missingActionAbility",
             ContentDiagnosticCode::MissingActionActor => "missingActionActor",
             ContentDiagnosticCode::MissingActionTarget => "missingActionTarget",
@@ -439,6 +445,7 @@ impl StatBlock {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Combatant {
     pub id: String,
+    pub entity_id: String,
     pub name: String,
     pub team: Team,
     pub position: GridPosition,
@@ -464,6 +471,7 @@ pub struct RulebenchScenario {
     pub ruleset: RulesetMetadata,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
+    pub entities: Vec<EntityDefinition>,
     pub abilities: Vec<AbilityDefinition>,
     pub selected_ability_id: Option<String>,
     pub classes: Vec<ClassDefinition>,
@@ -477,6 +485,10 @@ pub struct RulebenchScenario {
 }
 
 impl RulebenchScenario {
+    pub fn entity_by_id(&self, entity_id: &str) -> Option<&EntityDefinition> {
+        self.entities.iter().find(|entity| entity.id == entity_id)
+    }
+
     pub fn ability_by_id(&self, ability_id: &str) -> Option<&AbilityDefinition> {
         self.abilities
             .iter()
@@ -565,6 +577,14 @@ pub struct AbilityDefinition {
     pub id: String,
     pub name: String,
     pub kind: AbilityDefinitionKind,
+    pub summary: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntityDefinition {
+    pub id: String,
+    pub name: String,
     pub summary: String,
     pub tags: Vec<String>,
 }

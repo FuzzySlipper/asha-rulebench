@@ -16,6 +16,7 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
         ));
     }
 
+    validate_entities(scenario, &mut diagnostics);
     validate_abilities(scenario, &mut diagnostics);
     validate_classes(scenario, &mut diagnostics);
     validate_stat_definitions(scenario, &mut diagnostics);
@@ -61,6 +62,28 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_entities(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
+    let mut seen_entity_ids = HashSet::new();
+    for entity in &scenario.entities {
+        if entity.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyEntityId,
+                None,
+                "Entity catalog contains an entity with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_entity_ids.insert(entity.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateEntityId,
+                Some(entity.id.clone()),
+                format!("Entity id {} appears more than once.", entity.id),
+            ));
+        }
+    }
 }
 
 fn validate_abilities(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
@@ -185,6 +208,17 @@ fn validate_combatant_class_and_stat_references(
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
     for combatant in &scenario.combatants {
+        if scenario.entity_by_id(&combatant.entity_id).is_none() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::MissingCombatantEntity,
+                Some(combatant.entity_id.clone()),
+                format!(
+                    "Combatant {} references entity {} that is not present in the scenario entity catalog.",
+                    combatant.id, combatant.entity_id
+                ),
+            ));
+        }
+
         for class_id in &combatant.class_ids {
             if scenario.class_by_id(class_id).is_none() {
                 diagnostics.push(ContentDiagnostic::error(

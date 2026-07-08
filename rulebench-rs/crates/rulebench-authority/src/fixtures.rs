@@ -30,6 +30,7 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             ],
         },
         combatants: vec![adept_initial(), raider_initial()],
+        entities: hexing_bolt_entities(),
         abilities: hexing_bolt_abilities(),
         selected_ability_id: Some("ability.hexing-bolt".to_string()),
         classes: hexing_bolt_classes(),
@@ -104,6 +105,23 @@ fn hexing_bolt_abilities() -> Vec<AbilityDefinition> {
             "psychic".to_string(),
         ],
     }]
+}
+
+fn hexing_bolt_entities() -> Vec<EntityDefinition> {
+    vec![
+        EntityDefinition {
+            id: "entity.adept".to_string(),
+            name: "Adept".to_string(),
+            summary: "A focused caster entity used as the Hexing Bolt actor.".to_string(),
+            tags: vec!["ally".to_string(), "caster".to_string()],
+        },
+        EntityDefinition {
+            id: "entity.raider".to_string(),
+            name: "Raider".to_string(),
+            summary: "A hostile raider entity used as the Hexing Bolt target.".to_string(),
+            tags: vec!["enemy".to_string(), "skirmisher".to_string()],
+        },
+    ]
 }
 
 fn hexing_bolt_items() -> Vec<ItemDefinition> {
@@ -192,6 +210,7 @@ pub fn rejected_target_fixture_receipt() -> RulebenchReceipt {
 fn adept_initial() -> Combatant {
     Combatant {
         id: "entity-adept".to_string(),
+        entity_id: "entity.adept".to_string(),
         name: "Adept".to_string(),
         team: Team::Ally,
         position: GridPosition { x: 1, y: 1 },
@@ -241,6 +260,7 @@ fn adept_initial() -> Combatant {
 fn raider_initial() -> Combatant {
     Combatant {
         id: "entity-raider".to_string(),
+        entity_id: "entity.raider".to_string(),
         name: "Raider".to_string(),
         team: Team::Enemy,
         position: GridPosition { x: 4, y: 1 },
