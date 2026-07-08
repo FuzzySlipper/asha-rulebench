@@ -67,7 +67,8 @@ impl CombatState {
                 .find(|state| state.id == combatant.id)
             {
                 combatant.hit_points = state.hit_points;
-                combatant.conditions = state.conditions.clone();
+                combatant.active_modifiers = state.active_modifiers.clone();
+                combatant.conditions = state.condition_labels();
             }
         }
         scenario

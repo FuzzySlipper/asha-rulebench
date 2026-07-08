@@ -719,6 +719,33 @@ mod tests {
     }
 
     #[test]
+    fn combat_state_applies_active_modifiers_back_to_scenario() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let receipt = accepted_hexing_bolt_fixture_receipt();
+        let damage = receipt.damage.as_ref().expect("fixture hit has damage");
+        let modifier = receipt.modifier.as_ref().expect("fixture hit has modifier");
+        let mut state = crate::state::CombatState::from_scenario(&scenario);
+
+        state.apply_hit(damage, modifier);
+        let next_scenario = state.apply_to_scenario(scenario);
+        let raider = next_scenario
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == "entity-raider")
+            .expect("raider exists");
+
+        assert_eq!(raider.active_modifiers.len(), 1);
+        assert_eq!(raider.active_modifiers[0].modifier_id, "rattled");
+        assert_eq!(raider.active_modifiers[0].label, "rattled");
+        assert_eq!(
+            raider.active_modifiers[0].duration,
+            "until end of next turn"
+        );
+        assert_eq!(raider.active_modifiers[0].tenure, ModifierTenure::Temporary);
+        assert_eq!(raider.conditions, vec!["rattled".to_string()]);
+    }
+
+    #[test]
     fn session_runtime_accepts_hit_command_and_advances_state() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
