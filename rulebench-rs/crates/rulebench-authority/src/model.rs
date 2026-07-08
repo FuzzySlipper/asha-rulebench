@@ -325,6 +325,38 @@ pub struct ActionResourceSpendReadout {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionResourceRefreshDecisionKind {
+    Refreshed,
+    RejectedByMissingCombatant,
+    RejectedByMissingResource,
+}
+
+impl ActionResourceRefreshDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ActionResourceRefreshDecisionKind::Refreshed => "refreshed",
+            ActionResourceRefreshDecisionKind::RejectedByMissingCombatant => {
+                "rejectedByMissingCombatant"
+            }
+            ActionResourceRefreshDecisionKind::RejectedByMissingResource => {
+                "rejectedByMissingResource"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourceRefreshReadout {
+    pub combatant_id: String,
+    pub resource_kind: ActionResourceKind,
+    pub accepted: bool,
+    pub decision_kind: ActionResourceRefreshDecisionKind,
+    pub previous_resource: Option<ActionResourceState>,
+    pub next_resource: Option<ActionResourceState>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatControlCommandKind {
     ExplicitStart,
     ExplicitEnd,

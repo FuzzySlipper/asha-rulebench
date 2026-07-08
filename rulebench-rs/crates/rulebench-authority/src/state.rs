@@ -1,8 +1,8 @@
 use crate::model::{
-    ActionResourceKind, ActionResourceLedgerReadout, ActionResourceSpendDecisionKind,
-    ActionResourceSpendReadout, ActionResourceState, ActiveModifier, BoundedValue, Combatant,
-    CombatantActionResourceReadout, DamageOutcome, FinalCombatantState, ModifierOutcome,
-    RulebenchScenario, ScenarioProjection,
+    ActionResourceKind, ActionResourceLedgerReadout, ActionResourceRefreshDecisionKind,
+    ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
+    ActionResourceState, ActiveModifier, BoundedValue, Combatant, CombatantActionResourceReadout,
+    DamageOutcome, FinalCombatantState, ModifierOutcome, RulebenchScenario, ScenarioProjection,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +109,30 @@ impl CombatState {
         };
 
         combatant.spend_action_resource(resource_kind)
+    }
+
+    pub(crate) fn refresh_action_resource(
+        &mut self,
+        combatant_id: &str,
+        resource_kind: ActionResourceKind,
+    ) -> ActionResourceRefreshReadout {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == combatant_id)
+        else {
+            return ActionResourceRefreshReadout {
+                combatant_id: combatant_id.to_string(),
+                resource_kind,
+                accepted: false,
+                decision_kind: ActionResourceRefreshDecisionKind::RejectedByMissingCombatant,
+                previous_resource: None,
+                next_resource: None,
+                reason: "Combatant is not present in the action resource ledger.".to_string(),
+            };
+        };
+
+        combatant.refresh_action_resource(resource_kind)
     }
 
     #[cfg(test)]
@@ -263,6 +287,42 @@ impl CombatantState {
             reason: "Action resource spent.".to_string(),
         }
     }
+
+    fn refresh_action_resource(
+        &mut self,
+        resource_kind: ActionResourceKind,
+    ) -> ActionResourceRefreshReadout {
+        let Some(resource) = self
+            .action_resources
+            .iter_mut()
+            .find(|resource| resource.kind == resource_kind)
+        else {
+            return ActionResourceRefreshReadout {
+                combatant_id: self.id.clone(),
+                resource_kind,
+                accepted: false,
+                decision_kind: ActionResourceRefreshDecisionKind::RejectedByMissingResource,
+                previous_resource: None,
+                next_resource: None,
+                reason: "Combatant does not have the requested action resource.".to_string(),
+            };
+        };
+
+        let previous_resource = resource.clone();
+        resource.current = resource.max;
+        resource.available = resource.current > 0;
+        let next_resource = resource.clone();
+
+        ActionResourceRefreshReadout {
+            combatant_id: self.id.clone(),
+            resource_kind,
+            accepted: true,
+            decision_kind: ActionResourceRefreshDecisionKind::Refreshed,
+            previous_resource: Some(previous_resource),
+            next_resource: Some(next_resource),
+            reason: "Action resource refreshed.".to_string(),
+        }
+    }
 }
 
 fn default_action_resources() -> Vec<ActionResourceState> {
@@ -363,6 +423,86 @@ mod tests {
             readout.decision_kind,
             ActionResourceSpendDecisionKind::RejectedByMissingCombatant
         );
+        assert_eq!(readout.previous_resource, None);
+        assert_eq!(readout.next_resource, None);
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn combat_state_refreshes_spent_standard_action() {
+        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
+
+        let readout =
+            state.refresh_action_resource("entity-adept", ActionResourceKind::StandardAction);
+        let resources = state
+            .action_resources_for("entity-adept")
+            .expect("adept resources are initialized");
+
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            ActionResourceRefreshDecisionKind::Refreshed
+        );
+        assert_eq!(readout.decision_kind.code(), "refreshed");
+        assert_eq!(
+            readout.previous_resource,
+            Some(ActionResourceState::new(
+                ActionResourceKind::StandardAction,
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            readout.next_resource,
+            Some(ActionResourceState::standard_action_available())
+        );
+        assert_eq!(
+            resources.resources,
+            vec![ActionResourceState::standard_action_available()]
+        );
+    }
+
+    #[test]
+    fn combat_state_refreshes_full_standard_action_idempotently() {
+        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let before = state.action_resource_ledger();
+
+        let readout =
+            state.refresh_action_resource("entity-adept", ActionResourceKind::StandardAction);
+        let after = state.action_resource_ledger();
+
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            ActionResourceRefreshDecisionKind::Refreshed
+        );
+        assert_eq!(
+            readout.previous_resource,
+            Some(ActionResourceState::standard_action_available())
+        );
+        assert_eq!(
+            readout.next_resource,
+            Some(ActionResourceState::standard_action_available())
+        );
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn combat_state_rejects_missing_combatant_refresh_without_mutation() {
+        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let before = state.action_resource_ledger();
+
+        let readout =
+            state.refresh_action_resource("entity-missing", ActionResourceKind::StandardAction);
+        let after = state.action_resource_ledger();
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            ActionResourceRefreshDecisionKind::RejectedByMissingCombatant
+        );
+        assert_eq!(readout.decision_kind.code(), "rejectedByMissingCombatant");
         assert_eq!(readout.previous_resource, None);
         assert_eq!(readout.next_resource, None);
         assert_eq!(before, after);

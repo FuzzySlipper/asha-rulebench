@@ -5899,6 +5899,143 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_turn_wrap_refreshes_spent_current_actor_action_resource() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-round-one-action",
+            "Runtime round one action",
+            "Adept spends the standard action in round one.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        assert_eq!(
+            session
+                .action_resource_ledger()
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::new(
+                ActionResourceKind::StandardAction,
+                0,
+                1
+            ))
+        );
+        assert!(
+            !session
+                .preflight_command(UseActionIntent::new(
+                    "entity-adept",
+                    "hexing_bolt",
+                    "entity-raider"
+                ))
+                .accepted
+        );
+
+        session.advance_turn();
+        let readout = session.advance_turn();
+
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.next_turn_order.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(
+            session
+                .action_resource_ledger()
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::standard_action_available())
+        );
+        assert!(
+            session
+                .preflight_command(UseActionIntent::new(
+                    "entity-adept",
+                    "hexing_bolt",
+                    "entity-raider"
+                ))
+                .accepted
+        );
+        assert!(session
+            .current_actor_command_candidates()
+            .candidates
+            .iter()
+            .any(|candidate| candidate.accepted));
+    }
+
+    #[test]
+    fn session_runtime_rejected_turn_advance_does_not_refresh_action_resource() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-spend-before-end",
+            "Runtime spend before end",
+            "Adept spends the standard action before combat ends.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.end_combat();
+        let before = session.action_resource_ledger();
+
+        let readout = session.advance_turn();
+        let after = session.action_resource_ledger();
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            TurnAdvanceDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(after, before);
+        assert_eq!(
+            after
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::new(
+                ActionResourceKind::StandardAction,
+                0,
+                1
+            ))
+        );
+    }
+
+    #[test]
+    fn session_runtime_control_turn_advance_refreshes_action_resource_on_round_wrap() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-spend-before-control-wrap",
+            "Runtime spend before control wrap",
+            "Adept spends the standard action before control turn advancement.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        session.submit_control_command(CombatControlCommandSpec::advance_turn());
+        let readout = session.submit_control_command(CombatControlCommandSpec::advance_turn());
+
+        assert!(readout.accepted);
+        assert_eq!(readout.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(session.control_history().len(), 2);
+        assert_eq!(
+            session
+                .action_resource_ledger()
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == "entity-adept")
+                .and_then(|combatant| combatant.resources.first())
+                .cloned(),
+            Some(ActionResourceState::standard_action_available())
+        );
+    }
+
+    #[test]
     fn session_runtime_action_usage_records_current_turn_context() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());

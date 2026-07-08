@@ -727,6 +727,10 @@ impl CombatSessionState {
         }
 
         self.turn_order.advance_turn();
+        if let Some(current_actor_id) = self.turn_order.current_actor_id.as_deref() {
+            self.state
+                .refresh_action_resource(current_actor_id, ActionResourceKind::StandardAction);
+        }
         let transition = turn_transition_entry(
             self.turn_transition_log.len() as u32,
             &previous_turn_order,
