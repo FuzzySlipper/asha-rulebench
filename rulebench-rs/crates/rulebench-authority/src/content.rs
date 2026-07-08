@@ -2,8 +2,12 @@ use std::collections::HashSet;
 
 use crate::model::{
     ActionDefinition, Combatant, ContentDiagnostic, ContentDiagnosticCode,
-    ContentDiagnosticSeverity, RulebenchScenario,
+    ContentDiagnosticSeverity, ContentValidationReport, RulebenchScenario,
 };
+
+pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> ContentValidationReport {
+    ContentValidationReport::from_diagnostics(validate_scenario_content(scenario))
+}
 
 pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDiagnostic> {
     let mut diagnostics = Vec::new();

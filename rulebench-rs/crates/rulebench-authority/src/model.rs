@@ -367,6 +367,34 @@ pub struct ContentDiagnostic {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentValidationReport {
+    pub accepted: bool,
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub diagnostics: Vec<ContentDiagnostic>,
+}
+
+impl ContentValidationReport {
+    pub fn from_diagnostics(diagnostics: Vec<ContentDiagnostic>) -> Self {
+        let error_count = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == ContentDiagnosticSeverity::Error)
+            .count();
+        let warning_count = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == ContentDiagnosticSeverity::Warning)
+            .count();
+
+        Self {
+            accepted: error_count == 0,
+            error_count,
+            warning_count,
+            diagnostics,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grid {
     pub width: u32,
     pub height: u32,

@@ -22,7 +22,7 @@ pub use audit::{
     STATE_FINGERPRINT_ALGORITHM,
 };
 pub use catalog::{resolve_catalog_scenario, scenario_catalog_cases, scenario_catalog_summaries};
-pub use content::validate_scenario_content;
+pub use content::{validate_scenario_content, validate_scenario_content_report};
 pub use fixtures::{
     accepted_hexing_bolt_fixture_receipt, hexing_bolt_fixture_scenario,
     rejected_target_fixture_receipt,
@@ -866,6 +866,79 @@ mod tests {
     }
 
     #[test]
+    fn content_validation_report_accepts_valid_fixture() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let report = validate_scenario_content_report(&scenario);
+
+        assert!(report.accepted);
+        assert_eq!(report.error_count, 0);
+        assert_eq!(report.warning_count, 0);
+        assert!(report.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn content_validation_report_counts_error_diagnostics() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.ruleset.id.clear();
+        scenario.entities.push(scenario.entities[0].clone());
+
+        let report = validate_scenario_content_report(&scenario);
+
+        assert!(!report.accepted);
+        assert_eq!(report.error_count, 2);
+        assert_eq!(report.warning_count, 0);
+        assert_eq!(
+            report
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code)
+                .collect::<Vec<_>>(),
+            vec![
+                ContentDiagnosticCode::EmptyRulesetId,
+                ContentDiagnosticCode::DuplicateEntityId,
+            ]
+        );
+    }
+
+    #[test]
+    fn content_validation_report_preserves_diagnostic_details() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.selected_item_id = Some("item.missing-focus".to_string());
+
+        let report = validate_scenario_content_report(&scenario);
+
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(
+            report.diagnostics[0].code,
+            ContentDiagnosticCode::SelectedItemMissingFromCatalog
+        );
+        assert_eq!(
+            report.diagnostics[0].content_id,
+            Some("item.missing-focus".to_string())
+        );
+        assert!(report.diagnostics[0]
+            .message
+            .contains("not present in the scenario item catalog"));
+    }
+
+    #[test]
+    fn content_validation_report_accepts_warning_only_diagnostics() {
+        let report = ContentValidationReport::from_diagnostics(vec![ContentDiagnostic {
+            severity: ContentDiagnosticSeverity::Warning,
+            code: ContentDiagnosticCode::EmptyRulesetId,
+            content_id: None,
+            message: "Warning-only fixtures remain accepted until errors exist.".to_string(),
+        }]);
+
+        assert!(report.accepted);
+        assert_eq!(report.error_count, 0);
+        assert_eq!(report.warning_count, 1);
+        assert_eq!(report.diagnostics.len(), 1);
+        assert_eq!(ContentDiagnosticSeverity::Warning.code(), "warning");
+    }
+
+    #[test]
     fn scenario_carries_combatant_stat_blocks() {
         let scenario = hexing_bolt_fixture_scenario();
         let adept = scenario
@@ -1064,6 +1137,33 @@ mod tests {
             Some(AttackOutcome::Hit)
         );
         assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+    }
+
+    #[test]
+    fn content_validation_report_does_not_change_hexing_bolt_resolution() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let report = validate_scenario_content_report(&scenario);
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(report.accepted);
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.total),
+            Some(21)
+        );
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+        assert_eq!(
+            receipt
+                .projection
+                .as_ref()
+                .map(|projection| projection.combatants[1].conditions.as_slice()),
+            Some(&["rattled".to_string()][..])
+        );
     }
 
     #[test]
