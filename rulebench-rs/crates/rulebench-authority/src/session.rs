@@ -1,8 +1,9 @@
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
 use crate::runtime::{
-    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionScriptReadout,
-    CombatSessionScriptSpec, CombatSessionScriptStepSpec, CombatSessionState,
+    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
+    CombatSessionScriptReadout, CombatSessionScriptSpec, CombatSessionScriptStepSpec,
+    CombatSessionState,
 };
 
 pub fn combat_session_summaries() -> Vec<CombatSessionSummary> {
@@ -166,6 +167,18 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
                     "Raider has no command candidates in this fixture.",
                     "hexing_bolt",
                     "entity-raider",
+                    vec![17, 5],
+                ),
+            ),
+            CombatSessionScriptStepSpec::intent(
+                "script-wrong-turn-intent-step",
+                "Adept acts during Raider turn",
+                "Raw intent command rejects because Adept is no longer the current actor.",
+                CombatSessionIntentCommandSpec::new(
+                    "script-wrong-turn-intent",
+                    "Adept wrong-turn intent",
+                    "Adept attempts Hexing Bolt during Raider's turn and Rust preflight rejects it.",
+                    UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
                     vec![17, 5],
                 ),
             ),

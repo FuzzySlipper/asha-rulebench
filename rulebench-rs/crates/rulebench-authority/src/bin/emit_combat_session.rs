@@ -11,9 +11,9 @@ use rulebench_authority::{
     CombatControlHistoryReadout, CombatLifecyclePhase, CombatLogEntry,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptStepReadout, CombatSessionStepReadout, CombatSessionStepSummary,
-    CombatSessionSummary, CommandAttempt, CommandDecisionKind, CommandOutcomeClass,
-    ModifierDurationExpirationEntry, ModifierTenure, ScenarioMetadata, ScenarioProjection,
-    StateFingerprint,
+    CombatSessionSummary, CommandAttempt, CommandAuditEntry, CommandDecisionKind,
+    CommandOutcomeClass, CommandPreflightDecisionKind, ModifierDurationExpirationEntry,
+    ModifierTenure, RulebenchRejection, ScenarioMetadata, ScenarioProjection, StateFingerprint,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -376,6 +376,11 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      finalStateFingerprint: {},\n",
         render_fingerprint(&readout.final_snapshot.current_state_fingerprint, "      ")
     ));
+    out.push_str("      commandAuditLog: [\n");
+    for entry in &readout.final_snapshot.audit_log {
+        out.push_str(&render_command_audit_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str("      actionResourceTransitionLog: [\n");
     for entry in &readout.final_snapshot.action_resource_transition_log {
         out.push_str(&render_action_resource_transition_entry(entry, "        "));
@@ -390,6 +395,59 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
     out.push_str("      ],\n");
     out.push_str("    },\n");
     out
+}
+
+fn render_command_audit_entry(entry: &CommandAuditEntry, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  id: {},\n", ts_string(&entry.id)));
+    out.push_str(&format!(
+        "{indent}  stepId: {},\n",
+        ts_string(&entry.step_id)
+    ));
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  outcomeClass: {},\n",
+        ts_string(outcome_class(entry.outcome_class))
+    ));
+    out.push_str(&format!(
+        "{indent}  decisionKind: {},\n",
+        ts_string(command_decision_kind(entry.decision_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  preflightDecisionKind: {},\n",
+        render_optional_preflight_decision_kind(entry.preflight_decision_kind)
+    ));
+    out.push_str(&format!("{indent}  accepted: {},\n", entry.accepted));
+    out.push_str(&format!(
+        "{indent}  rejection: {},\n",
+        render_optional_rejection(entry.rejection)
+    ));
+    out.push_str(&format!("{indent}  eventCount: {},\n", entry.event_count));
+    out.push_str(&format!("{indent}  traceCount: {},\n", entry.trace_count));
+    out.push_str(&format!(
+        "{indent}  stateBeforeFingerprint: {},\n",
+        render_fingerprint(&entry.state_before_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  stateAfterFingerprint: {},\n",
+        render_fingerprint(&entry.state_after_fingerprint, indent)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_optional_preflight_decision_kind(
+    decision_kind: Option<CommandPreflightDecisionKind>,
+) -> String {
+    decision_kind
+        .map(|inner| ts_string(preflight_decision_kind(inner)))
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn render_optional_rejection(rejection: Option<RulebenchRejection>) -> String {
+    rejection
+        .map(|inner| ts_string(inner.code()))
+        .unwrap_or_else(|| "null".to_string())
 }
 
 fn render_action_resource_transition_entry(
@@ -682,6 +740,10 @@ fn command_decision_kind(kind: CommandDecisionKind) -> &'static str {
         CommandDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
         CommandDecisionKind::RejectedByTurnOrder => "rejectedByTurnOrder",
     }
+}
+
+fn preflight_decision_kind(kind: CommandPreflightDecisionKind) -> &'static str {
+    kind.code()
 }
 
 fn lifecycle_phase(phase: CombatLifecyclePhase) -> &'static str {

@@ -242,6 +242,7 @@ describe('RulebenchTransport fixtures', () => {
         'selectedCandidate',
         'control',
         'selectedCandidate',
+        'intent',
         'control',
         'control',
       ]);
@@ -251,6 +252,7 @@ describe('RulebenchTransport fixtures', () => {
         'acceptedByResolver',
         'accepted',
         'rejectedByUnavailableCandidates',
+        'rejectedByTurnOrder',
         'accepted',
         'accepted',
       ]);
@@ -258,10 +260,54 @@ describe('RulebenchTransport fixtures', () => {
       expect(result.value.steps[2]?.commandAuditSequence).toBe(0);
       expect(result.value.steps[4]?.runtimeStepId).toBeNull();
       expect(result.value.steps[4]?.commandAuditSequence).toBeNull();
+      expect(result.value.steps[5]?.runtimeStepId).toBe('script-wrong-turn-intent');
+      expect(result.value.steps[5]?.commandAuditSequence).toBe(1);
       expect(result.value.steps[1]?.controlHistorySequence).toBe(1);
-      expect(result.value.steps[5]?.id).toBe('script-advance-turn-wrap');
-      expect(result.value.steps[5]?.controlHistorySequence).toBe(3);
+      expect(result.value.steps[6]?.id).toBe('script-advance-turn-wrap');
+      expect(result.value.steps[6]?.controlHistorySequence).toBe(3);
       expect(result.value.finalLifecyclePhase).toBe('ended');
+      expect(result.value.commandAuditLog).toEqual([
+        {
+          id: 'audit-script-selected-runtime-hit',
+          stepId: 'script-selected-runtime-hit',
+          sequence: 0,
+          outcomeClass: 'acceptedHit',
+          decisionKind: 'acceptedByResolver',
+          preflightDecisionKind: 'accepted',
+          accepted: true,
+          rejection: null,
+          eventCount: 4,
+          traceCount: 4,
+          stateBeforeFingerprint: {
+            algorithm: 'fnv1a64.rulebench-state.v0',
+            value: '43b17555d3d7ff0d',
+          },
+          stateAfterFingerprint: {
+            algorithm: 'fnv1a64.rulebench-state.v0',
+            value: '1872b66dd0de303a',
+          },
+        },
+        {
+          id: 'audit-script-wrong-turn-intent',
+          stepId: 'script-wrong-turn-intent',
+          sequence: 1,
+          outcomeClass: 'rejectedInvalidCommand',
+          decisionKind: 'rejectedByTurnOrder',
+          preflightDecisionKind: 'rejectedByTurnOrder',
+          accepted: false,
+          rejection: 'invalidAction',
+          eventCount: 0,
+          traceCount: 2,
+          stateBeforeFingerprint: {
+            algorithm: 'fnv1a64.rulebench-state.v0',
+            value: '1872b66dd0de303a',
+          },
+          stateAfterFingerprint: {
+            algorithm: 'fnv1a64.rulebench-state.v0',
+            value: '1872b66dd0de303a',
+          },
+        },
+      ]);
       expect(result.value.actionResourceTransitionLog).toEqual([
         {
           sequence: 0,

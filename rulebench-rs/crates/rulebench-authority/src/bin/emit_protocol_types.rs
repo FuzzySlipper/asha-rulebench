@@ -49,6 +49,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
         "export type RulebenchActionResourceKindDto = 'standardAction';",
         "export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';",
+        "export type RulebenchCommandDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder';",
         "export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn' | 'endIfConditionMet';",
         "export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';",
         "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';",
@@ -279,6 +280,10 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchStateFingerprintDto",
                 },
                 Field {
+                    name: "commandAuditLog",
+                    ty: "readonly RulebenchCommandAuditEntryDto[]",
+                },
+                Field {
                     name: "actionResourceTransitionLog",
                     ty: "readonly RulebenchActionResourceTransitionEntryDto[]",
                 },
@@ -351,6 +356,59 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "reason",
                     ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCommandAuditEntryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "stepId",
+                    ty: "string",
+                },
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "outcomeClass",
+                    ty: "RulebenchCommandOutcomeClassDto",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchCommandDecisionKindDto",
+                },
+                Field {
+                    name: "preflightDecisionKind",
+                    ty: "RulebenchCommandPreflightDecisionKindDto | null",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "rejection",
+                    ty: "RulebenchRejectionCodeDto | null",
+                },
+                Field {
+                    name: "eventCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "traceCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "stateBeforeFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "stateAfterFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
                 },
             ],
         },

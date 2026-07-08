@@ -24,6 +24,8 @@ export type RulebenchActionResourceKindDto = 'standardAction';
 
 export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
 
+export type RulebenchCommandDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder';
+
 export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn' | 'endIfConditionMet';
 
 export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';
@@ -103,6 +105,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly steps: readonly RulebenchCombatScriptStepReadoutDto[];
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
 }
@@ -125,6 +128,21 @@ export interface RulebenchModifierDurationExpirationEntryDto {
   readonly turnIndex: number;
   readonly currentActorId: string | null;
   readonly reason: string;
+}
+
+export interface RulebenchCommandAuditEntryDto {
+  readonly id: string;
+  readonly stepId: string;
+  readonly sequence: number;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly decisionKind: RulebenchCommandDecisionKindDto;
+  readonly preflightDecisionKind: RulebenchCommandPreflightDecisionKindDto | null;
+  readonly accepted: boolean;
+  readonly rejection: RulebenchRejectionCodeDto | null;
+  readonly eventCount: number;
+  readonly traceCount: number;
+  readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchStateFingerprintDto;
 }
 
 export interface RulebenchActionResourceTransitionEntryDto {
