@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createFakeRulebenchTransport,
+  defaultCombatAutomaticRunReplayReadout,
   defaultCombatAutomaticRunReadout,
   defaultCombatControlHistoryReadout,
   defaultCombatScriptReadout,
@@ -853,6 +854,55 @@ describe("RulebenchTransport fixtures", () => {
     }
   });
 
+  it("reads generated automatic run replay verification evidence through transport", async () => {
+    expect(defaultCombatSessionCatalog).toBe(rustBackedCombatSessionCatalog);
+
+    const transport = createFakeRulebenchTransport();
+    const result = await transport.loadSessionAutomaticRunReplayReadout(
+      "hexing-bolt-bounded-automatic-run-replay",
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toBe(defaultCombatAutomaticRunReplayReadout);
+      expect(result.value.id).toBe(
+        "hexing-bolt-bounded-automatic-run-replay",
+      );
+      expect(result.value.accepted).toBe(true);
+      expect(result.value.decisionKind).toBe("verified");
+      expect(result.value.expectedFinalStateFingerprint).toEqual({
+        algorithm: "fnv1a64.rulebench-projection.v0",
+        value: "977a31e4f5dc71bc",
+      });
+      expect(result.value.actualFinalStateFingerprint).toEqual({
+        algorithm: "fnv1a64.rulebench-projection.v0",
+        value: "977a31e4f5dc71bc",
+      });
+      expect(result.value.finalStateFingerprintMatches).toBe(true);
+      expect(result.value.expectedRunDecisionKind).toBe(
+        "completedCombatEnded",
+      );
+      expect(result.value.actualRunDecisionKind).toBe("completedCombatEnded");
+      expect(result.value.runDecisionKindMatches).toBe(true);
+      expect(result.value.expectedExecutedStepCount).toBe(5);
+      expect(result.value.actualExecutedStepCount).toBe(5);
+      expect(result.value.executedStepCountMatches).toBe(true);
+      expect(result.value.replayedRun.id).toBe(
+        "hexing-bolt-bounded-automatic-run",
+      );
+      expect(result.value.replayedRun.decisionKind).toBe(
+        "completedCombatEnded",
+      );
+      expect(result.value.replayedRun.executedStepCount).toBe(5);
+      expect(result.value.replayedRun.finalLifecyclePhase).toBe("ended");
+      expect(result.value.replayedRun.combatLogEntryCount).toBe(2);
+      expect(result.value.replayedRun.auditEntryCount).toBe(2);
+      expect(result.value.reason).toBe(
+        "Automatic run replay verified expected final evidence.",
+      );
+    }
+  });
+
   it("classifies missing combat script readout ids as not found", async () => {
     const transport = createFakeRulebenchTransport();
 
@@ -918,6 +968,24 @@ describe("RulebenchTransport fixtures", () => {
         kind: "not-found",
         message:
           "Combat automatic run readout not found: missing-automatic-run",
+        retryable: false,
+      },
+    });
+  });
+
+  it("classifies missing automatic combat run replay readout ids as not found", async () => {
+    const transport = createFakeRulebenchTransport();
+
+    const result = await transport.loadSessionAutomaticRunReplayReadout(
+      "missing-automatic-run-replay",
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        kind: "not-found",
+        message:
+          "Combat automatic run replay readout not found: missing-automatic-run-replay",
         retryable: false,
       },
     });

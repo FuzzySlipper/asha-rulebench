@@ -56,6 +56,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';",
         "export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';",
         "export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';",
+        "export type RulebenchAutomaticRunReplayDecisionKindDto = 'verified' | 'mismatchedEvidence';",
         "export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle';",
         "export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';",
         "export type RulebenchRollRequestKindDto = 'attackRoll' | 'damageRoll';",
@@ -124,6 +125,10 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "automaticRunReadouts",
                     ty: "readonly RulebenchAutomaticRunReadoutDto[]",
+                },
+                Field {
+                    name: "automaticRunReplayReadouts",
+                    ty: "readonly RulebenchAutomaticRunReplayReadoutDto[]",
                 },
             ],
         },
@@ -459,6 +464,75 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "auditEntryCount",
                     ty: "number",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAutomaticRunReplayReadoutDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchAutomaticRunReplayDecisionKindDto",
+                },
+                Field {
+                    name: "expectedFinalStateFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "actualFinalStateFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "finalStateFingerprintMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "expectedRunDecisionKind",
+                    ty: "RulebenchAutomaticRunDecisionKindDto",
+                },
+                Field {
+                    name: "actualRunDecisionKind",
+                    ty: "RulebenchAutomaticRunDecisionKindDto",
+                },
+                Field {
+                    name: "runDecisionKindMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "expectedExecutedStepCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "actualExecutedStepCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "executedStepCountMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "replayedRun",
+                    ty: "RulebenchAutomaticRunReadoutDto",
                 },
                 Field {
                     name: "reason",

@@ -53,9 +53,9 @@ pub use runtime::{
     CombatSessionState,
 };
 pub use session::{
-    combat_session_automatic_run_readouts, combat_session_control_history_readouts,
-    combat_session_script_readouts, combat_session_summaries, combat_session_transcripts,
-    resolve_combat_session_step,
+    combat_session_automatic_run_readouts, combat_session_automatic_run_replay_readouts,
+    combat_session_control_history_readouts, combat_session_script_readouts,
+    combat_session_summaries, combat_session_transcripts, resolve_combat_session_step,
 };
 
 #[cfg(test)]

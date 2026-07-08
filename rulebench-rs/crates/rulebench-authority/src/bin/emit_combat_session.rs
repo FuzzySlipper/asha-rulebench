@@ -4,13 +4,14 @@
 mod ts_emit;
 
 use rulebench_authority::{
-    combat_session_automatic_run_readouts, combat_session_control_history_readouts,
-    combat_session_script_readouts, combat_session_transcripts, ActionResourceKind,
-    ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
-    ActionResourceTransitionKind, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
-    CombatControlCommandKind, CombatControlDecisionKind, CombatControlHistoryEntry,
-    CombatControlHistoryReadout, CombatEndConditionKind, CombatEndConditionReadout,
-    CombatLifecyclePhase, CombatLogEntry, CombatSessionAutomaticRunReadout,
+    combat_session_automatic_run_readouts, combat_session_automatic_run_replay_readouts,
+    combat_session_control_history_readouts, combat_session_script_readouts,
+    combat_session_transcripts, ActionResourceKind, ActionResourceLedgerReadout,
+    ActionResourceState, ActionResourceTransitionEntry, ActionResourceTransitionKind,
+    ActionUsageEntry, ActionUsageSummary, ActiveModifier, CombatControlCommandKind,
+    CombatControlDecisionKind, CombatControlHistoryEntry, CombatControlHistoryReadout,
+    CombatEndConditionKind, CombatEndConditionReadout, CombatLifecyclePhase, CombatLogEntry,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunReplayReadout,
     CombatSessionAutomaticStepOperationKind, CombatSessionScriptCommandKind,
     CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptStepReadout,
     CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary, CombatTurnOrder,
@@ -63,6 +64,11 @@ fn render_combat_session_catalog() -> String {
     out.push_str("  automaticRunReadouts: [\n");
     for readout in combat_session_automatic_run_readouts() {
         out.push_str(&render_automatic_run_readout(&readout));
+    }
+    out.push_str("  ],\n");
+    out.push_str("  automaticRunReplayReadouts: [\n");
+    for readout in combat_session_automatic_run_replay_readouts() {
+        out.push_str(&render_automatic_run_replay_readout(&readout));
     }
     out.push_str("  ],\n");
     out.push_str("};\n");
@@ -584,6 +590,92 @@ fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunReadout) -> S
     ));
     out.push_str(&format!("      reason: {},\n", ts_string(&readout.reason)));
     out.push_str("    },\n");
+    out
+}
+
+fn render_automatic_run_replay_readout(readout: &CombatSessionAutomaticRunReplayReadout) -> String {
+    let mut out = String::from("    {\n");
+    out.push_str(&format!("      id: {},\n", ts_string(&readout.id)));
+    out.push_str(&format!("      title: {},\n", ts_string(&readout.title)));
+    out.push_str(&format!(
+        "      summary: {},\n",
+        ts_string(&readout.summary)
+    ));
+    out.push_str(&format!("      accepted: {},\n", readout.accepted));
+    out.push_str(&format!(
+        "      decisionKind: {},\n",
+        ts_string(readout.decision_kind.code())
+    ));
+    out.push_str(&format!(
+        "      expectedFinalStateFingerprint: {},\n",
+        render_fingerprint(&readout.expected_final_state_fingerprint, "      ")
+    ));
+    out.push_str(&format!(
+        "      actualFinalStateFingerprint: {},\n",
+        render_fingerprint(&readout.actual_final_state_fingerprint, "      ")
+    ));
+    out.push_str(&format!(
+        "      finalStateFingerprintMatches: {},\n",
+        readout.final_state_fingerprint_matches
+    ));
+    out.push_str(&format!(
+        "      expectedRunDecisionKind: {},\n",
+        ts_string(readout.expected_run_decision_kind.code())
+    ));
+    out.push_str(&format!(
+        "      actualRunDecisionKind: {},\n",
+        ts_string(readout.actual_run_decision_kind.code())
+    ));
+    out.push_str(&format!(
+        "      runDecisionKindMatches: {},\n",
+        readout.run_decision_kind_matches
+    ));
+    out.push_str(&format!(
+        "      expectedExecutedStepCount: {},\n",
+        readout.expected_executed_step_count
+    ));
+    out.push_str(&format!(
+        "      actualExecutedStepCount: {},\n",
+        readout.actual_executed_step_count
+    ));
+    out.push_str(&format!(
+        "      executedStepCountMatches: {},\n",
+        readout.executed_step_count_matches
+    ));
+    out.push_str("      replayedRun: ");
+    out.push_str(&render_nested_automatic_run_readout(
+        &readout.replayed_run,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str(&format!("      reason: {},\n", ts_string(&readout.reason)));
+    out.push_str("    },\n");
+    out
+}
+
+fn render_nested_automatic_run_readout(
+    readout: &CombatSessionAutomaticRunReadout,
+    indent: &str,
+) -> String {
+    let rendered = render_automatic_run_readout(readout);
+    let trimmed = rendered.trim_end();
+    let value = trimmed.strip_suffix(',').unwrap_or(trimmed);
+    let mut lines = value.lines();
+    let mut out = String::new();
+
+    if let Some(first_line) = lines.next() {
+        out.push_str(first_line.trim_start());
+        out.push('\n');
+    }
+    for line in lines {
+        out.push_str(indent);
+        out.push_str(line.strip_prefix("    ").unwrap_or(line));
+        out.push('\n');
+    }
+
+    if out.ends_with('\n') {
+        out.pop();
+    }
     out
 }
 

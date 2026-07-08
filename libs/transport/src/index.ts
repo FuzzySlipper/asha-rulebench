@@ -1,6 +1,7 @@
 import type {
   Result,
   RulebenchAutomaticRunReadoutDto,
+  RulebenchAutomaticRunReplayReadoutDto,
   RulebenchCombatControlHistoryReadoutDto,
   RulebenchCombatScriptReadoutDto,
   RulebenchCombatSessionCatalogDto,
@@ -49,6 +50,9 @@ export interface RulebenchTransport {
   readonly loadSessionAutomaticRunReadout: (
     runId?: string,
   ) => Promise<Result<RulebenchAutomaticRunReadoutDto>>;
+  readonly loadSessionAutomaticRunReplayReadout: (
+    replayId?: string,
+  ) => Promise<Result<RulebenchAutomaticRunReplayReadoutDto>>;
 }
 
 export const defaultRulesetCatalog: RulebenchRulesetCatalogDto =
@@ -106,6 +110,13 @@ export const defaultCombatAutomaticRunReadout: RulebenchAutomaticRunReadoutDto =
   requireSessionAutomaticRunReadout(
     defaultCombatSessionCatalog,
     defaultCombatAutomaticRunReadoutId,
+  );
+export const defaultCombatAutomaticRunReplayReadoutId: string =
+  firstAutomaticRunReplayReadoutId(defaultCombatSessionCatalog);
+export const defaultCombatAutomaticRunReplayReadout: RulebenchAutomaticRunReplayReadoutDto =
+  requireSessionAutomaticRunReplayReadout(
+    defaultCombatSessionCatalog,
+    defaultCombatAutomaticRunReplayReadoutId,
   );
 
 export const createFakeRulebenchTransport = (
@@ -204,6 +215,21 @@ export const createFakeRulebenchTransport = (
           error: {
             kind: "not-found",
             message: `Combat automatic run readout not found: ${runId}`,
+            retryable: false,
+          },
+        }
+      : { ok: true, value: readout };
+  },
+  loadSessionAutomaticRunReplayReadout: async (
+    replayId: string = firstAutomaticRunReplayReadoutId(sessionCatalog),
+  ) => {
+    const readout = sessionAutomaticRunReplayReadout(sessionCatalog, replayId);
+    return readout === null
+      ? {
+          ok: false,
+          error: {
+            kind: "not-found",
+            message: `Combat automatic run replay readout not found: ${replayId}`,
             retryable: false,
           },
         }
@@ -378,6 +404,37 @@ function sessionAutomaticRunReadout(
 ): RulebenchAutomaticRunReadoutDto | null {
   return (
     catalog.automaticRunReadouts.find((readout) => readout.id === runId) ?? null
+  );
+}
+
+function firstAutomaticRunReplayReadoutId(
+  catalog: RulebenchCombatSessionCatalogDto,
+): string {
+  const firstReadout = catalog.automaticRunReplayReadouts[0];
+  return firstReadout?.id ?? "";
+}
+
+function requireSessionAutomaticRunReplayReadout(
+  catalog: RulebenchCombatSessionCatalogDto,
+  replayId: string,
+): RulebenchAutomaticRunReplayReadoutDto {
+  const readout = sessionAutomaticRunReplayReadout(catalog, replayId);
+  if (readout === null) {
+    throw new Error(
+      `Default combat automatic run replay readout is missing: ${replayId}`,
+    );
+  }
+  return readout;
+}
+
+function sessionAutomaticRunReplayReadout(
+  catalog: RulebenchCombatSessionCatalogDto,
+  replayId: string,
+): RulebenchAutomaticRunReplayReadoutDto | null {
+  return (
+    catalog.automaticRunReplayReadouts.find(
+      (readout) => readout.id === replayId,
+    ) ?? null
   );
 }
 

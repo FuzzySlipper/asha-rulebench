@@ -1,10 +1,11 @@
 use crate::fixtures::hexing_bolt_fixture_scenario;
 use crate::model::*;
 use crate::runtime::{
-    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
-    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
-    CombatSessionScriptReadout, CombatSessionScriptSpec, CombatSessionScriptStepSpec,
-    CombatSessionState,
+    verify_automatic_run_replay, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
+    CombatSessionAutomaticRunSpec, CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec,
+    CombatSessionIntentCommandSpec, CombatSessionScriptReadout, CombatSessionScriptSpec,
+    CombatSessionScriptStepSpec, CombatSessionState,
 };
 
 pub fn combat_session_summaries() -> Vec<CombatSessionSummary> {
@@ -46,6 +47,34 @@ pub fn combat_session_script_readouts() -> Vec<CombatSessionScriptReadout> {
 
 pub fn combat_session_automatic_run_readouts() -> Vec<CombatSessionAutomaticRunReadout> {
     vec![hexing_bolt_bounded_automatic_run_readout()]
+}
+
+pub fn combat_session_automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayReadout>
+{
+    vec![hexing_bolt_bounded_automatic_run_replay_readout()]
+}
+
+fn hexing_bolt_bounded_automatic_run_replay_readout() -> CombatSessionAutomaticRunReplayReadout {
+    let run_readout = hexing_bolt_bounded_automatic_run_readout();
+    let run_spec = CombatSessionAutomaticRunSpec::new(
+        run_readout.id.clone(),
+        run_readout.title.clone(),
+        run_readout.summary.clone(),
+        run_readout.max_steps,
+        vec![17, 5],
+    );
+
+    verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+        "hexing-bolt-bounded-automatic-run-replay",
+        "Hexing Bolt Bounded Automatic Run Replay",
+        "A generated Rust replay verification readout for the bounded automatic run fixture.",
+        "hexing-bolt-bounded-automatic-run-replay-session",
+        hexing_bolt_fixture_scenario(),
+        run_spec,
+        run_readout.final_snapshot.current_state_fingerprint,
+        run_readout.decision_kind,
+        run_readout.executed_step_count,
+    ))
 }
 
 fn hexing_bolt_bounded_automatic_run_readout() -> CombatSessionAutomaticRunReadout {

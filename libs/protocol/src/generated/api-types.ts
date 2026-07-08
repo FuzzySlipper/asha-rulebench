@@ -38,6 +38,8 @@ export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejec
 
 export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';
 
+export type RulebenchAutomaticRunReplayDecisionKindDto = 'verified' | 'mismatchedEvidence';
+
 export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle';
 
 export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';
@@ -70,6 +72,7 @@ export interface RulebenchCombatSessionCatalogDto {
   readonly controlHistoryReadouts: readonly RulebenchCombatControlHistoryReadoutDto[];
   readonly scriptReadouts: readonly RulebenchCombatScriptReadoutDto[];
   readonly automaticRunReadouts: readonly RulebenchAutomaticRunReadoutDto[];
+  readonly automaticRunReplayReadouts: readonly RulebenchAutomaticRunReplayReadoutDto[];
 }
 
 export interface RulebenchStateFingerprintDto {
@@ -166,6 +169,25 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
   readonly combatLogEntryCount: number;
   readonly auditEntryCount: number;
+  readonly reason: string;
+}
+
+export interface RulebenchAutomaticRunReplayReadoutDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchAutomaticRunReplayDecisionKindDto;
+  readonly expectedFinalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly actualFinalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly finalStateFingerprintMatches: boolean;
+  readonly expectedRunDecisionKind: RulebenchAutomaticRunDecisionKindDto;
+  readonly actualRunDecisionKind: RulebenchAutomaticRunDecisionKindDto;
+  readonly runDecisionKindMatches: boolean;
+  readonly expectedExecutedStepCount: number;
+  readonly actualExecutedStepCount: number;
+  readonly executedStepCountMatches: boolean;
+  readonly replayedRun: RulebenchAutomaticRunReadoutDto;
   readonly reason: string;
 }
 
