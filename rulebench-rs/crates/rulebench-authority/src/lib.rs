@@ -78,6 +78,14 @@ mod tests {
     }
 
     #[test]
+    fn modifier_duration_expiration_decision_kind_codes_are_stable() {
+        assert_eq!(
+            ModifierDurationExpirationDecisionKind::Expired.code(),
+            "expired"
+        );
+    }
+
+    #[test]
     fn empty_actor_rejects_without_events() {
         let intent = UseActionIntent::new("", "action.hexing_bolt", "combatant.marauder");
 
@@ -6113,6 +6121,116 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_turn_wrap_expires_previous_actor_temporary_modifier() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-rattled-before-turns",
+            "Runtime rattled before turns",
+            "Adept applies rattled to Raider before turn advancement.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let first_advance = session.advance_turn();
+        assert!(first_advance.accepted);
+        assert_eq!(
+            first_advance.next_turn_order.current_actor_id,
+            Some("entity-raider".to_string())
+        );
+        assert_eq!(
+            first_advance.state_before_fingerprint,
+            first_advance.state_after_fingerprint
+        );
+        assert!(session.modifier_duration_expiration_log().is_empty());
+        assert_eq!(
+            session
+                .snapshot()
+                .current_state
+                .combatants
+                .iter()
+                .find(|combatant| combatant.id == "entity-raider")
+                .expect("raider remains present")
+                .conditions,
+            vec!["rattled".to_string()]
+        );
+
+        let second_advance = session.advance_turn();
+
+        assert!(second_advance.accepted);
+        assert_eq!(
+            second_advance.next_turn_order.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_ne!(
+            second_advance.state_before_fingerprint,
+            second_advance.state_after_fingerprint
+        );
+        assert!(session
+            .snapshot()
+            .current_state
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == "entity-raider")
+            .expect("raider remains present")
+            .conditions
+            .is_empty());
+        assert_eq!(session.modifier_duration_expiration_log().len(), 1);
+        let expiration = &session.modifier_duration_expiration_log()[0];
+        assert_eq!(expiration.sequence, 0);
+        assert_eq!(expiration.combatant_id, "entity-raider");
+        assert_eq!(expiration.modifier_id, "rattled");
+        assert_eq!(
+            expiration.previous_modifier,
+            ActiveModifier::temporary("rattled", "rattled", "until end of next turn")
+        );
+        assert_eq!(expiration.next_modifier, None);
+        assert_eq!(expiration.turn_transition_sequence, 1);
+        assert_eq!(expiration.round_number, 2);
+        assert_eq!(expiration.turn_index, 0);
+        assert_eq!(
+            expiration.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(
+            expiration.reason,
+            "Temporary modifier expired at turn boundary."
+        );
+        assert_eq!(
+            session.snapshot().modifier_duration_expiration_log,
+            session.modifier_duration_expiration_log()
+        );
+    }
+
+    #[test]
+    fn session_runtime_turn_wrap_preserves_permanent_modifier() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1]
+            .active_modifiers
+            .push(ActiveModifier::permanent(
+                "battle-drilled",
+                "battle-drilled",
+            ));
+        let mut session = CombatSessionState::new("runtime-permanent-modifier", scenario);
+
+        session.advance_turn();
+        session.advance_turn();
+
+        assert!(session.modifier_duration_expiration_log().is_empty());
+        assert_eq!(
+            session
+                .snapshot()
+                .current_state
+                .combatants
+                .iter()
+                .find(|combatant| combatant.id == "entity-raider")
+                .expect("raider remains present")
+                .conditions,
+            vec!["battle-drilled".to_string()]
+        );
+    }
+
+    #[test]
     fn session_runtime_rejected_turn_advance_does_not_refresh_action_resource() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -6126,6 +6244,7 @@ mod tests {
         session.end_combat();
         let before = session.action_resource_ledger();
         let before_transition_log = session.action_resource_transition_log().to_vec();
+        let before_expiration_log = session.modifier_duration_expiration_log().to_vec();
 
         let readout = session.advance_turn();
         let after = session.action_resource_ledger();
@@ -6139,6 +6258,21 @@ mod tests {
         assert_eq!(
             session.action_resource_transition_log(),
             before_transition_log
+        );
+        assert_eq!(
+            session.modifier_duration_expiration_log(),
+            before_expiration_log
+        );
+        assert_eq!(
+            session
+                .snapshot()
+                .current_state
+                .combatants
+                .iter()
+                .find(|combatant| combatant.id == "entity-raider")
+                .expect("raider remains present")
+                .conditions,
+            vec!["rattled".to_string()]
         );
         assert_eq!(
             after

@@ -389,6 +389,44 @@ pub struct ActionResourceTransitionEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModifierDurationExpirationDecisionKind {
+    Expired,
+}
+
+impl ModifierDurationExpirationDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ModifierDurationExpirationDecisionKind::Expired => "expired",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModifierDurationExpirationReadout {
+    pub combatant_id: String,
+    pub modifier_id: String,
+    pub accepted: bool,
+    pub decision_kind: ModifierDurationExpirationDecisionKind,
+    pub previous_modifier: ActiveModifier,
+    pub next_modifier: Option<ActiveModifier>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModifierDurationExpirationEntry {
+    pub sequence: u32,
+    pub combatant_id: String,
+    pub modifier_id: String,
+    pub previous_modifier: ActiveModifier,
+    pub next_modifier: Option<ActiveModifier>,
+    pub turn_transition_sequence: u32,
+    pub round_number: u32,
+    pub turn_index: u32,
+    pub current_actor_id: Option<String>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatControlCommandKind {
     ExplicitStart,
     ExplicitEnd,
@@ -806,6 +844,7 @@ pub struct CombatSessionSnapshot {
     pub audit_log: Vec<CommandAuditEntry>,
     pub action_usage_log: Vec<ActionUsageEntry>,
     pub action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
+    pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,

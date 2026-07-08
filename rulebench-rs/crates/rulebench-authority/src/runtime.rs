@@ -294,6 +294,7 @@ pub struct CombatSessionState {
     audit_log: Vec<CommandAuditEntry>,
     action_usage_log: Vec<ActionUsageEntry>,
     action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
+    modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
     lifecycle_transition_log: Vec<LifecycleTransitionEntry>,
@@ -320,6 +321,7 @@ impl CombatSessionState {
             audit_log: Vec::new(),
             action_usage_log: Vec::new(),
             action_resource_transition_log: Vec::new(),
+            modifier_duration_expiration_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
             lifecycle_transition_log: Vec::new(),
@@ -545,7 +547,7 @@ impl CombatSessionState {
         }
         self.next_step_index += 1;
         if should_apply_state {
-            self.state.apply_projection(&state_after);
+            self.apply_receipt_effects_to_state(&receipt);
         }
 
         CombatSessionStepReadout {
@@ -562,6 +564,19 @@ impl CombatSessionState {
         }
     }
 
+    fn apply_receipt_effects_to_state(&mut self, receipt: &RulebenchReceipt) {
+        if !receipt.accepted {
+            return;
+        }
+
+        let (Some(damage), Some(modifier)) = (receipt.damage.as_ref(), receipt.modifier.as_ref())
+        else {
+            return;
+        };
+
+        self.state.apply_hit(damage, modifier);
+    }
+
     pub fn combat_log(&self) -> &[CombatLogEntry] {
         &self.combat_log
     }
@@ -576,6 +591,10 @@ impl CombatSessionState {
 
     pub fn action_resource_transition_log(&self) -> &[ActionResourceTransitionEntry] {
         &self.action_resource_transition_log
+    }
+
+    pub fn modifier_duration_expiration_log(&self) -> &[ModifierDurationExpirationEntry] {
+        &self.modifier_duration_expiration_log
     }
 
     pub fn control_history(&self) -> &[CombatControlHistoryEntry] {
@@ -745,6 +764,10 @@ impl CombatSessionState {
                 .refresh_action_resource(&current_actor_id, ActionResourceKind::StandardAction);
             self.record_action_resource_refresh_transition(&transition, &refresh);
         }
+        if let Some(previous_actor_id) = transition.previous_actor_id.as_deref() {
+            let expirations = self.state.expire_temporary_modifiers_for(previous_actor_id);
+            self.record_modifier_duration_expiration_transitions(&transition, &expirations);
+        }
         let state_after = self.state.project("State after turn advancement.");
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
 
@@ -775,6 +798,7 @@ impl CombatSessionState {
             audit_log: self.audit_log.clone(),
             action_usage_log: self.action_usage_log.clone(),
             action_resource_transition_log: self.action_resource_transition_log.clone(),
+            modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
@@ -887,6 +911,28 @@ impl CombatSessionState {
                 current_actor_id: transition.next_actor_id.clone(),
                 reason: refresh.reason.clone(),
             });
+    }
+
+    fn record_modifier_duration_expiration_transitions(
+        &mut self,
+        transition: &TurnTransitionEntry,
+        expirations: &[ModifierDurationExpirationReadout],
+    ) {
+        for expiration in expirations.iter().filter(|expiration| expiration.accepted) {
+            self.modifier_duration_expiration_log
+                .push(ModifierDurationExpirationEntry {
+                    sequence: self.modifier_duration_expiration_log.len() as u32,
+                    combatant_id: expiration.combatant_id.clone(),
+                    modifier_id: expiration.modifier_id.clone(),
+                    previous_modifier: expiration.previous_modifier.clone(),
+                    next_modifier: expiration.next_modifier.clone(),
+                    turn_transition_sequence: transition.sequence,
+                    round_number: transition.next_round_number,
+                    turn_index: transition.next_turn_index,
+                    current_actor_id: transition.next_actor_id.clone(),
+                    reason: expiration.reason.clone(),
+                });
+        }
     }
 
     fn submit_explicit_start_control(&mut self) -> CombatControlReadout {

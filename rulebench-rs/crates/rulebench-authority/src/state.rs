@@ -2,7 +2,9 @@ use crate::model::{
     ActionResourceKind, ActionResourceLedgerReadout, ActionResourceRefreshDecisionKind,
     ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
     ActionResourceState, ActiveModifier, BoundedValue, Combatant, CombatantActionResourceReadout,
-    DamageOutcome, FinalCombatantState, ModifierOutcome, RulebenchScenario, ScenarioProjection,
+    DamageOutcome, FinalCombatantState, ModifierDurationExpirationDecisionKind,
+    ModifierDurationExpirationReadout, ModifierOutcome, ModifierTenure, RulebenchScenario,
+    ScenarioProjection,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +56,7 @@ impl CombatState {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn apply_projection(&mut self, projection: &ScenarioProjection) {
         for projected in &projection.combatants {
             if let Some(combatant) = self
@@ -133,6 +136,21 @@ impl CombatState {
         };
 
         combatant.refresh_action_resource(resource_kind)
+    }
+
+    pub(crate) fn expire_temporary_modifiers_for(
+        &mut self,
+        combatant_id: &str,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == combatant_id)
+        else {
+            return Vec::new();
+        };
+
+        combatant.expire_temporary_modifiers()
     }
 
     #[cfg(test)]
@@ -216,6 +234,7 @@ impl CombatantState {
         ));
     }
 
+    #[cfg(test)]
     fn apply_projection(&mut self, combatant: &FinalCombatantState) {
         self.name = combatant.name.clone();
         self.hit_points = combatant.hit_points;
@@ -322,6 +341,30 @@ impl CombatantState {
             next_resource: Some(next_resource),
             reason: "Action resource refreshed.".to_string(),
         }
+    }
+
+    fn expire_temporary_modifiers(&mut self) -> Vec<ModifierDurationExpirationReadout> {
+        let mut retained_modifiers = Vec::with_capacity(self.active_modifiers.len());
+        let mut expiration_readouts = Vec::new();
+
+        for modifier in self.active_modifiers.drain(..) {
+            if modifier.tenure == ModifierTenure::Temporary {
+                expiration_readouts.push(ModifierDurationExpirationReadout {
+                    combatant_id: self.id.clone(),
+                    modifier_id: modifier.modifier_id.clone(),
+                    accepted: true,
+                    decision_kind: ModifierDurationExpirationDecisionKind::Expired,
+                    previous_modifier: modifier,
+                    next_modifier: None,
+                    reason: "Temporary modifier expired at turn boundary.".to_string(),
+                });
+            } else {
+                retained_modifiers.push(modifier);
+            }
+        }
+
+        self.active_modifiers = retained_modifiers;
+        expiration_readouts
     }
 }
 
@@ -506,6 +549,96 @@ mod tests {
         assert_eq!(readout.previous_resource, None);
         assert_eq!(readout.next_resource, None);
         assert_eq!(before, after);
+    }
+
+    #[test]
+    fn combat_state_expires_temporary_modifier_at_turn_boundary() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1]
+            .active_modifiers
+            .push(ActiveModifier::temporary(
+                "rattled",
+                "rattled",
+                "until end of next turn",
+            ));
+        let mut state = CombatState::from_scenario(&scenario);
+
+        let readouts = state.expire_temporary_modifiers_for("entity-raider");
+
+        assert_eq!(readouts.len(), 1);
+        assert!(readouts[0].accepted);
+        assert_eq!(
+            readouts[0].decision_kind,
+            ModifierDurationExpirationDecisionKind::Expired
+        );
+        assert_eq!(readouts[0].decision_kind.code(), "expired");
+        assert_eq!(readouts[0].combatant_id, "entity-raider");
+        assert_eq!(readouts[0].modifier_id, "rattled");
+        assert_eq!(
+            readouts[0].previous_modifier,
+            ActiveModifier::temporary("rattled", "rattled", "until end of next turn")
+        );
+        assert_eq!(readouts[0].next_modifier, None);
+        assert_eq!(
+            readouts[0].reason,
+            "Temporary modifier expired at turn boundary."
+        );
+        assert_eq!(state.active_modifiers_for("entity-raider"), Some(&[][..]));
+        assert!(state
+            .project("After duration expiration.")
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == "entity-raider")
+            .expect("raider remains present")
+            .conditions
+            .is_empty());
+    }
+
+    #[test]
+    fn combat_state_preserves_permanent_modifier_at_turn_boundary() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1]
+            .active_modifiers
+            .push(ActiveModifier::permanent(
+                "battle-drilled",
+                "battle-drilled",
+            ));
+        let mut state = CombatState::from_scenario(&scenario);
+
+        let readouts = state.expire_temporary_modifiers_for("entity-raider");
+
+        assert!(readouts.is_empty());
+        assert_eq!(
+            state.active_modifiers_for("entity-raider"),
+            Some(
+                &[ActiveModifier::permanent(
+                    "battle-drilled",
+                    "battle-drilled"
+                )][..]
+            )
+        );
+        assert_eq!(
+            state
+                .project("Permanent modifier remains.")
+                .combatants
+                .iter()
+                .find(|combatant| combatant.id == "entity-raider")
+                .expect("raider remains present")
+                .conditions,
+            vec!["battle-drilled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_state_expiration_noops_without_temporary_modifiers() {
+        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let before = state.project("Before no-op expiration.");
+
+        let readouts = state.expire_temporary_modifiers_for("entity-raider");
+        let after = state.project("Before no-op expiration.");
+
+        assert!(readouts.is_empty());
+        assert_eq!(after, before);
     }
 
     #[test]
