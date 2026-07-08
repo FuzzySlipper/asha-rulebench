@@ -36,7 +36,12 @@ pub use modifiers::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
-pub use runtime::{CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionState};
+pub use runtime::{
+    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
+    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
+    CombatSessionState,
+};
 pub use session::{
     combat_session_control_history_readouts, combat_session_summaries, combat_session_transcripts,
     resolve_combat_session_step,
@@ -2527,6 +2532,199 @@ mod tests {
             readout.audit_entry.preflight_decision_kind,
             Some(CommandPreflightDecisionKind::RejectedByTurnOrder)
         );
+    }
+
+    #[test]
+    fn session_runtime_runs_mixed_combat_script_with_reviewable_step_readback() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let readout = session.run_script(CombatSessionScriptSpec::new(
+            "opening-control-script",
+            "Opening control script",
+            "Explicit control and intent commands run through Rust authority.",
+            vec![
+                CombatSessionScriptStepSpec::control(
+                    "script-start",
+                    "Start combat",
+                    "Explicitly start combat before action resolution.",
+                    CombatControlCommandSpec::explicit_start(),
+                ),
+                CombatSessionScriptStepSpec::control(
+                    "script-repeat-start",
+                    "Repeat start",
+                    "Repeated start records rejected no-op control evidence.",
+                    CombatControlCommandSpec::explicit_start(),
+                ),
+                CombatSessionScriptStepSpec::intent(
+                    "script-hit-step",
+                    "Adept hit",
+                    "Adept uses Hexing Bolt against Raider.",
+                    CombatSessionIntentCommandSpec::new(
+                        "script-runtime-hit",
+                        "Script runtime hit",
+                        "Scripted accepted hit command.",
+                        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                        vec![17, 5],
+                    ),
+                ),
+                CombatSessionScriptStepSpec::control(
+                    "script-advance-turn",
+                    "Advance turn",
+                    "Advance from Adept to Raider.",
+                    CombatControlCommandSpec::advance_turn(),
+                ),
+                CombatSessionScriptStepSpec::intent(
+                    "script-wrong-actor-step",
+                    "Wrong actor attempt",
+                    "Adept attempts another action on Raider turn.",
+                    CombatSessionIntentCommandSpec::new(
+                        "script-runtime-wrong-actor",
+                        "Script runtime wrong actor",
+                        "Scripted turn-order rejection.",
+                        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                        vec![17, 5],
+                    ),
+                ),
+                CombatSessionScriptStepSpec::control(
+                    "script-end",
+                    "End combat",
+                    "Explicitly end combat after scripted commands.",
+                    CombatControlCommandSpec::explicit_end(),
+                ),
+            ],
+        ));
+
+        assert_eq!(readout.session_id, "runtime-hexing-bolt");
+        assert_eq!(readout.script_id, "opening-control-script");
+        assert_eq!(readout.steps.len(), 6);
+        assert_eq!(
+            readout
+                .steps
+                .iter()
+                .map(|step| step.sequence)
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5]
+        );
+
+        let start = &readout.steps[0];
+        assert_eq!(start.command_kind, CombatSessionScriptCommandKind::Control);
+        assert_eq!(start.command_kind.code(), "control");
+        assert!(start.accepted);
+        assert_eq!(
+            start.decision_kind,
+            CombatSessionScriptDecisionKind::Control(CombatControlDecisionKind::Accepted)
+        );
+        assert_eq!(start.decision_kind.code(), "accepted");
+        assert_eq!(start.control_history_sequence, Some(0));
+        assert_eq!(start.command_audit_sequence, None);
+        assert_eq!(start.runtime_step_id, None);
+        assert_eq!(start.reason, "Combat explicitly started.");
+
+        let repeated_start = &readout.steps[1];
+        assert!(!repeated_start.accepted);
+        assert_eq!(
+            repeated_start.decision_kind,
+            CombatSessionScriptDecisionKind::Control(CombatControlDecisionKind::RejectedNoop)
+        );
+        assert_eq!(repeated_start.decision_kind.code(), "rejectedNoop");
+        assert_eq!(repeated_start.control_history_sequence, Some(1));
+        assert_eq!(
+            repeated_start.state_before_fingerprint,
+            repeated_start.state_after_fingerprint
+        );
+        assert_eq!(repeated_start.reason, "Combat is already in progress.");
+
+        let hit = &readout.steps[2];
+        assert_eq!(hit.command_kind, CombatSessionScriptCommandKind::Intent);
+        assert_eq!(hit.command_kind.code(), "intent");
+        assert!(hit.accepted);
+        assert_eq!(
+            hit.decision_kind,
+            CombatSessionScriptDecisionKind::Intent(CommandDecisionKind::AcceptedByResolver)
+        );
+        assert_eq!(hit.decision_kind.code(), "acceptedByResolver");
+        assert_eq!(hit.runtime_step_id, Some("script-runtime-hit".to_string()));
+        assert_eq!(hit.command_audit_sequence, Some(0));
+        assert_eq!(hit.control_history_sequence, None);
+        assert_ne!(hit.state_before_fingerprint, hit.state_after_fingerprint);
+        assert_eq!(hit.reason, "Intent command accepted by resolver.");
+
+        let advance_turn = &readout.steps[3];
+        assert!(advance_turn.accepted);
+        assert_eq!(
+            advance_turn.decision_kind,
+            CombatSessionScriptDecisionKind::Control(CombatControlDecisionKind::Accepted)
+        );
+        assert_eq!(advance_turn.control_history_sequence, Some(2));
+        assert_eq!(
+            advance_turn.state_before_fingerprint,
+            advance_turn.state_after_fingerprint
+        );
+
+        let wrong_actor = &readout.steps[4];
+        assert!(!wrong_actor.accepted);
+        assert_eq!(
+            wrong_actor.decision_kind,
+            CombatSessionScriptDecisionKind::Intent(CommandDecisionKind::RejectedByTurnOrder)
+        );
+        assert_eq!(wrong_actor.decision_kind.code(), "rejectedByTurnOrder");
+        assert_eq!(
+            wrong_actor.runtime_step_id,
+            Some("script-runtime-wrong-actor".to_string())
+        );
+        assert_eq!(wrong_actor.command_audit_sequence, Some(1));
+        assert_eq!(
+            wrong_actor.state_before_fingerprint,
+            wrong_actor.state_after_fingerprint
+        );
+        assert_eq!(wrong_actor.reason, "Intent command rejected by turn order.");
+
+        let end = &readout.steps[5];
+        assert!(end.accepted);
+        assert_eq!(
+            end.decision_kind,
+            CombatSessionScriptDecisionKind::Control(CombatControlDecisionKind::Accepted)
+        );
+        assert_eq!(end.control_history_sequence, Some(3));
+        assert_eq!(end.reason, "Combat explicitly ended.");
+
+        assert_eq!(session.control_history().len(), 4);
+        assert_eq!(session.audit_log().len(), 2);
+        assert_eq!(session.combat_log().len(), 2);
+        assert_eq!(session.next_step_index(), 2);
+        assert_eq!(
+            session.audit_log()[1].preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByTurnOrder)
+        );
+        assert_eq!(
+            readout.final_snapshot.lifecycle.phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(readout.final_snapshot.lifecycle.ended_at_step, Some(2));
+        assert_eq!(readout.final_snapshot.audit_log.len(), 2);
+    }
+
+    #[test]
+    fn session_runtime_empty_combat_script_is_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_script = session.snapshot();
+
+        let readout = session.run_script(CombatSessionScriptSpec::new(
+            "empty-script",
+            "Empty script",
+            "No commands are submitted.",
+            Vec::new(),
+        ));
+
+        assert_eq!(readout.session_id, "runtime-hexing-bolt");
+        assert_eq!(readout.script_id, "empty-script");
+        assert!(readout.steps.is_empty());
+        assert_eq!(readout.final_snapshot, before_script);
+        assert!(session.combat_log().is_empty());
+        assert!(session.audit_log().is_empty());
+        assert!(session.control_history().is_empty());
     }
 
     #[test]
