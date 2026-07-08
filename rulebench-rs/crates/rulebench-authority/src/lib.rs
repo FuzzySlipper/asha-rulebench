@@ -1330,6 +1330,61 @@ mod tests {
     }
 
     #[test]
+    fn generated_content_validation_readouts_include_clean_and_invalid_reports() {
+        let readouts = content_validation_readouts();
+
+        let clean_readout = readouts
+            .iter()
+            .find(|readout| readout.scenario_id == "hexing-bolt-hit")
+            .expect("clean catalog validation readout exists");
+        assert!(clean_readout.report.accepted);
+        assert!(clean_readout.report.diagnostics.is_empty());
+
+        let invalid_ruleset = readouts
+            .iter()
+            .find(|readout| readout.scenario_id == "hexing-bolt-invalid-selected-ruleset")
+            .expect("invalid selected ruleset validation readout exists");
+        assert!(!invalid_ruleset.report.accepted);
+        assert_eq!(invalid_ruleset.report.error_count, 1);
+        assert_eq!(
+            invalid_ruleset.report.diagnostics[0].code,
+            ContentDiagnosticCode::SelectedRulesetMissingFromCatalog
+        );
+        assert_eq!(
+            invalid_ruleset.report.diagnostics[0].content_id,
+            Some("asha-rulebench.missing.v0".to_string())
+        );
+
+        let invalid_ability = readouts
+            .iter()
+            .find(|readout| readout.scenario_id == "hexing-bolt-invalid-selected-ability")
+            .expect("invalid selected ability validation readout exists");
+        assert!(!invalid_ability.report.accepted);
+        assert_eq!(
+            invalid_ability.report.diagnostics[0].code,
+            ContentDiagnosticCode::SelectedAbilityMissingFromCatalog
+        );
+        assert_eq!(
+            invalid_ability.report.diagnostics[0].content_id,
+            Some("ability.missing".to_string())
+        );
+
+        let invalid_equipped_item = readouts
+            .iter()
+            .find(|readout| readout.scenario_id == "hexing-bolt-invalid-equipped-item")
+            .expect("invalid equipped item validation readout exists");
+        assert!(!invalid_equipped_item.report.accepted);
+        assert_eq!(
+            invalid_equipped_item.report.diagnostics[0].code,
+            ContentDiagnosticCode::MissingEquippedItem
+        );
+        assert_eq!(
+            invalid_equipped_item.report.diagnostics[0].content_id,
+            Some("item.missing-focus".to_string())
+        );
+    }
+
+    #[test]
     fn scenario_carries_combatant_stat_blocks() {
         let scenario = hexing_bolt_fixture_scenario();
         let adept = scenario

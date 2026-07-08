@@ -27,14 +27,16 @@ pub fn ruleset_catalog_readout() -> RulesetCatalogReadout {
 }
 
 pub fn content_validation_readouts() -> Vec<ContentValidationReadout> {
-    scenario_catalog_cases()
+    let mut readouts = scenario_catalog_cases()
         .into_iter()
         .map(|case| ContentValidationReadout {
             scenario_id: case.summary.id,
             scenario_title: case.summary.title,
             report: validate_scenario_content_report(&case.scenario),
         })
-        .collect()
+        .collect::<Vec<_>>();
+    readouts.extend(invalid_content_validation_readouts());
+    readouts
 }
 
 pub fn resolve_catalog_scenario(
@@ -88,6 +90,49 @@ fn rejected_target_legality_catalog_case() -> ScenarioCatalogCase {
         UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
         vec![17, 5],
     )
+}
+
+fn invalid_content_validation_readouts() -> Vec<ContentValidationReadout> {
+    vec![
+        invalid_content_validation_readout(
+            "hexing-bolt-invalid-selected-ruleset",
+            "Hexing Bolt Invalid Selected Ruleset",
+            |scenario| {
+                scenario.selected_ruleset_id = "asha-rulebench.missing.v0".to_string();
+            },
+        ),
+        invalid_content_validation_readout(
+            "hexing-bolt-invalid-selected-ability",
+            "Hexing Bolt Invalid Selected Ability",
+            |scenario| {
+                scenario.selected_ability_id = Some("ability.missing".to_string());
+            },
+        ),
+        invalid_content_validation_readout(
+            "hexing-bolt-invalid-equipped-item",
+            "Hexing Bolt Invalid Equipped Item",
+            |scenario| {
+                scenario.combatants[0]
+                    .equipped_item_ids
+                    .push("item.missing-focus".to_string());
+            },
+        ),
+    ]
+}
+
+fn invalid_content_validation_readout(
+    id: &str,
+    title: &str,
+    configure: impl FnOnce(&mut RulebenchScenario),
+) -> ContentValidationReadout {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    configure(&mut scenario);
+
+    ContentValidationReadout {
+        scenario_id: id.to_string(),
+        scenario_title: title.to_string(),
+        report: validate_scenario_content_report(&scenario),
+    }
 }
 
 fn catalog_case(

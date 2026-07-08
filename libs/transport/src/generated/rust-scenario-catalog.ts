@@ -44,6 +44,42 @@ export const rustBackedContentValidationCatalog: RulebenchContentValidationCatal
         ],
       },
     },
+    {
+      scenarioId: 'hexing-bolt-invalid-selected-ruleset',
+      scenarioTitle: 'Hexing Bolt Invalid Selected Ruleset',
+      report: {
+        accepted: false,
+        errorCount: 1,
+        warningCount: 0,
+        diagnostics: [
+          { severity: 'error', code: 'selectedRulesetMissingFromCatalog', contentId: 'asha-rulebench.missing.v0', message: 'Selected ruleset asha-rulebench.missing.v0 is not present in the scenario ruleset catalog.' },
+        ],
+      },
+    },
+    {
+      scenarioId: 'hexing-bolt-invalid-selected-ability',
+      scenarioTitle: 'Hexing Bolt Invalid Selected Ability',
+      report: {
+        accepted: false,
+        errorCount: 1,
+        warningCount: 0,
+        diagnostics: [
+          { severity: 'error', code: 'selectedAbilityMissingFromCatalog', contentId: 'ability.missing', message: 'Selected ability ability.missing is not present in the scenario ability catalog.' },
+        ],
+      },
+    },
+    {
+      scenarioId: 'hexing-bolt-invalid-equipped-item',
+      scenarioTitle: 'Hexing Bolt Invalid Equipped Item',
+      report: {
+        accepted: false,
+        errorCount: 1,
+        warningCount: 0,
+        diagnostics: [
+          { severity: 'error', code: 'missingEquippedItem', contentId: 'item.missing-focus', message: 'Combatant entity-adept equips item item.missing-focus that is not present in the scenario item catalog.' },
+        ],
+      },
+    },
   ],
 };
 

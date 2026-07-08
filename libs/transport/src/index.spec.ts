@@ -59,6 +59,32 @@ describe('RulebenchTransport fixtures', () => {
     }
   });
 
+  it('reads generated invalid Rust content validation diagnostics through transport', async () => {
+    const transport = createFakeRulebenchTransport();
+
+    const result = await transport.loadContentValidationReport('hexing-bolt-invalid-selected-ability');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.scenarioId).toBe('hexing-bolt-invalid-selected-ability');
+      expect(result.value.scenarioTitle).toBe('Hexing Bolt Invalid Selected Ability');
+      expect(result.value.report).toEqual({
+        accepted: false,
+        errorCount: 1,
+        warningCount: 0,
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'selectedAbilityMissingFromCatalog',
+            contentId: 'ability.missing',
+            message:
+              'Selected ability ability.missing is not present in the scenario ability catalog.',
+          },
+        ],
+      });
+    }
+  });
+
   it('uses the checked Rust-backed scenario catalog as the default transport payload', async () => {
     expect(defaultScenarioCatalog).toBe(rustBackedScenarioCatalog);
 
