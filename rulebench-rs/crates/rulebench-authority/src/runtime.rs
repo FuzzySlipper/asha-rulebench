@@ -1,3 +1,4 @@
+use crate::fingerprint_projection;
 use crate::model::*;
 use crate::resolver::resolve_use_action;
 use crate::state::CombatState;
@@ -134,13 +135,17 @@ impl CombatSessionState {
     }
 
     pub fn snapshot(&self) -> CombatSessionSnapshot {
+        let current_state = self.state.project("Current session state.");
+        let current_state_fingerprint = fingerprint_projection(&current_state);
+
         CombatSessionSnapshot {
             session_id: self.session_id.clone(),
             next_step_index: self.next_step_index,
             lifecycle: self.lifecycle.clone(),
             turn_order: self.turn_order.clone(),
             combat_log: self.combat_log.clone(),
-            current_state: self.state.project("Current session state."),
+            current_state,
+            current_state_fingerprint,
         }
     }
 }

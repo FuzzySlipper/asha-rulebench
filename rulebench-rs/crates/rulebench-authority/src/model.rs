@@ -218,6 +218,7 @@ pub struct CombatSessionSnapshot {
     pub turn_order: CombatTurnOrder,
     pub combat_log: Vec<CombatLogEntry>,
     pub current_state: ScenarioProjection,
+    pub current_state_fingerprint: StateFingerprint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -675,6 +676,12 @@ pub struct FinalCombatantState {
 pub struct ScenarioProjection {
     pub summary: String,
     pub combatants: Vec<FinalCombatantState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateFingerprint {
+    pub algorithm: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

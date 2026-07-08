@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+mod audit;
 mod catalog;
 mod content;
 mod fixtures;
@@ -16,6 +17,7 @@ mod runtime;
 mod session;
 mod state;
 
+pub use audit::{fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM};
 pub use catalog::{resolve_catalog_scenario, scenario_catalog_cases, scenario_catalog_summaries};
 pub use content::validate_scenario_content;
 pub use fixtures::{
@@ -1186,6 +1188,28 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_snapshot_fingerprint_is_stable_for_unchanged_state() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let first_snapshot = session.snapshot();
+        let second_snapshot = session.snapshot();
+
+        assert_eq!(
+            first_snapshot.current_state_fingerprint.algorithm,
+            PROJECTION_FINGERPRINT_ALGORITHM
+        );
+        assert_eq!(
+            first_snapshot.current_state_fingerprint,
+            second_snapshot.current_state_fingerprint
+        );
+        assert_eq!(
+            first_snapshot.current_state_fingerprint,
+            fingerprint_projection(&first_snapshot.current_state)
+        );
+    }
+
+    #[test]
     fn session_runtime_snapshot_reads_command_updates() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -1209,6 +1233,57 @@ mod tests {
         assert_eq!(
             snapshot.current_state.combatants[1].conditions,
             vec!["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn session_runtime_snapshot_fingerprint_changes_after_accepted_hit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let initial_fingerprint = session.snapshot().current_state_fingerprint;
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        let hit_fingerprint = session.snapshot().current_state_fingerprint;
+
+        assert_ne!(initial_fingerprint, hit_fingerprint);
+    }
+
+    #[test]
+    fn session_runtime_snapshot_fingerprint_is_preserved_after_rejected_command() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let after_hit_fingerprint = session.snapshot().current_state_fingerprint;
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-rejected",
+            "Runtime rejected",
+            "Adept targets themself through the command runtime.",
+            CommandOutcomeClass::RejectedTargetLegality,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+        let after_rejection_snapshot = session.snapshot();
+
+        assert_eq!(after_rejection_snapshot.next_step_index, 2);
+        assert_eq!(
+            after_rejection_snapshot.current_state_fingerprint,
+            after_hit_fingerprint
         );
     }
 
