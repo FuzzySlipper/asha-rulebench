@@ -474,7 +474,7 @@ fn rejected_with_projection(
     }
 }
 
-fn validate_target_legality(
+pub(crate) fn validate_target_legality(
     actor: &Combatant,
     target: &Combatant,
     action: &ActionDefinition,
@@ -507,7 +507,7 @@ fn validate_target_legality(
     }
 }
 
-fn target_legality_rejection(target_legality: &TargetLegality) -> RulebenchRejection {
+pub(crate) fn target_legality_rejection(target_legality: &TargetLegality) -> RulebenchRejection {
     match target_legality.reason.as_str() {
         "Target is outside range." => RulebenchRejection::TargetOutOfRange,
         "Line of sight is blocked." => RulebenchRejection::TargetNotVisible,

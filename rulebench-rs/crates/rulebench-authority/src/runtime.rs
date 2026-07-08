@@ -1,5 +1,5 @@
 use crate::model::*;
-use crate::resolver::resolve_use_action;
+use crate::resolver::{resolve_use_action, target_legality_rejection, validate_target_legality};
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
 
@@ -221,6 +221,16 @@ impl CombatSessionState {
         )
     }
 
+    pub fn preflight_command(&self, intent: UseActionIntent) -> CommandPreflightReadout {
+        let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
+        command_preflight_readout(
+            &self.lifecycle,
+            self.turn_order.current_actor_id.clone(),
+            &current_scenario,
+            intent,
+        )
+    }
+
     pub fn next_step_index(&self) -> u32 {
         self.next_step_index
     }
@@ -351,6 +361,164 @@ fn ended_combat_receipt(
             ),
         ],
         projection: Some(projection),
+    }
+}
+
+fn command_preflight_readout(
+    lifecycle: &CombatLifecycle,
+    current_actor_id: Option<String>,
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+) -> CommandPreflightReadout {
+    if intent.actor_id.is_empty() {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByShape,
+            Some(RulebenchRejection::EmptyActorId),
+            current_actor_id,
+            None,
+            "Actor id is empty.",
+        );
+    }
+    if intent.action_id.is_empty() {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByShape,
+            Some(RulebenchRejection::EmptyActionId),
+            current_actor_id,
+            None,
+            "Action id is empty.",
+        );
+    }
+    if intent.target_id.is_empty() {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByShape,
+            Some(RulebenchRejection::EmptyTargetId),
+            current_actor_id,
+            None,
+            "Target id is empty.",
+        );
+    }
+
+    if lifecycle.phase == CombatLifecyclePhase::Ended {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByLifecycle,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            "Combat is already ended.",
+        );
+    }
+
+    if current_actor_id
+        .as_deref()
+        .is_some_and(|actor_id| intent.actor_id != actor_id)
+    {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByTurnOrder,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            "Actor is not the current turn actor.",
+        );
+    }
+
+    let Some(actor) = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == intent.actor_id)
+    else {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActorLookup,
+            Some(RulebenchRejection::InvalidActor),
+            current_actor_id,
+            None,
+            "Actor is not present in the current scenario.",
+        );
+    };
+
+    let Some(action) = scenario.action_by_id(&intent.action_id) else {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActionLookup,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            "Action is not present in the current scenario.",
+        );
+    };
+
+    if action.actor_id != intent.actor_id {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActionOwnership,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            "Action does not belong to the proposed actor.",
+        );
+    }
+
+    let Some(target) = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == intent.target_id)
+    else {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByTargetLookup,
+            Some(RulebenchRejection::InvalidTarget),
+            current_actor_id,
+            None,
+            "Target is not present in the current scenario.",
+        );
+    };
+
+    let target_legality = validate_target_legality(actor, target, action);
+    if !target_legality.accepted {
+        let rejection = target_legality_rejection(&target_legality);
+        let reason = target_legality.reason.clone();
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByTargetLegality,
+            Some(rejection),
+            current_actor_id,
+            Some(target_legality),
+            reason,
+        );
+    }
+
+    CommandPreflightReadout {
+        intent,
+        accepted: true,
+        decision_kind: CommandPreflightDecisionKind::Accepted,
+        rejection: None,
+        current_actor_id,
+        target_legality: Some(target_legality),
+        reason: "Command is admissible before roll resolution.".to_string(),
+    }
+}
+
+fn rejected_command_preflight(
+    intent: UseActionIntent,
+    decision_kind: CommandPreflightDecisionKind,
+    rejection: Option<RulebenchRejection>,
+    current_actor_id: Option<String>,
+    target_legality: Option<TargetLegality>,
+    reason: impl Into<String>,
+) -> CommandPreflightReadout {
+    CommandPreflightReadout {
+        intent,
+        accepted: false,
+        decision_kind,
+        rejection,
+        current_actor_id,
+        target_legality,
+        reason: reason.into(),
     }
 }
 

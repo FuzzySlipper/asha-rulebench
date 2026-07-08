@@ -2354,6 +2354,255 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_command_preflight_accepts_current_actor_action_target_without_rolls() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-raider",
+        ));
+
+        assert!(preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::Accepted
+        );
+        assert_eq!(preflight.decision_kind.code(), "accepted");
+        assert_eq!(preflight.rejection, None);
+        assert_eq!(preflight.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(
+            preflight
+                .target_legality
+                .as_ref()
+                .map(|legality| legality.accepted),
+            Some(true)
+        );
+        assert_eq!(
+            preflight
+                .target_legality
+                .as_ref()
+                .map(|legality| legality.reason.as_str()),
+            Some("Target is hostile, within range, and line of sight is clear.")
+        );
+        assert_eq!(
+            preflight.reason,
+            "Command is admissible before roll resolution."
+        );
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_empty_shape() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let preflight =
+            session.preflight_command(UseActionIntent::new("", "hexing_bolt", "entity-raider"));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByShape
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByShape");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::EmptyActorId));
+        assert_eq!(preflight.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(preflight.target_legality, None);
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_ended_combat() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.end_combat();
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-raider",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByLifecycle");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::InvalidAction));
+        assert_eq!(preflight.reason, "Combat is already ended.");
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_wrong_turn_actor() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-raider",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByTurnOrder
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByTurnOrder");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::InvalidAction));
+        assert_eq!(
+            preflight.current_actor_id,
+            Some("entity-raider".to_string())
+        );
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_invalid_actor_without_current_actor() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants.clear();
+        let session = CombatSessionState::new("runtime-empty", scenario);
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-raider",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByActorLookup
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByActorLookup");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::InvalidActor));
+        assert_eq!(preflight.current_actor_id, None);
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_invalid_action() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "not_hexing_bolt",
+            "entity-raider",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByActionLookup
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByActionLookup");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::InvalidAction));
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_action_actor_mismatch() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].actor_id = "entity-raider".to_string();
+        let session = CombatSessionState::new("runtime-action-mismatch", scenario);
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-raider",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByActionOwnership
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByActionOwnership");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::InvalidAction));
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_invalid_target() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-missing",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByTargetLookup
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByTargetLookup");
+        assert_eq!(preflight.rejection, Some(RulebenchRejection::InvalidTarget));
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_rejects_target_legality_failure() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-adept",
+        ));
+
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByTargetLegality
+        );
+        assert_eq!(preflight.decision_kind.code(), "rejectedByTargetLegality");
+        assert_eq!(
+            preflight.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
+        assert_eq!(
+            preflight
+                .target_legality
+                .as_ref()
+                .map(|legality| legality.reason.as_str()),
+            Some("Target is not hostile.")
+        );
+    }
+
+    #[test]
+    fn session_runtime_command_preflight_is_read_only() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let before_preflight = session.snapshot();
+
+        let preflight = session.preflight_command(UseActionIntent::new(
+            "entity-adept",
+            "hexing_bolt",
+            "entity-raider",
+        ));
+        let after_preflight = session.snapshot();
+
+        assert!(preflight.accepted);
+        assert_eq!(after_preflight, before_preflight);
+        assert_eq!(session.next_step_index(), 1);
+        assert_eq!(session.combat_log().len(), 1);
+        assert_eq!(session.audit_log().len(), 1);
+        assert_eq!(session.action_usage_log().len(), 1);
+        assert_eq!(session.turn_transition_log().len(), 0);
+        assert_eq!(session.lifecycle_transition_log().len(), 1);
+    }
+
+    #[test]
     fn session_runtime_current_turn_action_usage_summarizes_accepted_hit() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());

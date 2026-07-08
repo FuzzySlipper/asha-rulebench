@@ -244,6 +244,46 @@ impl CommandDecisionKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandPreflightDecisionKind {
+    Accepted,
+    RejectedByShape,
+    RejectedByLifecycle,
+    RejectedByTurnOrder,
+    RejectedByActorLookup,
+    RejectedByActionLookup,
+    RejectedByActionOwnership,
+    RejectedByTargetLookup,
+    RejectedByTargetLegality,
+}
+
+impl CommandPreflightDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CommandPreflightDecisionKind::Accepted => "accepted",
+            CommandPreflightDecisionKind::RejectedByShape => "rejectedByShape",
+            CommandPreflightDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            CommandPreflightDecisionKind::RejectedByTurnOrder => "rejectedByTurnOrder",
+            CommandPreflightDecisionKind::RejectedByActorLookup => "rejectedByActorLookup",
+            CommandPreflightDecisionKind::RejectedByActionLookup => "rejectedByActionLookup",
+            CommandPreflightDecisionKind::RejectedByActionOwnership => "rejectedByActionOwnership",
+            CommandPreflightDecisionKind::RejectedByTargetLookup => "rejectedByTargetLookup",
+            CommandPreflightDecisionKind::RejectedByTargetLegality => "rejectedByTargetLegality",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandPreflightReadout {
+    pub intent: UseActionIntent,
+    pub accepted: bool,
+    pub decision_kind: CommandPreflightDecisionKind,
+    pub rejection: Option<RulebenchRejection>,
+    pub current_actor_id: Option<String>,
+    pub target_legality: Option<TargetLegality>,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandAuditEntry {
     pub id: String,
