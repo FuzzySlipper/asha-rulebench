@@ -87,8 +87,16 @@ pub fn resolve_use_action(
         );
     };
 
-    let action = &scenario.selected_action;
-    if action.id != intent.action_id || action.actor_id != intent.actor_id {
+    let Some(action) = scenario.action_by_id(&intent.action_id) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
+    if action.actor_id != intent.actor_id {
         return rejected_with_projection(
             scenario,
             intent,
@@ -142,6 +150,7 @@ pub fn resolve_use_action(
         intent,
         actor,
         target,
+        action,
         target_legality,
         roll_stream,
     )
@@ -152,10 +161,10 @@ fn resolve_accepted_action(
     intent: UseActionIntent,
     _actor: &Combatant,
     target: &Combatant,
+    action: &ActionDefinition,
     target_legality: TargetLegality,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
-    let action = &scenario.selected_action;
     let defense_value = defense_value(target, &action.attack.defense_id);
     let total = roll_stream[0] + action.attack.modifier;
     let attack_roll = AttackRollResult {
