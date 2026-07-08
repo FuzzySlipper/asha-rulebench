@@ -190,6 +190,90 @@ mod tests {
     }
 
     #[test]
+    fn content_diagnostics_report_missing_action_actor() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].actor_id = "entity-missing-actor".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingActionActor
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("entity-missing-actor".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_action_target() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].target_ids = vec!["entity-missing-target".to_string()];
+        scenario.actions[0].visible_target_ids = vec!["entity-missing-target".to_string()];
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingActionTarget
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("entity-missing-target".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_visible_target_outside_target_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0]
+            .visible_target_ids
+            .push("entity-adept".to_string());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::VisibleTargetOutsideTargetIds
+        );
+        assert_eq!(diagnostics[0].content_id, Some("entity-adept".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_attack_modifier_stat() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].attack.modifier_stat_id = "missing-mind".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingAttackModifierStat
+        );
+        assert_eq!(diagnostics[0].content_id, Some("missing-mind".to_string()));
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_target_defense() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].attack.defense_id = "missing-nerve".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingTargetDefense
+        );
+        assert_eq!(diagnostics[0].content_id, Some("missing-nerve".to_string()));
+    }
+
+    #[test]
     fn scenario_carries_combatant_stat_blocks() {
         let scenario = hexing_bolt_fixture_scenario();
         let adept = scenario

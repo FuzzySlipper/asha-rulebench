@@ -263,6 +263,11 @@ pub enum ContentDiagnosticCode {
     EmptyActionId,
     DuplicateActionId,
     SelectedActionMissingFromCatalog,
+    MissingActionActor,
+    MissingActionTarget,
+    VisibleTargetOutsideTargetIds,
+    MissingAttackModifierStat,
+    MissingTargetDefense,
 }
 
 impl ContentDiagnosticCode {
@@ -274,6 +279,11 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::SelectedActionMissingFromCatalog => {
                 "selectedActionMissingFromCatalog"
             }
+            ContentDiagnosticCode::MissingActionActor => "missingActionActor",
+            ContentDiagnosticCode::MissingActionTarget => "missingActionTarget",
+            ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
+            ContentDiagnosticCode::MissingAttackModifierStat => "missingAttackModifierStat",
+            ContentDiagnosticCode::MissingTargetDefense => "missingTargetDefense",
         }
     }
 }
