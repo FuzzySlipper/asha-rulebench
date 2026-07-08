@@ -1,4 +1,5 @@
 use crate::model::*;
+use crate::modifiers::effective_stats_for_combatant;
 use crate::state::CombatState;
 
 pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
@@ -106,7 +107,7 @@ pub fn resolve_use_action(
         );
     }
 
-    let Some(attack_modifier) = attack_modifier(actor, action) else {
+    let Some(attack_modifier) = attack_modifier(scenario, actor, action) else {
         return rejected_with_projection(
             scenario,
             intent,
@@ -526,10 +527,16 @@ fn defense_value(target: &Combatant, defense_id: &str) -> i32 {
         .map_or(0, |defense| defense.value)
 }
 
-fn attack_modifier(actor: &Combatant, action: &ActionDefinition) -> Option<i32> {
-    actor
-        .stat_by_id(&action.attack.modifier_stat_id)
-        .map(|stat| stat.value)
+fn attack_modifier(
+    scenario: &RulebenchScenario,
+    actor: &Combatant,
+    action: &ActionDefinition,
+) -> Option<i32> {
+    effective_stats_for_combatant(scenario, &actor.id)?
+        .stats
+        .into_iter()
+        .find(|stat| stat.stat_id == action.attack.modifier_stat_id)
+        .map(|stat| stat.effective_value)
 }
 
 #[derive(Debug, Clone, Copy)]

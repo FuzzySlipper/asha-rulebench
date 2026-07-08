@@ -576,7 +576,7 @@ mod tests {
     }
 
     #[test]
-    fn active_modifier_stat_adjustment_readout_does_not_change_hexing_bolt_resolution() {
+    fn active_modifier_stat_adjustment_readout_feeds_attack_modifier_resolution() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.combatants[0]
             .active_modifiers
@@ -605,11 +605,11 @@ mod tests {
         assert!(receipt.accepted);
         assert_eq!(
             receipt.attack_roll.as_ref().map(|roll| roll.modifier),
-            Some(4)
+            Some(3)
         );
         assert_eq!(
             receipt.attack_roll.as_ref().map(|roll| roll.total),
-            Some(21)
+            Some(20)
         );
     }
 
@@ -1525,6 +1525,41 @@ mod tests {
             receipt.attack_roll.as_ref().map(|roll| roll.total),
             Some(21)
         );
+    }
+
+    #[test]
+    fn resolver_uses_effective_actor_stat_for_attack_modifier() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0]
+            .active_modifiers
+            .push(ActiveModifier::temporary(
+                "rattled",
+                "rattled",
+                "until end of next turn",
+            ));
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[9, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.modifier),
+            Some(3)
+        );
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.total),
+            Some(12)
+        );
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.outcome),
+            Some(AttackOutcome::Miss)
+        );
+        assert!(receipt.damage.is_none());
+        assert!(receipt.modifier.is_none());
+        assert_eq!(receipt.events.len(), 2);
     }
 
     #[test]
