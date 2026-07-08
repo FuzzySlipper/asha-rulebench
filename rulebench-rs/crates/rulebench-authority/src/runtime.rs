@@ -61,6 +61,75 @@ impl CombatSessionIntentCommandSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionCandidateSelectionSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub action_id: String,
+    pub target_id: String,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionCandidateSelectionSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        action_id: impl Into<String>,
+        target_id: impl Into<String>,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            action_id: action_id.into(),
+            target_id: target_id.into(),
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionCandidateSelectionDecisionKind {
+    Accepted,
+    RejectedByUnavailableCandidates,
+    RejectedByMissingCandidate,
+    RejectedByPreflight,
+}
+
+impl CombatSessionCandidateSelectionDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionCandidateSelectionDecisionKind::Accepted => "accepted",
+            CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates => {
+                "rejectedByUnavailableCandidates"
+            }
+            CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate => {
+                "rejectedByMissingCandidate"
+            }
+            CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight => {
+                "rejectedByPreflight"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionCandidateSelectionReadout {
+    pub action_id: String,
+    pub target_id: String,
+    pub accepted: bool,
+    pub decision_kind: CombatSessionCandidateSelectionDecisionKind,
+    pub current_actor_id: Option<String>,
+    pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
+    pub preflight_decision_kind: Option<CommandPreflightDecisionKind>,
+    pub rejection: Option<RulebenchRejection>,
+    pub reason: String,
+    pub command: Option<CombatSessionIntentCommandSpec>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionScriptSpec {
     pub id: String,
     pub title: String,
@@ -494,6 +563,14 @@ impl CombatSessionState {
         );
 
         current_actor_command_candidates(&self.lifecycle, &current_scenario, current_actor_options)
+    }
+
+    pub fn plan_candidate_command(
+        &self,
+        spec: CombatSessionCandidateSelectionSpec,
+    ) -> CombatSessionCandidateSelectionReadout {
+        let candidates = self.current_actor_command_candidates();
+        plan_candidate_command(spec, candidates)
     }
 
     pub fn preflight_command(&self, intent: UseActionIntent) -> CommandPreflightReadout {
@@ -1458,6 +1535,105 @@ fn current_actor_command_candidates(
         unavailable_reason: options.unavailable_reason,
         candidates,
     }
+}
+
+fn plan_candidate_command(
+    spec: CombatSessionCandidateSelectionSpec,
+    candidates: CommandCandidateSummary,
+) -> CombatSessionCandidateSelectionReadout {
+    if !candidates.available {
+        return CombatSessionCandidateSelectionReadout {
+            action_id: spec.action_id,
+            target_id: spec.target_id,
+            accepted: false,
+            decision_kind:
+                CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates,
+            current_actor_id: candidates.current_actor_id,
+            unavailable_reason: candidates.unavailable_reason,
+            preflight_decision_kind: None,
+            rejection: None,
+            reason: candidate_selection_unavailable_reason(candidates.unavailable_reason),
+            command: None,
+        };
+    }
+
+    let Some(candidate) = candidates.candidates.iter().find(|candidate| {
+        candidate.action_id == spec.action_id && candidate.target_id == spec.target_id
+    }) else {
+        return CombatSessionCandidateSelectionReadout {
+            action_id: spec.action_id,
+            target_id: spec.target_id,
+            accepted: false,
+            decision_kind: CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate,
+            current_actor_id: candidates.current_actor_id,
+            unavailable_reason: None,
+            preflight_decision_kind: None,
+            rejection: None,
+            reason: "Selected command candidate is not available for the current actor."
+                .to_string(),
+            command: None,
+        };
+    };
+
+    if !candidate.accepted {
+        return CombatSessionCandidateSelectionReadout {
+            action_id: spec.action_id,
+            target_id: spec.target_id,
+            accepted: false,
+            decision_kind: CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight,
+            current_actor_id: candidates.current_actor_id,
+            unavailable_reason: None,
+            preflight_decision_kind: Some(candidate.decision_kind),
+            rejection: candidate.rejection,
+            reason: candidate.reason.clone(),
+            command: None,
+        };
+    }
+
+    let command = CombatSessionIntentCommandSpec::new(
+        spec.id,
+        spec.title,
+        spec.summary,
+        candidate.intent.clone(),
+        spec.roll_stream,
+    );
+
+    CombatSessionCandidateSelectionReadout {
+        action_id: spec.action_id,
+        target_id: spec.target_id,
+        accepted: true,
+        decision_kind: CombatSessionCandidateSelectionDecisionKind::Accepted,
+        current_actor_id: candidates.current_actor_id,
+        unavailable_reason: None,
+        preflight_decision_kind: Some(candidate.decision_kind),
+        rejection: None,
+        reason: "Selected command candidate planned for deterministic submission.".to_string(),
+        command: Some(command),
+    }
+}
+
+fn candidate_selection_unavailable_reason(
+    reason: Option<CurrentActorOptionsUnavailableReason>,
+) -> String {
+    match reason {
+        Some(CurrentActorOptionsUnavailableReason::CombatEnded) => {
+            "No command candidates are available because combat is ended."
+        }
+        Some(CurrentActorOptionsUnavailableReason::NoCurrentActor) => {
+            "No command candidates are available because there is no current actor."
+        }
+        Some(CurrentActorOptionsUnavailableReason::CurrentActorDefeated) => {
+            "No command candidates are available because the current actor is defeated."
+        }
+        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions) => {
+            "No command candidates are available because the current actor has no matching actions."
+        }
+        Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets) => {
+            "No command candidates are available because there are no visible active targets."
+        }
+        None => "No command candidates are available.",
+    }
+    .to_string()
 }
 
 fn current_actor_id_command_candidates(

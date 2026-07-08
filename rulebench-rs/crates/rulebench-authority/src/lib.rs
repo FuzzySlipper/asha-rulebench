@@ -37,10 +37,11 @@ pub use modifiers::{
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
-    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
-    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
-    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
-    CombatSessionState,
+    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
+    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
+    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
+    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
+    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
 };
 pub use session::{
     combat_session_control_history_readouts, combat_session_script_readouts,
@@ -3132,6 +3133,220 @@ mod tests {
         assert_eq!(session.action_usage_log().len(), 1);
         assert_eq!(session.turn_transition_log().len(), 0);
         assert_eq!(session.lifecycle_transition_log().len(), 1);
+    }
+
+    #[test]
+    fn session_runtime_candidate_selection_plans_current_actor_command() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "planned-hit",
+            "Planned hit",
+            "Caller selected the Hexing Bolt candidate.",
+            "hexing_bolt",
+            "entity-raider",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::Accepted
+        );
+        assert_eq!(plan.decision_kind.code(), "accepted");
+        assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(plan.unavailable_reason, None);
+        assert_eq!(
+            plan.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
+        assert_eq!(plan.rejection, None);
+        assert_eq!(
+            plan.reason,
+            "Selected command candidate planned for deterministic submission."
+        );
+
+        let command = plan.command.as_ref().expect("accepted plan has command");
+        assert_eq!(command.id, "planned-hit");
+        assert_eq!(command.title, "Planned hit");
+        assert_eq!(
+            command.summary,
+            "Caller selected the Hexing Bolt candidate."
+        );
+        assert_eq!(
+            command.intent,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider")
+        );
+        assert_eq!(command.roll_stream, vec![17, 5]);
+        assert_eq!(after_plan, before_plan);
+    }
+
+    #[test]
+    fn session_runtime_candidate_selection_rejects_unavailable_candidates() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "planned-hit",
+            "Planned hit",
+            "Raider has no command candidates in this fixture.",
+            "hexing_bolt",
+            "entity-raider",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(!plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates
+        );
+        assert_eq!(plan.decision_kind.code(), "rejectedByUnavailableCandidates");
+        assert_eq!(plan.current_actor_id, Some("entity-raider".to_string()));
+        assert_eq!(
+            plan.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
+        );
+        assert_eq!(
+            plan.reason,
+            "No command candidates are available because the current actor has no matching actions."
+        );
+        assert_eq!(plan.command, None);
+        assert_eq!(after_plan, before_plan);
+    }
+
+    #[test]
+    fn session_runtime_candidate_selection_rejects_missing_candidate() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "planned-missing",
+            "Planned missing",
+            "Caller selected a target that is not in current candidates.",
+            "hexing_bolt",
+            "missing-target",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(!plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate
+        );
+        assert_eq!(plan.decision_kind.code(), "rejectedByMissingCandidate");
+        assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(plan.unavailable_reason, None);
+        assert_eq!(plan.preflight_decision_kind, None);
+        assert_eq!(plan.rejection, None);
+        assert_eq!(
+            plan.reason,
+            "Selected command candidate is not available for the current actor."
+        );
+        assert_eq!(plan.command, None);
+        assert_eq!(after_plan, before_plan);
+    }
+
+    #[test]
+    fn session_runtime_candidate_selection_rejects_candidate_failed_by_preflight() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].target_ids = vec!["entity-adept".to_string()];
+        scenario.actions[0].visible_target_ids = vec!["entity-adept".to_string()];
+        scenario.selected_action = scenario.actions[0].clone();
+        let session = CombatSessionState::new("runtime-self-target-candidate", scenario);
+        let candidates = session.current_actor_command_candidates();
+
+        assert!(candidates.available);
+        assert_eq!(candidates.candidates.len(), 1);
+        assert!(!candidates.candidates[0].accepted);
+        assert_eq!(
+            candidates.candidates[0].decision_kind,
+            CommandPreflightDecisionKind::RejectedByTargetLegality
+        );
+        let before_plan = session.snapshot();
+
+        let plan = session.plan_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "planned-self-target",
+            "Planned self target",
+            "Caller selected a visible but illegal self target.",
+            "hexing_bolt",
+            "entity-adept",
+            vec![17, 5],
+        ));
+        let after_plan = session.snapshot();
+
+        assert!(!plan.accepted);
+        assert_eq!(
+            plan.decision_kind,
+            CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight
+        );
+        assert_eq!(plan.decision_kind.code(), "rejectedByPreflight");
+        assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(
+            plan.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByTargetLegality)
+        );
+        assert_eq!(
+            plan.rejection,
+            Some(RulebenchRejection::TargetLegalityFailed)
+        );
+        assert_eq!(plan.command, None);
+        assert_eq!(after_plan, before_plan);
+    }
+
+    #[test]
+    fn session_runtime_candidate_selection_plan_can_be_submitted() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let plan = session.plan_candidate_command(CombatSessionCandidateSelectionSpec::new(
+            "planned-hit",
+            "Planned hit",
+            "Caller selected the Hexing Bolt candidate.",
+            "hexing_bolt",
+            "entity-raider",
+            vec![17, 5],
+        ));
+        let command = plan.command.expect("accepted plan has command");
+
+        let readout = session.submit_intent_command(command);
+
+        assert!(readout.receipt.accepted);
+        assert_eq!(readout.step.id, "planned-hit");
+        assert_eq!(
+            readout.command,
+            CommandAttempt {
+                step_id: "planned-hit".to_string(),
+                step_index: 0,
+                actor_id: "entity-adept".to_string(),
+                action_id: "hexing_bolt".to_string(),
+                target_id: "entity-raider".to_string(),
+                roll_stream: vec![17, 5],
+                outcome_class: CommandOutcomeClass::AcceptedHit,
+            }
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::AcceptedByResolver
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
+        assert_eq!(session.audit_log().len(), 1);
+        assert_eq!(session.action_usage_log().len(), 1);
+        assert_eq!(
+            session.snapshot().current_state.combatants[1]
+                .hit_points
+                .current,
+            9
+        );
     }
 
     #[test]
