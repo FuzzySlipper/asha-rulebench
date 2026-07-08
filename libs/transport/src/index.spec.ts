@@ -695,6 +695,61 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.finalState.combatants[1]?.hitPoints.current).toBe(0);
       expect(result.value.combatLogEntryCount).toBe(2);
       expect(result.value.auditEntryCount).toBe(2);
+      expect(result.value.combatLog).toHaveLength(2);
+      expect(result.value.commandAuditLog).toHaveLength(2);
+      expect(
+        result.value.combatLog.map((entry) => entry.outcomeClass),
+      ).toEqual(["acceptedHit", "acceptedHit"]);
+      expect(result.value.combatLog[0]?.eventTypes).toEqual([
+        "ActionUsed",
+        "AttackRolled",
+        "DamageApplied",
+        "ModifierApplied",
+      ]);
+      expect(result.value.combatLog[1]?.eventTypes).toEqual([
+        "ActionUsed",
+        "AttackRolled",
+        "DamageApplied",
+        "ModifierApplied",
+      ]);
+      expect(
+        result.value.commandAuditLog.map((entry) => entry.decisionKind),
+      ).toEqual(["acceptedByResolver", "acceptedByResolver"]);
+      expect(result.value.commandAuditLog.map((entry) => entry.accepted)).toEqual(
+        [true, true],
+      );
+      expect(result.value.commandAuditLog[0]?.rollConsumption).toEqual([
+        {
+          sequence: 0,
+          requestKind: "attackRoll",
+          suppliedValue: 17,
+          consumed: true,
+          reason: "Attack roll value was consumed for hit resolution.",
+        },
+        {
+          sequence: 1,
+          requestKind: "damageRoll",
+          suppliedValue: 5,
+          consumed: true,
+          reason: "Damage roll value was consumed for damage resolution.",
+        },
+      ]);
+      expect(result.value.commandAuditLog[1]?.rollConsumption).toEqual([
+        {
+          sequence: 0,
+          requestKind: "attackRoll",
+          suppliedValue: 17,
+          consumed: true,
+          reason: "Attack roll value was consumed for hit resolution.",
+        },
+        {
+          sequence: 1,
+          requestKind: "damageRoll",
+          suppliedValue: 5,
+          consumed: true,
+          reason: "Damage roll value was consumed for damage resolution.",
+        },
+      ]);
       expect(result.value.reason).toBe(
         "Automatic combat run completed because combat reached ended lifecycle.",
       );

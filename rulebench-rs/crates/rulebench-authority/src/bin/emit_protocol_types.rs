@@ -409,6 +409,14 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchFinalStateDto",
                 },
                 Field {
+                    name: "combatLog",
+                    ty: "readonly RulebenchCombatLogEntryDto[]",
+                },
+                Field {
+                    name: "commandAuditLog",
+                    ty: "readonly RulebenchCommandAuditEntryDto[]",
+                },
+                Field {
                     name: "combatLogEntryCount",
                     ty: "number",
                 },

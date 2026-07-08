@@ -513,6 +513,16 @@ fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunReadout) -> S
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      combatLog: [\n");
+    for entry in &readout.final_snapshot.combat_log {
+        out.push_str(&render_log_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      commandAuditLog: [\n");
+    for entry in &readout.final_snapshot.audit_log {
+        out.push_str(&render_command_audit_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str(&format!(
         "      combatLogEntryCount: {},\n",
         readout.final_snapshot.combat_log.len()

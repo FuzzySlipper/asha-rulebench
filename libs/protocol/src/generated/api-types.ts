@@ -153,6 +153,8 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly stepDecisions: readonly RulebenchAutomaticStepDecisionDto[];
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalState: RulebenchFinalStateDto;
+  readonly combatLog: readonly RulebenchCombatLogEntryDto[];
+  readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly combatLogEntryCount: number;
   readonly auditEntryCount: number;
   readonly reason: string;
