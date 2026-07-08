@@ -231,6 +231,7 @@ pub struct CommandAttempt {
 pub enum CommandDecisionKind {
     AcceptedByResolver,
     RejectedByResolver,
+    RejectedByPreflight,
     RejectedByLifecycle,
     RejectedByTurnOrder,
 }
@@ -240,6 +241,7 @@ impl CommandDecisionKind {
         match self {
             CommandDecisionKind::AcceptedByResolver => "acceptedByResolver",
             CommandDecisionKind::RejectedByResolver => "rejectedByResolver",
+            CommandDecisionKind::RejectedByPreflight => "rejectedByPreflight",
             CommandDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
             CommandDecisionKind::RejectedByTurnOrder => "rejectedByTurnOrder",
         }
@@ -293,6 +295,7 @@ pub struct CommandAuditEntry {
     pub sequence: u32,
     pub outcome_class: CommandOutcomeClass,
     pub decision_kind: CommandDecisionKind,
+    pub preflight_decision_kind: Option<CommandPreflightDecisionKind>,
     pub accepted: bool,
     pub rejection: Option<RulebenchRejection>,
     pub event_count: u32,

@@ -108,6 +108,7 @@ impl CombatSessionState {
             Some(spec.outcome_class),
             spec.intent,
             spec.roll_stream,
+            false,
         )
     }
 
@@ -122,6 +123,7 @@ impl CombatSessionState {
             None,
             spec.intent,
             spec.roll_stream,
+            true,
         )
     }
 
@@ -133,13 +135,37 @@ impl CombatSessionState {
         outcome_class: Option<CommandOutcomeClass>,
         intent: UseActionIntent,
         roll_stream: Vec<i32>,
+        preflight_enabled: bool,
     ) -> CombatSessionStepReadout {
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let turn_context = self.turn_order.clone();
         let state_before = self.state.project("State before command resolution.");
         let state_before_fingerprint = fingerprint_projected_state(&state_before);
+        let preflight = if preflight_enabled {
+            Some(command_preflight_readout(
+                &self.lifecycle,
+                self.turn_order.current_actor_id.clone(),
+                &self.scenario,
+                intent.clone(),
+            ))
+        } else {
+            None
+        };
+        let rejected_preflight = preflight.as_ref().filter(|readout| !readout.accepted);
         let combat_has_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
-        let (receipt, state_after, should_apply_state, decision_kind) = if combat_has_ended {
+        let (receipt, state_after, should_apply_state, decision_kind) = if let Some(preflight) =
+            rejected_preflight
+        {
+            let state_after = self
+                .state
+                .project("No authority state changed; command preflight rejected.");
+            (
+                preflight_rejected_receipt(preflight, state_after.clone()),
+                state_after,
+                false,
+                command_decision_kind_for_preflight(preflight.decision_kind),
+            )
+        } else if combat_has_ended {
             let state_after = self
                 .state
                 .project("No authority state changed; combat already ended.");
@@ -184,8 +210,8 @@ impl CombatSessionState {
             }
         };
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
-        let outcome_class =
-            outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt, decision_kind));
+        let outcome_class = outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt));
+        let preflight_decision_kind = preflight.as_ref().map(|readout| readout.decision_kind);
 
         let step = CombatSessionStepSummary {
             id,
@@ -209,6 +235,7 @@ impl CombatSessionState {
             &step,
             &receipt,
             decision_kind,
+            preflight_decision_kind,
             state_before_fingerprint,
             state_after_fingerprint,
         );
@@ -631,6 +658,54 @@ fn non_current_actor_receipt(
     }
 }
 
+fn preflight_rejected_receipt(
+    preflight: &CommandPreflightReadout,
+    projection: ScenarioProjection,
+) -> RulebenchReceipt {
+    RulebenchReceipt {
+        accepted: false,
+        authority_surface: AUTHORITY_SURFACE,
+        intent: preflight.intent.clone(),
+        rejection: preflight.rejection,
+        target_legality: preflight.target_legality.clone(),
+        attack_roll: None,
+        damage: None,
+        modifier: None,
+        events: Vec::new(),
+        trace: vec![
+            TraceEntry::new(
+                1,
+                TracePhase::Proposal,
+                TraceStatus::Info,
+                "UseActionIntent received.",
+                "Session command submitted through preflight-gated intent path.",
+            ),
+            TraceEntry::new(
+                2,
+                TracePhase::Validation,
+                TraceStatus::Rejected,
+                "Command rejected by preflight.",
+                preflight.reason.clone(),
+            ),
+        ],
+        projection: Some(projection),
+    }
+}
+
+fn command_decision_kind_for_preflight(
+    decision_kind: CommandPreflightDecisionKind,
+) -> CommandDecisionKind {
+    match decision_kind {
+        CommandPreflightDecisionKind::RejectedByLifecycle => {
+            CommandDecisionKind::RejectedByLifecycle
+        }
+        CommandPreflightDecisionKind::RejectedByTurnOrder => {
+            CommandDecisionKind::RejectedByTurnOrder
+        }
+        _ => CommandDecisionKind::RejectedByPreflight,
+    }
+}
+
 fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt) -> CombatLogEntry {
     CombatLogEntry {
         id: format!("log-{}", step.id),
@@ -643,19 +718,14 @@ fn combat_log_entry(step: &CombatSessionStepSummary, receipt: &RulebenchReceipt)
     }
 }
 
-fn derive_command_outcome_class(
-    receipt: &RulebenchReceipt,
-    decision_kind: CommandDecisionKind,
-) -> CommandOutcomeClass {
+fn derive_command_outcome_class(receipt: &RulebenchReceipt) -> CommandOutcomeClass {
     if receipt.accepted {
         if receipt.events.iter().any(domain_event_is_damage_applied) {
             CommandOutcomeClass::AcceptedHit
         } else {
             CommandOutcomeClass::AcceptedMiss
         }
-    } else if decision_kind == CommandDecisionKind::RejectedByResolver
-        && receipt.rejection.is_some_and(is_target_legality_rejection)
-    {
+    } else if receipt.rejection.is_some_and(is_target_legality_rejection) {
         CommandOutcomeClass::RejectedTargetLegality
     } else {
         CommandOutcomeClass::RejectedInvalidCommand
@@ -680,6 +750,7 @@ fn command_audit_entry(
     step: &CombatSessionStepSummary,
     receipt: &RulebenchReceipt,
     decision_kind: CommandDecisionKind,
+    preflight_decision_kind: Option<CommandPreflightDecisionKind>,
     state_before_fingerprint: StateFingerprint,
     state_after_fingerprint: StateFingerprint,
 ) -> CommandAuditEntry {
@@ -689,6 +760,7 @@ fn command_audit_entry(
         sequence: step.index,
         outcome_class: step.outcome_class,
         decision_kind,
+        preflight_decision_kind,
         accepted: receipt.accepted,
         rejection: receipt.rejection,
         event_count: receipt.events.len() as u32,

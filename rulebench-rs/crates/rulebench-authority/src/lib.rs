@@ -2146,6 +2146,10 @@ mod tests {
             readout.audit_entry.decision_kind,
             CommandDecisionKind::AcceptedByResolver
         );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
     }
 
     #[test]
@@ -2182,6 +2186,10 @@ mod tests {
             readout.audit_entry.outcome_class,
             CommandOutcomeClass::AcceptedMiss
         );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::Accepted)
+        );
         assert_eq!(readout.audit_entry.event_count, 2);
     }
 
@@ -2213,8 +2221,123 @@ mod tests {
         );
         assert_eq!(
             readout.audit_entry.decision_kind,
-            CommandDecisionKind::RejectedByResolver
+            CommandDecisionKind::RejectedByPreflight
         );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByTargetLegality)
+        );
+    }
+
+    #[test]
+    fn session_runtime_intent_command_records_shape_preflight_rejection() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_fingerprint = session.snapshot().current_state_fingerprint;
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-shape-rejected",
+            "Runtime derived shape rejection",
+            "Rust rejects malformed commands before roll resolution.",
+            UseActionIntent::new("", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let after_snapshot = session.snapshot();
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::EmptyActorId)
+        );
+        assert_eq!(
+            readout.step.outcome_class,
+            CommandOutcomeClass::RejectedInvalidCommand
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByPreflight
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByShape)
+        );
+        assert_eq!(readout.audit_entry.event_count, 0);
+        assert_eq!(
+            readout.audit_entry.state_before_fingerprint,
+            readout.audit_entry.state_after_fingerprint
+        );
+        assert_eq!(after_snapshot.current_state_fingerprint, before_fingerprint);
+        assert!(after_snapshot.action_usage_log.is_empty());
+        assert_eq!(after_snapshot.lifecycle.phase, CombatLifecyclePhase::Ready);
+    }
+
+    #[test]
+    fn session_runtime_intent_command_records_action_ownership_preflight_rejection() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+        let before_fingerprint = session.snapshot().current_state_fingerprint;
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-action-owner-rejected",
+            "Runtime derived action ownership rejection",
+            "Rust rejects action ownership before roll resolution.",
+            UseActionIntent::new("entity-raider", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+        let after_snapshot = session.snapshot();
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::InvalidAction)
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByPreflight
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByActionOwnership)
+        );
+        assert_eq!(after_snapshot.current_state_fingerprint, before_fingerprint);
+        assert!(after_snapshot.action_usage_log.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_intent_command_records_target_lookup_preflight_rejection() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        let before_fingerprint = session.snapshot().current_state_fingerprint;
+
+        let readout = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "runtime-derived-target-lookup-rejected",
+            "Runtime derived target lookup rejection",
+            "Rust rejects missing targets before roll resolution.",
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-missing"),
+            vec![17, 5],
+        ));
+        let after_snapshot = session.snapshot();
+
+        assert!(!readout.receipt.accepted);
+        assert_eq!(
+            readout.receipt.rejection,
+            Some(RulebenchRejection::InvalidTarget)
+        );
+        assert_eq!(
+            readout.step.outcome_class,
+            CommandOutcomeClass::RejectedTargetLegality
+        );
+        assert_eq!(
+            readout.audit_entry.decision_kind,
+            CommandDecisionKind::RejectedByPreflight
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByTargetLookup)
+        );
+        assert_eq!(after_snapshot.current_state_fingerprint, before_fingerprint);
+        assert!(after_snapshot.action_usage_log.is_empty());
     }
 
     #[test]
@@ -2247,6 +2370,10 @@ mod tests {
         assert_eq!(
             readout.audit_entry.decision_kind,
             CommandDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByLifecycle)
         );
     }
 
@@ -2281,6 +2408,10 @@ mod tests {
             readout.audit_entry.decision_kind,
             CommandDecisionKind::RejectedByTurnOrder
         );
+        assert_eq!(
+            readout.audit_entry.preflight_decision_kind,
+            Some(CommandPreflightDecisionKind::RejectedByTurnOrder)
+        );
     }
 
     #[test]
@@ -2308,6 +2439,7 @@ mod tests {
             readout.audit_entry.decision_kind,
             CommandDecisionKind::RejectedByLifecycle
         );
+        assert_eq!(readout.audit_entry.preflight_decision_kind, None);
     }
 
     #[test]
