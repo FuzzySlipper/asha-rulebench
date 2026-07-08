@@ -247,6 +247,65 @@ mod tests {
     }
 
     #[test]
+    fn resolver_uses_hit_operations_for_damage_and_modifier() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].hit.damage_bonus = 99;
+        scenario.actions[0].hit.damage_type = "wrong".to_string();
+        scenario.actions[0].hit.modifier_id = "wrong".to_string();
+        scenario.actions[0].hit.modifier_label = "wrong".to_string();
+        scenario.actions[0].hit.modifier_duration = "wrong".to_string();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+        assert_eq!(
+            receipt
+                .damage
+                .as_ref()
+                .map(|damage| damage.damage_type.as_str()),
+            Some("psychic")
+        );
+        assert_eq!(
+            receipt
+                .modifier
+                .as_ref()
+                .map(|modifier| modifier.label.as_str()),
+            Some("rattled")
+        );
+        assert_eq!(
+            receipt
+                .modifier
+                .as_ref()
+                .map(|modifier| modifier.duration.as_str()),
+            Some("until end of next turn")
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_missing_hit_operations() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.actions[0].hit.operations.clear();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(!receipt.accepted);
+        assert_eq!(receipt.rejection, Some(RulebenchRejection::InvalidAction));
+        assert!(receipt.events.is_empty());
+        assert!(receipt.attack_roll.is_none());
+        assert!(receipt.damage.is_none());
+        assert!(receipt.modifier.is_none());
+    }
+
+    #[test]
     fn resolver_uses_action_catalog_for_action_lookup() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.selected_action.id = "display_only_hexing_bolt".to_string();

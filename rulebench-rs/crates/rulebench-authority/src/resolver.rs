@@ -116,6 +116,16 @@ pub fn resolve_use_action(
         );
     };
 
+    let Some(hit_operations) = hit_operations(action) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
+
     let Some(target) = scenario
         .combatants
         .iter()
@@ -161,6 +171,7 @@ pub fn resolve_use_action(
         target,
         action,
         attack_modifier,
+        hit_operations,
         target_legality,
         roll_stream,
     )
@@ -172,6 +183,7 @@ fn resolve_accepted_action(
     target: &Combatant,
     action: &ActionDefinition,
     attack_modifier: i32,
+    hit_operations: HitOperations<'_>,
     target_legality: TargetLegality,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
@@ -233,14 +245,14 @@ fn resolve_accepted_action(
 
     let damage = apply_damage(
         target,
-        roll_stream[1] + action.hit.damage_bonus,
-        &action.hit.damage_type,
+        roll_stream[1] + hit_operations.damage.damage_bonus,
+        &hit_operations.damage.damage_type,
     );
     let modifier = ModifierOutcome {
         target_id: target.id.clone(),
-        modifier_id: action.hit.modifier_id.clone(),
-        label: action.hit.modifier_label.clone(),
-        duration: action.hit.modifier_duration.clone(),
+        modifier_id: hit_operations.modifier.modifier_id.clone(),
+        label: hit_operations.modifier.modifier_label.clone(),
+        duration: hit_operations.modifier.modifier_duration.clone(),
     };
 
     trace.push(TraceEntry::new(
@@ -518,6 +530,19 @@ fn attack_modifier(actor: &Combatant, action: &ActionDefinition) -> Option<i32> 
     actor
         .stat_by_id(&action.attack.modifier_stat_id)
         .map(|stat| stat.value)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct HitOperations<'a> {
+    damage: &'a DamageEffectOperation,
+    modifier: &'a ModifierEffectOperation,
+}
+
+fn hit_operations(action: &ActionDefinition) -> Option<HitOperations<'_>> {
+    Some(HitOperations {
+        damage: action.hit.damage_operation()?,
+        modifier: action.hit.modifier_operation()?,
+    })
 }
 
 fn apply_damage(target: &Combatant, amount: i32, damage_type: &str) -> DamageOutcome {
