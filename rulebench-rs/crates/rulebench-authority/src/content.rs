@@ -16,6 +16,8 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
         ));
     }
 
+    validate_items(scenario, &mut diagnostics);
+
     let mut seen_action_ids = HashSet::new();
     for action in &scenario.actions {
         if action.id.is_empty() {
@@ -54,6 +56,56 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_items(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
+    let mut seen_item_ids = HashSet::new();
+    for item in &scenario.items {
+        if item.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyItemId,
+                None,
+                "Item catalog contains an item with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_item_ids.insert(item.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateItemId,
+                Some(item.id.clone()),
+                format!("Item id {} appears more than once.", item.id),
+            ));
+        }
+    }
+
+    if let Some(selected_item_id) = &scenario.selected_item_id {
+        if scenario.item_by_id(selected_item_id).is_none() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::SelectedItemMissingFromCatalog,
+                Some(selected_item_id.clone()),
+                format!(
+                    "Selected item {} is not present in the scenario item catalog.",
+                    selected_item_id
+                ),
+            ));
+        }
+    }
+
+    for combatant in &scenario.combatants {
+        for item_id in &combatant.equipped_item_ids {
+            if scenario.item_by_id(item_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingEquippedItem,
+                    Some(item_id.clone()),
+                    format!(
+                        "Combatant {} equips item {} that is not present in the scenario item catalog.",
+                        combatant.id, item_id
+                    ),
+                ));
+            }
+        }
+    }
 }
 
 fn validate_action_references(

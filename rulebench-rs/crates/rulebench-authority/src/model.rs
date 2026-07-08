@@ -278,12 +278,16 @@ pub enum ContentDiagnosticCode {
     EmptyRulesetId,
     EmptyActionId,
     DuplicateActionId,
+    EmptyItemId,
+    DuplicateItemId,
     SelectedActionMissingFromCatalog,
+    SelectedItemMissingFromCatalog,
     MissingActionActor,
     MissingActionTarget,
     VisibleTargetOutsideTargetIds,
     MissingAttackModifierStat,
     MissingTargetDefense,
+    MissingEquippedItem,
 }
 
 impl ContentDiagnosticCode {
@@ -292,14 +296,20 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
             ContentDiagnosticCode::EmptyActionId => "emptyActionId",
             ContentDiagnosticCode::DuplicateActionId => "duplicateActionId",
+            ContentDiagnosticCode::EmptyItemId => "emptyItemId",
+            ContentDiagnosticCode::DuplicateItemId => "duplicateItemId",
             ContentDiagnosticCode::SelectedActionMissingFromCatalog => {
                 "selectedActionMissingFromCatalog"
+            }
+            ContentDiagnosticCode::SelectedItemMissingFromCatalog => {
+                "selectedItemMissingFromCatalog"
             }
             ContentDiagnosticCode::MissingActionActor => "missingActionActor",
             ContentDiagnosticCode::MissingActionTarget => "missingActionTarget",
             ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
             ContentDiagnosticCode::MissingAttackModifierStat => "missingAttackModifierStat",
             ContentDiagnosticCode::MissingTargetDefense => "missingTargetDefense",
+            ContentDiagnosticCode::MissingEquippedItem => "missingEquippedItem",
         }
     }
 }
@@ -374,6 +384,7 @@ pub struct Combatant {
     pub hit_points: BoundedValue,
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
+    pub equipped_item_ids: Vec<String>,
     pub active_modifiers: Vec<ActiveModifier>,
     pub conditions: Vec<String>,
     pub is_actor: bool,
@@ -391,6 +402,8 @@ pub struct RulebenchScenario {
     pub ruleset: RulesetMetadata,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
+    pub items: Vec<ItemDefinition>,
+    pub selected_item_id: Option<String>,
     pub actions: Vec<ActionDefinition>,
     pub selected_action: ActionDefinition,
 }
@@ -398,6 +411,10 @@ pub struct RulebenchScenario {
 impl RulebenchScenario {
     pub fn action_by_id(&self, action_id: &str) -> Option<&ActionDefinition> {
         self.actions.iter().find(|action| action.id == action_id)
+    }
+
+    pub fn item_by_id(&self, item_id: &str) -> Option<&ItemDefinition> {
+        self.items.iter().find(|item| item.id == item_id)
     }
 }
 
@@ -435,6 +452,14 @@ pub struct ActionDefinition {
     pub hit: HitEffect,
     pub action_text: String,
     pub effect_text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemDefinition {
+    pub id: String,
+    pub name: String,
+    pub summary: String,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

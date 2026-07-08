@@ -127,6 +127,43 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_item_catalog_and_equipped_item_references() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(validate_scenario_content(&scenario).is_empty());
+        assert_eq!(
+            scenario
+                .items
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["item.hex-focus", "item.raider-mail"]
+        );
+        assert_eq!(
+            scenario
+                .item_by_id("item.hex-focus")
+                .map(|item| item.name.as_str()),
+            Some("Hex Focus")
+        );
+        assert_eq!(scenario.selected_item_id.as_deref(), Some("item.hex-focus"));
+        assert_eq!(
+            scenario.combatants[0].equipped_item_ids,
+            vec!["item.hex-focus".to_string()]
+        );
+        assert_eq!(
+            scenario.combatants[1].equipped_item_ids,
+            vec!["item.raider-mail".to_string()]
+        );
+    }
+
+    #[test]
+    fn scenario_item_catalog_rejects_unknown_item_lookup() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        assert!(scenario.item_by_id("item.missing").is_none());
+    }
+
+    #[test]
     fn content_diagnostics_report_empty_ruleset_id() {
         let mut scenario = hexing_bolt_fixture_scenario();
         scenario.ruleset.id.clear();
@@ -158,6 +195,71 @@ mod tests {
                 ContentDiagnosticCode::EmptyActionId,
                 ContentDiagnosticCode::SelectedActionMissingFromCatalog,
             ]
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_empty_item_id() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.items[1].id.clear();
+        scenario.combatants[1].equipped_item_ids.clear();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].severity, ContentDiagnosticSeverity::Error);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::EmptyItemId);
+        assert_eq!(ContentDiagnosticCode::EmptyItemId.code(), "emptyItemId");
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_item_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.items.push(scenario.items[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, ContentDiagnosticCode::DuplicateItemId);
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("item.hex-focus".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_selected_item_missing_from_catalog() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.selected_item_id = Some("item.missing-focus".to_string());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::SelectedItemMissingFromCatalog
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("item.missing-focus".to_string())
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_missing_equipped_item() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0].equipped_item_ids = vec!["item.missing-focus".to_string()];
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::MissingEquippedItem
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("item.missing-focus".to_string())
         );
     }
 
@@ -365,6 +467,31 @@ mod tests {
                 .as_ref()
                 .map(|projection| projection.combatants[1].hit_points.current),
             Some(9)
+        );
+    }
+
+    #[test]
+    fn item_equipment_content_does_not_change_hexing_bolt_resolution() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.total),
+            Some(21)
+        );
+        assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+        assert_eq!(
+            receipt
+                .projection
+                .as_ref()
+                .map(|projection| projection.combatants[1].conditions.as_slice()),
+            Some(&["rattled".to_string()][..])
         );
     }
 

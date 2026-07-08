@@ -30,6 +30,8 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             ],
         },
         combatants: vec![adept_initial(), raider_initial()],
+        items: hexing_bolt_items(),
+        selected_item_id: Some("item.hex-focus".to_string()),
         actions: vec![selected_action.clone()],
         selected_action,
     }
@@ -81,6 +83,23 @@ fn hexing_bolt_action() -> ActionDefinition {
         effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
             .to_string(),
     }
+}
+
+fn hexing_bolt_items() -> Vec<ItemDefinition> {
+    vec![
+        ItemDefinition {
+            id: "item.hex-focus".to_string(),
+            name: "Hex Focus".to_string(),
+            summary: "A small focus carried by the Adept; structural content only.".to_string(),
+            tags: vec!["focus".to_string(), "implement".to_string()],
+        },
+        ItemDefinition {
+            id: "item.raider-mail".to_string(),
+            name: "Raider Mail".to_string(),
+            summary: "Rough armor worn by the Raider; structural content only.".to_string(),
+            tags: vec!["armor".to_string()],
+        },
+    ]
 }
 
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
@@ -140,6 +159,7 @@ fn adept_initial() -> Combatant {
                 value: 15,
             },
         ],
+        equipped_item_ids: vec!["item.hex-focus".to_string()],
         active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: true,
@@ -187,6 +207,7 @@ fn raider_initial() -> Combatant {
                 value: 13,
             },
         ],
+        equipped_item_ids: vec!["item.raider-mail".to_string()],
         active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: false,
