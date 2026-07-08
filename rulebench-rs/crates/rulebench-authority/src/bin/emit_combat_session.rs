@@ -15,9 +15,10 @@ use rulebench_authority::{
     CombatSessionSummary, CombatTurnOrder, CombatantVitalityEntry, CombatantVitalitySummary,
     CommandAttempt, CommandAuditEntry, CommandDecisionKind, CommandOutcomeClass,
     CommandPreflightDecisionKind, CurrentActorActionOption, CurrentActorOptionSummary,
-    CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
-    ModifierDurationExpirationEntry, ModifierTenure, RulebenchRejection, ScenarioMetadata,
-    ScenarioProjection, StateFingerprint,
+    CurrentActorOptionsUnavailableReason, CurrentActorTargetOption, LifecycleTransitionEntry,
+    LifecycleTransitionTrigger, ModifierDurationExpirationEntry, ModifierTenure,
+    RulebenchRejection, ScenarioMetadata, ScenarioProjection, StateFingerprint,
+    TurnTransitionEntry,
 };
 use ts_emit::{render_scenario_readout, ts_string, ts_string_array};
 
@@ -410,6 +411,16 @@ fn render_script_readout(readout: &CombatSessionScriptReadout) -> String {
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      lifecycleTransitionLog: [\n");
+    for entry in &readout.final_snapshot.lifecycle_transition_log {
+        out.push_str(&render_lifecycle_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      turnTransitionLog: [\n");
+    for entry in &readout.final_snapshot.turn_transition_log {
+        out.push_str(&render_turn_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str("      commandAuditLog: [\n");
     for entry in &readout.final_snapshot.audit_log {
         out.push_str(&render_command_audit_entry(entry, "        "));
@@ -528,6 +539,69 @@ fn render_turn_order(turn_order: &CombatTurnOrder, indent: &str) -> String {
         render_optional_string(&turn_order.current_actor_id)
     ));
     out.push_str(&format!("{indent}}}"));
+    out
+}
+
+fn render_lifecycle_transition_entry(entry: &LifecycleTransitionEntry, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  trigger: {},\n",
+        ts_string(lifecycle_transition_trigger(entry.trigger))
+    ));
+    out.push_str(&format!("{indent}  stepIndex: {},\n", entry.step_index));
+    out.push_str(&format!(
+        "{indent}  previousLifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(entry.previous_phase))
+    ));
+    out.push_str(&format!(
+        "{indent}  nextLifecyclePhase: {},\n",
+        ts_string(lifecycle_phase(entry.next_phase))
+    ));
+    out.push_str(&format!(
+        "{indent}  startedAtStep: {},\n",
+        render_optional_u32(entry.started_at_step)
+    ));
+    out.push_str(&format!(
+        "{indent}  endedAtStep: {},\n",
+        render_optional_u32(entry.ended_at_step)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_turn_transition_entry(entry: &TurnTransitionEntry, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  previousRoundNumber: {},\n",
+        entry.previous_round_number
+    ));
+    out.push_str(&format!(
+        "{indent}  previousTurnIndex: {},\n",
+        entry.previous_turn_index
+    ));
+    out.push_str(&format!(
+        "{indent}  previousActorId: {},\n",
+        render_optional_string(&entry.previous_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  nextRoundNumber: {},\n",
+        entry.next_round_number
+    ));
+    out.push_str(&format!(
+        "{indent}  nextTurnIndex: {},\n",
+        entry.next_turn_index
+    ));
+    out.push_str(&format!(
+        "{indent}  nextActorId: {},\n",
+        render_optional_string(&entry.next_actor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  wrappedRound: {},\n",
+        entry.wrapped_round
+    ));
+    out.push_str(&format!("{indent}}},\n"));
     out
 }
 
@@ -1043,6 +1117,10 @@ fn lifecycle_phase(phase: CombatLifecyclePhase) -> &'static str {
         CombatLifecyclePhase::InProgress => "inProgress",
         CombatLifecyclePhase::Ended => "ended",
     }
+}
+
+fn lifecycle_transition_trigger(trigger: LifecycleTransitionTrigger) -> &'static str {
+    trigger.code()
 }
 
 fn modifier_tenure(tenure: ModifierTenure) -> &'static str {

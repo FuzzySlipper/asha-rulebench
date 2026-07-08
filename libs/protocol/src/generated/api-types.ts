@@ -20,6 +20,8 @@ export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | '
 
 export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
 
+export type RulebenchLifecycleTransitionTriggerDto = 'explicitStart' | 'commandStart' | 'explicitEnd' | 'conditionalEnd';
+
 export type RulebenchActionResourceKindDto = 'standardAction';
 
 export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
@@ -114,6 +116,8 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
   readonly finalCombatEndCondition: RulebenchCombatEndConditionDto;
+  readonly lifecycleTransitionLog: readonly RulebenchLifecycleTransitionEntryDto[];
+  readonly turnTransitionLog: readonly RulebenchTurnTransitionEntryDto[];
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
@@ -125,6 +129,27 @@ export interface RulebenchCombatTurnOrderDto {
   readonly currentTurnIndex: number;
   readonly participantOrder: readonly string[];
   readonly currentActorId: string | null;
+}
+
+export interface RulebenchLifecycleTransitionEntryDto {
+  readonly sequence: number;
+  readonly trigger: RulebenchLifecycleTransitionTriggerDto;
+  readonly stepIndex: number;
+  readonly previousLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly nextLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly startedAtStep: number | null;
+  readonly endedAtStep: number | null;
+}
+
+export interface RulebenchTurnTransitionEntryDto {
+  readonly sequence: number;
+  readonly previousRoundNumber: number;
+  readonly previousTurnIndex: number;
+  readonly previousActorId: string | null;
+  readonly nextRoundNumber: number;
+  readonly nextTurnIndex: number;
+  readonly nextActorId: string | null;
+  readonly wrappedRound: boolean;
 }
 
 export interface RulebenchActionUsageSummaryDto {

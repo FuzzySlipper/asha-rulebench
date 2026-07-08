@@ -47,6 +47,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
+        "export type RulebenchLifecycleTransitionTriggerDto = 'explicitStart' | 'commandStart' | 'explicitEnd' | 'conditionalEnd';",
         "export type RulebenchActionResourceKindDto = 'standardAction';",
         "export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';",
         "export type RulebenchCommandDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder';",
@@ -302,6 +303,14 @@ fn interfaces() -> &'static [Interface] {
                     ty: "RulebenchCombatEndConditionDto",
                 },
                 Field {
+                    name: "lifecycleTransitionLog",
+                    ty: "readonly RulebenchLifecycleTransitionEntryDto[]",
+                },
+                Field {
+                    name: "turnTransitionLog",
+                    ty: "readonly RulebenchTurnTransitionEntryDto[]",
+                },
+                Field {
                     name: "commandAuditLog",
                     ty: "readonly RulebenchCommandAuditEntryDto[]",
                 },
@@ -337,6 +346,76 @@ fn interfaces() -> &'static [Interface] {
                 Field {
                     name: "currentActorId",
                     ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchLifecycleTransitionEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "trigger",
+                    ty: "RulebenchLifecycleTransitionTriggerDto",
+                },
+                Field {
+                    name: "stepIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "previousLifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "nextLifecyclePhase",
+                    ty: "RulebenchCombatLifecyclePhaseDto",
+                },
+                Field {
+                    name: "startedAtStep",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "endedAtStep",
+                    ty: "number | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchTurnTransitionEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "previousRoundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "previousTurnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "previousActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "nextRoundNumber",
+                    ty: "number",
+                },
+                Field {
+                    name: "nextTurnIndex",
+                    ty: "number",
+                },
+                Field {
+                    name: "nextActorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "wrappedRound",
+                    ty: "boolean",
                 },
             ],
         },

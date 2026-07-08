@@ -319,6 +319,48 @@ describe('RulebenchTransport fixtures', () => {
         defeatedEnemyCount: 0,
         reason: 'Combat can continue because both sides have active combatants.',
       });
+      expect(result.value.lifecycleTransitionLog).toEqual([
+        {
+          sequence: 0,
+          trigger: 'explicitStart',
+          stepIndex: 0,
+          previousLifecyclePhase: 'ready',
+          nextLifecyclePhase: 'inProgress',
+          startedAtStep: 0,
+          endedAtStep: null,
+        },
+        {
+          sequence: 1,
+          trigger: 'explicitEnd',
+          stepIndex: 2,
+          previousLifecyclePhase: 'inProgress',
+          nextLifecyclePhase: 'ended',
+          startedAtStep: 0,
+          endedAtStep: 2,
+        },
+      ]);
+      expect(result.value.turnTransitionLog).toEqual([
+        {
+          sequence: 0,
+          previousRoundNumber: 1,
+          previousTurnIndex: 0,
+          previousActorId: 'entity-adept',
+          nextRoundNumber: 1,
+          nextTurnIndex: 1,
+          nextActorId: 'entity-raider',
+          wrappedRound: false,
+        },
+        {
+          sequence: 1,
+          previousRoundNumber: 1,
+          previousTurnIndex: 1,
+          previousActorId: 'entity-raider',
+          nextRoundNumber: 2,
+          nextTurnIndex: 0,
+          nextActorId: 'entity-adept',
+          wrappedRound: true,
+        },
+      ]);
       expect(result.value.commandAuditLog).toEqual([
         {
           id: 'audit-script-selected-runtime-hit',
