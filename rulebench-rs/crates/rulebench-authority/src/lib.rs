@@ -2154,6 +2154,34 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_records_accepted_hit_action_usage() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.action_usage_log().len(), 1);
+        let usage = &session.action_usage_log()[0];
+        assert_eq!(usage.id, "action-usage-runtime-hit");
+        assert_eq!(usage.step_id, "runtime-hit");
+        assert_eq!(usage.step_index, 0);
+        assert_eq!(usage.round_number, 1);
+        assert_eq!(usage.turn_index, 0);
+        assert_eq!(usage.actor_id, "entity-adept");
+        assert_eq!(usage.action_id, "hexing_bolt");
+        assert_eq!(usage.ability_id, "ability.hexing-bolt");
+        assert_eq!(usage.target_id, "entity-raider");
+        assert_eq!(usage.outcome_class, CommandOutcomeClass::AcceptedHit);
+    }
+
+    #[test]
     fn session_runtime_miss_preserves_prior_state() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -2231,6 +2259,42 @@ mod tests {
             readout.audit_entry.state_before_fingerprint,
             readout.audit_entry.state_after_fingerprint
         );
+    }
+
+    #[test]
+    fn session_runtime_records_accepted_miss_action_usage() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-miss",
+            "Runtime miss",
+            "Adept misses Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        assert_eq!(session.action_usage_log().len(), 2);
+        let usage = &session.action_usage_log()[1];
+        assert_eq!(usage.id, "action-usage-runtime-miss");
+        assert_eq!(usage.step_id, "runtime-miss");
+        assert_eq!(usage.step_index, 1);
+        assert_eq!(usage.round_number, 1);
+        assert_eq!(usage.turn_index, 0);
+        assert_eq!(usage.actor_id, "entity-adept");
+        assert_eq!(usage.action_id, "hexing_bolt");
+        assert_eq!(usage.ability_id, "ability.hexing-bolt");
+        assert_eq!(usage.target_id, "entity-raider");
+        assert_eq!(usage.outcome_class, CommandOutcomeClass::AcceptedMiss);
     }
 
     #[test]
@@ -2316,6 +2380,32 @@ mod tests {
             readout.audit_entry.state_before_fingerprint,
             readout.audit_entry.state_after_fingerprint
         );
+    }
+
+    #[test]
+    fn session_runtime_rejected_command_does_not_record_action_usage() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let before_rejection = session.action_usage_log().to_vec();
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-rejected",
+            "Runtime rejected",
+            "Adept targets themself through the command runtime.",
+            CommandOutcomeClass::RejectedTargetLegality,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.action_usage_log(), before_rejection.as_slice());
     }
 
     #[test]
@@ -2725,6 +2815,33 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_post_end_command_does_not_record_action_usage() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.end_combat();
+        let before_post_end = session.action_usage_log().to_vec();
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-post-end",
+            "Runtime post-end command",
+            "A command submitted after combat ended.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.action_usage_log(), before_post_end.as_slice());
+    }
+
+    #[test]
     fn session_runtime_rejects_commands_for_non_current_actor() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -2819,6 +2936,33 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_non_current_actor_command_does_not_record_action_usage() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.advance_turn();
+        let before_wrong_actor = session.action_usage_log().to_vec();
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-wrong-actor",
+            "Runtime wrong actor",
+            "Adept attempts to act during Raider's turn.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.action_usage_log(), before_wrong_actor.as_slice());
+    }
+
+    #[test]
     fn session_runtime_ended_combat_gate_takes_precedence_over_actor_gate() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -2890,6 +3034,32 @@ mod tests {
             session.turn_order().current_actor_id,
             Some("entity-adept".to_string())
         );
+    }
+
+    #[test]
+    fn session_runtime_action_usage_records_current_turn_context() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.advance_turn();
+        session.advance_turn();
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-round-two-hit",
+            "Runtime round two hit",
+            "Adept acts after turn order wraps into round two.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.action_usage_log().len(), 1);
+        let usage = &session.action_usage_log()[0];
+        assert_eq!(usage.step_id, "runtime-round-two-hit");
+        assert_eq!(usage.step_index, 0);
+        assert_eq!(usage.round_number, 2);
+        assert_eq!(usage.turn_index, 0);
+        assert_eq!(usage.actor_id, "entity-adept");
+        assert_eq!(usage.outcome_class, CommandOutcomeClass::AcceptedHit);
     }
 
     #[test]
@@ -3008,6 +3178,12 @@ mod tests {
         assert_eq!(snapshot.audit_log.len(), 1);
         assert_eq!(snapshot.audit_log[0].step_id, "runtime-hit");
         assert!(snapshot.audit_log[0].accepted);
+        assert_eq!(snapshot.action_usage_log.len(), 1);
+        assert_eq!(snapshot.action_usage_log[0].step_id, "runtime-hit");
+        assert_eq!(
+            snapshot.action_usage_log[0].ability_id,
+            "ability.hexing-bolt"
+        );
         assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
         assert_eq!(
             snapshot.current_state.combatants[1].conditions,

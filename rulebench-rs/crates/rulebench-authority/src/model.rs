@@ -199,6 +199,20 @@ pub struct CommandAuditEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionUsageEntry {
+    pub id: String,
+    pub step_id: String,
+    pub step_index: u32,
+    pub round_number: u32,
+    pub turn_index: u32,
+    pub actor_id: String,
+    pub action_id: String,
+    pub ability_id: String,
+    pub target_id: String,
+    pub outcome_class: CommandOutcomeClass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatLogEntry {
     pub id: String,
     pub step_id: String,
@@ -236,6 +250,7 @@ pub struct CombatSessionSnapshot {
     pub turn_order: CombatTurnOrder,
     pub combat_log: Vec<CombatLogEntry>,
     pub audit_log: Vec<CommandAuditEntry>,
+    pub action_usage_log: Vec<ActionUsageEntry>,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,
 }

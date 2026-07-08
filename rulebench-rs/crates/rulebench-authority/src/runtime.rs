@@ -40,6 +40,7 @@ pub struct CombatSessionState {
     state: CombatState,
     combat_log: Vec<CombatLogEntry>,
     audit_log: Vec<CommandAuditEntry>,
+    action_usage_log: Vec<ActionUsageEntry>,
     next_step_index: u32,
     lifecycle: CombatLifecycle,
     turn_order: CombatTurnOrder,
@@ -61,6 +62,7 @@ impl CombatSessionState {
             state,
             combat_log: Vec::new(),
             audit_log: Vec::new(),
+            action_usage_log: Vec::new(),
             next_step_index: 0,
             lifecycle: CombatLifecycle::ready(),
             turn_order,
@@ -69,6 +71,7 @@ impl CombatSessionState {
 
     pub fn submit_command(&mut self, spec: CombatSessionCommandSpec) -> CombatSessionStepReadout {
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
+        let turn_context = self.turn_order.clone();
         let state_before = self.state.project("State before command resolution.");
         let state_before_fingerprint = fingerprint_projected_state(&state_before);
         let combat_has_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
@@ -136,9 +139,19 @@ impl CombatSessionState {
             state_before_fingerprint,
             state_after_fingerprint,
         );
+        let action_usage_entry = if receipt.accepted {
+            self.scenario
+                .action_by_id(&command.action_id)
+                .map(|action| action_usage_entry(&step, &command, &turn_context, action))
+        } else {
+            None
+        };
 
         self.combat_log.push(log_entry.clone());
         self.audit_log.push(audit_entry.clone());
+        if let Some(entry) = action_usage_entry {
+            self.action_usage_log.push(entry);
+        }
         self.next_step_index += 1;
         if should_apply_state {
             self.state = CombatState::from_projection(&state_after);
@@ -163,6 +176,10 @@ impl CombatSessionState {
 
     pub fn audit_log(&self) -> &[CommandAuditEntry] {
         &self.audit_log
+    }
+
+    pub fn action_usage_log(&self) -> &[ActionUsageEntry] {
+        &self.action_usage_log
     }
 
     pub fn next_step_index(&self) -> u32 {
@@ -204,6 +221,7 @@ impl CombatSessionState {
             turn_order: self.turn_order.clone(),
             combat_log: self.combat_log.clone(),
             audit_log: self.audit_log.clone(),
+            action_usage_log: self.action_usage_log.clone(),
             current_state,
             current_state_fingerprint,
         }
@@ -307,6 +325,26 @@ fn command_audit_entry(
         trace_count: receipt.trace.len() as u32,
         state_before_fingerprint,
         state_after_fingerprint,
+    }
+}
+
+fn action_usage_entry(
+    step: &CombatSessionStepSummary,
+    command: &CommandAttempt,
+    turn_context: &CombatTurnOrder,
+    action: &ActionDefinition,
+) -> ActionUsageEntry {
+    ActionUsageEntry {
+        id: format!("action-usage-{}", step.id),
+        step_id: step.id.clone(),
+        step_index: step.index,
+        round_number: turn_context.round_number,
+        turn_index: turn_context.current_turn_index,
+        actor_id: command.actor_id.clone(),
+        action_id: command.action_id.clone(),
+        ability_id: action.ability_id.clone(),
+        target_id: command.target_id.clone(),
+        outcome_class: step.outcome_class,
     }
 }
 
