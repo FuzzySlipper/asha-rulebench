@@ -2182,6 +2182,47 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_current_turn_action_usage_is_empty_initially() {
+        let session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        let summary = session.current_turn_action_usage();
+
+        assert_eq!(summary.round_number, 1);
+        assert_eq!(summary.turn_index, 0);
+        assert_eq!(summary.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(summary.used_action_count, 0);
+        assert!(summary.used_action_ids.is_empty());
+        assert!(summary.used_ability_ids.is_empty());
+    }
+
+    #[test]
+    fn session_runtime_current_turn_action_usage_summarizes_accepted_hit() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let summary = session.current_turn_action_usage();
+
+        assert_eq!(summary.round_number, 1);
+        assert_eq!(summary.turn_index, 0);
+        assert_eq!(summary.current_actor_id, Some("entity-adept".to_string()));
+        assert_eq!(summary.used_action_count, 1);
+        assert_eq!(summary.used_action_ids, vec!["hexing_bolt".to_string()]);
+        assert_eq!(
+            summary.used_ability_ids,
+            vec!["ability.hexing-bolt".to_string()]
+        );
+    }
+
+    #[test]
     fn session_runtime_miss_preserves_prior_state() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -2298,6 +2339,43 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_current_turn_action_usage_includes_accepted_miss() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-miss",
+            "Runtime miss",
+            "Adept misses Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedMiss,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![2, 5],
+        ));
+
+        let summary = session.current_turn_action_usage();
+
+        assert_eq!(summary.used_action_count, 2);
+        assert_eq!(
+            summary.used_action_ids,
+            vec!["hexing_bolt".to_string(), "hexing_bolt".to_string()]
+        );
+        assert_eq!(
+            summary.used_ability_ids,
+            vec![
+                "ability.hexing-bolt".to_string(),
+                "ability.hexing-bolt".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn session_runtime_rejection_preserves_prior_state() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -2406,6 +2484,32 @@ mod tests {
         ));
 
         assert_eq!(session.action_usage_log(), before_rejection.as_slice());
+    }
+
+    #[test]
+    fn session_runtime_current_turn_action_usage_ignores_rejected_commands() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let before_rejection = session.current_turn_action_usage();
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-rejected",
+            "Runtime rejected",
+            "Adept targets themself through the command runtime.",
+            CommandOutcomeClass::RejectedTargetLegality,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
+            vec![17, 5],
+        ));
+
+        assert_eq!(session.current_turn_action_usage(), before_rejection);
     }
 
     #[test]
@@ -2963,6 +3067,30 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_current_turn_action_usage_filters_after_turn_advance() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-hit",
+            "Runtime hit",
+            "Adept hits Raider through the command runtime.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+
+        session.advance_turn();
+        let summary = session.current_turn_action_usage();
+
+        assert_eq!(summary.round_number, 1);
+        assert_eq!(summary.turn_index, 1);
+        assert_eq!(summary.current_actor_id, Some("entity-raider".to_string()));
+        assert_eq!(summary.used_action_count, 0);
+        assert!(summary.used_action_ids.is_empty());
+        assert!(summary.used_ability_ids.is_empty());
+    }
+
+    #[test]
     fn session_runtime_ended_combat_gate_takes_precedence_over_actor_gate() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -3063,6 +3191,47 @@ mod tests {
     }
 
     #[test]
+    fn session_runtime_current_turn_action_usage_filters_after_round_wrap() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-round-one-hit",
+            "Runtime round one hit",
+            "Adept acts in round one.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        session.advance_turn();
+        session.advance_turn();
+
+        let before_round_two_action = session.current_turn_action_usage();
+        assert_eq!(before_round_two_action.round_number, 2);
+        assert_eq!(before_round_two_action.turn_index, 0);
+        assert_eq!(
+            before_round_two_action.current_actor_id,
+            Some("entity-adept".to_string())
+        );
+        assert_eq!(before_round_two_action.used_action_count, 0);
+
+        session.submit_command(CombatSessionCommandSpec::new(
+            "runtime-round-two-hit",
+            "Runtime round two hit",
+            "Adept acts in round two.",
+            CommandOutcomeClass::AcceptedHit,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            vec![17, 5],
+        ));
+        let after_round_two_action = session.current_turn_action_usage();
+
+        assert_eq!(after_round_two_action.used_action_count, 1);
+        assert_eq!(
+            after_round_two_action.used_action_ids,
+            vec!["hexing_bolt".to_string()]
+        );
+    }
+
+    #[test]
     fn session_runtime_does_not_advance_turn_after_combat_end() {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -3107,6 +3276,17 @@ mod tests {
         assert_eq!(session.turn_order().current_turn_index, 0);
         assert!(session.turn_order().participant_order.is_empty());
         assert_eq!(session.turn_order().current_actor_id, None);
+        assert_eq!(
+            session.current_turn_action_usage(),
+            ActionUsageSummary {
+                round_number: 0,
+                turn_index: 0,
+                current_actor_id: None,
+                used_action_count: 0,
+                used_action_ids: Vec::new(),
+                used_ability_ids: Vec::new(),
+            }
+        );
 
         session.advance_turn();
 
@@ -3183,6 +3363,11 @@ mod tests {
         assert_eq!(
             snapshot.action_usage_log[0].ability_id,
             "ability.hexing-bolt"
+        );
+        assert_eq!(snapshot.current_turn_action_usage.used_action_count, 1);
+        assert_eq!(
+            snapshot.current_turn_action_usage.used_action_ids,
+            vec!["hexing_bolt".to_string()]
         );
         assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 9);
         assert_eq!(

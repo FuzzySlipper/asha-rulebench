@@ -213,6 +213,16 @@ pub struct ActionUsageEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionUsageSummary {
+    pub round_number: u32,
+    pub turn_index: u32,
+    pub current_actor_id: Option<String>,
+    pub used_action_count: u32,
+    pub used_action_ids: Vec<String>,
+    pub used_ability_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatLogEntry {
     pub id: String,
     pub step_id: String,
@@ -251,6 +261,7 @@ pub struct CombatSessionSnapshot {
     pub combat_log: Vec<CombatLogEntry>,
     pub audit_log: Vec<CommandAuditEntry>,
     pub action_usage_log: Vec<ActionUsageEntry>,
+    pub current_turn_action_usage: ActionUsageSummary,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,
 }

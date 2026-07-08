@@ -182,6 +182,10 @@ impl CombatSessionState {
         &self.action_usage_log
     }
 
+    pub fn current_turn_action_usage(&self) -> ActionUsageSummary {
+        current_turn_action_usage(&self.turn_order, &self.action_usage_log)
+    }
+
     pub fn next_step_index(&self) -> u32 {
         self.next_step_index
     }
@@ -222,6 +226,7 @@ impl CombatSessionState {
             combat_log: self.combat_log.clone(),
             audit_log: self.audit_log.clone(),
             action_usage_log: self.action_usage_log.clone(),
+            current_turn_action_usage: self.current_turn_action_usage(),
             current_state,
             current_state_fingerprint,
         }
@@ -345,6 +350,39 @@ fn action_usage_entry(
         ability_id: action.ability_id.clone(),
         target_id: command.target_id.clone(),
         outcome_class: step.outcome_class,
+    }
+}
+
+fn current_turn_action_usage(
+    turn_order: &CombatTurnOrder,
+    action_usage_log: &[ActionUsageEntry],
+) -> ActionUsageSummary {
+    let current_actor_id = turn_order.current_actor_id.clone();
+    let current_actor_matches = |entry: &ActionUsageEntry| {
+        current_actor_id
+            .as_deref()
+            .is_some_and(|actor_id| entry.actor_id == actor_id)
+    };
+    let current_turn_entries = action_usage_log
+        .iter()
+        .filter(|entry| entry.round_number == turn_order.round_number)
+        .filter(|entry| entry.turn_index == turn_order.current_turn_index)
+        .filter(|entry| current_actor_matches(entry));
+
+    let mut used_action_ids = Vec::new();
+    let mut used_ability_ids = Vec::new();
+    for entry in current_turn_entries {
+        used_action_ids.push(entry.action_id.clone());
+        used_ability_ids.push(entry.ability_id.clone());
+    }
+
+    ActionUsageSummary {
+        round_number: turn_order.round_number,
+        turn_index: turn_order.current_turn_index,
+        current_actor_id,
+        used_action_count: used_action_ids.len() as u32,
+        used_action_ids,
+        used_ability_ids,
     }
 }
 
