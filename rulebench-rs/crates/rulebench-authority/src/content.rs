@@ -12,14 +12,7 @@ pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> Content
 pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDiagnostic> {
     let mut diagnostics = Vec::new();
 
-    if scenario.ruleset.id.is_empty() {
-        diagnostics.push(ContentDiagnostic::error(
-            ContentDiagnosticCode::EmptyRulesetId,
-            None,
-            "Scenario ruleset id is empty.",
-        ));
-    }
-
+    validate_rulesets(scenario, &mut diagnostics);
     validate_entities(scenario, &mut diagnostics);
     validate_abilities(scenario, &mut diagnostics);
     validate_classes(scenario, &mut diagnostics);
@@ -66,6 +59,42 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_rulesets(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
+    let mut seen_ruleset_ids = HashSet::new();
+    for ruleset in &scenario.rulesets {
+        if ruleset.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyRulesetId,
+                None,
+                "Ruleset catalog contains a ruleset with an empty id.",
+            ));
+            continue;
+        }
+
+        if !seen_ruleset_ids.insert(ruleset.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateRulesetId,
+                Some(ruleset.id.clone()),
+                format!("Ruleset id {} appears more than once.", ruleset.id),
+            ));
+        }
+    }
+
+    if scenario
+        .ruleset_by_id(&scenario.selected_ruleset_id)
+        .is_none()
+    {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::SelectedRulesetMissingFromCatalog,
+            Some(scenario.selected_ruleset_id.clone()),
+            format!(
+                "Selected ruleset {} is not present in the scenario ruleset catalog.",
+                scenario.selected_ruleset_id
+            ),
+        ));
+    }
 }
 
 fn validate_entities(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {

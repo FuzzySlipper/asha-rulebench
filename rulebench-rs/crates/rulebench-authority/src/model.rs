@@ -647,6 +647,8 @@ impl ContentDiagnosticSeverity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentDiagnosticCode {
     EmptyRulesetId,
+    DuplicateRulesetId,
+    SelectedRulesetMissingFromCatalog,
     EmptyAbilityId,
     DuplicateAbilityId,
     EmptyEntityId,
@@ -684,6 +686,10 @@ impl ContentDiagnosticCode {
     pub const fn code(self) -> &'static str {
         match self {
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
+            ContentDiagnosticCode::DuplicateRulesetId => "duplicateRulesetId",
+            ContentDiagnosticCode::SelectedRulesetMissingFromCatalog => {
+                "selectedRulesetMissingFromCatalog"
+            }
             ContentDiagnosticCode::EmptyAbilityId => "emptyAbilityId",
             ContentDiagnosticCode::DuplicateAbilityId => "duplicateAbilityId",
             ContentDiagnosticCode::EmptyEntityId => "emptyEntityId",
@@ -871,7 +877,8 @@ impl Combatant {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
-    pub ruleset: RulesetMetadata,
+    pub rulesets: Vec<RulesetMetadata>,
+    pub selected_ruleset_id: String,
     pub grid: Grid,
     pub combatants: Vec<Combatant>,
     pub entities: Vec<EntityDefinition>,
@@ -888,6 +895,16 @@ pub struct RulebenchScenario {
 }
 
 impl RulebenchScenario {
+    pub fn ruleset_by_id(&self, ruleset_id: &str) -> Option<&RulesetMetadata> {
+        self.rulesets
+            .iter()
+            .find(|ruleset| ruleset.id == ruleset_id)
+    }
+
+    pub fn selected_ruleset(&self) -> Option<&RulesetMetadata> {
+        self.ruleset_by_id(&self.selected_ruleset_id)
+    }
+
     pub fn entity_by_id(&self, entity_id: &str) -> Option<&EntityDefinition> {
         self.entities.iter().find(|entity| entity.id == entity_id)
     }

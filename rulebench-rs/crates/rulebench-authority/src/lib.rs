@@ -79,7 +79,17 @@ mod tests {
         let receipt = accepted_hexing_bolt_fixture_receipt();
 
         assert_eq!(scenario.metadata.id, "two-combatant-hexing-bolt");
-        assert_eq!(scenario.ruleset.id, "asha-rulebench.hexing-bolt.v0");
+        assert_eq!(scenario.rulesets.len(), 1);
+        assert_eq!(
+            scenario.selected_ruleset_id,
+            "asha-rulebench.hexing-bolt.v0"
+        );
+        assert_eq!(
+            scenario
+                .selected_ruleset()
+                .map(|ruleset| ruleset.id.as_str()),
+            Some("asha-rulebench.hexing-bolt.v0")
+        );
         assert_eq!(scenario.grid.width, 6);
         assert_eq!(scenario.combatants.len(), 2);
         assert!(receipt.accepted);
@@ -617,7 +627,8 @@ mod tests {
     #[test]
     fn content_diagnostics_report_empty_ruleset_id() {
         let mut scenario = hexing_bolt_fixture_scenario();
-        scenario.ruleset.id.clear();
+        scenario.rulesets[0].id.clear();
+        scenario.selected_ruleset_id.clear();
 
         let diagnostics = validate_scenario_content(&scenario);
 
@@ -627,6 +638,50 @@ mod tests {
         assert_eq!(
             ContentDiagnosticCode::EmptyRulesetId.code(),
             "emptyRulesetId"
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_duplicate_ruleset_ids() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.rulesets.push(scenario.rulesets[0].clone());
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::DuplicateRulesetId
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("asha-rulebench.hexing-bolt.v0".to_string())
+        );
+        assert_eq!(
+            ContentDiagnosticCode::DuplicateRulesetId.code(),
+            "duplicateRulesetId"
+        );
+    }
+
+    #[test]
+    fn content_diagnostics_report_selected_ruleset_missing_from_catalog() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.selected_ruleset_id = "asha-rulebench.missing.v0".to_string();
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].code,
+            ContentDiagnosticCode::SelectedRulesetMissingFromCatalog
+        );
+        assert_eq!(
+            diagnostics[0].content_id,
+            Some("asha-rulebench.missing.v0".to_string())
+        );
+        assert_eq!(
+            ContentDiagnosticCode::SelectedRulesetMissingFromCatalog.code(),
+            "selectedRulesetMissingFromCatalog"
         );
     }
 
@@ -1212,7 +1267,8 @@ mod tests {
     #[test]
     fn content_validation_report_counts_error_diagnostics() {
         let mut scenario = hexing_bolt_fixture_scenario();
-        scenario.ruleset.id.clear();
+        scenario.rulesets[0].id.clear();
+        scenario.selected_ruleset_id.clear();
         scenario.entities.push(scenario.entities[0].clone());
 
         let report = validate_scenario_content_report(&scenario);
