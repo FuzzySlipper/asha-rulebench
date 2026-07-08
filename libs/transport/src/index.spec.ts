@@ -272,6 +272,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.steps.map((step) => step.commandKind)).toEqual([
         "control",
         "control",
+        "intent",
         "selectedCandidate",
         "control",
         "selectedCandidate",
@@ -282,6 +283,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.steps.map((step) => step.decisionKind)).toEqual([
         "accepted",
         "rejectedNoop",
+        "rejectedByResolver",
         "acceptedByResolver",
         "accepted",
         "rejectedByUnavailableCandidates",
@@ -290,18 +292,22 @@ describe("RulebenchTransport fixtures", () => {
         "accepted",
       ]);
       expect(result.value.steps[2]?.runtimeStepId).toBe(
-        "script-selected-runtime-hit",
+        "script-missing-damage-intent",
       );
       expect(result.value.steps[2]?.commandAuditSequence).toBe(0);
-      expect(result.value.steps[4]?.runtimeStepId).toBeNull();
-      expect(result.value.steps[4]?.commandAuditSequence).toBeNull();
-      expect(result.value.steps[5]?.runtimeStepId).toBe(
+      expect(result.value.steps[3]?.runtimeStepId).toBe(
+        "script-selected-runtime-hit",
+      );
+      expect(result.value.steps[3]?.commandAuditSequence).toBe(1);
+      expect(result.value.steps[5]?.runtimeStepId).toBeNull();
+      expect(result.value.steps[5]?.commandAuditSequence).toBeNull();
+      expect(result.value.steps[6]?.runtimeStepId).toBe(
         "script-wrong-turn-intent",
       );
-      expect(result.value.steps[5]?.commandAuditSequence).toBe(1);
+      expect(result.value.steps[6]?.commandAuditSequence).toBe(2);
       expect(result.value.steps[1]?.controlHistorySequence).toBe(1);
-      expect(result.value.steps[6]?.id).toBe("script-advance-turn-wrap");
-      expect(result.value.steps[6]?.controlHistorySequence).toBe(3);
+      expect(result.value.steps[7]?.id).toBe("script-advance-turn-wrap");
+      expect(result.value.steps[7]?.controlHistorySequence).toBe(3);
       expect(result.value.finalLifecyclePhase).toBe("ended");
       expect(result.value.finalState).toEqual({
         summary: "Current session state.",
@@ -413,11 +419,11 @@ describe("RulebenchTransport fixtures", () => {
         {
           sequence: 1,
           trigger: "explicitEnd",
-          stepIndex: 2,
+          stepIndex: 3,
           previousLifecyclePhase: "inProgress",
           nextLifecyclePhase: "ended",
           startedAtStep: 0,
-          endedAtStep: 2,
+          endedAtStep: 3,
         },
       ]);
       expect(result.value.turnTransitionLog).toEqual([
@@ -444,9 +450,46 @@ describe("RulebenchTransport fixtures", () => {
       ]);
       expect(result.value.commandAuditLog).toEqual([
         {
+          id: "audit-script-missing-damage-intent",
+          stepId: "script-missing-damage-intent",
+          sequence: 0,
+          outcomeClass: "rejectedInvalidCommand",
+          decisionKind: "rejectedByResolver",
+          preflightDecisionKind: "accepted",
+          accepted: false,
+          rejection: "missingDamageRoll",
+          eventCount: 0,
+          traceCount: 2,
+          rollConsumption: [
+            {
+              sequence: 0,
+              requestKind: "attackRoll",
+              suppliedValue: 17,
+              consumed: true,
+              reason: "Attack roll value was consumed for hit resolution.",
+            },
+            {
+              sequence: 1,
+              requestKind: "damageRoll",
+              suppliedValue: null,
+              consumed: false,
+              reason:
+                "Damage roll was requested after a hit but no roll value was supplied.",
+            },
+          ],
+          stateBeforeFingerprint: {
+            algorithm: "fnv1a64.rulebench-state.v0",
+            value: "43b17555d3d7ff0d",
+          },
+          stateAfterFingerprint: {
+            algorithm: "fnv1a64.rulebench-state.v0",
+            value: "43b17555d3d7ff0d",
+          },
+        },
+        {
           id: "audit-script-selected-runtime-hit",
           stepId: "script-selected-runtime-hit",
-          sequence: 0,
+          sequence: 1,
           outcomeClass: "acceptedHit",
           decisionKind: "acceptedByResolver",
           preflightDecisionKind: "accepted",
@@ -454,6 +497,22 @@ describe("RulebenchTransport fixtures", () => {
           rejection: null,
           eventCount: 4,
           traceCount: 4,
+          rollConsumption: [
+            {
+              sequence: 0,
+              requestKind: "attackRoll",
+              suppliedValue: 17,
+              consumed: true,
+              reason: "Attack roll value was consumed for hit resolution.",
+            },
+            {
+              sequence: 1,
+              requestKind: "damageRoll",
+              suppliedValue: 5,
+              consumed: true,
+              reason: "Damage roll value was consumed for damage resolution.",
+            },
+          ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
             value: "43b17555d3d7ff0d",
@@ -466,7 +525,7 @@ describe("RulebenchTransport fixtures", () => {
         {
           id: "audit-script-wrong-turn-intent",
           stepId: "script-wrong-turn-intent",
-          sequence: 1,
+          sequence: 2,
           outcomeClass: "rejectedInvalidCommand",
           decisionKind: "rejectedByTurnOrder",
           preflightDecisionKind: "rejectedByTurnOrder",
@@ -474,6 +533,7 @@ describe("RulebenchTransport fixtures", () => {
           rejection: "invalidAction",
           eventCount: 0,
           traceCount: 2,
+          rollConsumption: [],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
             value: "1872b66dd0de303a",
@@ -488,7 +548,7 @@ describe("RulebenchTransport fixtures", () => {
         {
           id: "action-usage-script-selected-runtime-hit",
           stepId: "script-selected-runtime-hit",
-          stepIndex: 0,
+          stepIndex: 1,
           roundNumber: 1,
           turnIndex: 0,
           actorId: "entity-adept",
@@ -517,7 +577,7 @@ describe("RulebenchTransport fixtures", () => {
             available: false,
           },
           commandStepId: "script-selected-runtime-hit",
-          commandStepIndex: 0,
+          commandStepIndex: 1,
           turnTransitionSequence: null,
           roundNumber: 1,
           turnIndex: 0,

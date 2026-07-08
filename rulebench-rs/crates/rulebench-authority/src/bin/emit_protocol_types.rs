@@ -58,6 +58,7 @@ fn aliases() -> &'static [&'static str] {
         "export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';",
         "export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle';",
         "export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';",
+        "export type RulebenchRollRequestKindDto = 'attackRoll' | 'damageRoll';",
         "export type RulebenchModifierTenureDto = 'temporary' | 'permanent';",
         "export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';",
         "export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';",
@@ -813,12 +814,41 @@ fn interfaces() -> &'static [Interface] {
                     ty: "number",
                 },
                 Field {
+                    name: "rollConsumption",
+                    ty: "readonly RulebenchRollConsumptionEntryDto[]",
+                },
+                Field {
                     name: "stateBeforeFingerprint",
                     ty: "RulebenchStateFingerprintDto",
                 },
                 Field {
                     name: "stateAfterFingerprint",
                     ty: "RulebenchStateFingerprintDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchRollConsumptionEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "requestKind",
+                    ty: "RulebenchRollRequestKindDto",
+                },
+                Field {
+                    name: "suppliedValue",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "consumed",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },

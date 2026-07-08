@@ -553,6 +553,26 @@ fn render_command_audit_entry(entry: &CommandAuditEntry, indent: &str) -> String
     ));
     out.push_str(&format!("{indent}  eventCount: {},\n", entry.event_count));
     out.push_str(&format!("{indent}  traceCount: {},\n", entry.trace_count));
+    out.push_str(&format!("{indent}  rollConsumption: [\n"));
+    for roll in &entry.roll_consumption {
+        out.push_str(&format!("{indent}    {{\n"));
+        out.push_str(&format!("{indent}      sequence: {},\n", roll.sequence));
+        out.push_str(&format!(
+            "{indent}      requestKind: {},\n",
+            ts_string(roll.request_kind.code())
+        ));
+        out.push_str(&format!(
+            "{indent}      suppliedValue: {},\n",
+            render_optional_i32(roll.supplied_value)
+        ));
+        out.push_str(&format!("{indent}      consumed: {},\n", roll.consumed));
+        out.push_str(&format!(
+            "{indent}      reason: {},\n",
+            ts_string(&roll.reason)
+        ));
+        out.push_str(&format!("{indent}    }},\n"));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
     out.push_str(&format!(
         "{indent}  stateBeforeFingerprint: {},\n",
         render_fingerprint(&entry.state_before_fingerprint, indent)
@@ -1110,6 +1130,12 @@ fn render_optional_string(value: &Option<String>) -> String {
 }
 
 fn render_optional_u32(value: Option<u32>) -> String {
+    value
+        .map(|inner| inner.to_string())
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn render_optional_i32(value: Option<i32>) -> String {
     value
         .map(|inner| inner.to_string())
         .unwrap_or_else(|| "null".to_string())

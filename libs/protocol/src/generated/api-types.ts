@@ -42,6 +42,8 @@ export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCa
 
 export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';
 
+export type RulebenchRollRequestKindDto = 'attackRoll' | 'damageRoll';
+
 export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
 
 export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
@@ -275,8 +277,17 @@ export interface RulebenchCommandAuditEntryDto {
   readonly rejection: RulebenchRejectionCodeDto | null;
   readonly eventCount: number;
   readonly traceCount: number;
+  readonly rollConsumption: readonly RulebenchRollConsumptionEntryDto[];
   readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
   readonly stateAfterFingerprint: RulebenchStateFingerprintDto;
+}
+
+export interface RulebenchRollConsumptionEntryDto {
+  readonly sequence: number;
+  readonly requestKind: RulebenchRollRequestKindDto;
+  readonly suppliedValue: number | null;
+  readonly consumed: boolean;
+  readonly reason: string;
 }
 
 export interface RulebenchActionUsageEntryDto {

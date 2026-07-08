@@ -159,6 +159,18 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
                 "A repeated explicit start is rejected as a no-op without changing state.",
                 CombatControlCommandSpec::explicit_start(),
             ),
+            CombatSessionScriptStepSpec::intent(
+                "script-missing-damage-intent-step",
+                "Adept has incomplete roll evidence",
+                "Raw intent command rejects because Rust needs damage roll evidence after the attack roll hits.",
+                CombatSessionIntentCommandSpec::new(
+                    "script-missing-damage-intent",
+                    "Adept missing damage roll",
+                    "Adept attempts Hexing Bolt with no damage roll supplied.",
+                    UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+                    vec![17],
+                ),
+            ),
             CombatSessionScriptStepSpec::selected_candidate(
                 "script-selected-hit-step",
                 "Adept selects Hexing Bolt",
