@@ -3737,6 +3737,52 @@ mod tests {
             CombatLifecyclePhase::InProgress
         );
         assert_eq!(after_start.lifecycle_transition_log.len(), 1);
+        assert_eq!(session.control_history().len(), 1);
+        let history = &session.control_history()[0];
+        assert_eq!(history.sequence, 0);
+        assert_eq!(
+            history.command_kind,
+            CombatControlCommandKind::ExplicitStart
+        );
+        assert!(history.accepted);
+        assert_eq!(history.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(
+            history.previous_lifecycle_phase,
+            CombatLifecyclePhase::Ready
+        );
+        assert_eq!(
+            history.next_lifecycle_phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(
+            history.previous_round_number,
+            before_start.turn_order.round_number
+        );
+        assert_eq!(
+            history.previous_turn_index,
+            before_start.turn_order.current_turn_index
+        );
+        assert_eq!(
+            history.previous_actor_id,
+            before_start.turn_order.current_actor_id
+        );
+        assert_eq!(
+            history.next_round_number,
+            before_start.turn_order.round_number
+        );
+        assert_eq!(
+            history.next_turn_index,
+            before_start.turn_order.current_turn_index
+        );
+        assert_eq!(
+            history.next_actor_id,
+            before_start.turn_order.current_actor_id
+        );
+        assert_eq!(history.lifecycle_transition_sequence, Some(0));
+        assert_eq!(history.turn_transition_sequence, None);
+        assert_eq!(history.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(history.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(history.reason, "Combat explicitly started.");
     }
 
     #[test]
@@ -3744,6 +3790,7 @@ mod tests {
         let mut session =
             CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
         session.start_combat();
+        assert!(session.control_history().is_empty());
         let before_repeat = session.snapshot();
         let before_state_fingerprint = fingerprint_projected_state(&before_repeat.current_state);
 
@@ -3773,6 +3820,31 @@ mod tests {
             after_repeat.lifecycle_transition_log,
             before_repeat.lifecycle_transition_log
         );
+        assert_eq!(session.control_history().len(), 1);
+        let history = &session.control_history()[0];
+        assert_eq!(history.sequence, 0);
+        assert_eq!(
+            history.command_kind,
+            CombatControlCommandKind::ExplicitStart
+        );
+        assert!(!history.accepted);
+        assert_eq!(
+            history.decision_kind,
+            CombatControlDecisionKind::RejectedNoop
+        );
+        assert_eq!(
+            history.previous_lifecycle_phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(
+            history.next_lifecycle_phase,
+            CombatLifecyclePhase::InProgress
+        );
+        assert_eq!(history.lifecycle_transition_sequence, None);
+        assert_eq!(history.turn_transition_sequence, None);
+        assert_eq!(history.state_before_fingerprint, before_state_fingerprint);
+        assert_eq!(history.state_after_fingerprint, before_state_fingerprint);
+        assert_eq!(history.reason, "Combat is already in progress.");
     }
 
     #[test]
@@ -3927,6 +3999,16 @@ mod tests {
         assert_eq!(after_end.lifecycle.phase, CombatLifecyclePhase::Ended);
         assert_eq!(after_end.lifecycle.started_at_step, Some(0));
         assert_eq!(after_end.lifecycle.ended_at_step, Some(0));
+        assert_eq!(session.control_history().len(), 1);
+        assert_eq!(session.control_history()[0].sequence, 0);
+        assert_eq!(
+            session.control_history()[0].command_kind,
+            CombatControlCommandKind::ExplicitEnd
+        );
+        assert_eq!(
+            session.control_history()[0].lifecycle_transition_sequence,
+            Some(0)
+        );
 
         let before_repeat = session.snapshot();
         let before_repeat_state_fingerprint =
@@ -3957,6 +4039,30 @@ mod tests {
             after_repeat.lifecycle_transition_log,
             before_repeat.lifecycle_transition_log
         );
+        assert_eq!(session.control_history().len(), 2);
+        assert_eq!(session.control_history()[1].sequence, 1);
+        assert_eq!(
+            session.control_history()[1].decision_kind,
+            CombatControlDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(
+            session.control_history()[1].lifecycle_transition_sequence,
+            None
+        );
+    }
+
+    #[test]
+    fn session_runtime_direct_control_methods_do_not_record_control_history() {
+        let mut session =
+            CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+
+        session.start_combat();
+        session.advance_turn();
+        session.end_combat();
+
+        assert!(session.control_history().is_empty());
+        assert_eq!(session.lifecycle_transition_log().len(), 2);
+        assert_eq!(session.turn_transition_log().len(), 1);
     }
 
     #[test]
@@ -4483,6 +4589,52 @@ mod tests {
             turn_advance.state_after_fingerprint
         );
         assert_eq!(readout.reason, "Turn advanced to the next participant.");
+        assert_eq!(session.control_history().len(), 1);
+        let history = &session.control_history()[0];
+        assert_eq!(history.sequence, 0);
+        assert_eq!(history.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert!(history.accepted);
+        assert_eq!(history.decision_kind, CombatControlDecisionKind::Accepted);
+        assert_eq!(
+            history.previous_lifecycle_phase,
+            CombatLifecyclePhase::Ready
+        );
+        assert_eq!(history.next_lifecycle_phase, CombatLifecyclePhase::Ready);
+        assert_eq!(
+            history.previous_round_number,
+            before_advance.turn_order.round_number
+        );
+        assert_eq!(
+            history.previous_turn_index,
+            before_advance.turn_order.current_turn_index
+        );
+        assert_eq!(
+            history.previous_actor_id,
+            before_advance.turn_order.current_actor_id
+        );
+        assert_eq!(
+            history.next_round_number,
+            after_advance.turn_order.round_number
+        );
+        assert_eq!(
+            history.next_turn_index,
+            after_advance.turn_order.current_turn_index
+        );
+        assert_eq!(
+            history.next_actor_id,
+            after_advance.turn_order.current_actor_id
+        );
+        assert_eq!(history.lifecycle_transition_sequence, None);
+        assert_eq!(history.turn_transition_sequence, Some(0));
+        assert_eq!(
+            history.state_before_fingerprint,
+            turn_advance.state_before_fingerprint
+        );
+        assert_eq!(
+            history.state_after_fingerprint,
+            turn_advance.state_after_fingerprint
+        );
+        assert_eq!(history.reason, "Turn advanced to the next participant.");
     }
 
     #[test]
@@ -4678,6 +4830,23 @@ mod tests {
             after_attempt.turn_transition_log,
             before_attempt.turn_transition_log
         );
+        assert_eq!(session.control_history().len(), 1);
+        let history = &session.control_history()[0];
+        assert_eq!(history.sequence, 0);
+        assert_eq!(history.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert!(!history.accepted);
+        assert_eq!(
+            history.decision_kind,
+            CombatControlDecisionKind::RejectedByLifecycle
+        );
+        assert_eq!(
+            history.previous_lifecycle_phase,
+            CombatLifecyclePhase::Ended
+        );
+        assert_eq!(history.next_lifecycle_phase, CombatLifecyclePhase::Ended);
+        assert_eq!(history.lifecycle_transition_sequence, None);
+        assert_eq!(history.turn_transition_sequence, None);
+        assert_eq!(history.reason, "Combat is already ended.");
     }
 
     #[test]
@@ -4798,6 +4967,22 @@ mod tests {
         assert_eq!(readout.reason, "Turn order has no participants.");
         assert_eq!(after_attempt.turn_order, before_attempt.turn_order);
         assert!(after_attempt.turn_transition_log.is_empty());
+        assert_eq!(session.control_history().len(), 1);
+        let history = &session.control_history()[0];
+        assert_eq!(history.sequence, 0);
+        assert_eq!(history.command_kind, CombatControlCommandKind::AdvanceTurn);
+        assert!(!history.accepted);
+        assert_eq!(
+            history.decision_kind,
+            CombatControlDecisionKind::RejectedByEmptyTurnOrder
+        );
+        assert_eq!(history.previous_round_number, 0);
+        assert_eq!(history.next_round_number, 0);
+        assert_eq!(history.previous_actor_id, None);
+        assert_eq!(history.next_actor_id, None);
+        assert_eq!(history.lifecycle_transition_sequence, None);
+        assert_eq!(history.turn_transition_sequence, None);
+        assert_eq!(history.reason, "Turn order has no participants.");
     }
 
     #[test]

@@ -304,6 +304,27 @@ pub struct CombatControlReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatControlHistoryEntry {
+    pub sequence: u32,
+    pub command_kind: CombatControlCommandKind,
+    pub accepted: bool,
+    pub decision_kind: CombatControlDecisionKind,
+    pub previous_lifecycle_phase: CombatLifecyclePhase,
+    pub next_lifecycle_phase: CombatLifecyclePhase,
+    pub previous_round_number: u32,
+    pub previous_turn_index: u32,
+    pub previous_actor_id: Option<String>,
+    pub next_round_number: u32,
+    pub next_turn_index: u32,
+    pub next_actor_id: Option<String>,
+    pub lifecycle_transition_sequence: Option<u32>,
+    pub turn_transition_sequence: Option<u32>,
+    pub state_before_fingerprint: StateFingerprint,
+    pub state_after_fingerprint: StateFingerprint,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
     pub id: String,
     pub title: String,

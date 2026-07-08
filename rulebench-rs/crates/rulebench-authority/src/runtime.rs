@@ -68,6 +68,7 @@ pub struct CombatSessionState {
     combat_log: Vec<CombatLogEntry>,
     audit_log: Vec<CommandAuditEntry>,
     action_usage_log: Vec<ActionUsageEntry>,
+    control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
     lifecycle_transition_log: Vec<LifecycleTransitionEntry>,
     next_step_index: u32,
@@ -92,6 +93,7 @@ impl CombatSessionState {
             combat_log: Vec::new(),
             audit_log: Vec::new(),
             action_usage_log: Vec::new(),
+            control_history: Vec::new(),
             turn_transition_log: Vec::new(),
             lifecycle_transition_log: Vec::new(),
             next_step_index: 0,
@@ -282,6 +284,10 @@ impl CombatSessionState {
         &self.action_usage_log
     }
 
+    pub fn control_history(&self) -> &[CombatControlHistoryEntry] {
+        &self.control_history
+    }
+
     pub fn turn_transition_log(&self) -> &[TurnTransitionEntry] {
         &self.turn_transition_log
     }
@@ -352,11 +358,15 @@ impl CombatSessionState {
         &mut self,
         spec: CombatControlCommandSpec,
     ) -> CombatControlReadout {
-        match spec.kind {
+        let readout = match spec.kind {
             CombatControlCommandKind::ExplicitStart => self.submit_explicit_start_control(),
             CombatControlCommandKind::ExplicitEnd => self.submit_explicit_end_control(),
             CombatControlCommandKind::AdvanceTurn => self.submit_advance_turn_control(),
-        }
+        };
+        let history_entry =
+            combat_control_history_entry(self.control_history.len() as u32, &readout);
+        self.control_history.push(history_entry);
+        readout
     }
 
     pub fn turn_order(&self) -> &CombatTurnOrder {
@@ -604,6 +614,38 @@ fn combat_control_readout(
         state_before_fingerprint,
         state_after_fingerprint,
         reason: reason.into(),
+    }
+}
+
+fn combat_control_history_entry(
+    sequence: u32,
+    readout: &CombatControlReadout,
+) -> CombatControlHistoryEntry {
+    CombatControlHistoryEntry {
+        sequence,
+        command_kind: readout.command_kind,
+        accepted: readout.accepted,
+        decision_kind: readout.decision_kind,
+        previous_lifecycle_phase: readout.previous_lifecycle.phase,
+        next_lifecycle_phase: readout.next_lifecycle.phase,
+        previous_round_number: readout.previous_turn_order.round_number,
+        previous_turn_index: readout.previous_turn_order.current_turn_index,
+        previous_actor_id: readout.previous_turn_order.current_actor_id.clone(),
+        next_round_number: readout.next_turn_order.round_number,
+        next_turn_index: readout.next_turn_order.current_turn_index,
+        next_actor_id: readout.next_turn_order.current_actor_id.clone(),
+        lifecycle_transition_sequence: readout
+            .lifecycle_transition
+            .as_ref()
+            .map(|transition| transition.sequence),
+        turn_transition_sequence: readout
+            .turn_advance
+            .as_ref()
+            .and_then(|turn_advance| turn_advance.transition.as_ref())
+            .map(|transition| transition.sequence),
+        state_before_fingerprint: readout.state_before_fingerprint.clone(),
+        state_after_fingerprint: readout.state_after_fingerprint.clone(),
+        reason: readout.reason.clone(),
     }
 }
 
