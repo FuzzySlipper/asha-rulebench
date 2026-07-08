@@ -118,6 +118,40 @@ mod tests {
     }
 
     #[test]
+    fn scenario_carries_combatant_stat_blocks() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let adept = scenario
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == "entity-adept")
+            .expect("fixture has adept");
+        let raider = scenario
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == "entity-raider")
+            .expect("fixture has raider");
+
+        assert_eq!(adept.stat_by_id("mind").map(|stat| stat.value), Some(4));
+        assert_eq!(
+            adept.stat_by_id("initiative").map(|stat| stat.value),
+            Some(3)
+        );
+        assert_eq!(raider.stat_by_id("body").map(|stat| stat.value), Some(3));
+    }
+
+    #[test]
+    fn combatant_stat_lookup_rejects_unknown_stat() {
+        let scenario = hexing_bolt_fixture_scenario();
+        let adept = scenario
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == "entity-adept")
+            .expect("fixture has adept");
+
+        assert!(adept.stat_by_id("spell_slots").is_none());
+    }
+
+    #[test]
     fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
         let receipt = resolve_use_action(
             &hexing_bolt_fixture_scenario(),

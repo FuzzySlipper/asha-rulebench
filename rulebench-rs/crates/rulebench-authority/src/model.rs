@@ -175,15 +175,37 @@ pub struct NamedNumber {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatBlock {
+    pub base_stats: Vec<NamedNumber>,
+    pub derived_stats: Vec<NamedNumber>,
+}
+
+impl StatBlock {
+    pub fn stat_by_id(&self, stat_id: &str) -> Option<&NamedNumber> {
+        self.base_stats
+            .iter()
+            .chain(self.derived_stats.iter())
+            .find(|stat| stat.id == stat_id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Combatant {
     pub id: String,
     pub name: String,
     pub team: Team,
     pub position: GridPosition,
     pub hit_points: BoundedValue,
+    pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
     pub conditions: Vec<String>,
     pub is_actor: bool,
+}
+
+impl Combatant {
+    pub fn stat_by_id(&self, stat_id: &str) -> Option<&NamedNumber> {
+        self.stats.stat_by_id(stat_id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

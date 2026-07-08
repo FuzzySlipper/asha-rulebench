@@ -87,6 +87,25 @@ fn adept_initial() -> Combatant {
             current: 24,
             max: 24,
         },
+        stats: StatBlock {
+            base_stats: vec![
+                NamedNumber {
+                    id: "mind".to_string(),
+                    label: "Mind".to_string(),
+                    value: 4,
+                },
+                NamedNumber {
+                    id: "body".to_string(),
+                    label: "Body".to_string(),
+                    value: 2,
+                },
+            ],
+            derived_stats: vec![NamedNumber {
+                id: "initiative".to_string(),
+                label: "Initiative".to_string(),
+                value: 3,
+            }],
+        },
         defenses: vec![
             NamedNumber {
                 id: "guard".to_string(),
@@ -113,6 +132,25 @@ fn raider_initial() -> Combatant {
         hit_points: BoundedValue {
             current: 18,
             max: 18,
+        },
+        stats: StatBlock {
+            base_stats: vec![
+                NamedNumber {
+                    id: "mind".to_string(),
+                    label: "Mind".to_string(),
+                    value: 1,
+                },
+                NamedNumber {
+                    id: "body".to_string(),
+                    label: "Body".to_string(),
+                    value: 3,
+                },
+            ],
+            derived_stats: vec![NamedNumber {
+                id: "initiative".to_string(),
+                label: "Initiative".to_string(),
+                value: 1,
+            }],
         },
         defenses: vec![
             NamedNumber {
