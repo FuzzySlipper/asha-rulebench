@@ -660,6 +660,22 @@ pub struct CombatantModifierStatAdjustmentReadout {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatantEffectiveStatReadout {
+    pub combatant_id: String,
+    pub stats: Vec<EffectiveStatReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectiveStatReadout {
+    pub stat_id: String,
+    pub stat_label: String,
+    pub base_value: i32,
+    pub total_modifier_delta: i32,
+    pub effective_value: i32,
+    pub contributions: Vec<ModifierStatAdjustmentContribution>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModifierStatAdjustmentContribution {
     pub modifier_id: String,
     pub modifier_label: String,

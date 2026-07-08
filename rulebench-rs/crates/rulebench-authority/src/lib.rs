@@ -29,7 +29,9 @@ pub use fixtures::{
     rejected_target_fixture_receipt,
 };
 pub use model::*;
-pub use modifiers::active_modifier_stat_adjustments_for_combatant;
+pub use modifiers::{
+    active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
+};
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{CombatSessionCommandSpec, CombatSessionState};
 pub use session::{
@@ -425,6 +427,151 @@ mod tests {
         assert_eq!(
             readout.contributions[0].tenure.code(),
             ModifierTenure::Permanent.code()
+        );
+    }
+
+    #[test]
+    fn effective_stat_readout_lists_base_values_without_modifiers() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let readout =
+            effective_stats_for_combatant(&scenario, "entity-raider").expect("fixture has raider");
+
+        assert_eq!(readout.combatant_id, "entity-raider");
+        assert_eq!(readout.stats.len(), 3);
+
+        let mind = readout
+            .stats
+            .iter()
+            .find(|stat| stat.stat_id == "mind")
+            .expect("raider has mind");
+        assert_eq!(mind.stat_label, "Mind");
+        assert_eq!(mind.base_value, 1);
+        assert_eq!(mind.total_modifier_delta, 0);
+        assert_eq!(mind.effective_value, 1);
+        assert!(mind.contributions.is_empty());
+
+        let initiative = readout
+            .stats
+            .iter()
+            .find(|stat| stat.stat_id == "initiative")
+            .expect("raider has initiative");
+        assert_eq!(initiative.base_value, 1);
+        assert_eq!(initiative.effective_value, 1);
+    }
+
+    #[test]
+    fn effective_stat_readout_applies_temporary_modifier_contribution() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[1]
+            .active_modifiers
+            .push(ActiveModifier::temporary(
+                "rattled",
+                "rattled",
+                "until end of next turn",
+            ));
+
+        let readout =
+            effective_stats_for_combatant(&scenario, "entity-raider").expect("fixture has raider");
+        let mind = readout
+            .stats
+            .iter()
+            .find(|stat| stat.stat_id == "mind")
+            .expect("raider has mind");
+
+        assert_eq!(mind.base_value, 1);
+        assert_eq!(mind.total_modifier_delta, -1);
+        assert_eq!(mind.effective_value, 0);
+        assert_eq!(
+            mind.contributions,
+            vec![ModifierStatAdjustmentContribution {
+                modifier_id: "rattled".to_string(),
+                modifier_label: "rattled".to_string(),
+                tenure: ModifierTenure::Temporary,
+                stat_id: "mind".to_string(),
+                stat_label: "Mind".to_string(),
+                delta: -1,
+            }]
+        );
+    }
+
+    #[test]
+    fn effective_stat_readout_applies_permanent_modifier_contribution() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0]
+            .active_modifiers
+            .push(ActiveModifier::permanent(
+                "battle-drilled",
+                "battle drilled",
+            ));
+
+        let readout =
+            effective_stats_for_combatant(&scenario, "entity-adept").expect("fixture has adept");
+        let initiative = readout
+            .stats
+            .iter()
+            .find(|stat| stat.stat_id == "initiative")
+            .expect("adept has initiative");
+
+        assert_eq!(initiative.base_value, 3);
+        assert_eq!(initiative.total_modifier_delta, 1);
+        assert_eq!(initiative.effective_value, 4);
+        assert_eq!(
+            initiative.contributions,
+            vec![ModifierStatAdjustmentContribution {
+                modifier_id: "battle-drilled".to_string(),
+                modifier_label: "battle drilled".to_string(),
+                tenure: ModifierTenure::Permanent,
+                stat_id: "initiative".to_string(),
+                stat_label: "Initiative".to_string(),
+                delta: 1,
+            }]
+        );
+    }
+
+    #[test]
+    fn effective_stat_readout_rejects_missing_combatant() {
+        let scenario = hexing_bolt_fixture_scenario();
+
+        let readout = effective_stats_for_combatant(&scenario, "entity-missing");
+
+        assert!(readout.is_none());
+    }
+
+    #[test]
+    fn effective_stat_readout_does_not_change_hexing_bolt_resolution() {
+        let mut scenario = hexing_bolt_fixture_scenario();
+        scenario.combatants[0]
+            .active_modifiers
+            .push(ActiveModifier::permanent(
+                "battle-drilled",
+                "battle drilled",
+            ));
+
+        let readout =
+            effective_stats_for_combatant(&scenario, "entity-adept").expect("fixture has adept");
+        let receipt = resolve_use_action(
+            &scenario,
+            UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            &[17, 5],
+        );
+
+        assert_eq!(
+            readout
+                .stats
+                .iter()
+                .find(|stat| stat.stat_id == "initiative")
+                .map(|stat| stat.effective_value),
+            Some(4)
+        );
+        assert!(receipt.accepted);
+        assert_eq!(
+            receipt.attack_roll.as_ref().map(|roll| roll.modifier),
+            Some(4)
+        );
+        assert_eq!(
+            receipt.damage.as_ref().map(|damage| damage.after.current),
+            Some(9)
         );
     }
 

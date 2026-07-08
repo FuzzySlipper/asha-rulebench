@@ -1,5 +1,6 @@
 use crate::model::{
-    CombatantModifierStatAdjustmentReadout, ModifierStatAdjustmentContribution, RulebenchScenario,
+    CombatantEffectiveStatReadout, CombatantModifierStatAdjustmentReadout, EffectiveStatReadout,
+    ModifierStatAdjustmentContribution, RulebenchScenario,
 };
 
 pub fn active_modifier_stat_adjustments_for_combatant(
@@ -32,5 +33,49 @@ pub fn active_modifier_stat_adjustments_for_combatant(
     Some(CombatantModifierStatAdjustmentReadout {
         combatant_id: combatant.id.clone(),
         contributions,
+    })
+}
+
+pub fn effective_stats_for_combatant(
+    scenario: &RulebenchScenario,
+    combatant_id: &str,
+) -> Option<CombatantEffectiveStatReadout> {
+    let combatant = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == combatant_id)?;
+    let modifier_readout = active_modifier_stat_adjustments_for_combatant(scenario, combatant_id)?;
+
+    let stats = combatant
+        .stats
+        .base_stats
+        .iter()
+        .chain(combatant.stats.derived_stats.iter())
+        .map(|stat| {
+            let contributions = modifier_readout
+                .contributions
+                .iter()
+                .filter(|contribution| contribution.stat_id == stat.id)
+                .cloned()
+                .collect::<Vec<_>>();
+            let total_modifier_delta = contributions
+                .iter()
+                .map(|contribution| contribution.delta)
+                .sum();
+
+            EffectiveStatReadout {
+                stat_id: stat.id.clone(),
+                stat_label: stat.label.clone(),
+                base_value: stat.value,
+                total_modifier_delta,
+                effective_value: stat.value + total_modifier_delta,
+                contributions,
+            }
+        })
+        .collect();
+
+    Some(CombatantEffectiveStatReadout {
+        combatant_id: combatant.id.clone(),
+        stats,
     })
 }
