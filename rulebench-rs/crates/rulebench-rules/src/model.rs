@@ -19,6 +19,10 @@ pub use control::*;
 pub use effects::*;
 pub use projection::*;
 pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};
+pub use rulebench_ruleset::{
+    AbilityDefinition, AbilityDefinitionKind, ActionDefinition, AttackSpec, DamageEffectOperation,
+    HitEffect, HitEffectOperation, ModifierEffectOperation, ModifierTenure, RulesetMetadata,
+};
 pub use scenario::*;
 pub use session::*;
 pub use stats::{StatBlock, StatDefinition, StatDefinitionKind};

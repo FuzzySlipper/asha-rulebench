@@ -6,14 +6,6 @@ pub struct ScenarioMetadata {
     pub seed_label: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RulesetMetadata {
-    pub id: String,
-    pub name: String,
-    pub version: String,
-    pub summary: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentDiagnosticSeverity {
     Error,

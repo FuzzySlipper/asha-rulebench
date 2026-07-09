@@ -1,6 +1,7 @@
 use super::{
-    ActiveModifier, AttackSpec, BoundedValue, GridPosition, HitEffect, ModifierTenure, NamedNumber,
-    RulesetMetadata, ScenarioMetadata, StatBlock, StatDefinition, Team,
+    AbilityDefinition, ActionDefinition, ActiveModifier, BoundedValue, GridPosition,
+    ModifierTenure, NamedNumber, RulesetMetadata, ScenarioMetadata, StatBlock, StatDefinition,
+    Team,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,46 +125,6 @@ impl UseActionIntent {
             target_id: target_id.into(),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ActionDefinition {
-    pub id: String,
-    pub ability_id: String,
-    pub name: String,
-    pub actor_id: String,
-    pub target_ids: Vec<String>,
-    pub range: u32,
-    pub line_of_sight_required: bool,
-    pub visible_target_ids: Vec<String>,
-    pub attack: AttackSpec,
-    pub hit: HitEffect,
-    pub action_text: String,
-    pub effect_text: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AbilityDefinitionKind {
-    Ability,
-    Spell,
-}
-
-impl AbilityDefinitionKind {
-    pub const fn code(self) -> &'static str {
-        match self {
-            AbilityDefinitionKind::Ability => "ability",
-            AbilityDefinitionKind::Spell => "spell",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AbilityDefinition {
-    pub id: String,
-    pub name: String,
-    pub kind: AbilityDefinitionKind,
-    pub summary: String,
-    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
