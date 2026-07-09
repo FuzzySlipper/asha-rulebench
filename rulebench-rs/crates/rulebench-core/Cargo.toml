@@ -1,0 +1,11 @@
+[package]
+name = "rulebench-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared authority primitives for ASHA Rulebench rule execution."
+
+[lints]
+workspace = true
+
+[dependencies]

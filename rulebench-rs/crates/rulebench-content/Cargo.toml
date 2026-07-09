@@ -1,0 +1,13 @@
+[package]
+name = "rulebench-content"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Content packs, references, validation, and diagnostics for ASHA Rulebench."
+
+[lints]
+workspace = true
+
+[dependencies]
+rulebench-core = { path = "../rulebench-core" }
+rulebench-ruleset = { path = "../rulebench-ruleset" }

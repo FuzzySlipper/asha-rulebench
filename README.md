@@ -23,9 +23,19 @@ This repo is also a proving ground. Local Rust crates may incubate RPG-domain or
 
 ## Rust Authority Workspace
 
-Local Rust authority work lives under `rulebench-rs/`. It is an incubation workspace for Rulebench-specific scenario resolution, not an upstream ASHA crate set.
+Local Rust authority work lives under `rulebench-rs/`. It is an incubation
+workspace with explicit portable-authority, protocol/adapter, and
+Rulebench-local crate boundaries, not an upstream ASHA crate set.
 
-The first crate, `rulebench-authority`, establishes the local authority lane with typed intents, explicit rejections, DomainEvent-shaped accepted facts, diagnostic trace, and readout receipts. It intentionally has no external Rust dependencies and no path dependency on `/home/dev/asha-engine`; adding serialization/codegen crates or ASHA path dependencies is a planner-approval moment.
+The complete destination crate skeleton is present so new work has a durable
+owner from the start. `rulebench-rules` and `rulebench-authority` currently hold
+the substantial implementation; focused tasks will move concerns into the
+reserved `core`, `ruleset`, `content`, `combat`, `replay`, `protocol`, `bridge`,
+`codegen`, and `fixtures` crates. See `rulebench-rs/README.md` for ownership and
+dependency direction. The workspace intentionally has no external Rust
+dependencies and no path dependency on `/home/dev/asha-engine`; adding
+serialization/codegen crates or ASHA path dependencies is a planner-approval
+moment.
 
 Run the focused Rust gates with:
 

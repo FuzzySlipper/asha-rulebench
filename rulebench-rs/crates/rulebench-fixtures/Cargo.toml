@@ -1,0 +1,12 @@
+[package]
+name = "rulebench-fixtures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rulebench-local scenarios, fixtures, and regression packs."
+
+[lints]
+workspace = true
+
+[dependencies]
+rulebench-rules = { path = "../rulebench-rules" }

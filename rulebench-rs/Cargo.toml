@@ -3,7 +3,16 @@ resolver = "2"
 
 members = [
     "crates/rulebench-authority",
+    "crates/rulebench-bridge",
+    "crates/rulebench-codegen",
+    "crates/rulebench-combat",
+    "crates/rulebench-content",
+    "crates/rulebench-core",
+    "crates/rulebench-fixtures",
+    "crates/rulebench-protocol",
+    "crates/rulebench-replay",
     "crates/rulebench-rules",
+    "crates/rulebench-ruleset",
 ]
 
 [workspace.package]

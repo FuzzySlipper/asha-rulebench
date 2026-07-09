@@ -1,0 +1,13 @@
+[package]
+name = "rulebench-replay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Audit, replay packages, and verification for ASHA Rulebench combat."
+
+[lints]
+workspace = true
+
+[dependencies]
+rulebench-combat = { path = "../rulebench-combat" }
+rulebench-core = { path = "../rulebench-core" }

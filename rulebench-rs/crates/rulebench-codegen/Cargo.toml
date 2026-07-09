@@ -1,0 +1,13 @@
+[package]
+name = "rulebench-codegen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rulebench-local protocol and artifact generation support."
+
+[lints]
+workspace = true
+
+[dependencies]
+rulebench-fixtures = { path = "../rulebench-fixtures" }
+rulebench-protocol = { path = "../rulebench-protocol" }

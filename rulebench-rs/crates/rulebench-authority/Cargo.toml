@@ -9,4 +9,7 @@ description = "Local ASHA Rulebench authority incubation crate."
 workspace = true
 
 [dependencies]
+rulebench-bridge = { path = "../rulebench-bridge" }
+rulebench-codegen = { path = "../rulebench-codegen" }
+rulebench-fixtures = { path = "../rulebench-fixtures" }
 rulebench-rules = { path = "../rulebench-rules" }

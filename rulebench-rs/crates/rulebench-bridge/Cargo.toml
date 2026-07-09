@@ -1,0 +1,13 @@
+[package]
+name = "rulebench-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Runtime invocation boundary for ASHA Rulebench transports."
+
+[lints]
+workspace = true
+
+[dependencies]
+rulebench-protocol = { path = "../rulebench-protocol" }
+rulebench-rules = { path = "../rulebench-rules" }

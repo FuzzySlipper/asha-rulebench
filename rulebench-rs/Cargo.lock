@@ -6,9 +6,85 @@ version = 4
 name = "rulebench-authority"
 version = "0.1.0"
 dependencies = [
+ "rulebench-bridge",
+ "rulebench-codegen",
+ "rulebench-fixtures",
  "rulebench-rules",
+]
+
+[[package]]
+name = "rulebench-bridge"
+version = "0.1.0"
+dependencies = [
+ "rulebench-protocol",
+ "rulebench-rules",
+]
+
+[[package]]
+name = "rulebench-codegen"
+version = "0.1.0"
+dependencies = [
+ "rulebench-fixtures",
+ "rulebench-protocol",
+]
+
+[[package]]
+name = "rulebench-combat"
+version = "0.1.0"
+dependencies = [
+ "rulebench-content",
+ "rulebench-core",
+ "rulebench-ruleset",
+]
+
+[[package]]
+name = "rulebench-content"
+version = "0.1.0"
+dependencies = [
+ "rulebench-core",
+ "rulebench-ruleset",
+]
+
+[[package]]
+name = "rulebench-core"
+version = "0.1.0"
+
+[[package]]
+name = "rulebench-fixtures"
+version = "0.1.0"
+dependencies = [
+ "rulebench-rules",
+]
+
+[[package]]
+name = "rulebench-protocol"
+version = "0.1.0"
+dependencies = [
+ "rulebench-rules",
+]
+
+[[package]]
+name = "rulebench-replay"
+version = "0.1.0"
+dependencies = [
+ "rulebench-combat",
+ "rulebench-core",
 ]
 
 [[package]]
 name = "rulebench-rules"
 version = "0.1.0"
+dependencies = [
+ "rulebench-combat",
+ "rulebench-content",
+ "rulebench-core",
+ "rulebench-replay",
+ "rulebench-ruleset",
+]
+
+[[package]]
+name = "rulebench-ruleset"
+version = "0.1.0"
+dependencies = [
+ "rulebench-core",
+]
