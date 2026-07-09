@@ -37,7 +37,6 @@ impl CombatantState {
         }
     }
 
-    #[cfg(test)]
     pub(super) fn from_final_state(combatant: &FinalCombatantState) -> Self {
         Self {
             id: combatant.id.clone(),
@@ -63,7 +62,6 @@ impl CombatantState {
         ));
     }
 
-    #[cfg(test)]
     pub(super) fn apply_projection(&mut self, combatant: &FinalCombatantState) {
         self.name = combatant.name.clone();
         self.hit_points = combatant.hit_points;

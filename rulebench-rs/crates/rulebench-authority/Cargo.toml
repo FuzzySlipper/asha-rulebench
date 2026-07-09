@@ -9,3 +9,4 @@ description = "Local ASHA Rulebench authority incubation crate."
 workspace = true
 
 [dependencies]
+rulebench-rules = { path = "../rulebench-rules" }

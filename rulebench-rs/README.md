@@ -6,7 +6,10 @@ It is intentionally local to this repo. Crates here may use ASHA/ECRP vocabulary
 
 ## Current Crates
 
-- `rulebench-authority`: local authority surface for typed intents, explicit rejections, DomainEvent-shaped accepted facts, diagnostic trace, and readout receipts.
+- `rulebench-rules`: reusable rule model, state, resolution, content validation, modifiers, and session runtime substrate. This crate should stay free of Rulebench artifact emitters, canned transcript catalogs, and UI fixture generation.
+- `rulebench-authority`: Rulebench-local facade and testbench crate. It re-exports `rulebench-rules` for existing callers and owns fixtures, scenario/session catalogs, checked artifact emitters, and transport-generation support.
+
+The crate boundary is meant to add useful friction. A game repo should be able to share `rulebench-rules` behavior without inheriting Rulebench's testing/artifact machinery, while Rulebench can still exercise and inspect that substrate through the facade.
 
 ## Commands
 

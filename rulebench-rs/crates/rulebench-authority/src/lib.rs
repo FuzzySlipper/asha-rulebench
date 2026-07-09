@@ -2,55 +2,71 @@
 //!
 //! This crate establishes the local authority lane: typed intents enter,
 //! rejections fail closed, accepted facts are represented as DomainEvent-shaped
-//! records, and trace/readout values explain what happened. It does not claim to
-//! be upstream ASHA or a complete combat resolver.
+//! records, and trace/readout values explain what happened. The reusable rule
+//! substrate lives in `rulebench-rules`; this crate keeps Rulebench-local
+//! fixtures, transcript catalogs, emitters, and compatibility exports together.
 
 #![forbid(unsafe_code)]
 
-mod audit;
 mod catalog;
-mod content;
 mod fixtures;
-mod model;
-mod modifiers;
-mod resolver;
-mod runtime;
 mod session;
-mod state;
 
-pub use audit::{
-    fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
-    STATE_FINGERPRINT_ALGORITHM,
-};
+pub mod audit {
+    pub use rulebench_rules::audit::*;
+}
+
+pub mod content {
+    pub use rulebench_rules::content::*;
+}
+
+pub mod model {
+    pub use rulebench_rules::model::*;
+}
+
+pub mod modifiers {
+    pub use rulebench_rules::modifiers::*;
+}
+
+pub mod resolver {
+    pub use rulebench_rules::resolver::*;
+}
+
+pub mod runtime {
+    pub use rulebench_rules::runtime::*;
+}
+
+pub mod state {
+    pub use rulebench_rules::state::*;
+}
+
 pub use catalog::{
     content_validation_readouts, resolve_catalog_scenario, ruleset_catalog_readout,
     scenario_catalog_cases, scenario_catalog_summaries,
 };
-pub use content::{validate_scenario_content, validate_scenario_content_report};
 pub use fixtures::{
     accepted_hexing_bolt_fixture_receipt, hexing_bolt_fixture_scenario,
     rejected_target_fixture_receipt,
 };
-pub use model::*;
-pub use modifiers::{
+pub use rulebench_rules::*;
+pub use rulebench_rules::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
-};
-pub use resolver::{resolve_use_action, validate_intent_shape};
-pub use runtime::{
-    verify_automatic_run_replay, CombatSessionAutoCandidateCommandSpec,
-    CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
-    CombatSessionAutoCandidatePlanReadout, CombatSessionAutomaticRunDecisionKind,
-    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunReplayDecisionKind,
-    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
-    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
-    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
-    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
-    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
-    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
-    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
-    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
-    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
-    CombatSessionState,
+    fingerprint_projected_state, fingerprint_projection, resolve_use_action, validate_intent_shape,
+    validate_scenario_content, validate_scenario_content_report, verify_automatic_run_replay,
+    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
+    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunReplayDecisionKind, CombatSessionAutomaticRunReplayReadout,
+    CombatSessionAutomaticRunReplaySpec, CombatSessionAutomaticRunSpec,
+    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
+    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
+    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
+    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
+    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
+    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
+    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
+    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
+    PROJECTION_FINGERPRINT_ALGORITHM, STATE_FINGERPRINT_ALGORITHM,
 };
 pub use session::{
     combat_session_automatic_run_readouts, combat_session_automatic_run_replay_readouts,

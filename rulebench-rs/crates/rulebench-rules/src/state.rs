@@ -5,23 +5,17 @@ use combatant::CombatantState;
 use crate::model::{
     ActionResourceKind, ActionResourceLedgerReadout, ActionResourceRefreshDecisionKind,
     ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
-    DamageOutcome, ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario,
-    ScenarioProjection,
-};
-
-#[cfg(test)]
-use crate::model::{
-    ActionResourceState, ActiveModifier, CombatantActionResourceReadout,
-    ModifierDurationExpirationDecisionKind,
+    ActiveModifier, CombatantActionResourceReadout, DamageOutcome,
+    ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario, ScenarioProjection,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CombatState {
+pub struct CombatState {
     combatants: Vec<CombatantState>,
 }
 
 impl CombatState {
-    pub(crate) fn from_scenario(scenario: &RulebenchScenario) -> Self {
+    pub fn from_scenario(scenario: &RulebenchScenario) -> Self {
         Self {
             combatants: scenario
                 .combatants
@@ -31,8 +25,7 @@ impl CombatState {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn from_projection(projection: &ScenarioProjection) -> Self {
+    pub fn from_projection(projection: &ScenarioProjection) -> Self {
         Self {
             combatants: projection
                 .combatants
@@ -42,7 +35,7 @@ impl CombatState {
         }
     }
 
-    pub(crate) fn project(&self, summary: &str) -> ScenarioProjection {
+    pub fn project(&self, summary: &str) -> ScenarioProjection {
         ScenarioProjection {
             summary: summary.to_string(),
             combatants: self
@@ -53,7 +46,7 @@ impl CombatState {
         }
     }
 
-    pub(crate) fn apply_hit(&mut self, damage: &DamageOutcome, modifier: &ModifierOutcome) {
+    pub fn apply_hit(&mut self, damage: &DamageOutcome, modifier: &ModifierOutcome) {
         for combatant in &mut self.combatants {
             if combatant.id == damage.target_id {
                 combatant.hit_points = damage.after;
@@ -64,8 +57,7 @@ impl CombatState {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn apply_projection(&mut self, projection: &ScenarioProjection) {
+    pub fn apply_projection(&mut self, projection: &ScenarioProjection) {
         for projected in &projection.combatants {
             if let Some(combatant) = self
                 .combatants
@@ -77,7 +69,7 @@ impl CombatState {
         }
     }
 
-    pub(crate) fn action_resource_ledger(&self) -> ActionResourceLedgerReadout {
+    pub fn action_resource_ledger(&self) -> ActionResourceLedgerReadout {
         ActionResourceLedgerReadout {
             combatants: self
                 .combatants
@@ -87,8 +79,7 @@ impl CombatState {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn action_resources_for(
+    pub fn action_resources_for(
         &self,
         combatant_id: &str,
     ) -> Option<CombatantActionResourceReadout> {
@@ -98,7 +89,7 @@ impl CombatState {
             .map(CombatantState::action_resource_readout)
     }
 
-    pub(crate) fn spend_action_resource(
+    pub fn spend_action_resource(
         &mut self,
         combatant_id: &str,
         resource_kind: ActionResourceKind,
@@ -122,7 +113,7 @@ impl CombatState {
         combatant.spend_action_resource(resource_kind)
     }
 
-    pub(crate) fn refresh_action_resource(
+    pub fn refresh_action_resource(
         &mut self,
         combatant_id: &str,
         resource_kind: ActionResourceKind,
@@ -146,7 +137,7 @@ impl CombatState {
         combatant.refresh_action_resource(resource_kind)
     }
 
-    pub(crate) fn expire_temporary_modifiers_for(
+    pub fn expire_temporary_modifiers_for(
         &mut self,
         combatant_id: &str,
     ) -> Vec<ModifierDurationExpirationReadout> {
@@ -161,15 +152,14 @@ impl CombatState {
         combatant.expire_temporary_modifiers()
     }
 
-    #[cfg(test)]
-    pub(crate) fn active_modifiers_for(&self, combatant_id: &str) -> Option<&[ActiveModifier]> {
+    pub fn active_modifiers_for(&self, combatant_id: &str) -> Option<&[ActiveModifier]> {
         self.combatants
             .iter()
             .find(|combatant| combatant.id == combatant_id)
             .map(|combatant| combatant.active_modifiers.as_slice())
     }
 
-    pub(crate) fn apply_to_scenario(&self, mut scenario: RulebenchScenario) -> RulebenchScenario {
+    pub fn apply_to_scenario(&self, mut scenario: RulebenchScenario) -> RulebenchScenario {
         for combatant in &mut scenario.combatants {
             if let Some(state) = self
                 .combatants
@@ -188,11 +178,97 @@ impl CombatState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fixtures::hexing_bolt_fixture_scenario;
+    use crate::model::*;
+
+    fn test_scenario() -> RulebenchScenario {
+        RulebenchScenario {
+            metadata: ScenarioMetadata {
+                id: "state-test".to_string(),
+                title: "State Test".to_string(),
+                summary: "Minimal state test scenario.".to_string(),
+                seed_label: "state-test".to_string(),
+            },
+            rulesets: Vec::new(),
+            selected_ruleset_id: "test-rules".to_string(),
+            grid: Grid {
+                width: 2,
+                height: 1,
+                cells: Vec::new(),
+            },
+            combatants: vec![
+                test_combatant("entity-adept", Team::Ally),
+                test_combatant("entity-raider", Team::Enemy),
+            ],
+            entities: Vec::new(),
+            abilities: Vec::new(),
+            selected_ability_id: None,
+            classes: Vec::new(),
+            selected_class_id: None,
+            stat_definitions: Vec::new(),
+            modifiers: Vec::new(),
+            items: Vec::new(),
+            selected_item_id: None,
+            actions: Vec::new(),
+            selected_action: test_action(),
+        }
+    }
+
+    fn test_combatant(id: &str, team: Team) -> Combatant {
+        Combatant {
+            id: id.to_string(),
+            entity_id: id.to_string(),
+            name: id.to_string(),
+            team,
+            position: GridPosition { x: 0, y: 0 },
+            hit_points: BoundedValue {
+                current: 12,
+                max: 12,
+            },
+            class_ids: Vec::new(),
+            stats: StatBlock {
+                base_stats: Vec::new(),
+                derived_stats: Vec::new(),
+            },
+            defenses: Vec::new(),
+            equipped_item_ids: Vec::new(),
+            active_modifiers: Vec::new(),
+            conditions: Vec::new(),
+            is_actor: true,
+        }
+    }
+
+    fn test_action() -> ActionDefinition {
+        ActionDefinition {
+            id: "test-action".to_string(),
+            ability_id: "test-ability".to_string(),
+            name: "Test Action".to_string(),
+            actor_id: "entity-adept".to_string(),
+            target_ids: vec!["entity-raider".to_string()],
+            range: 1,
+            line_of_sight_required: false,
+            visible_target_ids: vec!["entity-raider".to_string()],
+            attack: AttackSpec {
+                modifier: 0,
+                modifier_stat_id: "attack".to_string(),
+                defense_id: "defense".to_string(),
+                defense_label: "Defense".to_string(),
+            },
+            hit: HitEffect {
+                damage_bonus: 0,
+                damage_type: "test".to_string(),
+                modifier_id: "test-modifier".to_string(),
+                modifier_label: "Test Modifier".to_string(),
+                modifier_duration: "test".to_string(),
+                operations: Vec::new(),
+            },
+            action_text: "Test action.".to_string(),
+            effect_text: "Test effect.".to_string(),
+        }
+    }
 
     #[test]
     fn combat_state_initializes_standard_action_for_each_combatant() {
-        let state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let state = CombatState::from_scenario(&test_scenario());
 
         let ledger = state.action_resource_ledger();
 
@@ -211,7 +287,7 @@ mod tests {
 
     #[test]
     fn combat_state_spends_standard_action_once() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
 
         let readout =
             state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
@@ -248,7 +324,7 @@ mod tests {
 
     #[test]
     fn combat_state_rejects_repeated_standard_action_spend_without_mutation() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
         let before = state.action_resources_for("entity-adept");
 
@@ -267,7 +343,7 @@ mod tests {
 
     #[test]
     fn combat_state_rejects_missing_combatant_spend_without_mutation() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         let before = state.action_resource_ledger();
 
         let readout =
@@ -286,7 +362,7 @@ mod tests {
 
     #[test]
     fn combat_state_refreshes_spent_standard_action() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
 
         let readout =
@@ -321,7 +397,7 @@ mod tests {
 
     #[test]
     fn combat_state_refreshes_full_standard_action_idempotently() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         let before = state.action_resource_ledger();
 
         let readout =
@@ -346,7 +422,7 @@ mod tests {
 
     #[test]
     fn combat_state_rejects_missing_combatant_refresh_without_mutation() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         let before = state.action_resource_ledger();
 
         let readout =
@@ -366,7 +442,7 @@ mod tests {
 
     #[test]
     fn combat_state_expires_temporary_modifier_at_turn_boundary() {
-        let mut scenario = hexing_bolt_fixture_scenario();
+        let mut scenario = test_scenario();
         scenario.combatants[1]
             .active_modifiers
             .push(ActiveModifier::temporary(
@@ -409,7 +485,7 @@ mod tests {
 
     #[test]
     fn combat_state_preserves_permanent_modifier_at_turn_boundary() {
-        let mut scenario = hexing_bolt_fixture_scenario();
+        let mut scenario = test_scenario();
         scenario.combatants[1]
             .active_modifiers
             .push(ActiveModifier::permanent(
@@ -444,7 +520,7 @@ mod tests {
 
     #[test]
     fn combat_state_expiration_noops_without_temporary_modifiers() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         let before = state.project("Before no-op expiration.");
 
         let readouts = state.expire_temporary_modifiers_for("entity-raider");
@@ -456,7 +532,7 @@ mod tests {
 
     #[test]
     fn combat_state_projection_update_preserves_action_resources() {
-        let mut state = CombatState::from_scenario(&hexing_bolt_fixture_scenario());
+        let mut state = CombatState::from_scenario(&test_scenario());
         state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
         let before = state.action_resources_for("entity-adept");
         let mut projection = state.project("Projected damage update.");

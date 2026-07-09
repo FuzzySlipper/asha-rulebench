@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "rulebench-authority"
 version = "0.1.0"
+dependencies = [
+ "rulebench-rules",
+]
+
+[[package]]
+name = "rulebench-rules"
+version = "0.1.0"
