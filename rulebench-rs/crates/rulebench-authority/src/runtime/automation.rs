@@ -1,5 +1,284 @@
 use super::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionCandidateSelectionSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub action_id: String,
+    pub target_id: String,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionCandidateSelectionSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        action_id: impl Into<String>,
+        target_id: impl Into<String>,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            action_id: action_id.into(),
+            target_id: target_id.into(),
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionCandidateSelectionDecisionKind {
+    Accepted,
+    RejectedByUnavailableCandidates,
+    RejectedByMissingCandidate,
+    RejectedByPreflight,
+}
+
+impl CombatSessionCandidateSelectionDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionCandidateSelectionDecisionKind::Accepted => "accepted",
+            CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates => {
+                "rejectedByUnavailableCandidates"
+            }
+            CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate => {
+                "rejectedByMissingCandidate"
+            }
+            CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight => {
+                "rejectedByPreflight"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionCandidateSelectionReadout {
+    pub action_id: String,
+    pub target_id: String,
+    pub accepted: bool,
+    pub decision_kind: CombatSessionCandidateSelectionDecisionKind,
+    pub current_actor_id: Option<String>,
+    pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
+    pub preflight_decision_kind: Option<CommandPreflightDecisionKind>,
+    pub rejection: Option<RulebenchRejection>,
+    pub reason: String,
+    pub command: Option<CombatSessionIntentCommandSpec>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionCandidateExecutionReadout {
+    pub selection: CombatSessionCandidateSelectionReadout,
+    pub submitted_step: Option<CombatSessionStepReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutoCandidateCommandSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionAutoCandidateCommandSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutoCandidateDecisionKind {
+    Accepted,
+    RejectedByUnavailableCandidates,
+    RejectedByNoAcceptedCandidate,
+}
+
+impl CombatSessionAutoCandidateDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutoCandidateDecisionKind::Accepted => "accepted",
+            CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates => {
+                "rejectedByUnavailableCandidates"
+            }
+            CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate => {
+                "rejectedByNoAcceptedCandidate"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutoCandidatePlanReadout {
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutoCandidateDecisionKind,
+    pub current_actor_id: Option<String>,
+    pub candidate_count: usize,
+    pub accepted_candidate_count: usize,
+    pub selected_action_id: Option<String>,
+    pub selected_target_id: Option<String>,
+    pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
+    pub reason: String,
+    pub selection: Option<CombatSessionCandidateSelectionReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutoCandidateExecutionReadout {
+    pub plan: CombatSessionAutoCandidatePlanReadout,
+    pub submitted_step: Option<CombatSessionStepReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticStepSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionAutomaticStepSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticStepOperationKind {
+    ConditionalEnd,
+    SubmitCandidate,
+    AdvanceTurn,
+}
+
+impl CombatSessionAutomaticStepOperationKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticStepOperationKind::ConditionalEnd => "conditionalEnd",
+            CombatSessionAutomaticStepOperationKind::SubmitCandidate => "submitCandidate",
+            CombatSessionAutomaticStepOperationKind::AdvanceTurn => "advanceTurn",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticStepDecisionKind {
+    ConditionalEnd,
+    SubmitCandidate,
+    AdvanceTurn,
+    RejectedByLifecycle,
+}
+
+impl CombatSessionAutomaticStepDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticStepDecisionKind::ConditionalEnd => "conditionalEnd",
+            CombatSessionAutomaticStepDecisionKind::SubmitCandidate => "submitCandidate",
+            CombatSessionAutomaticStepDecisionKind::AdvanceTurn => "advanceTurn",
+            CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticStepPlanReadout {
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutomaticStepDecisionKind,
+    pub operation_kind: Option<CombatSessionAutomaticStepOperationKind>,
+    pub lifecycle_phase: CombatLifecyclePhase,
+    pub current_actor_id: Option<String>,
+    pub combat_end_condition: CombatEndConditionReadout,
+    pub auto_candidate_plan: Option<CombatSessionAutoCandidatePlanReadout>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticStepExecutionReadout {
+    pub plan: CombatSessionAutomaticStepPlanReadout,
+    pub control: Option<CombatControlReadout>,
+    pub auto_candidate: Option<CombatSessionAutoCandidateExecutionReadout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticRunSpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub max_steps: u32,
+    pub roll_stream: Vec<i32>,
+}
+
+impl CombatSessionAutomaticRunSpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        max_steps: u32,
+        roll_stream: Vec<i32>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            max_steps,
+            roll_stream,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticRunDecisionKind {
+    CompletedCombatEnded,
+    StoppedAtMaxSteps,
+    RejectedByLifecycle,
+    RejectedByStepLimit,
+}
+
+impl CombatSessionAutomaticRunDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded => "completedCombatEnded",
+            CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps => "stoppedAtMaxSteps",
+            CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit => "rejectedByStepLimit",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticRunReadout {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutomaticRunDecisionKind,
+    pub max_steps: u32,
+    pub executed_step_count: u32,
+    pub steps: Vec<CombatSessionAutomaticStepExecutionReadout>,
+    pub final_snapshot: CombatSessionSnapshot,
+    pub reason: String,
+}
+
 pub(super) fn combat_session_automatic_run_readout(
     id: String,
     title: String,
