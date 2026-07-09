@@ -1,6 +1,6 @@
 use super::{
-    ActiveModifier, AttackSpec, BoundedValue, HitEffect, ModifierTenure, NamedNumber,
-    RulesetMetadata, ScenarioMetadata, StatBlock, StatDefinition,
+    ActiveModifier, AttackSpec, BoundedValue, GridPosition, HitEffect, ModifierTenure, NamedNumber,
+    RulesetMetadata, ScenarioMetadata, StatBlock, StatDefinition, Team,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,18 +14,6 @@ pub struct Grid {
 pub struct GridCell {
     pub position: GridPosition,
     pub terrain_tags: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GridPosition {
-    pub x: u32,
-    pub y: u32,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Team {
-    Ally,
-    Enemy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

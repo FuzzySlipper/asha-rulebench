@@ -17,12 +17,6 @@ pub struct ScenarioProjection {
     pub combatants: Vec<FinalCombatantState>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StateFingerprint {
-    pub algorithm: String,
-    pub value: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RollRequestKind {
     AttackRoll,
