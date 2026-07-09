@@ -53,6 +53,16 @@ The diagram is ownership shorthand rather than a complete Cargo edge list.
 Dependencies may point from a higher layer to the lower layers it consumes;
 portable layers must never depend on bridge, codegen, fixtures, authority, or UI.
 
+`pnpm run check:rust-boundaries` enforces this workspace graph and is part of
+`pnpm run verify`. It also runs focused invalid-dependency checks so the guard
+fails closed for a portable-to-Rulebench edge and a portable path dependency on
+a frontend surface.
+
+To approve a real boundary change, update the owning north-star task and
+systems map, revise this dependency direction, change the checker policy and
+its focused failure coverage, then land the crate migration with its callers
+and tests. Do not add a path dependency simply to preserve an old import path.
+
 ## Migration Posture
 
 - Empty crates are intentional reservation boundaries, not implemented feature claims.

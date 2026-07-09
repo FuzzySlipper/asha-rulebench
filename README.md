@@ -42,6 +42,7 @@ Run the focused Rust gates with:
 ```bash
 pnpm run rust:check
 pnpm run rust:test
+pnpm run check:rust-boundaries
 ```
 
 ## Source Material
