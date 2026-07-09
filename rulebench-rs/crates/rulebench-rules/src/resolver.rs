@@ -24,7 +24,7 @@ pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     accepted_shape(intent.clone(), trace)
 }
 
-/// Resolve the first local Hexing Bolt-shaped action path.
+/// Resolve a single action against the supplied scenario.
 ///
 /// The resolver is intentionally narrow and deterministic. It consumes a
 /// scenario, a typed intent, and an explicit roll stream. It returns accepted

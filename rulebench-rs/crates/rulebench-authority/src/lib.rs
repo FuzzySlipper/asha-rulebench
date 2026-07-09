@@ -10,6 +10,7 @@
 
 mod catalog;
 mod fixtures;
+mod scenarios;
 mod session;
 
 pub mod audit {
