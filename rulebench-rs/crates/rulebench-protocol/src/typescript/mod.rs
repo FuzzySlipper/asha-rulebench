@@ -1,8 +1,10 @@
 mod aliases;
 mod interfaces;
+mod live_interfaces;
 
 pub use aliases::aliases;
 pub use interfaces::interfaces;
+pub use live_interfaces::live_interfaces;
 
 /// One field in a stable TypeScript interface contract.
 pub struct ProtocolField {
@@ -27,7 +29,7 @@ pub fn render_api_types() -> String {
         out.push_str(alias);
         out.push_str("\n\n");
     }
-    for interface in interfaces() {
+    for interface in live_interfaces().iter().chain(interfaces()) {
         out.push_str(&format!("export interface {} {{\n", interface.name));
         for field in interface.fields {
             out.push_str(&format!("  readonly {}: {};\n", field.name, field.ty));

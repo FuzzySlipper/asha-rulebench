@@ -59,6 +59,10 @@ See `README.md` and Den doc `asha-rulebench/basic-design` for current repo orien
 
 Future local Rust crates may be added only when a task explicitly calls for incubating authority behavior here. Keep local Rust separate from the Angular shell and promote generic pieces upstream to ASHA when proven.
 
+The selected concrete live adapter lives at
+`rulebench-rs/hosts/rulebench-process-host`. It binds loopback and is reached
+through the Angular same-origin proxy; `rulebench-bridge` remains host-neutral.
+
 ## Local Commands
 
 ```bash

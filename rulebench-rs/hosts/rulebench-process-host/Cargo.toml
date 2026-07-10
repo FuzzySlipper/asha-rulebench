@@ -1,0 +1,16 @@
+[package]
+name = "rulebench-process-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local process-backed HTTP/JSON host for ASHA Rulebench."
+
+[lints]
+workspace = true
+
+[dependencies]
+rulebench-bridge = { path = "../../crates/rulebench-bridge" }
+rulebench-fixtures = { path = "../../crates/rulebench-fixtures" }
+rulebench-protocol = { path = "../../crates/rulebench-protocol" }
+serde.workspace = true
+serde_json.workspace = true

@@ -3,11 +3,13 @@ use rulebench_rules::{
     CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec, CombatSessionIntentCommandSpec,
     UseActionIntent,
 };
+use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";
 pub const PROTOCOL_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProtocolRequestContextDto {
     pub protocol_version: u32,
 }
@@ -20,27 +22,31 @@ impl ProtocolRequestContextDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProtocolHandshakeDto {
     pub protocol_id: String,
     pub protocol_version: u32,
     pub authority_surface: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScenarioOptionDto {
     pub id: String,
     pub title: String,
     pub summary: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatSessionCreateRequestDto {
     pub session_id: String,
     pub scenario_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UseActionIntentDto {
     pub actor_id: String,
     pub action_id: String,
@@ -53,7 +59,8 @@ impl UseActionIntentDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatSessionIntentCommandDto {
     pub id: String,
     pub title: String,
@@ -74,7 +81,8 @@ impl CombatSessionIntentCommandDto {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum CombatControlCommandKindDto {
     ExplicitStart,
     ExplicitEnd,
@@ -82,7 +90,8 @@ pub enum CombatControlCommandKindDto {
     EndIfConditionMet,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatControlCommandDto {
     pub kind: CombatControlCommandKindDto,
 }
@@ -102,13 +111,15 @@ impl CombatControlCommandDto {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum CombatAutomationNoCandidateBehaviorDto {
     AdvanceTurn,
     StopRun,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatAutomationPolicyDto {
     pub id: String,
     pub version: u32,
@@ -132,7 +143,8 @@ impl CombatAutomationPolicyDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AutomaticStepRequestDto {
     pub id: String,
     pub title: String,
@@ -153,7 +165,8 @@ impl AutomaticStepRequestDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AutomaticRunRequestDto {
     pub id: String,
     pub title: String,

@@ -1,4 +1,5 @@
 use rulebench_rules::CombatSessionApiError;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BridgeErrorKind {
@@ -32,6 +33,14 @@ pub struct BridgeError {
     pub message: String,
     pub retryable: bool,
 }
+
+impl Display for BridgeError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for BridgeError {}
 
 impl BridgeError {
     pub(crate) fn new(kind: BridgeErrorKind, message: impl Into<String>) -> Self {

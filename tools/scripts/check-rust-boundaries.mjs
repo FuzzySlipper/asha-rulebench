@@ -3,6 +3,7 @@ import { join, relative, resolve } from 'node:path';
 
 const root = process.cwd();
 const cratesRoot = join(root, 'rulebench-rs', 'crates');
+const hostsRoot = join(root, 'rulebench-rs', 'hosts');
 
 const allowedDependencies = new Map([
   ['rulebench-core', new Set()],
@@ -19,6 +20,7 @@ const allowedDependencies = new Map([
   ['rulebench-fixtures', new Set(['rulebench-rules'])],
   ['rulebench-codegen', new Set(['rulebench-fixtures', 'rulebench-protocol'])],
   ['rulebench-authority', new Set(['rulebench-rules', 'rulebench-fixtures', 'rulebench-codegen', 'rulebench-bridge'])],
+  ['rulebench-process-host', new Set(['rulebench-bridge', 'rulebench-fixtures', 'rulebench-protocol'])],
 ]);
 
 const portableCrates = new Set([
@@ -44,16 +46,18 @@ console.log(`check:rust-boundaries ok (${manifests.size} crates)`);
 
 function readWorkspaceManifests() {
   const manifests = new Map();
-  for (const entry of readdirSync(cratesRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
+  for (const workspaceRoot of [cratesRoot, hostsRoot]) {
+    for (const entry of readdirSync(workspaceRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
 
-    const crateName = entry.name;
-    const manifestPath = join(cratesRoot, crateName, 'Cargo.toml');
-    const manifest = readFileSync(manifestPath, 'utf8');
-    manifests.set(crateName, {
-      manifestPath,
-      dependencies: parseLocalDependencies(manifest),
-    });
+      const crateName = entry.name;
+      const manifestPath = join(workspaceRoot, crateName, 'Cargo.toml');
+      const manifest = readFileSync(manifestPath, 'utf8');
+      manifests.set(crateName, {
+        manifestPath,
+        dependencies: parseLocalDependencies(manifest),
+      });
+    }
   }
   return manifests;
 }

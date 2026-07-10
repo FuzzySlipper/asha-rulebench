@@ -9,6 +9,7 @@
 mod authoring;
 mod bridge;
 mod content;
+mod live;
 mod replay;
 mod session;
 mod typescript;
@@ -27,6 +28,14 @@ pub use bridge::{
 pub use content::{
     ContentFingerprintDto, ContentImportDiagnosticDto, ContentImportReadoutDto,
     ContentPackIdentityDto,
+};
+pub use live::{
+    LiveActionOptionDto, LiveActionResourceCostDto, LiveActionResourceStateDto, LiveAuditEntryDto,
+    LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateDto, LiveCandidateSummaryDto,
+    LiveCombatEndDto, LiveCombatLogEntryDto, LiveCommandExecutionDto, LiveCommandStepDto,
+    LiveControlExecutionDto, LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto,
+    LiveParticipantDto, LivePreflightDto, LiveRollEvidenceDto, LiveSessionSnapshotDto,
+    LiveStateFingerprintDto, LiveTargetOptionDto, LiveTraceEntryDto, LiveTransportErrorDto,
 };
 pub use replay::{
     ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayComparisonDifferenceDto,

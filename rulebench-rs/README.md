@@ -26,6 +26,7 @@ Boundary and adapter layers:
 - `rulebench-protocol`: Rust-owned command/readback DTO contracts.
 - `rulebench-bridge`: protocol-to-authority runtime invocation, independent of the eventual host technology.
 - `rulebench-codegen`: Rulebench-local TypeScript and checked-artifact generation.
+- `hosts/rulebench-process-host`: concrete loopback HTTP/JSON adapter over `rulebench-bridge`; this host is Rulebench-local and not portable authority.
 
 Rulebench-local layers:
 
@@ -62,6 +63,7 @@ core
   -> rules (portable facade)
        -> protocol -> bridge
        -> fixtures -> codegen
+       -> bridge + fixtures + protocol -> process host
                        \-> authority
 ```
 
@@ -85,7 +87,7 @@ and tests. Do not add a path dependency simply to preserve an old import path.
 - Move behavior by concern, preserving portable compatibility through `rulebench-rules`; migrate Rulebench callers directly to fixture, protocol, bridge, or codegen owners rather than adding authority forwards.
 - Do not create circular dependencies to preserve an old import path.
 - Keep scenario-specific assumptions in `rulebench-fixtures` or the Rulebench harness.
-- Keep host choice out of `rulebench-bridge`; concrete native, WASM, process, or service adapters can be added after the live bridge design is selected.
+- Keep host choice out of `rulebench-bridge`; the selected first concrete adapter lives under `hosts/rulebench-process-host`.
 
 ## Commands
 
@@ -94,6 +96,7 @@ From the repo root:
 ```bash
 pnpm run rust:check
 pnpm run rust:test
+pnpm run rust:host -- --bind 127.0.0.1:4318
 ```
 
 Or directly:
@@ -103,11 +106,25 @@ cargo check --manifest-path rulebench-rs/Cargo.toml
 cargo test --manifest-path rulebench-rs/Cargo.toml
 ```
 
+## Process Host Lifecycle
+
+`pnpm dev` starts the Rust host on an available loopback port, waits for its
+versioned handshake, supplies that URL to the Angular proxy configuration, and
+then starts Angular on `0.0.0.0`. The browser uses the same-origin
+`/api/rulebench/v1` path; the Rust listener is not exposed directly to the LAN.
+Stopping the development command terminates both child processes.
+
+The process host is trusted local development infrastructure. It is not an
+authenticated, internet-facing, multi-user, or durable-session service.
+
 ## Dependency Posture
 
-The initial workspace has no external Rust dependencies and no path dependency on `/home/dev/asha-engine`.
+The workspace has no path dependency on `/home/dev/asha-engine`.
 
-Add dependencies only after planner approval. This includes serialization/codegen crates such as `serde`, `serde_json`, `schemars`, or `ts-rs`, and also local path dependencies into ASHA engine crates.
+Planner approval in task #5560 authorizes `serde` with derive support for
+protocol DTOs and `serde_json` for the concrete process host. Portable authority
+crates remain serialization-free. Further external or ASHA path dependencies
+still require planner approval.
 
 ## Non-Claims
 

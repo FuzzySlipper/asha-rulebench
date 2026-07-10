@@ -10,3 +10,4 @@ workspace = true
 
 [dependencies]
 rulebench-rules = { path = "../rulebench-rules" }
+serde.workspace = true

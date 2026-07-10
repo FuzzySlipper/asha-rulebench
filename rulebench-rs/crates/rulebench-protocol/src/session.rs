@@ -1,10 +1,12 @@
 use rulebench_rules::CombatSessionHandle;
+use serde::{Deserialize, Serialize};
 
 /// Stable wire representation of an opaque combat-session identity.
 ///
 /// Hosts can retain this value and pass it back to a bridge without learning
 /// anything about the authority-owned session state.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatSessionHandleDto {
     pub id: String,
 }

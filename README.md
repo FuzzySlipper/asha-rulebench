@@ -32,10 +32,11 @@ owner from the start. `rulebench-rules` and `rulebench-authority` currently hold
 the substantial implementation; focused tasks will move concerns into the
 reserved `core`, `ruleset`, `content`, `combat`, `replay`, `protocol`, `bridge`,
 `codegen`, and `fixtures` crates. See `rulebench-rs/README.md` for ownership and
-dependency direction. The workspace intentionally has no external Rust
-dependencies and no path dependency on `/home/dev/asha-engine`; adding
-serialization/codegen crates or ASHA path dependencies is a planner-approval
-moment.
+dependency direction. The workspace has no path dependency on
+`/home/dev/asha-engine`. Planner-approved `serde` protocol DTOs and the
+`serde_json` process host provide the first live local bridge; further
+serialization/codegen crates or ASHA path dependencies remain a
+planner-approval moment.
 
 Run the focused Rust gates with:
 
@@ -44,6 +45,10 @@ pnpm run rust:check
 pnpm run rust:test
 pnpm run check:rust-boundaries
 ```
+
+`pnpm dev` starts both the loopback Rust process host and the Angular server.
+Angular remains the only `0.0.0.0` LAN-facing process and proxies the versioned
+`/api/rulebench/v1` path to Rust on the same origin.
 
 ## Source Material
 

@@ -114,6 +114,262 @@ export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMi
 
 export type RulebenchReplayArchiveErrorKindDto = 'invalidPackage' | 'storage' | 'notFound' | 'corrupt' | 'unsupportedVersion';
 
+export interface RulebenchLiveTransportErrorDto {
+  readonly kind: string;
+  readonly code: string;
+  readonly message: string;
+  readonly retryable: boolean;
+}
+
+export interface RulebenchLiveStateFingerprintDto {
+  readonly algorithm: string;
+  readonly value: string;
+}
+
+export interface RulebenchLiveParticipantDto {
+  readonly id: string;
+  readonly name: string;
+  readonly currentHitPoints: number;
+  readonly maxHitPoints: number;
+  readonly temporaryVitality: number;
+  readonly defeated: boolean;
+  readonly conditions: readonly string[];
+}
+
+export interface RulebenchLiveActionResourceCostDto {
+  readonly resourceId: string;
+  readonly amount: number;
+}
+
+export interface RulebenchLiveActionResourceStateDto {
+  readonly resourceId: string;
+  readonly sourceId: string;
+  readonly kind: string;
+  readonly current: number;
+  readonly max: number;
+  readonly available: boolean;
+  readonly refreshPolicy: string;
+  readonly refreshTurns: number | null;
+  readonly remainingRefreshTurns: number | null;
+}
+
+export interface RulebenchLiveTargetOptionDto {
+  readonly targetId: string;
+  readonly targetName: string;
+  readonly currentHitPoints: number;
+  readonly maxHitPoints: number;
+}
+
+export interface RulebenchLiveActionOptionDto {
+  readonly actionId: string;
+  readonly abilityId: string;
+  readonly actionName: string;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly resourceCosts: readonly RulebenchLiveActionResourceCostDto[];
+  readonly resourceStates: readonly RulebenchLiveActionResourceStateDto[];
+  readonly targets: readonly RulebenchLiveTargetOptionDto[];
+}
+
+export interface RulebenchLiveCurrentActorOptionsDto {
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly lifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly currentActorId: string | null;
+  readonly currentActorDefeated: boolean;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly actions: readonly RulebenchLiveActionOptionDto[];
+}
+
+export interface RulebenchLiveCombatLogEntryDto {
+  readonly id: string;
+  readonly stepId: string;
+  readonly logIndex: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly eventTypes: readonly string[];
+}
+
+export interface RulebenchLiveAuditEntryDto {
+  readonly id: string;
+  readonly stepId: string;
+  readonly sequence: number;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly decisionKind: RulebenchCommandDecisionKindDto;
+  readonly preflightDecisionKind: RulebenchCommandPreflightDecisionKindDto | null;
+  readonly accepted: boolean;
+  readonly rejectionCode: RulebenchRejectionCodeDto | null;
+  readonly eventCount: number;
+  readonly traceCount: number;
+  readonly stateBeforeFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchLiveStateFingerprintDto;
+}
+
+export interface RulebenchLiveCombatEndDto {
+  readonly shouldEnd: boolean;
+  readonly conditionKind: RulebenchCombatEndConditionKindDto;
+  readonly outcomeKind: RulebenchCombatOutcomeKindDto;
+  readonly activeSides: readonly RulebenchCombatSideIdDto[];
+  readonly defeatedSides: readonly RulebenchCombatSideIdDto[];
+  readonly winningSides: readonly RulebenchCombatSideIdDto[];
+  readonly reason: string;
+}
+
+export interface RulebenchLiveFinalizationDto {
+  readonly trigger: RulebenchLifecycleTransitionTriggerDto;
+  readonly finalizedAtStep: number;
+  readonly outcomeKind: RulebenchCombatOutcomeKindDto;
+  readonly winningSides: readonly RulebenchCombatSideIdDto[];
+  readonly remainingSides: readonly RulebenchCombatSideIdDto[];
+  readonly finalStateFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveSessionSnapshotDto {
+  readonly sessionId: string;
+  readonly nextStepIndex: number;
+  readonly lifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly startedAtStep: number | null;
+  readonly endedAtStep: number | null;
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly participantOrder: readonly string[];
+  readonly currentActorId: string | null;
+  readonly participants: readonly RulebenchLiveParticipantDto[];
+  readonly options: RulebenchLiveCurrentActorOptionsDto;
+  readonly combatEnd: RulebenchLiveCombatEndDto;
+  readonly finalization: RulebenchLiveFinalizationDto | null;
+  readonly combatLog: readonly RulebenchLiveCombatLogEntryDto[];
+  readonly auditLog: readonly RulebenchLiveAuditEntryDto[];
+  readonly stateFingerprint: RulebenchLiveStateFingerprintDto;
+}
+
+export interface RulebenchLiveRollEvidenceDto {
+  readonly sequence: number;
+  readonly requestKind: string;
+  readonly suppliedValue: number | null;
+  readonly consumed: boolean;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveTraceEntryDto {
+  readonly sequence: number;
+  readonly phase: RulebenchTracePhaseDto;
+  readonly status: RulebenchTraceStatusDto;
+  readonly message: string;
+  readonly detail: string;
+}
+
+export interface RulebenchLiveDomainEventDto {
+  readonly kind: string;
+  readonly summary: string;
+}
+
+export interface RulebenchLivePreflightDto {
+  readonly intent: RulebenchUseActionIntentDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCommandPreflightDecisionKindDto;
+  readonly rejectionCode: RulebenchRejectionCodeDto | null;
+  readonly currentActorId: string | null;
+  readonly targetId: string | null;
+  readonly targetAccepted: boolean | null;
+  readonly targetReason: string | null;
+  readonly resourceCosts: readonly RulebenchLiveActionResourceCostDto[];
+  readonly actionResource: RulebenchLiveActionResourceStateDto | null;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveCandidateDto {
+  readonly intent: RulebenchUseActionIntentDto;
+  readonly abilityId: string;
+  readonly targetName: string;
+  readonly targetCurrentHitPoints: number;
+  readonly targetMaxHitPoints: number;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCommandPreflightDecisionKindDto;
+  readonly rejectionCode: RulebenchRejectionCodeDto | null;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveCandidateSummaryDto {
+  readonly roundNumber: number;
+  readonly turnIndex: number;
+  readonly lifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly currentActorId: string | null;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly candidates: readonly RulebenchLiveCandidateDto[];
+}
+
+export interface RulebenchLiveCommandStepDto {
+  readonly sessionId: string;
+  readonly stepId: string;
+  readonly stepIndex: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCommandDecisionKindDto;
+  readonly rejectionCode: RulebenchRejectionCodeDto | null;
+  readonly intent: RulebenchUseActionIntentDto;
+  readonly rolls: readonly RulebenchLiveRollEvidenceDto[];
+  readonly events: readonly RulebenchLiveDomainEventDto[];
+  readonly trace: readonly RulebenchLiveTraceEntryDto[];
+  readonly stateBeforeFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchLiveStateFingerprintDto;
+}
+
+export interface RulebenchLiveCommandExecutionDto {
+  readonly step: RulebenchLiveCommandStepDto;
+  readonly snapshot: RulebenchLiveSessionSnapshotDto;
+}
+
+export interface RulebenchLiveControlExecutionDto {
+  readonly commandKind: RulebenchCombatControlCommandKindDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCombatControlDecisionKindDto;
+  readonly previousLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly nextLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly stateBeforeFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly reason: string;
+  readonly snapshot: RulebenchLiveSessionSnapshotDto;
+}
+
+export interface RulebenchLiveAutomaticStepDto {
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchAutomaticStepDecisionKindDto;
+  readonly operationKind: RulebenchAutomaticStepOperationKindDto | null;
+  readonly lifecyclePhase: RulebenchCombatLifecyclePhaseDto;
+  readonly currentActorId: string | null;
+  readonly policyId: string;
+  readonly policyVersion: number;
+  readonly selectedActionId: string | null;
+  readonly selectedTargetId: string | null;
+  readonly candidateCount: number;
+  readonly acceptedCandidateCount: number;
+  readonly submittedStep: RulebenchLiveCommandStepDto | null;
+  readonly reason: string;
+  readonly snapshot: RulebenchLiveSessionSnapshotDto | null;
+}
+
+export interface RulebenchLiveAutomaticRunDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchAutomaticRunDecisionKindDto;
+  readonly maxSteps: number;
+  readonly executedStepCount: number;
+  readonly policyId: string;
+  readonly policyVersion: number;
+  readonly steps: readonly RulebenchLiveAutomaticStepDto[];
+  readonly finalSnapshot: RulebenchLiveSessionSnapshotDto;
+  readonly reason: string;
+}
+
 export interface RulebenchProtocolRequestContextDto {
   readonly protocolVersion: number;
 }
