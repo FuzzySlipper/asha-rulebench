@@ -13,6 +13,22 @@ pub use session::{
     combat_session_transcripts,
 };
 
+pub fn registration() -> crate::ScenarioPackageRegistration {
+    crate::ScenarioPackageRegistration::new(
+        hexing_bolt_scenario_package(),
+        crate::ScenarioPackageReadbackFactories {
+            catalog_cases: scenario_catalog_cases,
+            ruleset_catalog_readout,
+            content_validation_readouts,
+            session_transcripts: combat_session_transcripts,
+            control_history_readouts: combat_session_control_history_readouts,
+            script_readouts: combat_session_script_readouts,
+            automatic_run_readouts: combat_session_automatic_run_readouts,
+            automatic_run_replay_readouts: combat_session_automatic_run_replay_readouts,
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

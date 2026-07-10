@@ -12,15 +12,15 @@ pub fn scenario_catalog_summaries() -> Vec<ScenarioCatalogSummary> {
 }
 
 pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
-    rulebench_fixtures::scenario_catalog_cases()
+    rulebench_fixtures::aggregated_scenario_catalog_cases()
 }
 
 pub fn ruleset_catalog_readout() -> RulesetCatalogReadout {
-    rulebench_fixtures::ruleset_catalog_readout()
+    rulebench_fixtures::aggregated_ruleset_catalog_readout()
 }
 
 pub fn content_validation_readouts() -> Vec<ContentValidationReadout> {
-    rulebench_fixtures::content_validation_readouts()
+    rulebench_fixtures::aggregated_content_validation_readouts()
 }
 
 pub fn resolve_catalog_scenario(

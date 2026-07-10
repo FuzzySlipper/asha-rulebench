@@ -33,22 +33,22 @@ pub fn resolve_combat_session_step(
 }
 
 pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
-    rulebench_fixtures::combat_session_transcripts()
+    rulebench_fixtures::aggregated_combat_session_transcripts()
 }
 
 pub fn combat_session_control_history_readouts() -> Vec<CombatControlHistoryReadout> {
-    rulebench_fixtures::combat_session_control_history_readouts()
+    rulebench_fixtures::aggregated_combat_session_control_history_readouts()
 }
 
 pub fn combat_session_script_readouts() -> Vec<CombatSessionScriptReadout> {
-    rulebench_fixtures::combat_session_script_readouts()
+    rulebench_fixtures::aggregated_combat_session_script_readouts()
 }
 
 pub fn combat_session_automatic_run_readouts() -> Vec<CombatSessionAutomaticRunReadout> {
-    rulebench_fixtures::combat_session_automatic_run_readouts()
+    rulebench_fixtures::aggregated_combat_session_automatic_run_readouts()
 }
 
 pub fn combat_session_automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayReadout>
 {
-    rulebench_fixtures::combat_session_automatic_run_replay_readouts()
+    rulebench_fixtures::aggregated_combat_session_automatic_run_replay_readouts()
 }

@@ -8,6 +8,7 @@
 mod catalog;
 mod goldens;
 mod package;
+mod registry;
 pub mod scenarios;
 
 pub use catalog::*;
@@ -18,6 +19,10 @@ pub use package::{
     ScenarioPackageInitialState, ScenarioPackageRulesetReference, ScenarioPackageScript,
     ScenarioPackageValidationError,
 };
+pub use registry::{
+    ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRegistry,
+    ScenarioPackageRegistryError, ScenarioPackageSelectionError,
+};
 pub use scenarios::hexing_bolt::{
     accepted_hexing_bolt_fixture_receipt, combat_session_automatic_run_readouts,
     combat_session_automatic_run_replay_readouts, combat_session_control_history_readouts,
@@ -25,3 +30,51 @@ pub use scenarios::hexing_bolt::{
     hexing_bolt_fixture_scenario, hexing_bolt_scenario_package, rejected_target_fixture_receipt,
     ruleset_catalog_readout, scenario_catalog_cases, turn_control_fixture_scenario,
 };
+
+pub fn scenario_package_registry() -> ScenarioPackageRegistry {
+    scenarios::registry()
+}
+
+pub fn registered_scenario_packages() -> Vec<ScenarioPackage> {
+    scenario_package_registry()
+        .registrations()
+        .iter()
+        .map(|registration| registration.package.clone())
+        .collect()
+}
+
+pub fn aggregated_scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
+    scenario_package_registry().scenario_catalog_cases()
+}
+
+pub fn aggregated_ruleset_catalog_readout() -> RulesetCatalogReadout {
+    scenario_package_registry().ruleset_catalog_readout()
+}
+
+pub fn aggregated_content_validation_readouts() -> Vec<ContentValidationReadout> {
+    scenario_package_registry().content_validation_readouts()
+}
+
+pub fn aggregated_combat_session_transcripts() -> Vec<rulebench_rules::CombatSessionTranscript> {
+    scenario_package_registry().combat_session_transcripts()
+}
+
+pub fn aggregated_combat_session_control_history_readouts(
+) -> Vec<rulebench_rules::CombatControlHistoryReadout> {
+    scenario_package_registry().combat_session_control_history_readouts()
+}
+
+pub fn aggregated_combat_session_script_readouts(
+) -> Vec<rulebench_rules::CombatSessionScriptReadout> {
+    scenario_package_registry().combat_session_script_readouts()
+}
+
+pub fn aggregated_combat_session_automatic_run_readouts(
+) -> Vec<rulebench_rules::CombatSessionAutomaticRunReadout> {
+    scenario_package_registry().combat_session_automatic_run_readouts()
+}
+
+pub fn aggregated_combat_session_automatic_run_replay_readouts(
+) -> Vec<rulebench_rules::CombatSessionAutomaticRunReplayReadout> {
+    scenario_package_registry().combat_session_automatic_run_replay_readouts()
+}
