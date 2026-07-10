@@ -10,7 +10,7 @@ const localWebServer = process.env['BASE_URL']
   ? {}
   : {
       webServer: {
-        command: `pnpm nx serve app --host 0.0.0.0 --port ${localPort}`,
+        command: `pnpm dev -- --port ${localPort}`,
         url: localBaseUrl,
         reuseExistingServer: false,
         cwd: workspaceRoot,

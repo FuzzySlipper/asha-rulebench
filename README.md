@@ -52,6 +52,9 @@ Angular remains the only `0.0.0.0` LAN-facing process and proxies the versioned
 `libs/transport/src/live.ts` owns protocol handshakes, generated DTO requests,
 classified host errors, and request cancellation. Stores and components must
 consume that public transport boundary rather than call the host directly.
+The canonical `pnpm run e2e` gate starts this combined stack and completes a
+real Rust-owned combat session through the transport, including cleanup and
+classified failure/version-mismatch checks.
 
 ## Source Material
 
