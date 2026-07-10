@@ -146,6 +146,7 @@ pub fn verify_automatic_run_replay(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rulebench_combat::ActionResourceCost;
     use rulebench_combat::{
         ActionDefinition, AttackCheckDeclaration, CheckDeclaration, CombatSessionState,
         DefenseReference, Grid, HitEffect, RulebenchScenario, ScenarioMetadata, TargetKind,
@@ -267,6 +268,7 @@ mod tests {
                 modifier_duration: "placeholder".to_string(),
                 operations: Vec::new(),
             },
+            resource_costs: vec![ActionResourceCost::standard_action()],
             action_text: "Placeholder action.".to_string(),
             effect_text: "Placeholder effect.".to_string(),
         };

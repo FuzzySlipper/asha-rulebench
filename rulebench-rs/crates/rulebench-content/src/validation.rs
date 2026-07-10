@@ -759,6 +759,7 @@ fn validate_action_references(
     }
     validate_hit_modifier(scenario, action, diagnostics);
     validate_effect_operations(action, diagnostics);
+    validate_action_resource_costs(action, diagnostics);
 
     for target_id in &action.targeting.target_ids {
         if let Some(target) = scenario
@@ -793,6 +794,38 @@ fn validate_action_references(
                     );
                 }
             }
+        }
+    }
+}
+
+fn validate_action_resource_costs(
+    action: &ActionDefinition,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let mut seen_resource_kinds = HashSet::new();
+    for cost in &action.resource_costs {
+        if cost.amount == 0 {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidActionResourceCost,
+                Some(action.id.clone()),
+                format!(
+                    "Action {} declares a zero {} resource cost.",
+                    action.id,
+                    cost.kind.code()
+                ),
+            ));
+        }
+
+        if !seen_resource_kinds.insert(cost.kind.code()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateActionResourceCost,
+                Some(action.id.clone()),
+                format!(
+                    "Action {} declares {} more than once in its resource costs.",
+                    action.id,
+                    cost.kind.code()
+                ),
+            ));
         }
     }
 }

@@ -1082,6 +1082,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "RulebenchActionResourceKindDto",
                 },
                 Field {
+                    name: "amount",
+                    ty: "number",
+                },
+                Field {
                     name: "previousResource",
                     ty: "RulebenchActionResourceStateDto",
                 },

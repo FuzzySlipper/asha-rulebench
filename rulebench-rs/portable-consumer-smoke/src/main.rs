@@ -57,6 +57,7 @@ fn scenario() -> RulebenchScenario {
                 HitEffectOperation::ApplyModifier(ModifierEffectOperation { modifier_id: "rattled".to_string(), modifier_label: "Rattled".to_string(), modifier_duration: "one turn".to_string() }),
             ],
         },
+        resource_costs: vec![ActionResourceCost::standard_action()],
         action_text: "Mind vs Nerve.".to_string(),
         effect_text: "Psychic damage and rattled.".to_string(),
     };

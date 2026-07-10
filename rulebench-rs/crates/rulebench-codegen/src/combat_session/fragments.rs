@@ -630,6 +630,7 @@ pub(crate) fn render_action_resource_transition_entry(
         "{indent}  resourceKind: {},\n",
         ts_string(action_resource_kind(entry.resource_kind))
     ));
+    out.push_str(&format!("{indent}  amount: {},\n", entry.amount));
     out.push_str(&format!(
         "{indent}  previousResource: {},\n",
         render_action_resource_state_inline(&entry.previous_resource)

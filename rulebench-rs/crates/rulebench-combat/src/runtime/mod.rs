@@ -4,6 +4,7 @@ use crate::model::*;
 use crate::resolver::{resolve_use_action, target_legality_rejection, validate_target_legality};
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
+use rulebench_ruleset::ActionResourceCost;
 
 mod automation;
 mod control;
@@ -281,10 +282,17 @@ impl CombatSessionState {
             self.action_usage_log.push(entry);
         }
         if receipt.accepted {
-            let spend = self
-                .state
-                .spend_action_resource(&command.actor_id, ActionResourceKind::StandardAction);
-            self.record_action_resource_spend_transition(&step, &spend);
+            let resource_costs = self
+                .scenario
+                .action_by_id(&command.action_id)
+                .map(|action| action.resource_costs.clone())
+                .unwrap_or_default();
+            for cost in &resource_costs {
+                let spend =
+                    self.state
+                        .spend_action_resource(&command.actor_id, cost.kind, cost.amount);
+                self.record_action_resource_spend_transition(&step, &spend);
+            }
         }
         self.next_step_index += 1;
         if should_apply_state {
@@ -545,6 +553,7 @@ impl CombatSessionState {
                 transition_kind: ActionResourceTransitionKind::Spent,
                 combatant_id: spend.combatant_id.clone(),
                 resource_kind: spend.resource_kind,
+                amount: spend.amount,
                 previous_resource,
                 next_resource,
                 command_step_id: Some(step.id.clone()),
@@ -571,6 +580,12 @@ impl CombatSessionState {
         if !refresh.accepted {
             return;
         }
+        let amount = u32::try_from(
+            next_resource
+                .current
+                .saturating_sub(previous_resource.current),
+        )
+        .unwrap_or_default();
 
         self.action_resource_transition_log
             .push(ActionResourceTransitionEntry {
@@ -578,6 +593,7 @@ impl CombatSessionState {
                 transition_kind: ActionResourceTransitionKind::Refreshed,
                 combatant_id: refresh.combatant_id.clone(),
                 resource_kind: refresh.resource_kind,
+                amount,
                 previous_resource,
                 next_resource,
                 command_step_id: None,
@@ -836,30 +852,27 @@ fn command_preflight_readout(
         );
     }
 
-    let action_resource = standard_action_resource_for(action_resources, &intent.actor_id);
-    let Some(action_resource) = action_resource else {
-        return rejected_command_preflight(
-            intent,
-            CommandPreflightDecisionKind::RejectedByActionResource,
-            Some(RulebenchRejection::InvalidAction),
-            current_actor_id,
-            Some(target_legality),
-            None,
-            "Actor has no standard action resource in the ledger.",
-        );
+    let action_resources_for_costs = match action_resource_costs_available(
+        action_resources,
+        &intent.actor_id,
+        &action.resource_costs,
+    ) {
+        Ok(resources) => resources,
+        Err((action_resource, reason)) => {
+            let mut readout = rejected_command_preflight(
+                intent,
+                CommandPreflightDecisionKind::RejectedByActionResource,
+                Some(RulebenchRejection::InvalidAction),
+                current_actor_id,
+                Some(target_legality),
+                action_resource,
+                reason,
+            );
+            readout.resource_costs = action.resource_costs.clone();
+            return readout;
+        }
     };
-
-    if !action_resource.available {
-        return rejected_command_preflight(
-            intent,
-            CommandPreflightDecisionKind::RejectedByActionResource,
-            Some(RulebenchRejection::InvalidAction),
-            current_actor_id,
-            Some(target_legality),
-            Some(action_resource),
-            "Actor has no available standard action resource.",
-        );
-    }
+    let action_resource = action_resources_for_costs.first().cloned();
 
     CommandPreflightReadout {
         intent,
@@ -868,26 +881,91 @@ fn command_preflight_readout(
         rejection: None,
         current_actor_id,
         target_legality: Some(target_legality),
-        action_resource: Some(action_resource),
+        resource_costs: action.resource_costs.clone(),
+        action_resource,
         reason: "Command is admissible before roll resolution.".to_string(),
     }
 }
 
-fn standard_action_resource_for(
+fn action_resource_costs_available(
     action_resources: &ActionResourceLedgerReadout,
     combatant_id: &str,
-) -> Option<ActionResourceState> {
-    action_resources
+    costs: &[ActionResourceCost],
+) -> Result<Vec<ActionResourceState>, (Option<ActionResourceState>, String)> {
+    let Some(combatant) = action_resources
         .combatants
         .iter()
         .find(|combatant| combatant.combatant_id == combatant_id)
-        .and_then(|combatant| {
-            combatant
-                .resources
-                .iter()
-                .find(|resource| resource.kind == ActionResourceKind::StandardAction)
-                .cloned()
-        })
+    else {
+        return Err((
+            None,
+            "Actor has no action-resource ledger entry.".to_string(),
+        ));
+    };
+
+    let mut resources = Vec::new();
+    for cost in costs {
+        if cost.amount == 0 {
+            return Err((
+                None,
+                format!(
+                    "Action declares an invalid zero {} resource cost.",
+                    cost.kind.code()
+                ),
+            ));
+        }
+        let Ok(amount) = i32::try_from(cost.amount) else {
+            return Err((
+                None,
+                format!(
+                    "Action {} resource cost exceeds the supported resource range.",
+                    cost.kind.code()
+                ),
+            ));
+        };
+        let Some(resource) = combatant
+            .resources
+            .iter()
+            .find(|resource| resource.kind == cost.kind)
+            .cloned()
+        else {
+            return Err((
+                None,
+                format!(
+                    "Actor has no {} resource in the ledger.",
+                    action_resource_label(cost.kind)
+                ),
+            ));
+        };
+        if !resource.available {
+            return Err((
+                Some(resource),
+                format!(
+                    "Actor has no available {} resource.",
+                    action_resource_label(cost.kind)
+                ),
+            ));
+        }
+        if resource.current < amount {
+            return Err((
+                Some(resource),
+                format!(
+                    "Actor cannot cover the declared {} {} resource cost.",
+                    cost.amount,
+                    cost.kind.code()
+                ),
+            ));
+        }
+        resources.push(resource);
+    }
+
+    Ok(resources)
+}
+
+fn action_resource_label(kind: ActionResourceKind) -> &'static str {
+    match kind {
+        ActionResourceKind::StandardAction => "standard action",
+    }
 }
 
 fn rejected_command_preflight(
@@ -906,6 +984,7 @@ fn rejected_command_preflight(
         rejection,
         current_actor_id,
         target_legality,
+        resource_costs: Vec::new(),
         action_resource,
         reason: reason.into(),
     }

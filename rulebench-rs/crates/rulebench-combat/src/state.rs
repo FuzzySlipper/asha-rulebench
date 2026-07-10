@@ -125,6 +125,7 @@ impl CombatState {
         &mut self,
         combatant_id: &str,
         resource_kind: ActionResourceKind,
+        amount: u32,
     ) -> ActionResourceSpendReadout {
         let Some(combatant) = self
             .combatants
@@ -134,6 +135,7 @@ impl CombatState {
             return ActionResourceSpendReadout {
                 combatant_id: combatant_id.to_string(),
                 resource_kind,
+                amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByMissingCombatant,
                 previous_resource: None,
@@ -142,7 +144,7 @@ impl CombatState {
             };
         };
 
-        combatant.spend_action_resource(resource_kind)
+        combatant.spend_action_resource(resource_kind, amount)
     }
 
     pub fn refresh_action_resource(
@@ -247,6 +249,7 @@ impl CombatState {
 mod tests {
     use super::*;
     use crate::model::*;
+    use rulebench_ruleset::ActionResourceCost;
 
     fn test_scenario() -> RulebenchScenario {
         RulebenchScenario {
@@ -339,6 +342,7 @@ mod tests {
                 modifier_duration: "test".to_string(),
                 operations: Vec::new(),
             },
+            resource_costs: vec![ActionResourceCost::standard_action()],
             action_text: "Test action.".to_string(),
             effect_text: "Test effect.".to_string(),
         }
@@ -402,7 +406,7 @@ mod tests {
         let mut state = CombatState::from_scenario(&test_scenario());
 
         let readout =
-            state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
+            state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction, 1);
         let resources = state
             .action_resources_for("entity-adept")
             .expect("adept resources are initialized");
@@ -437,11 +441,11 @@ mod tests {
     #[test]
     fn combat_state_rejects_repeated_standard_action_spend_without_mutation() {
         let mut state = CombatState::from_scenario(&test_scenario());
-        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
+        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction, 1);
         let before = state.action_resources_for("entity-adept");
 
         let readout =
-            state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
+            state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction, 1);
         let after = state.action_resources_for("entity-adept");
 
         assert!(!readout.accepted);
@@ -454,12 +458,31 @@ mod tests {
     }
 
     #[test]
+    fn combat_state_rejects_cost_above_available_resource_without_mutation() {
+        let mut state = CombatState::from_scenario(&test_scenario());
+        let before = state.action_resource_ledger();
+
+        let readout =
+            state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction, 2);
+        let after = state.action_resource_ledger();
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            ActionResourceSpendDecisionKind::RejectedByInsufficientResource
+        );
+        assert_eq!(readout.amount, 2);
+        assert_eq!(readout.previous_resource, readout.next_resource);
+        assert_eq!(before, after);
+    }
+
+    #[test]
     fn combat_state_rejects_missing_combatant_spend_without_mutation() {
         let mut state = CombatState::from_scenario(&test_scenario());
         let before = state.action_resource_ledger();
 
         let readout =
-            state.spend_action_resource("entity-missing", ActionResourceKind::StandardAction);
+            state.spend_action_resource("entity-missing", ActionResourceKind::StandardAction, 1);
         let after = state.action_resource_ledger();
 
         assert!(!readout.accepted);
@@ -475,7 +498,7 @@ mod tests {
     #[test]
     fn combat_state_refreshes_spent_standard_action() {
         let mut state = CombatState::from_scenario(&test_scenario());
-        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
+        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction, 1);
 
         let readout =
             state.refresh_action_resource("entity-adept", ActionResourceKind::StandardAction);
@@ -771,7 +794,7 @@ mod tests {
     #[test]
     fn combat_state_projection_update_preserves_action_resources() {
         let mut state = CombatState::from_scenario(&test_scenario());
-        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction);
+        state.spend_action_resource("entity-adept", ActionResourceKind::StandardAction, 1);
         let before = state.action_resources_for("entity-adept");
         let mut projection = state.project("Projected damage update.");
         projection.combatants[1].hit_points.current = 9;

@@ -574,6 +574,7 @@ describe("RulebenchTransport fixtures", () => {
           transitionKind: "spent",
           combatantId: "entity-adept",
           resourceKind: "standardAction",
+          amount: 1,
           previousResource: {
             kind: "standardAction",
             current: 1,
@@ -599,6 +600,7 @@ describe("RulebenchTransport fixtures", () => {
           transitionKind: "refreshed",
           combatantId: "entity-raider",
           resourceKind: "standardAction",
+          amount: 0,
           previousResource: {
             kind: "standardAction",
             current: 1,
@@ -624,6 +626,7 @@ describe("RulebenchTransport fixtures", () => {
           transitionKind: "refreshed",
           combatantId: "entity-adept",
           resourceKind: "standardAction",
+          amount: 1,
           previousResource: {
             kind: "standardAction",
             current: 0,

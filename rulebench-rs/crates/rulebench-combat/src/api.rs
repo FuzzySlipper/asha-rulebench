@@ -263,6 +263,7 @@ impl CombatSessionApi {
 mod tests {
     use super::*;
     use crate::model::*;
+    use rulebench_ruleset::ActionResourceCost;
 
     #[test]
     fn api_owns_lifecycle_and_archives_immutable_session_readbacks() {
@@ -389,6 +390,128 @@ mod tests {
         assert_eq!(
             snapshot.current_actor_options.lifecycle_phase,
             CombatLifecyclePhase::Ended
+        );
+    }
+
+    #[test]
+    fn api_rejects_unaffordable_declared_cost_without_resource_mutation() {
+        let mut scenario = valid_scenario();
+        let costly_resource = ActionResourceCost {
+            kind: ActionResourceKind::StandardAction,
+            amount: 2,
+        };
+        scenario.actions[0].resource_costs = vec![costly_resource.clone()];
+        scenario.selected_action.resource_costs = vec![costly_resource.clone()];
+
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new("unaffordable", scenario))
+            .expect("resource costs are structurally valid authored content");
+        let session = created.session;
+        api.start_session(&session).expect("session starts");
+
+        let intent = UseActionIntent::new("adept", "api_bolt", "raider");
+        let before = api.snapshot(&session).expect("initial snapshot");
+        let preflight = api
+            .preflight_command(&session, intent.clone())
+            .expect("preflight readback");
+        assert!(!preflight.accepted);
+        assert_eq!(
+            preflight.decision_kind,
+            CommandPreflightDecisionKind::RejectedByActionResource
+        );
+        assert_eq!(preflight.resource_costs, vec![costly_resource]);
+        assert!(api
+            .command_candidates(&session)
+            .expect("candidate readback")
+            .candidates
+            .is_empty());
+
+        let step = api
+            .submit_intent(
+                &session,
+                CombatSessionIntentCommandSpec::new(
+                    "unaffordable-command",
+                    "Unaffordable command",
+                    "The declared standard-action cost exceeds the available resource.",
+                    intent,
+                    vec![20, 20],
+                ),
+            )
+            .expect("rejected command still produces an authoritative readback");
+        let after = api.snapshot(&session).expect("post-rejection snapshot");
+
+        assert!(!step.receipt.accepted);
+        assert_eq!(
+            step.audit_entry.state_before_fingerprint,
+            step.audit_entry.state_after_fingerprint
+        );
+        assert_eq!(before.action_resource_ledger, after.action_resource_ledger);
+        assert!(after.action_resource_transition_log.is_empty());
+    }
+
+    #[test]
+    fn api_refreshes_standard_action_when_its_turn_returns() {
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new("refresh", valid_scenario()))
+            .expect("valid session is created");
+        let session = created.session;
+        api.start_session(&session).expect("session starts");
+
+        let intent = UseActionIntent::new("adept", "api_bolt", "raider");
+        let step = api
+            .submit_intent(
+                &session,
+                CombatSessionIntentCommandSpec::new(
+                    "spend-standard-action",
+                    "Spend standard action",
+                    "Spend the authored standard-action cost.",
+                    intent,
+                    vec![20, 1],
+                ),
+            )
+            .expect("intent submission");
+        assert!(step.receipt.accepted);
+        assert_eq!(
+            step.action_resource_ledger.combatants[0].resources[0].current,
+            0
+        );
+
+        api.submit_control(&session, CombatControlCommandSpec::advance_turn())
+            .expect("advance to raider");
+        api.submit_control(&session, CombatControlCommandSpec::advance_turn())
+            .expect("advance back to adept");
+        let snapshot = api.snapshot(&session).expect("refreshed snapshot");
+
+        assert_eq!(
+            snapshot.turn_order.current_actor_id,
+            Some("adept".to_string())
+        );
+        assert_eq!(
+            snapshot.action_resource_ledger.combatants[0].resources[0].current,
+            1
+        );
+        let transitions = &snapshot.action_resource_transition_log;
+        assert_eq!(
+            transitions[0].transition_kind,
+            ActionResourceTransitionKind::Spent
+        );
+        assert_eq!(transitions[0].amount, 1);
+        let refresh = transitions.last().expect("turn return refresh is logged");
+        assert_eq!(
+            refresh.transition_kind,
+            ActionResourceTransitionKind::Refreshed
+        );
+        assert_eq!(refresh.combatant_id, "adept");
+        assert_eq!(refresh.amount, 1);
+        assert!(
+            api.preflight_command(
+                &session,
+                UseActionIntent::new("adept", "api_bolt", "raider")
+            )
+            .expect("refreshed preflight")
+            .accepted
         );
     }
 
@@ -560,6 +683,7 @@ mod tests {
                     ),
                 ],
             },
+            resource_costs: vec![ActionResourceCost::standard_action()],
             action_text: "Mind versus Nerve.".to_string(),
             effect_text: "Minimal hit effect.".to_string(),
         }

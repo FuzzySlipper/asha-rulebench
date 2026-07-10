@@ -278,6 +278,7 @@ fn hexing_bolt_action() -> ActionDefinition {
                 }),
             ],
         },
+        resource_costs: vec![ActionResourceCost::standard_action()],
         action_text: "Mind vs Nerve at range 10".to_string(),
         effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
             .to_string(),

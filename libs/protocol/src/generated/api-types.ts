@@ -396,6 +396,7 @@ export interface RulebenchActionResourceTransitionEntryDto {
   readonly transitionKind: RulebenchActionResourceTransitionKindDto;
   readonly combatantId: string;
   readonly resourceKind: RulebenchActionResourceKindDto;
+  readonly amount: number;
   readonly previousResource: RulebenchActionResourceStateDto;
   readonly nextResource: RulebenchActionResourceStateDto;
   readonly commandStepId: string | null;

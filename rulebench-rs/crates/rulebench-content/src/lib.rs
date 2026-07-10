@@ -31,9 +31,9 @@ mod tests {
     use super::*;
     use rulebench_core::GridPosition;
     use rulebench_ruleset::{
-        AbilityDefinition, ActionDefinition, AttackCheckDeclaration, CheckDeclaration,
-        DefenseReference, HitEffect, TargetKind, TargetSelection, TargetTeamConstraint,
-        TargetingDeclaration, VisibilityRequirement,
+        AbilityDefinition, ActionDefinition, ActionResourceCost, AttackCheckDeclaration,
+        CheckDeclaration, DefenseReference, HitEffect, TargetKind, TargetSelection,
+        TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,
     };
 
     #[test]
@@ -119,6 +119,7 @@ mod tests {
                 modifier_duration: "test".to_string(),
                 operations: Vec::new(),
             },
+            resource_costs: vec![ActionResourceCost::standard_action()],
             action_text: "Test action.".to_string(),
             effect_text: "Test effect.".to_string(),
         }

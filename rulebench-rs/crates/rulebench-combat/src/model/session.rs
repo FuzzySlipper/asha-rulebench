@@ -6,6 +6,7 @@ use super::{
     RollConsumptionEntry, RulebenchReceipt, RulebenchRejection, RulebenchScenario,
     ScenarioProjection, StateFingerprint, TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
+use rulebench_ruleset::ActionResourceCost;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
@@ -97,6 +98,7 @@ pub struct CommandPreflightReadout {
     pub rejection: Option<RulebenchRejection>,
     pub current_actor_id: Option<String>,
     pub target_legality: Option<TargetLegality>,
+    pub resource_costs: Vec<ActionResourceCost>,
     pub action_resource: Option<ActionResourceState>,
     pub reason: String,
 }

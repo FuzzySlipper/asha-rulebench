@@ -1,18 +1,6 @@
 /// Combat action-resource state and readbacks.
 use super::ActiveModifier;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActionResourceKind {
-    StandardAction,
-}
-
-impl ActionResourceKind {
-    pub const fn code(self) -> &'static str {
-        match self {
-            ActionResourceKind::StandardAction => "standardAction",
-        }
-    }
-}
+pub use rulebench_ruleset::{ActionResourceCost, ActionResourceKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResourceState {
@@ -53,7 +41,9 @@ pub enum ActionResourceSpendDecisionKind {
     Spent,
     RejectedByMissingCombatant,
     RejectedByMissingResource,
+    RejectedByInvalidAmount,
     RejectedByUnavailableResource,
+    RejectedByInsufficientResource,
 }
 
 impl ActionResourceSpendDecisionKind {
@@ -66,8 +56,12 @@ impl ActionResourceSpendDecisionKind {
             ActionResourceSpendDecisionKind::RejectedByMissingResource => {
                 "rejectedByMissingResource"
             }
+            ActionResourceSpendDecisionKind::RejectedByInvalidAmount => "rejectedByInvalidAmount",
             ActionResourceSpendDecisionKind::RejectedByUnavailableResource => {
                 "rejectedByUnavailableResource"
+            }
+            ActionResourceSpendDecisionKind::RejectedByInsufficientResource => {
+                "rejectedByInsufficientResource"
             }
         }
     }
@@ -77,6 +71,7 @@ impl ActionResourceSpendDecisionKind {
 pub struct ActionResourceSpendReadout {
     pub combatant_id: String,
     pub resource_kind: ActionResourceKind,
+    pub amount: u32,
     pub accepted: bool,
     pub decision_kind: ActionResourceSpendDecisionKind,
     pub previous_resource: Option<ActionResourceState>,
@@ -137,6 +132,7 @@ pub struct ActionResourceTransitionEntry {
     pub transition_kind: ActionResourceTransitionKind,
     pub combatant_id: String,
     pub resource_kind: ActionResourceKind,
+    pub amount: u32,
     pub previous_resource: ActionResourceState,
     pub next_resource: ActionResourceState,
     pub command_step_id: Option<String>,

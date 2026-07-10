@@ -504,6 +504,36 @@ pub struct AbilityDefinition {
     pub tags: Vec<String>,
 }
 
+/// A closed action-economy resource selected by authored action costs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionResourceKind {
+    StandardAction,
+}
+
+impl ActionResourceKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ActionResourceKind::StandardAction => "standardAction",
+        }
+    }
+}
+
+/// One authoritative resource cost required to admit an action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourceCost {
+    pub kind: ActionResourceKind,
+    pub amount: u32,
+}
+
+impl ActionResourceCost {
+    pub const fn standard_action() -> Self {
+        Self {
+            kind: ActionResourceKind::StandardAction,
+            amount: 1,
+        }
+    }
+}
+
 /// A declared action with targeting, check, and effect configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDefinition {
@@ -515,6 +545,7 @@ pub struct ActionDefinition {
     pub targeting: TargetingDeclaration,
     pub check: CheckDeclaration,
     pub hit: HitEffect,
+    pub resource_costs: Vec<ActionResourceCost>,
     pub action_text: String,
     pub effect_text: String,
 }

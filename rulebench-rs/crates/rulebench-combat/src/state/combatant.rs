@@ -121,6 +121,7 @@ impl CombatantState {
     pub(super) fn spend_action_resource(
         &mut self,
         resource_kind: ActionResourceKind,
+        amount: u32,
     ) -> ActionResourceSpendReadout {
         let Some(resource) = self
             .action_resources
@@ -130,6 +131,7 @@ impl CombatantState {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
                 resource_kind,
+                amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByMissingResource,
                 previous_resource: None,
@@ -139,10 +141,36 @@ impl CombatantState {
         };
 
         let previous_resource = resource.clone();
+        let requested_amount = amount;
+        let Ok(amount) = i32::try_from(requested_amount) else {
+            return ActionResourceSpendReadout {
+                combatant_id: self.id.clone(),
+                resource_kind,
+                amount: requested_amount,
+                accepted: false,
+                decision_kind: ActionResourceSpendDecisionKind::RejectedByInvalidAmount,
+                previous_resource: Some(previous_resource.clone()),
+                next_resource: Some(previous_resource),
+                reason: "Action resource cost exceeds supported resource range.".to_string(),
+            };
+        };
+        if amount <= 0 {
+            return ActionResourceSpendReadout {
+                combatant_id: self.id.clone(),
+                resource_kind,
+                amount: requested_amount,
+                accepted: false,
+                decision_kind: ActionResourceSpendDecisionKind::RejectedByInvalidAmount,
+                previous_resource: Some(previous_resource.clone()),
+                next_resource: Some(previous_resource),
+                reason: "Action resource cost must be greater than zero.".to_string(),
+            };
+        }
         if !resource.available {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
                 resource_kind,
+                amount: requested_amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByUnavailableResource,
                 previous_resource: Some(previous_resource.clone()),
@@ -150,14 +178,27 @@ impl CombatantState {
                 reason: "Action resource is not available.".to_string(),
             };
         }
+        if resource.current < amount {
+            return ActionResourceSpendReadout {
+                combatant_id: self.id.clone(),
+                resource_kind,
+                amount: requested_amount,
+                accepted: false,
+                decision_kind: ActionResourceSpendDecisionKind::RejectedByInsufficientResource,
+                previous_resource: Some(previous_resource.clone()),
+                next_resource: Some(previous_resource),
+                reason: "Action resource cannot cover the declared cost.".to_string(),
+            };
+        }
 
-        resource.current -= 1;
+        resource.current -= amount;
         resource.available = resource.current > 0;
         let next_resource = resource.clone();
 
         ActionResourceSpendReadout {
             combatant_id: self.id.clone(),
             resource_kind,
+            amount: requested_amount,
             accepted: true,
             decision_kind: ActionResourceSpendDecisionKind::Spent,
             previous_resource: Some(previous_resource),

@@ -137,6 +137,38 @@ fn content_diagnostics_reject_deferred_effect_operations() {
 }
 
 #[test]
+fn content_diagnostics_reject_invalid_and_duplicate_action_resource_costs() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0].resource_costs = vec![
+        ActionResourceCost {
+            kind: ActionResourceKind::StandardAction,
+            amount: 0,
+        },
+        ActionResourceCost::standard_action(),
+    ];
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::InvalidActionResourceCost
+    );
+    assert_eq!(
+        diagnostics[1].code,
+        ContentDiagnosticCode::DuplicateActionResourceCost
+    );
+    assert_eq!(
+        ContentDiagnosticCode::InvalidActionResourceCost.code(),
+        "invalidActionResourceCost"
+    );
+    assert_eq!(
+        ContentDiagnosticCode::DuplicateActionResourceCost.code(),
+        "duplicateActionResourceCost"
+    );
+}
+
+#[test]
 fn content_diagnostics_report_empty_action_id() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0].id.clear();
