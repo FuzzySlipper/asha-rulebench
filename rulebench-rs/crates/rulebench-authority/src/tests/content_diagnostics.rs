@@ -248,6 +248,21 @@ fn content_diagnostics_report_duplicate_entity_ids() {
 }
 
 #[test]
+fn content_diagnostics_report_duplicate_combatant_ids() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants.push(scenario.combatants[0].clone());
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::DuplicateCombatantId
+    );
+    assert_eq!(diagnostics[0].content_id, Some("entity-adept".to_string()));
+}
+
+#[test]
 fn content_diagnostics_reject_conflicting_damage_adjustments() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.entities[1].damage_adjustments = vec![

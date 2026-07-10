@@ -84,7 +84,7 @@ fn entity(id: &str) -> EntityDefinition { EntityDefinition { id: id.to_string(),
 
 fn combatant(id: &str, entity_id: &str, team: Team, x: u32, hit_points: i32, mind: i32, nerve: i32, is_actor: bool) -> Combatant {
     Combatant {
-        id: id.to_string(), entity_id: entity_id.to_string(), name: id.to_string(), team, position: GridPosition { x, y: 0 }, hit_points: BoundedValue { current: hit_points, max: hit_points }, temporary_vitality: 0,
+        id: id.to_string(), entity_id: entity_id.to_string(), name: id.to_string(), team, initiative: 0, position: GridPosition { x, y: 0 }, hit_points: BoundedValue { current: hit_points, max: hit_points }, temporary_vitality: 0,
         class_ids: vec![], stats: StatBlock { base_stats: vec![NamedNumber { id: "mind".to_string(), label: "Mind".to_string(), value: mind }], derived_stats: vec![] },
         defenses: vec![NamedNumber { id: "nerve".to_string(), label: "Nerve".to_string(), value: nerve }], equipped_item_ids: vec![], active_modifiers: vec![], conditions: vec![], is_actor,
     }

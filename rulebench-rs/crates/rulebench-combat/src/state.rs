@@ -49,6 +49,14 @@ impl CombatState {
         }
     }
 
+    pub fn active_combatant_ids(&self) -> Vec<String> {
+        self.combatants
+            .iter()
+            .filter(|combatant| combatant.hit_points.current > 0)
+            .map(|combatant| combatant.id.clone())
+            .collect()
+    }
+
     pub fn apply_hit(&mut self, damage: &DamageOutcome, modifier: &ModifierOutcome) {
         for combatant in &mut self.combatants {
             if combatant.id == damage.target_id {
@@ -279,6 +287,7 @@ mod tests {
             entity_id: id.to_string(),
             name: id.to_string(),
             team,
+            initiative: 0,
             position: GridPosition { x: 0, y: 0 },
             hit_points: BoundedValue {
                 current: 12,

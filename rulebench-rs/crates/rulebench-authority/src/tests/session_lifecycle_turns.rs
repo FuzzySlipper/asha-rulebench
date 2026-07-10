@@ -1095,6 +1095,32 @@ fn session_runtime_initializes_turn_order_from_scenario_combatants() {
 }
 
 #[test]
+fn session_runtime_orders_arbitrary_participants_by_initiative_then_id() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[1].initiative = 15;
+    let mut third = scenario.combatants[1].clone();
+    third.id = "entity-zed".to_string();
+    third.name = "Zed".to_string();
+    third.initiative = 20;
+    scenario.combatants.push(third);
+
+    let session = CombatSessionState::new("runtime-initiative-order", scenario);
+
+    assert_eq!(
+        session.turn_order().participant_order,
+        vec![
+            "entity-zed".to_string(),
+            "entity-adept".to_string(),
+            "entity-raider".to_string(),
+        ]
+    );
+    assert_eq!(
+        session.turn_order().current_actor_id,
+        Some("entity-zed".to_string())
+    );
+}
+
+#[test]
 fn session_runtime_advances_turns_and_rounds() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -1114,6 +1140,37 @@ fn session_runtime_advances_turns_and_rounds() {
     assert_eq!(session.turn_order().current_turn_index, 0);
     assert_eq!(
         session.turn_order().current_actor_id,
+        Some("entity-adept".to_string())
+    );
+}
+
+#[test]
+fn session_runtime_skips_a_combatant_defeated_between_turns() {
+    let mut session =
+        CombatSessionState::new("runtime-defeated-turn-skip", hexing_bolt_fixture_scenario());
+    session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "defeat-raider",
+        "Defeat Raider",
+        "Adept defeats Raider before the next turn.",
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        vec![17, 30],
+    ));
+
+    let readout = session.advance_turn();
+
+    assert!(readout.accepted);
+    assert_eq!(readout.decision_kind, TurnAdvanceDecisionKind::Advanced);
+    assert_eq!(session.turn_order().round_number, 2);
+    assert_eq!(session.turn_order().current_turn_index, 0);
+    assert_eq!(
+        session.turn_order().current_actor_id,
+        Some("entity-adept".to_string())
+    );
+    assert_eq!(
+        readout
+            .transition
+            .as_ref()
+            .and_then(|transition| transition.next_actor_id.clone()),
         Some("entity-adept".to_string())
     );
 }

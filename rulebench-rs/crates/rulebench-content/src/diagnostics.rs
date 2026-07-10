@@ -66,6 +66,8 @@ pub enum ContentDiagnosticCode {
     SelectedClassMissingFromCatalog,
     SelectedItemMissingFromCatalog,
     MissingCombatantEntity,
+    EmptyCombatantId,
+    DuplicateCombatantId,
     MissingActionAbility,
     CrossRulesetActionReference,
     MissingActionActor,
@@ -149,6 +151,8 @@ impl ContentDiagnosticCode {
                 "selectedItemMissingFromCatalog"
             }
             ContentDiagnosticCode::MissingCombatantEntity => "missingCombatantEntity",
+            ContentDiagnosticCode::EmptyCombatantId => "emptyCombatantId",
+            ContentDiagnosticCode::DuplicateCombatantId => "duplicateCombatantId",
             ContentDiagnosticCode::MissingActionAbility => "missingActionAbility",
             ContentDiagnosticCode::CrossRulesetActionReference => "crossRulesetActionReference",
             ContentDiagnosticCode::MissingActionActor => "missingActionActor",

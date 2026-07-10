@@ -60,7 +60,19 @@ impl CombatSessionState {
             );
         }
 
-        self.turn_order.advance_turn();
+        let active_combatant_ids = self.state.active_combatant_ids();
+        if !self
+            .turn_order
+            .advance_to_next_active(&active_combatant_ids)
+        {
+            return rejected_turn_advance_readout(
+                TurnAdvanceDecisionKind::RejectedByNoActiveParticipants,
+                previous_turn_order,
+                self.turn_order.clone(),
+                state_before_fingerprint,
+                "Turn order has no active participants.",
+            );
+        }
         let transition = turn_transition_entry(
             self.turn_transition_log.len() as u32,
             &previous_turn_order,
@@ -344,6 +356,9 @@ fn combat_control_decision_kind_for_turn_advance(
             CombatControlDecisionKind::RejectedByLifecycle
         }
         TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder => {
+            CombatControlDecisionKind::RejectedByEmptyTurnOrder
+        }
+        TurnAdvanceDecisionKind::RejectedByNoActiveParticipants => {
             CombatControlDecisionKind::RejectedByEmptyTurnOrder
         }
     }

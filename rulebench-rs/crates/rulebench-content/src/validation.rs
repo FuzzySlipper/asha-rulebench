@@ -479,7 +479,21 @@ fn validate_combatant_class_and_stat_references(
     scenario: &RulebenchScenario,
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
+    let mut seen_combatant_ids = HashSet::new();
     for combatant in &scenario.combatants {
+        if combatant.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyCombatantId,
+                None,
+                "Scenario contains a combatant with an empty id.",
+            ));
+        } else if !seen_combatant_ids.insert(combatant.id.clone()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateCombatantId,
+                Some(combatant.id.clone()),
+                format!("Combatant id {} appears more than once.", combatant.id),
+            ));
+        }
         if scenario.entity_by_id(&combatant.entity_id).is_none() {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::MissingCombatantEntity,

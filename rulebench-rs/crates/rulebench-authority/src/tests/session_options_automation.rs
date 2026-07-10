@@ -116,23 +116,23 @@ fn session_runtime_current_actor_options_report_ended_combat_unavailable() {
 }
 
 #[test]
-fn session_runtime_current_actor_options_report_defeated_current_actor_unavailable() {
+fn session_runtime_initial_turn_order_skips_defeated_combatants() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.combatants[0].hit_points.current = 0;
     let session = CombatSessionState::new("runtime-defeated-actor", scenario);
 
     let options = session.current_actor_options();
 
-    assert_eq!(options.current_actor_id, Some("entity-adept".to_string()));
-    assert!(options.current_actor_defeated);
+    assert_eq!(options.current_actor_id, Some("entity-raider".to_string()));
+    assert!(!options.current_actor_defeated);
     assert!(!options.available);
     assert_eq!(
         options.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::CurrentActorDefeated)
+        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
     );
     assert_eq!(
         options.unavailable_reason.map(|reason| reason.code()),
-        Some("currentActorDefeated")
+        Some("noMatchingActions")
     );
     assert!(options.actions.is_empty());
 }

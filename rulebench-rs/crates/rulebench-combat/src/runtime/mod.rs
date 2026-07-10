@@ -108,13 +108,7 @@ pub struct CombatSessionState {
 impl CombatSessionState {
     pub fn new(session_id: impl Into<String>, scenario: RulebenchScenario) -> Self {
         let state = CombatState::from_scenario(&scenario);
-        let turn_order = CombatTurnOrder::from_participant_order(
-            scenario
-                .combatants
-                .iter()
-                .map(|combatant| combatant.id.clone())
-                .collect(),
-        );
+        let turn_order = CombatTurnOrder::from_combatants(&scenario.combatants);
         Self {
             session_id: session_id.into(),
             scenario,

@@ -1,5 +1,5 @@
 /// Combat lifecycle, turn order, and session-flow readbacks.
-use super::StateFingerprint;
+use super::{Combatant, StateFingerprint};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandOutcomeClass {
@@ -112,6 +112,25 @@ pub struct CombatTurnOrder {
 }
 
 impl CombatTurnOrder {
+    pub fn from_combatants(combatants: &[Combatant]) -> Self {
+        let mut participants = combatants
+            .iter()
+            .filter(|combatant| combatant.hit_points.current > 0)
+            .collect::<Vec<_>>();
+        participants.sort_by(|left, right| {
+            right
+                .initiative
+                .cmp(&left.initiative)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Self::from_participant_order(
+            participants
+                .into_iter()
+                .map(|combatant| combatant.id.clone())
+                .collect(),
+        )
+    }
+
     pub fn from_participant_order(participant_order: Vec<String>) -> Self {
         let current_actor_id = participant_order.first().cloned();
         let round_number = if participant_order.is_empty() { 0 } else { 1 };
@@ -140,6 +159,30 @@ impl CombatTurnOrder {
             .get(next_turn_index as usize)
             .cloned();
     }
+
+    pub fn advance_to_next_active(&mut self, active_combatant_ids: &[String]) -> bool {
+        if self.participant_order.is_empty() || active_combatant_ids.is_empty() {
+            self.current_actor_id = None;
+            return false;
+        }
+
+        for offset in 1..=self.participant_order.len() {
+            let next_turn_index =
+                (self.current_turn_index as usize + offset) % self.participant_order.len();
+            let next_actor_id = &self.participant_order[next_turn_index];
+            if active_combatant_ids.contains(next_actor_id) {
+                if next_turn_index <= self.current_turn_index as usize {
+                    self.round_number += 1;
+                }
+                self.current_turn_index = next_turn_index as u32;
+                self.current_actor_id = Some(next_actor_id.clone());
+                return true;
+            }
+        }
+
+        self.current_actor_id = None;
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,6 +202,7 @@ pub enum TurnAdvanceDecisionKind {
     Advanced,
     RejectedByLifecycle,
     RejectedByEmptyTurnOrder,
+    RejectedByNoActiveParticipants,
 }
 
 impl TurnAdvanceDecisionKind {
@@ -167,6 +211,9 @@ impl TurnAdvanceDecisionKind {
             TurnAdvanceDecisionKind::Advanced => "advanced",
             TurnAdvanceDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
             TurnAdvanceDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
+            TurnAdvanceDecisionKind::RejectedByNoActiveParticipants => {
+                "rejectedByNoActiveParticipants"
+            }
         }
     }
 }

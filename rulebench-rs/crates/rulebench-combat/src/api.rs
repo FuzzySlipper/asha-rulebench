@@ -431,6 +431,7 @@ mod tests {
             entity_id: id.to_string(),
             name: id.to_string(),
             team,
+            initiative: 0,
             position: GridPosition { x, y: 0 },
             hit_points: BoundedValue {
                 current: hit_points,
