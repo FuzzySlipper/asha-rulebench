@@ -247,7 +247,7 @@ fn push(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{ReplayCommand, ReplayCommandRecord, ReplayEvidence};
     use rulebench_combat::{
@@ -291,7 +291,7 @@ mod tests {
         );
     }
 
-    fn valid_package() -> crate::ReplayPackage {
+    pub(crate) fn valid_package() -> crate::ReplayPackage {
         let ruleset = RulesetMetadata {
             id: "test.rules".to_string(),
             name: "Test rules".to_string(),
@@ -308,13 +308,27 @@ mod tests {
                 sequence: 0,
                 id: "start".to_string(),
                 command: ReplayCommand::Control(CombatControlCommandSpec::explicit_start()),
+                expected: crate::ReplayStepEvidence {
+                    accepted: true,
+                    decision_code: "accepted".to_string(),
+                    state_before_fingerprint: fingerprint(),
+                    state_after_fingerprint: fingerprint(),
+                    accepted_events: Vec::new(),
+                    command_audit: Vec::new(),
+                    rolls: Vec::new(),
+                    trace: Vec::new(),
+                },
             }],
             ReplayEvidence::default(),
-            StateFingerprint {
-                algorithm: "fnv1a64.rulebench-state.v0".to_string(),
-                value: "0123456789abcdef".to_string(),
-            },
+            fingerprint(),
         )
+    }
+
+    fn fingerprint() -> StateFingerprint {
+        StateFingerprint {
+            algorithm: "fnv1a64.rulebench-state.v0".to_string(),
+            value: "0123456789abcdef".to_string(),
+        }
     }
 
     fn scenario(ruleset: RulesetMetadata) -> RulebenchScenario {

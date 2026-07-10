@@ -15,10 +15,15 @@ pub use automatic_run::{
 };
 pub use package::{
     ReplayAcceptedEvents, ReplayCommand, ReplayCommandRecord, ReplayEvidence, ReplayNarration,
-    ReplayPackage, ReplayRollEvidence, ReplayTraceEvidence, REPLAY_PACKAGE_FINGERPRINT_KIND,
-    REPLAY_PACKAGE_VERSION,
+    ReplayPackage, ReplayRollEvidence, ReplayStepEvidence, ReplayTraceEvidence,
+    REPLAY_PACKAGE_FINGERPRINT_KIND, REPLAY_PACKAGE_VERSION,
 };
 pub use package_validation::{
     validate_replay_package, ReplayPackageDiagnostic, ReplayPackageDiagnosticCode,
     ReplayPackageValidationReport,
+};
+mod verification;
+pub use verification::{
+    verify_replay_package, ReplayMismatch, ReplayMismatchDimension, ReplayVerificationDecisionKind,
+    ReplayVerificationReadout,
 };

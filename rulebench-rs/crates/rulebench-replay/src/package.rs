@@ -58,6 +58,7 @@ pub struct ReplayCommandRecord {
     pub sequence: u32,
     pub id: String,
     pub command: ReplayCommand,
+    pub expected: ReplayStepEvidence,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +110,18 @@ pub struct ReplayRollEvidence {
 pub struct ReplayTraceEvidence {
     pub command_sequence: u32,
     pub entries: Vec<TraceEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplayStepEvidence {
+    pub accepted: bool,
+    pub decision_code: String,
+    pub state_before_fingerprint: StateFingerprint,
+    pub state_after_fingerprint: StateFingerprint,
+    pub accepted_events: Vec<DomainEvent>,
+    pub command_audit: Vec<CommandAuditEntry>,
+    pub rolls: Vec<RollConsumptionEntry>,
+    pub trace: Vec<TraceEntry>,
 }
 
 /// Optional presentation copy. None of these fields are replay inputs.
