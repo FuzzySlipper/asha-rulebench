@@ -396,6 +396,9 @@ fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
             label: "rattled".to_string(),
             summary: "A temporary condition-like modifier applied by Hexing Bolt.".to_string(),
             default_tenure: ModifierTenure::Temporary,
+            stacking_group: "rattled".to_string(),
+            stacking_policy: ModifierStackingPolicy::Refresh,
+            duration_policy: ModifierDurationPolicy::Turns(1),
             stat_adjustments: vec![ModifierStatAdjustment {
                 stat_id: "mind".to_string(),
                 stat_label: "Mind".to_string(),
@@ -407,6 +410,9 @@ fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
             label: "battle drilled".to_string(),
             summary: "A permanent training marker for stat-adjustment readouts.".to_string(),
             default_tenure: ModifierTenure::Permanent,
+            stacking_group: "battle-drilled".to_string(),
+            stacking_policy: ModifierStackingPolicy::Replace,
+            duration_policy: ModifierDurationPolicy::Permanent,
             stat_adjustments: vec![ModifierStatAdjustment {
                 stat_id: "initiative".to_string(),
                 stat_label: "Initiative".to_string(),

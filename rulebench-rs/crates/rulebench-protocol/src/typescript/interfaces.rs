@@ -546,6 +546,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "boolean",
                 },
                 Field {
+                    name: "modifierDurationExpirationLogMatches",
+                    ty: "boolean",
+                },
+                Field {
                     name: "replayedRun",
                     ty: "RulebenchAutomaticRunReadoutDto",
                 },
@@ -845,6 +849,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "string",
                 },
                 Field {
+                    name: "sourceId",
+                    ty: "string",
+                },
+                Field {
                     name: "label",
                     ty: "string",
                 },
@@ -855,6 +863,26 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "tenure",
                     ty: "RulebenchModifierTenureDto",
+                },
+                Field {
+                    name: "stackingGroup",
+                    ty: "string",
+                },
+                Field {
+                    name: "stackingPolicy",
+                    ty: "RulebenchModifierStackingPolicyDto",
+                },
+                Field {
+                    name: "durationPolicy",
+                    ty: "RulebenchModifierDurationPolicyDto",
+                },
+                Field {
+                    name: "remainingTurns",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "remainingRounds",
+                    ty: "number | null",
                 },
             ],
         },
@@ -882,16 +910,20 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "RulebenchActiveModifierDto | null",
                 },
                 Field {
+                    name: "trigger",
+                    ty: "RulebenchModifierDurationTransitionTriggerDto",
+                },
+                Field {
                     name: "turnTransitionSequence",
-                    ty: "number",
+                    ty: "number | null",
                 },
                 Field {
                     name: "roundNumber",
-                    ty: "number",
+                    ty: "number | null",
                 },
                 Field {
                     name: "turnIndex",
-                    ty: "number",
+                    ty: "number | null",
                 },
                 Field {
                     name: "currentActorId",

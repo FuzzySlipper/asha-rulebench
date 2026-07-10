@@ -74,8 +74,14 @@ impl CombatSessionState {
             self.record_action_resource_refresh_transition(&transition, &refresh);
         }
         if let Some(previous_actor_id) = transition.previous_actor_id.as_deref() {
-            let expirations = self.state.expire_temporary_modifiers_for(previous_actor_id);
+            let expirations = self
+                .state
+                .advance_turn_counted_modifiers_for(previous_actor_id);
             self.record_modifier_duration_expiration_transitions(&transition, &expirations);
+        }
+        if transition.wrapped_round {
+            let expirations = self.state.advance_all_round_counted_modifiers();
+            self.record_modifier_round_duration_transitions(&transition, &expirations);
         }
         let state_after = self.state.project("State after turn advancement.");
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
@@ -102,6 +108,8 @@ impl CombatSessionState {
         let previous_lifecycle = self.lifecycle.clone();
         self.lifecycle.end_at_step(self.next_step_index);
         self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
+        let expirations = self.state.expire_all_modifiers_for_event("combatEnd");
+        self.record_modifier_event_expiration_transitions("combatEnd", &expirations);
     }
 
     fn submit_explicit_start_control(&mut self) -> CombatControlReadout {

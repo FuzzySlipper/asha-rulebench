@@ -1,5 +1,5 @@
 /// Resolution outcomes, events, and trace records.
-use super::BoundedValue;
+use super::{BoundedValue, ModifierDurationPolicy, ModifierStackingPolicy};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RulebenchRejection {
@@ -149,8 +149,14 @@ pub struct TemporaryVitalityOutcome {
 pub struct ModifierOutcome {
     pub target_id: String,
     pub modifier_id: String,
+    pub source_id: String,
     pub label: String,
     pub duration: String,
+    pub stacking_group: String,
+    pub stacking_policy: ModifierStackingPolicy,
+    pub duration_policy: ModifierDurationPolicy,
+    pub remaining_turns: Option<u32>,
+    pub remaining_rounds: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -42,6 +42,7 @@ fn hexing_bolt_bounded_automatic_run_replay_readout() -> CombatSessionAutomaticR
         run_readout.final_snapshot.current_state_fingerprint,
         run_readout.decision_kind,
         run_readout.executed_step_count,
+        run_readout.final_snapshot.modifier_duration_expiration_log,
     ))
 }
 

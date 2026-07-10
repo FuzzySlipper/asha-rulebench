@@ -391,6 +391,10 @@ pub(crate) fn render_automatic_run_replay_readout(
         "      executedStepCountMatches: {},\n",
         readout.executed_step_count_matches
     ));
+    out.push_str(&format!(
+        "      modifierDurationExpirationLogMatches: {},\n",
+        readout.modifier_duration_expiration_log_matches
+    ));
     out.push_str("      replayedRun: ");
     out.push_str(&render_nested_automatic_run_readout(
         &readout.replayed_run,

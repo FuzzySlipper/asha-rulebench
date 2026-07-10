@@ -80,6 +80,13 @@ fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
     assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
     assert_eq!(
         receipt
+            .modifier
+            .as_ref()
+            .map(|modifier| modifier.source_id.as_str()),
+        Some("hexing_bolt")
+    );
+    assert_eq!(
+        receipt
             .roll_consumption
             .iter()
             .map(|entry| (

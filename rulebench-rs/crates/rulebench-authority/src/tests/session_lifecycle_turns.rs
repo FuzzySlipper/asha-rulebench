@@ -1504,19 +1504,34 @@ fn session_runtime_turn_wrap_expires_previous_actor_temporary_modifier() {
     assert_eq!(expiration.modifier_id, "rattled");
     assert_eq!(
         expiration.previous_modifier,
-        ActiveModifier::temporary("rattled", "rattled", "until end of next turn")
+        ActiveModifier {
+            modifier_id: "rattled".to_string(),
+            source_id: "hexing_bolt".to_string(),
+            label: "rattled".to_string(),
+            duration: "until end of next turn".to_string(),
+            tenure: ModifierTenure::Temporary,
+            stacking_group: "rattled".to_string(),
+            stacking_policy: ModifierStackingPolicy::Refresh,
+            duration_policy: ModifierDurationPolicy::Turns(1),
+            remaining_turns: Some(1),
+            remaining_rounds: None,
+        }
     );
     assert_eq!(expiration.next_modifier, None);
-    assert_eq!(expiration.turn_transition_sequence, 1);
-    assert_eq!(expiration.round_number, 2);
-    assert_eq!(expiration.turn_index, 0);
+    assert_eq!(
+        expiration.trigger,
+        ModifierDurationTransitionTrigger::TurnBoundary
+    );
+    assert_eq!(expiration.turn_transition_sequence, Some(1));
+    assert_eq!(expiration.round_number, Some(2));
+    assert_eq!(expiration.turn_index, Some(0));
     assert_eq!(
         expiration.current_actor_id,
         Some("entity-adept".to_string())
     );
     assert_eq!(
         expiration.reason,
-        "Temporary modifier expired at turn boundary."
+        "Turn-counted modifier expired at turn boundary."
     );
     assert_eq!(
         session.snapshot().modifier_duration_expiration_log,
@@ -1549,6 +1564,55 @@ fn session_runtime_turn_wrap_preserves_permanent_modifier() {
             .expect("raider remains present")
             .conditions,
         vec!["battle-drilled".to_string()]
+    );
+}
+
+#[test]
+fn session_runtime_combat_end_expires_event_counted_modifier_with_audit_evidence() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[1]
+        .active_modifiers
+        .push(ActiveModifier {
+            modifier_id: "rattled".to_string(),
+            source_id: "event-test".to_string(),
+            label: "rattled".to_string(),
+            duration: "until combat end".to_string(),
+            tenure: ModifierTenure::Temporary,
+            stacking_group: "event-rattled".to_string(),
+            stacking_policy: ModifierStackingPolicy::Replace,
+            duration_policy: ModifierDurationPolicy::UntilEvent("combatEnd".to_string()),
+            remaining_turns: None,
+            remaining_rounds: None,
+        });
+    let mut session = CombatSessionState::new("runtime-event-modifier", scenario);
+
+    session.end_combat();
+
+    assert!(session
+        .snapshot()
+        .current_state
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == "entity-raider")
+        .expect("raider remains present")
+        .conditions
+        .is_empty());
+    assert_eq!(session.modifier_duration_expiration_log().len(), 1);
+    let expiration = &session.modifier_duration_expiration_log()[0];
+    assert_eq!(
+        expiration.trigger,
+        ModifierDurationTransitionTrigger::Event("combatEnd".to_string())
+    );
+    assert_eq!(expiration.turn_transition_sequence, None);
+    assert_eq!(expiration.round_number, None);
+    assert_eq!(expiration.turn_index, None);
+    assert_eq!(
+        expiration.reason,
+        "Modifier expired when event combatEnd occurred."
+    );
+    assert_eq!(
+        session.snapshot().modifier_duration_expiration_log,
+        session.modifier_duration_expiration_log()
     );
 }
 

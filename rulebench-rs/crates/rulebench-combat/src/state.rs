@@ -161,7 +161,7 @@ impl CombatState {
         combatant.refresh_action_resource(resource_kind)
     }
 
-    pub fn expire_temporary_modifiers_for(
+    pub fn advance_turn_counted_modifiers_for(
         &mut self,
         combatant_id: &str,
     ) -> Vec<ModifierDurationExpirationReadout> {
@@ -173,7 +173,42 @@ impl CombatState {
             return Vec::new();
         };
 
-        combatant.expire_temporary_modifiers()
+        combatant.advance_turn_counted_modifiers()
+    }
+
+    pub fn advance_all_round_counted_modifiers(
+        &mut self,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        self.combatants
+            .iter_mut()
+            .flat_map(CombatantState::advance_round_counted_modifiers)
+            .collect()
+    }
+
+    pub fn expire_modifiers_for_event(
+        &mut self,
+        combatant_id: &str,
+        event: &str,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == combatant_id)
+        else {
+            return Vec::new();
+        };
+
+        combatant.expire_modifiers_for_event(event)
+    }
+
+    pub fn expire_all_modifiers_for_event(
+        &mut self,
+        event: &str,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        self.combatants
+            .iter_mut()
+            .flat_map(|combatant| combatant.expire_modifiers_for_event(event))
+            .collect()
     }
 
     pub fn active_modifiers_for(&self, combatant_id: &str) -> Option<&[ActiveModifier]> {
@@ -297,6 +332,40 @@ mod tests {
             },
             action_text: "Test action.".to_string(),
             effect_text: "Test effect.".to_string(),
+        }
+    }
+
+    fn test_modifier(
+        source_id: &str,
+        stacking_policy: ModifierStackingPolicy,
+        turns: u32,
+    ) -> ModifierOutcome {
+        ModifierOutcome {
+            target_id: "entity-raider".to_string(),
+            modifier_id: "rattled".to_string(),
+            source_id: source_id.to_string(),
+            label: "rattled".to_string(),
+            duration: format!("{turns} turns"),
+            stacking_group: "rattled".to_string(),
+            stacking_policy,
+            duration_policy: ModifierDurationPolicy::Turns(turns),
+            remaining_turns: Some(turns),
+            remaining_rounds: None,
+        }
+    }
+
+    fn test_round_modifier(rounds: u32) -> ModifierOutcome {
+        ModifierOutcome {
+            target_id: "entity-raider".to_string(),
+            modifier_id: "rattled".to_string(),
+            source_id: "round-source".to_string(),
+            label: "rattled".to_string(),
+            duration: format!("{rounds} rounds"),
+            stacking_group: "round-rattled".to_string(),
+            stacking_policy: ModifierStackingPolicy::Refresh,
+            duration_policy: ModifierDurationPolicy::Rounds(rounds),
+            remaining_turns: None,
+            remaining_rounds: Some(rounds),
         }
     }
 
@@ -486,7 +555,7 @@ mod tests {
             ));
         let mut state = CombatState::from_scenario(&scenario);
 
-        let readouts = state.expire_temporary_modifiers_for("entity-raider");
+        let readouts = state.advance_turn_counted_modifiers_for("entity-raider");
 
         assert_eq!(readouts.len(), 1);
         assert!(readouts[0].accepted);
@@ -504,7 +573,7 @@ mod tests {
         assert_eq!(readouts[0].next_modifier, None);
         assert_eq!(
             readouts[0].reason,
-            "Temporary modifier expired at turn boundary."
+            "Turn-counted modifier expired at turn boundary."
         );
         assert_eq!(state.active_modifiers_for("entity-raider"), Some(&[][..]));
         assert!(state
@@ -514,6 +583,132 @@ mod tests {
             .find(|combatant| combatant.id == "entity-raider")
             .expect("raider remains present")
             .conditions
+            .is_empty());
+    }
+
+    #[test]
+    fn combat_state_stacks_replaces_and_refreshes_modifiers_by_group() {
+        let mut state = CombatState::from_scenario(&test_scenario());
+        state.combatants[1].apply_modifier(&test_modifier(
+            "source-one",
+            ModifierStackingPolicy::Stack,
+            2,
+        ));
+        state.combatants[1].apply_modifier(&test_modifier(
+            "source-two",
+            ModifierStackingPolicy::Stack,
+            2,
+        ));
+        assert_eq!(
+            state
+                .active_modifiers_for("entity-raider")
+                .expect("raider")
+                .len(),
+            2
+        );
+
+        state.combatants[1].apply_modifier(&test_modifier(
+            "source-three",
+            ModifierStackingPolicy::Replace,
+            2,
+        ));
+        assert_eq!(
+            state
+                .active_modifiers_for("entity-raider")
+                .expect("raider")
+                .len(),
+            1
+        );
+        assert_eq!(
+            state.active_modifiers_for("entity-raider").expect("raider")[0].source_id,
+            "source-three"
+        );
+
+        state.combatants[1].apply_modifier(&test_modifier(
+            "source-four",
+            ModifierStackingPolicy::Refresh,
+            3,
+        ));
+        assert_eq!(
+            state
+                .active_modifiers_for("entity-raider")
+                .expect("raider")
+                .len(),
+            1
+        );
+        assert_eq!(
+            state.active_modifiers_for("entity-raider").expect("raider")[0].source_id,
+            "source-four"
+        );
+        assert_eq!(
+            state.active_modifiers_for("entity-raider").expect("raider")[0].remaining_turns,
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn combat_state_advances_turn_counted_modifier_before_expiration() {
+        let mut state = CombatState::from_scenario(&test_scenario());
+        state.combatants[1].apply_modifier(&test_modifier(
+            "source",
+            ModifierStackingPolicy::Refresh,
+            2,
+        ));
+
+        let first = state.advance_turn_counted_modifiers_for("entity-raider");
+        assert_eq!(
+            first[0].decision_kind,
+            ModifierDurationExpirationDecisionKind::Advanced
+        );
+        assert_eq!(
+            first[0]
+                .next_modifier
+                .as_ref()
+                .and_then(|modifier| modifier.remaining_turns),
+            Some(1)
+        );
+
+        let second = state.advance_turn_counted_modifiers_for("entity-raider");
+        assert_eq!(
+            second[0].decision_kind,
+            ModifierDurationExpirationDecisionKind::Expired
+        );
+        assert!(state
+            .active_modifiers_for("entity-raider")
+            .expect("raider")
+            .is_empty());
+    }
+
+    #[test]
+    fn combat_state_advances_round_counted_modifier_at_round_boundary() {
+        let mut state = CombatState::from_scenario(&test_scenario());
+        state.combatants[1].apply_modifier(&test_round_modifier(2));
+
+        let first = state.advance_all_round_counted_modifiers();
+        assert_eq!(
+            first[0].decision_kind,
+            ModifierDurationExpirationDecisionKind::Advanced
+        );
+        assert_eq!(
+            first[0]
+                .next_modifier
+                .as_ref()
+                .and_then(|modifier| modifier.remaining_rounds),
+            Some(1)
+        );
+        assert_eq!(
+            first[0].reason,
+            "Round-counted modifier duration advanced at round boundary."
+        );
+
+        let second = state.advance_all_round_counted_modifiers();
+        assert_eq!(
+            second[0].decision_kind,
+            ModifierDurationExpirationDecisionKind::Expired
+        );
+        assert!(state
+            .active_modifiers_for("entity-raider")
+            .expect("raider")
             .is_empty());
     }
 
@@ -528,7 +723,7 @@ mod tests {
             ));
         let mut state = CombatState::from_scenario(&scenario);
 
-        let readouts = state.expire_temporary_modifiers_for("entity-raider");
+        let readouts = state.advance_turn_counted_modifiers_for("entity-raider");
 
         assert!(readouts.is_empty());
         assert_eq!(
@@ -557,7 +752,7 @@ mod tests {
         let mut state = CombatState::from_scenario(&test_scenario());
         let before = state.project("Before no-op expiration.");
 
-        let readouts = state.expire_temporary_modifiers_for("entity-raider");
+        let readouts = state.advance_turn_counted_modifiers_for("entity-raider");
         let after = state.project("Before no-op expiration.");
 
         assert!(readouts.is_empty());

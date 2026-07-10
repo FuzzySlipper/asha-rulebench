@@ -50,6 +50,12 @@ export type RulebenchRollRequestKindDto = 'attackRoll' | 'damageRoll';
 
 export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
 
+export type RulebenchModifierStackingPolicyDto = 'stack' | 'replace' | 'refresh';
+
+export type RulebenchModifierDurationPolicyDto = { readonly kind: 'permanent'; readonly value: null; readonly event: null } | { readonly kind: 'turns' | 'rounds'; readonly value: number; readonly event: null } | { readonly kind: 'untilEvent'; readonly value: null; readonly event: string };
+
+export type RulebenchModifierDurationTransitionTriggerDto = { readonly kind: 'turnBoundary' | 'roundBoundary'; readonly event: null } | { readonly kind: 'event'; readonly event: string };
+
 export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
 
 export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';
@@ -228,6 +234,7 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly expectedExecutedStepCount: number;
   readonly actualExecutedStepCount: number;
   readonly executedStepCountMatches: boolean;
+  readonly modifierDurationExpirationLogMatches: boolean;
   readonly replayedRun: RulebenchAutomaticRunReadoutDto;
   readonly reason: string;
 }
@@ -322,9 +329,15 @@ export interface RulebenchCombatEndConditionDto {
 
 export interface RulebenchActiveModifierDto {
   readonly modifierId: string;
+  readonly sourceId: string;
   readonly label: string;
   readonly duration: string;
   readonly tenure: RulebenchModifierTenureDto;
+  readonly stackingGroup: string;
+  readonly stackingPolicy: RulebenchModifierStackingPolicyDto;
+  readonly durationPolicy: RulebenchModifierDurationPolicyDto;
+  readonly remainingTurns: number | null;
+  readonly remainingRounds: number | null;
 }
 
 export interface RulebenchModifierDurationExpirationEntryDto {
@@ -333,9 +346,10 @@ export interface RulebenchModifierDurationExpirationEntryDto {
   readonly modifierId: string;
   readonly previousModifier: RulebenchActiveModifierDto;
   readonly nextModifier: RulebenchActiveModifierDto | null;
-  readonly turnTransitionSequence: number;
-  readonly roundNumber: number;
-  readonly turnIndex: number;
+  readonly trigger: RulebenchModifierDurationTransitionTriggerDto;
+  readonly turnTransitionSequence: number | null;
+  readonly roundNumber: number | null;
+  readonly turnIndex: number | null;
   readonly currentActorId: string | null;
   readonly reason: string;
 }

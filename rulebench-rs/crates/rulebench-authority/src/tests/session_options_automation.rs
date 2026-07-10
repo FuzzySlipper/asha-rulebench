@@ -1147,7 +1147,6 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     let mut expected_session =
         CombatSessionState::new("runtime-hexing-bolt-expected", scenario.clone());
     let expected_run = expected_session.run_automatic_combat(run_spec.clone());
-
     let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
         "auto-run-replay-verification",
         "Auto run replay verification",
@@ -1161,6 +1160,10 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
             .clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
+        expected_run
+            .final_snapshot
+            .modifier_duration_expiration_log
+            .clone(),
     ));
 
     assert!(readout.accepted);
@@ -1172,6 +1175,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     assert!(readout.final_state_fingerprint_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
+    assert!(readout.modifier_duration_expiration_log_matches);
     assert_eq!(
         readout.actual_final_state_fingerprint,
         expected_run.final_snapshot.current_state_fingerprint
@@ -1195,6 +1199,11 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     let mut expected_session =
         CombatSessionState::new("runtime-hexing-bolt-expected", scenario.clone());
     let expected_run = expected_session.run_automatic_combat(run_spec.clone());
+    let mut expected_modifier_duration_expiration_log = expected_run
+        .final_snapshot
+        .modifier_duration_expiration_log
+        .clone();
+    expected_modifier_duration_expiration_log.clear();
 
     let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
         "auto-run-replay-mismatch-verification",
@@ -1208,7 +1217,8 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
             .current_state_fingerprint
             .clone(),
         expected_run.decision_kind,
-        expected_run.executed_step_count + 1,
+        expected_run.executed_step_count,
+        expected_modifier_duration_expiration_log,
     ));
 
     assert!(!readout.accepted);
@@ -1219,7 +1229,8 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     assert_eq!(readout.decision_kind.code(), "mismatchedEvidence");
     assert!(readout.final_state_fingerprint_matches);
     assert!(readout.run_decision_kind_matches);
-    assert!(!readout.executed_step_count_matches);
+    assert!(readout.executed_step_count_matches);
+    assert!(!readout.modifier_duration_expiration_log_matches);
     assert_eq!(
         readout.actual_executed_step_count,
         expected_run.executed_step_count

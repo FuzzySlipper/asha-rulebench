@@ -181,7 +181,46 @@ pub struct ModifierDefinition {
     pub label: String,
     pub summary: String,
     pub default_tenure: ModifierTenure,
+    pub stacking_group: String,
+    pub stacking_policy: ModifierStackingPolicy,
+    pub duration_policy: ModifierDurationPolicy,
     pub stat_adjustments: Vec<ModifierStatAdjustment>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModifierStackingPolicy {
+    Stack,
+    Replace,
+    Refresh,
+}
+
+impl ModifierStackingPolicy {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ModifierStackingPolicy::Stack => "stack",
+            ModifierStackingPolicy::Replace => "replace",
+            ModifierStackingPolicy::Refresh => "refresh",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModifierDurationPolicy {
+    Permanent,
+    Turns(u32),
+    Rounds(u32),
+    UntilEvent(String),
+}
+
+impl ModifierDurationPolicy {
+    pub fn display_label(&self) -> String {
+        match self {
+            ModifierDurationPolicy::Permanent => "permanent".to_string(),
+            ModifierDurationPolicy::Turns(turns) => format!("{} turns", turns),
+            ModifierDurationPolicy::Rounds(rounds) => format!("{} rounds", rounds),
+            ModifierDurationPolicy::UntilEvent(event) => format!("until {}", event),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -218,6 +257,7 @@ pub struct EffectiveStatReadout {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModifierStatAdjustmentContribution {
     pub modifier_id: String,
+    pub source_id: String,
     pub modifier_label: String,
     pub tenure: ModifierTenure,
     pub stat_id: String,

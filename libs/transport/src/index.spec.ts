@@ -652,16 +652,23 @@ describe("RulebenchTransport fixtures", () => {
           modifierId: "rattled",
           previousModifier: {
             modifierId: "rattled",
+            sourceId: "hexing_bolt",
             label: "rattled",
             duration: "until end of next turn",
             tenure: "temporary",
+            stackingGroup: "rattled",
+            stackingPolicy: "refresh",
+            durationPolicy: { kind: "turns", value: 1, event: null },
+            remainingTurns: 1,
+            remainingRounds: null,
           },
           nextModifier: null,
+          trigger: { kind: "turnBoundary", event: null },
           turnTransitionSequence: 1,
           roundNumber: 2,
           turnIndex: 0,
           currentActorId: "entity-adept",
-          reason: "Temporary modifier expired at turn boundary.",
+          reason: "Turn-counted modifier expired at turn boundary.",
         },
       ]);
     }
@@ -845,16 +852,23 @@ describe("RulebenchTransport fixtures", () => {
           modifierId: "rattled",
           previousModifier: {
             modifierId: "rattled",
+            sourceId: "hexing_bolt",
             label: "rattled",
             duration: "until end of next turn",
             tenure: "temporary",
+            stackingGroup: "rattled",
+            stackingPolicy: "refresh",
+            durationPolicy: { kind: "turns", value: 1, event: null },
+            remainingTurns: 1,
+            remainingRounds: null,
           },
           nextModifier: null,
+          trigger: { kind: "turnBoundary", event: null },
           turnTransitionSequence: 1,
           roundNumber: 2,
           turnIndex: 0,
           currentActorId: "entity-adept",
-          reason: "Temporary modifier expired at turn boundary.",
+          reason: "Turn-counted modifier expired at turn boundary.",
         },
       ]);
       expect(result.value.reason).toBe(
@@ -896,6 +910,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.expectedExecutedStepCount).toBe(5);
       expect(result.value.actualExecutedStepCount).toBe(5);
       expect(result.value.executedStepCountMatches).toBe(true);
+      expect(result.value.modifierDurationExpirationLogMatches).toBe(true);
       expect(result.value.replayedRun.id).toBe(
         "hexing-bolt-bounded-automatic-run",
       );

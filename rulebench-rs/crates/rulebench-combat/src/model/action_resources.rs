@@ -150,12 +150,14 @@ pub struct ActionResourceTransitionEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModifierDurationExpirationDecisionKind {
+    Advanced,
     Expired,
 }
 
 impl ModifierDurationExpirationDecisionKind {
     pub const fn code(self) -> &'static str {
         match self {
+            ModifierDurationExpirationDecisionKind::Advanced => "advanced",
             ModifierDurationExpirationDecisionKind::Expired => "expired",
         }
     }
@@ -179,9 +181,17 @@ pub struct ModifierDurationExpirationEntry {
     pub modifier_id: String,
     pub previous_modifier: ActiveModifier,
     pub next_modifier: Option<ActiveModifier>,
-    pub turn_transition_sequence: u32,
-    pub round_number: u32,
-    pub turn_index: u32,
+    pub trigger: ModifierDurationTransitionTrigger,
+    pub turn_transition_sequence: Option<u32>,
+    pub round_number: Option<u32>,
+    pub turn_index: Option<u32>,
     pub current_actor_id: Option<String>,
     pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModifierDurationTransitionTrigger {
+    TurnBoundary,
+    RoundBoundary,
+    Event(String),
 }

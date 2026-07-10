@@ -364,6 +364,7 @@ fn active_modifier_stat_adjustment_readout_resolves_rattled_contribution() {
         readout.contributions,
         vec![ModifierStatAdjustmentContribution {
             modifier_id: "rattled".to_string(),
+            source_id: "legacy".to_string(),
             modifier_label: "rattled".to_string(),
             tenure: ModifierTenure::Temporary,
             stat_id: "mind".to_string(),
@@ -399,6 +400,7 @@ fn active_modifier_stat_adjustment_readout_preserves_permanent_tenure() {
         readout.contributions,
         vec![ModifierStatAdjustmentContribution {
             modifier_id: "battle-drilled".to_string(),
+            source_id: "legacy".to_string(),
             modifier_label: "battle drilled".to_string(),
             tenure: ModifierTenure::Permanent,
             stat_id: "initiative".to_string(),
@@ -468,6 +470,7 @@ fn effective_stat_readout_applies_temporary_modifier_contribution() {
         mind.contributions,
         vec![ModifierStatAdjustmentContribution {
             modifier_id: "rattled".to_string(),
+            source_id: "legacy".to_string(),
             modifier_label: "rattled".to_string(),
             tenure: ModifierTenure::Temporary,
             stat_id: "mind".to_string(),
@@ -502,6 +505,7 @@ fn effective_stat_readout_applies_permanent_modifier_contribution() {
         initiative.contributions,
         vec![ModifierStatAdjustmentContribution {
             modifier_id: "battle-drilled".to_string(),
+            source_id: "legacy".to_string(),
             modifier_label: "battle drilled".to_string(),
             tenure: ModifierTenure::Permanent,
             stat_id: "initiative".to_string(),

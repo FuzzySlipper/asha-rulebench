@@ -67,6 +67,7 @@ pub fn active_modifier_stat_adjustments_for_combatant(
         for adjustment in &definition.stat_adjustments {
             contributions.push(ModifierStatAdjustmentContribution {
                 modifier_id: active_modifier.modifier_id.clone(),
+                source_id: active_modifier.source_id.clone(),
                 modifier_label: active_modifier.label.clone(),
                 tenure: active_modifier.tenure,
                 stat_id: adjustment.stat_id.clone(),

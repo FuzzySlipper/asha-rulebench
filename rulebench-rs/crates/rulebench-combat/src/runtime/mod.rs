@@ -609,9 +609,56 @@ impl CombatSessionState {
                     modifier_id: expiration.modifier_id.clone(),
                     previous_modifier: expiration.previous_modifier.clone(),
                     next_modifier: expiration.next_modifier.clone(),
-                    turn_transition_sequence: transition.sequence,
-                    round_number: transition.next_round_number,
-                    turn_index: transition.next_turn_index,
+                    trigger: ModifierDurationTransitionTrigger::TurnBoundary,
+                    turn_transition_sequence: Some(transition.sequence),
+                    round_number: Some(transition.next_round_number),
+                    turn_index: Some(transition.next_turn_index),
+                    current_actor_id: transition.next_actor_id.clone(),
+                    reason: expiration.reason.clone(),
+                });
+        }
+    }
+
+    fn record_modifier_event_expiration_transitions(
+        &mut self,
+        event: &str,
+        expirations: &[ModifierDurationExpirationReadout],
+    ) {
+        for expiration in expirations.iter().filter(|expiration| expiration.accepted) {
+            self.modifier_duration_expiration_log
+                .push(ModifierDurationExpirationEntry {
+                    sequence: self.modifier_duration_expiration_log.len() as u32,
+                    combatant_id: expiration.combatant_id.clone(),
+                    modifier_id: expiration.modifier_id.clone(),
+                    previous_modifier: expiration.previous_modifier.clone(),
+                    next_modifier: expiration.next_modifier.clone(),
+                    trigger: ModifierDurationTransitionTrigger::Event(event.to_string()),
+                    turn_transition_sequence: None,
+                    round_number: None,
+                    turn_index: None,
+                    current_actor_id: self.turn_order.current_actor_id.clone(),
+                    reason: expiration.reason.clone(),
+                });
+        }
+    }
+
+    fn record_modifier_round_duration_transitions(
+        &mut self,
+        transition: &TurnTransitionEntry,
+        expirations: &[ModifierDurationExpirationReadout],
+    ) {
+        for expiration in expirations.iter().filter(|expiration| expiration.accepted) {
+            self.modifier_duration_expiration_log
+                .push(ModifierDurationExpirationEntry {
+                    sequence: self.modifier_duration_expiration_log.len() as u32,
+                    combatant_id: expiration.combatant_id.clone(),
+                    modifier_id: expiration.modifier_id.clone(),
+                    previous_modifier: expiration.previous_modifier.clone(),
+                    next_modifier: expiration.next_modifier.clone(),
+                    trigger: ModifierDurationTransitionTrigger::RoundBoundary,
+                    turn_transition_sequence: Some(transition.sequence),
+                    round_number: Some(transition.next_round_number),
+                    turn_index: Some(transition.next_turn_index),
                     current_actor_id: transition.next_actor_id.clone(),
                     reason: expiration.reason.clone(),
                 });

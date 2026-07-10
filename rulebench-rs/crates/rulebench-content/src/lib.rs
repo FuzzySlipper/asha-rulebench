@@ -20,7 +20,8 @@ pub use scenario::{
     ClassDefinition, Combatant, CombatantEffectiveStatReadout,
     CombatantModifierStatAdjustmentReadout, DamageAdjustment, DamageAdjustmentPolicy,
     EffectiveStatReadout, EntityDefinition, Grid, GridCell, ItemDefinition, ModifierDefinition,
-    ModifierStatAdjustment, ModifierStatAdjustmentContribution, RulebenchScenario, UseActionIntent,
+    ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
+    ModifierStatAdjustmentContribution, RulebenchScenario, UseActionIntent,
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
 pub use validation::{validate_scenario_content, validate_scenario_content_report};

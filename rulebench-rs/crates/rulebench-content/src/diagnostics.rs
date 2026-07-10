@@ -54,6 +54,11 @@ pub enum ContentDiagnosticCode {
     AuthoredDerivedStatValue,
     EmptyModifierId,
     DuplicateModifierId,
+    EmptyModifierStackingGroup,
+    InvalidModifierTurnDuration,
+    InvalidModifierRoundDuration,
+    EmptyModifierDurationEvent,
+    ModifierTenureDurationMismatch,
     EmptyItemId,
     DuplicateItemId,
     SelectedAbilityMissingFromCatalog,
@@ -122,6 +127,13 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::AuthoredDerivedStatValue => "authoredDerivedStatValue",
             ContentDiagnosticCode::EmptyModifierId => "emptyModifierId",
             ContentDiagnosticCode::DuplicateModifierId => "duplicateModifierId",
+            ContentDiagnosticCode::EmptyModifierStackingGroup => "emptyModifierStackingGroup",
+            ContentDiagnosticCode::InvalidModifierTurnDuration => "invalidModifierTurnDuration",
+            ContentDiagnosticCode::InvalidModifierRoundDuration => "invalidModifierRoundDuration",
+            ContentDiagnosticCode::EmptyModifierDurationEvent => "emptyModifierDurationEvent",
+            ContentDiagnosticCode::ModifierTenureDurationMismatch => {
+                "modifierTenureDurationMismatch"
+            }
             ContentDiagnosticCode::EmptyItemId => "emptyItemId",
             ContentDiagnosticCode::DuplicateItemId => "duplicateItemId",
             ContentDiagnosticCode::SelectedAbilityMissingFromCatalog => {

@@ -8,8 +8,8 @@ use rulebench_fixtures::{
     CombatSessionStepSummary, CombatTurnOrder, CombatantVitalityEntry, CombatantVitalitySummary,
     CommandAttempt, CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
     CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
-    LifecycleTransitionEntry, ModifierDurationExpirationEntry, RulebenchRejection,
-    ScenarioProjection, TurnTransitionEntry,
+    LifecycleTransitionEntry, ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger,
+    RulebenchRejection, ScenarioProjection, TurnTransitionEntry,
 };
 
 pub(crate) fn render_action_resource_ledger(
@@ -703,11 +703,21 @@ pub(crate) fn render_modifier_duration_expiration_entry(
         render_optional_active_modifier(&entry.next_modifier)
     ));
     out.push_str(&format!(
-        "{indent}  turnTransitionSequence: {},\n",
-        entry.turn_transition_sequence
+        "{indent}  trigger: {},\n",
+        render_modifier_duration_trigger(&entry.trigger)
     ));
-    out.push_str(&format!("{indent}  roundNumber: {},\n", entry.round_number));
-    out.push_str(&format!("{indent}  turnIndex: {},\n", entry.turn_index));
+    out.push_str(&format!(
+        "{indent}  turnTransitionSequence: {},\n",
+        render_optional_u32(entry.turn_transition_sequence)
+    ));
+    out.push_str(&format!(
+        "{indent}  roundNumber: {},\n",
+        render_optional_u32(entry.round_number)
+    ));
+    out.push_str(&format!(
+        "{indent}  turnIndex: {},\n",
+        render_optional_u32(entry.turn_index)
+    ));
     out.push_str(&format!(
         "{indent}  currentActorId: {},\n",
         render_optional_string(&entry.current_actor_id)
@@ -720,14 +730,54 @@ pub(crate) fn render_modifier_duration_expiration_entry(
     out
 }
 
+pub(crate) fn render_modifier_duration_trigger(
+    trigger: &ModifierDurationTransitionTrigger,
+) -> String {
+    match trigger {
+        ModifierDurationTransitionTrigger::TurnBoundary => {
+            "{ kind: 'turnBoundary', event: null }".to_string()
+        }
+        ModifierDurationTransitionTrigger::RoundBoundary => {
+            "{ kind: 'roundBoundary', event: null }".to_string()
+        }
+        ModifierDurationTransitionTrigger::Event(event) => {
+            format!("{{ kind: 'event', event: {} }}", ts_string(event))
+        }
+    }
+}
+
 pub(crate) fn render_active_modifier(modifier: &ActiveModifier) -> String {
     format!(
-        "{{ modifierId: {}, label: {}, duration: {}, tenure: {} }}",
+        "{{ modifierId: {}, sourceId: {}, label: {}, duration: {}, tenure: {}, stackingGroup: {}, stackingPolicy: {}, durationPolicy: {}, remainingTurns: {}, remainingRounds: {} }}",
         ts_string(&modifier.modifier_id),
+        ts_string(&modifier.source_id),
         ts_string(&modifier.label),
         ts_string(&modifier.duration),
-        ts_string(modifier_tenure(modifier.tenure))
+        ts_string(modifier_tenure(modifier.tenure)),
+        ts_string(&modifier.stacking_group),
+        ts_string(modifier.stacking_policy.code()),
+        render_modifier_duration_policy(&modifier.duration_policy),
+        render_optional_u32(modifier.remaining_turns),
+        render_optional_u32(modifier.remaining_rounds)
     )
+}
+
+fn render_modifier_duration_policy(policy: &rulebench_fixtures::ModifierDurationPolicy) -> String {
+    match policy {
+        rulebench_fixtures::ModifierDurationPolicy::Permanent => {
+            "{ kind: 'permanent', value: null, event: null }".to_string()
+        }
+        rulebench_fixtures::ModifierDurationPolicy::Turns(turns) => {
+            format!("{{ kind: 'turns', value: {}, event: null }}", turns)
+        }
+        rulebench_fixtures::ModifierDurationPolicy::Rounds(rounds) => {
+            format!("{{ kind: 'rounds', value: {}, event: null }}", rounds)
+        }
+        rulebench_fixtures::ModifierDurationPolicy::UntilEvent(event) => format!(
+            "{{ kind: 'untilEvent', value: null, event: {} }}",
+            ts_string(event)
+        ),
+    }
 }
 
 pub(crate) fn render_optional_active_modifier(modifier: &Option<ActiveModifier>) -> String {

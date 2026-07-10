@@ -2,11 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     Combatant, ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity,
-    ContentValidationReport, RulebenchScenario, StatDefinitionKind,
+    ContentValidationReport, ModifierDurationPolicy, RulebenchScenario, StatDefinitionKind,
 };
 use rulebench_ruleset::{
     ActionDefinition, AttackCheckDeclaration, CheckDeclaration, ContestedCheckDeclaration,
-    RuleModuleValidationError, SavingThrowCheckDeclaration, TargetKind, TargetSelection,
+    ModifierTenure, RuleModuleValidationError, SavingThrowCheckDeclaration, TargetKind,
+    TargetSelection,
 };
 
 pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> ContentValidationReport {
@@ -409,6 +410,51 @@ fn validate_modifiers(scenario: &RulebenchScenario, diagnostics: &mut Vec<Conten
                 Some(modifier.id.clone()),
                 format!("Modifier id {} appears more than once.", modifier.id),
             ));
+        }
+
+        if modifier.stacking_group.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyModifierStackingGroup,
+                Some(modifier.id.clone()),
+                format!(
+                    "Modifier {} must declare a non-empty stacking group.",
+                    modifier.id
+                ),
+            ));
+        }
+        match (&modifier.default_tenure, &modifier.duration_policy) {
+            (_, ModifierDurationPolicy::Turns(0)) => diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidModifierTurnDuration,
+                Some(modifier.id.clone()),
+                format!("Modifier {} must declare at least one turn.", modifier.id),
+            )),
+            (_, ModifierDurationPolicy::Rounds(0)) => diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidModifierRoundDuration,
+                Some(modifier.id.clone()),
+                format!("Modifier {} must declare at least one round.", modifier.id),
+            )),
+            (_, ModifierDurationPolicy::UntilEvent(event)) if event.is_empty() => {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::EmptyModifierDurationEvent,
+                    Some(modifier.id.clone()),
+                    format!(
+                        "Modifier {} must declare a non-empty duration event.",
+                        modifier.id
+                    ),
+                ));
+            }
+            (ModifierTenure::Permanent, ModifierDurationPolicy::Permanent)
+            | (ModifierTenure::Temporary, ModifierDurationPolicy::Turns(_))
+            | (ModifierTenure::Temporary, ModifierDurationPolicy::Rounds(_))
+            | (ModifierTenure::Temporary, ModifierDurationPolicy::UntilEvent(_)) => {}
+            _ => diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::ModifierTenureDurationMismatch,
+                Some(modifier.id.clone()),
+                format!(
+                    "Modifier {} has incompatible tenure and duration policy.",
+                    modifier.id
+                ),
+            )),
         }
 
         for adjustment in &modifier.stat_adjustments {

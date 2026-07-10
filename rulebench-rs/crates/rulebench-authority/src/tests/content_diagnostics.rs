@@ -565,6 +565,9 @@ fn content_diagnostics_report_empty_modifier_id() {
         label: "empty".to_string(),
         summary: "Invalid modifier fixture.".to_string(),
         default_tenure: ModifierTenure::Temporary,
+        stacking_group: "invalid".to_string(),
+        stacking_policy: ModifierStackingPolicy::Replace,
+        duration_policy: ModifierDurationPolicy::Turns(1),
         stat_adjustments: Vec::new(),
     });
 
@@ -575,6 +578,49 @@ fn content_diagnostics_report_empty_modifier_id() {
     assert_eq!(
         ContentDiagnosticCode::EmptyModifierId.code(),
         "emptyModifierId"
+    );
+}
+
+#[test]
+fn content_diagnostics_reject_invalid_modifier_duration_and_stacking_policies() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.modifiers[0].stacking_group.clear();
+    scenario.modifiers[1].duration_policy = ModifierDurationPolicy::Rounds(0);
+    scenario.modifiers[1].default_tenure = ModifierTenure::Temporary;
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::EmptyModifierStackingGroup
+    );
+    assert_eq!(
+        diagnostics[1].code,
+        ContentDiagnosticCode::InvalidModifierRoundDuration
+    );
+    assert_eq!(
+        ContentDiagnosticCode::InvalidModifierRoundDuration.code(),
+        "invalidModifierRoundDuration"
+    );
+}
+
+#[test]
+fn content_diagnostics_reject_empty_modifier_event_and_tenure_mismatch() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.modifiers[0].duration_policy = ModifierDurationPolicy::UntilEvent(String::new());
+    scenario.modifiers[1].duration_policy = ModifierDurationPolicy::Turns(1);
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::EmptyModifierDurationEvent
+    );
+    assert_eq!(
+        diagnostics[1].code,
+        ContentDiagnosticCode::ModifierTenureDurationMismatch
     );
 }
 

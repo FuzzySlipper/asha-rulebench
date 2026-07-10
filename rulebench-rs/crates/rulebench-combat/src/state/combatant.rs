@@ -4,8 +4,8 @@ use crate::model::{
     ActionResourceKind, ActionResourceRefreshDecisionKind, ActionResourceRefreshReadout,
     ActionResourceSpendDecisionKind, ActionResourceSpendReadout, ActionResourceState,
     ActiveModifier, BoundedValue, Combatant, CombatantActionResourceReadout, FinalCombatantState,
-    ModifierDurationExpirationDecisionKind, ModifierDurationExpirationReadout, ModifierOutcome,
-    ModifierTenure,
+    ModifierDurationExpirationDecisionKind, ModifierDurationExpirationReadout,
+    ModifierDurationPolicy, ModifierOutcome, ModifierStackingPolicy, ModifierTenure,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,17 +55,42 @@ impl CombatantState {
     }
 
     pub(super) fn apply_modifier(&mut self, modifier: &ModifierOutcome) {
-        if self.active_modifiers.iter().any(|active| {
-            active.modifier_id == modifier.modifier_id || active.label == modifier.label
-        }) {
-            return;
+        let active_modifier = ActiveModifier {
+            modifier_id: modifier.modifier_id.clone(),
+            source_id: modifier.source_id.clone(),
+            label: modifier.label.clone(),
+            duration: modifier.duration.clone(),
+            tenure: match modifier.duration_policy {
+                ModifierDurationPolicy::Permanent => ModifierTenure::Permanent,
+                ModifierDurationPolicy::Turns(_)
+                | ModifierDurationPolicy::Rounds(_)
+                | ModifierDurationPolicy::UntilEvent(_) => ModifierTenure::Temporary,
+            },
+            stacking_group: modifier.stacking_group.clone(),
+            stacking_policy: modifier.stacking_policy,
+            duration_policy: modifier.duration_policy.clone(),
+            remaining_turns: modifier.remaining_turns,
+            remaining_rounds: modifier.remaining_rounds,
+        };
+        match modifier.stacking_policy {
+            ModifierStackingPolicy::Stack => self.active_modifiers.push(active_modifier),
+            ModifierStackingPolicy::Replace => {
+                self.active_modifiers
+                    .retain(|active| active.stacking_group != modifier.stacking_group);
+                self.active_modifiers.push(active_modifier);
+            }
+            ModifierStackingPolicy::Refresh => {
+                if let Some(existing) = self
+                    .active_modifiers
+                    .iter_mut()
+                    .find(|active| active.stacking_group == modifier.stacking_group)
+                {
+                    *existing = active_modifier;
+                } else {
+                    self.active_modifiers.push(active_modifier);
+                }
+            }
         }
-
-        self.active_modifiers.push(ActiveModifier::temporary(
-            modifier.modifier_id.clone(),
-            modifier.label.clone(),
-            modifier.duration.clone(),
-        ));
     }
 
     pub(super) fn apply_projection(&mut self, combatant: &FinalCombatantState) {
@@ -177,12 +202,46 @@ impl CombatantState {
         }
     }
 
-    pub(super) fn expire_temporary_modifiers(&mut self) -> Vec<ModifierDurationExpirationReadout> {
+    pub(super) fn advance_turn_counted_modifiers(
+        &mut self,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        self.advance_counted_modifiers(ModifierDurationBoundary::Turn)
+    }
+
+    pub(super) fn advance_round_counted_modifiers(
+        &mut self,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        self.advance_counted_modifiers(ModifierDurationBoundary::Round)
+    }
+
+    fn advance_counted_modifiers(
+        &mut self,
+        boundary: ModifierDurationBoundary,
+    ) -> Vec<ModifierDurationExpirationReadout> {
         let mut retained_modifiers = Vec::with_capacity(self.active_modifiers.len());
         let mut expiration_readouts = Vec::new();
 
-        for modifier in self.active_modifiers.drain(..) {
-            if modifier.tenure == ModifierTenure::Temporary {
+        for mut modifier in self.active_modifiers.drain(..) {
+            let remaining_count = match boundary {
+                ModifierDurationBoundary::Turn => match modifier.duration_policy {
+                    ModifierDurationPolicy::Turns(_) => modifier.remaining_turns,
+                    _ => {
+                        retained_modifiers.push(modifier);
+                        continue;
+                    }
+                },
+                ModifierDurationBoundary::Round => match modifier.duration_policy {
+                    ModifierDurationPolicy::Rounds(_) => modifier.remaining_rounds,
+                    _ => {
+                        retained_modifiers.push(modifier);
+                        continue;
+                    }
+                },
+            };
+            let boundary_label = boundary.label();
+            let boundary_display_label = boundary.display_label();
+
+            if remaining_count.is_some_and(|count| count <= 1) {
                 expiration_readouts.push(ModifierDurationExpirationReadout {
                     combatant_id: self.id.clone(),
                     modifier_id: modifier.modifier_id.clone(),
@@ -190,15 +249,89 @@ impl CombatantState {
                     decision_kind: ModifierDurationExpirationDecisionKind::Expired,
                     previous_modifier: modifier,
                     next_modifier: None,
-                    reason: "Temporary modifier expired at turn boundary.".to_string(),
+                    reason: format!(
+                        "{}-counted modifier expired at {} boundary.",
+                        boundary_display_label, boundary_label
+                    ),
                 });
             } else {
+                if let Some(count) = remaining_count {
+                    let previous_modifier = modifier.clone();
+                    match boundary {
+                        ModifierDurationBoundary::Turn => {
+                            modifier.remaining_turns = Some(count - 1)
+                        }
+                        ModifierDurationBoundary::Round => {
+                            modifier.remaining_rounds = Some(count - 1)
+                        }
+                    }
+                    expiration_readouts.push(ModifierDurationExpirationReadout {
+                        combatant_id: self.id.clone(),
+                        modifier_id: modifier.modifier_id.clone(),
+                        accepted: true,
+                        decision_kind: ModifierDurationExpirationDecisionKind::Advanced,
+                        previous_modifier,
+                        next_modifier: Some(modifier.clone()),
+                        reason: format!(
+                            "{}-counted modifier duration advanced at {} boundary.",
+                            boundary_display_label, boundary_label
+                        ),
+                    });
+                }
                 retained_modifiers.push(modifier);
             }
         }
 
         self.active_modifiers = retained_modifiers;
         expiration_readouts
+    }
+
+    pub(super) fn expire_modifiers_for_event(
+        &mut self,
+        event: &str,
+    ) -> Vec<ModifierDurationExpirationReadout> {
+        let mut retained_modifiers = Vec::with_capacity(self.active_modifiers.len());
+        let mut expiration_readouts = Vec::new();
+        for modifier in self.active_modifiers.drain(..) {
+            if matches!(&modifier.duration_policy, ModifierDurationPolicy::UntilEvent(trigger) if trigger == event)
+            {
+                expiration_readouts.push(ModifierDurationExpirationReadout {
+                    combatant_id: self.id.clone(),
+                    modifier_id: modifier.modifier_id.clone(),
+                    accepted: true,
+                    decision_kind: ModifierDurationExpirationDecisionKind::Expired,
+                    previous_modifier: modifier,
+                    next_modifier: None,
+                    reason: format!("Modifier expired when event {} occurred.", event),
+                });
+            } else {
+                retained_modifiers.push(modifier);
+            }
+        }
+        self.active_modifiers = retained_modifiers;
+        expiration_readouts
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ModifierDurationBoundary {
+    Turn,
+    Round,
+}
+
+impl ModifierDurationBoundary {
+    const fn label(self) -> &'static str {
+        match self {
+            ModifierDurationBoundary::Turn => "turn",
+            ModifierDurationBoundary::Round => "round",
+        }
+    }
+
+    const fn display_label(self) -> &'static str {
+        match self {
+            ModifierDurationBoundary::Turn => "Turn",
+            ModifierDurationBoundary::Round => "Round",
+        }
     }
 }
 

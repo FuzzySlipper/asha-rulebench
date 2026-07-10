@@ -806,11 +806,16 @@ fn resolve_accepted_action(
     let damage_roll = roll_stream[1];
     let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
     let damage = vitality_effects.damage.clone();
-    let modifier = ModifierOutcome {
-        target_id: target.id.clone(),
-        modifier_id: hit_operations.modifier.modifier_id.clone(),
-        label: hit_operations.modifier.modifier_label.clone(),
-        duration: hit_operations.modifier.modifier_duration.clone(),
+    let Some(modifier) =
+        modifier_outcome(scenario, target, &intent.action_id, hit_operations.modifier)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
     };
 
     trace.push(TraceEntry::new(
@@ -921,11 +926,16 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
     } = resolution;
     let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
     let damage = vitality_effects.damage.clone();
-    let modifier = ModifierOutcome {
-        target_id: target.id.clone(),
-        modifier_id: hit_operations.modifier.modifier_id.clone(),
-        label: hit_operations.modifier.modifier_label.clone(),
-        duration: hit_operations.modifier.modifier_duration.clone(),
+    let Some(modifier) =
+        modifier_outcome(scenario, target, &intent.action_id, hit_operations.modifier)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
     };
     append_vitality_trace(&mut trace, &vitality_effects);
     trace.push(TraceEntry::new(
@@ -1510,6 +1520,39 @@ fn apply_vitality_effects(
         healing,
         temporary_vitality,
     }
+}
+
+fn modifier_outcome(
+    scenario: &RulebenchScenario,
+    target: &Combatant,
+    source_id: &str,
+    operation: &ModifierEffectOperation,
+) -> Option<ModifierOutcome> {
+    let definition = scenario.modifier_by_id(&operation.modifier_id)?;
+    let remaining_turns = match definition.duration_policy {
+        ModifierDurationPolicy::Turns(turns) => Some(turns),
+        ModifierDurationPolicy::Permanent
+        | ModifierDurationPolicy::Rounds(_)
+        | ModifierDurationPolicy::UntilEvent(_) => None,
+    };
+    let remaining_rounds = match definition.duration_policy {
+        ModifierDurationPolicy::Rounds(rounds) => Some(rounds),
+        ModifierDurationPolicy::Permanent
+        | ModifierDurationPolicy::Turns(_)
+        | ModifierDurationPolicy::UntilEvent(_) => None,
+    };
+    Some(ModifierOutcome {
+        target_id: target.id.clone(),
+        modifier_id: operation.modifier_id.clone(),
+        source_id: source_id.to_string(),
+        label: operation.modifier_label.clone(),
+        duration: operation.modifier_duration.clone(),
+        stacking_group: definition.stacking_group.clone(),
+        stacking_policy: definition.stacking_policy,
+        duration_policy: definition.duration_policy.clone(),
+        remaining_turns,
+        remaining_rounds,
+    })
 }
 
 fn append_vitality_trace(trace: &mut Vec<TraceEntry>, effects: &AppliedVitalityEffects) {
