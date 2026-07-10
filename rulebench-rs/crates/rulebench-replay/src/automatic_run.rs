@@ -2,10 +2,11 @@
 
 use rulebench_combat::RulebenchScenario;
 use rulebench_combat::{
-    ActionResourceTransitionEntry, ClassBuildLedgerReadout, CombatSessionAutomaticRunDecisionKind,
-    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec, CombatSessionState,
-    EquipmentLedgerReadout, EquipmentTransitionEntry, ModifierDurationExpirationEntry,
-    ReactionAuditEntry, ReactionWindowLifecycleEntry,
+    ActionResourceTransitionEntry, ClassBuildLedgerReadout, CombatAutomationPolicyDecisionEvidence,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionState, EquipmentLedgerReadout,
+    EquipmentTransitionEntry, ModifierDurationExpirationEntry, ReactionAuditEntry,
+    ReactionWindowLifecycleEntry,
 };
 use rulebench_core::StateFingerprint;
 
@@ -20,6 +21,7 @@ pub struct CombatSessionAutomaticRunReplaySpec {
     pub expected_final_state_fingerprint: StateFingerprint,
     pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub expected_executed_step_count: u32,
+    pub expected_policy_decisions: Vec<CombatAutomationPolicyDecisionEvidence>,
     pub expected_action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     pub expected_equipment_ledger: EquipmentLedgerReadout,
     pub expected_class_build_ledger: ClassBuildLedgerReadout,
@@ -40,6 +42,7 @@ impl CombatSessionAutomaticRunReplaySpec {
         expected_final_state_fingerprint: StateFingerprint,
         expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
         expected_executed_step_count: u32,
+        expected_policy_decisions: Vec<CombatAutomationPolicyDecisionEvidence>,
         expected_action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
         expected_equipment_ledger: EquipmentLedgerReadout,
         expected_class_build_ledger: ClassBuildLedgerReadout,
@@ -58,6 +61,7 @@ impl CombatSessionAutomaticRunReplaySpec {
             expected_final_state_fingerprint,
             expected_run_decision_kind,
             expected_executed_step_count,
+            expected_policy_decisions,
             expected_action_resource_transition_log,
             expected_equipment_ledger,
             expected_class_build_ledger,
@@ -100,6 +104,7 @@ pub struct CombatSessionAutomaticRunReplayReadout {
     pub expected_executed_step_count: u32,
     pub actual_executed_step_count: u32,
     pub executed_step_count_matches: bool,
+    pub policy_decisions_match: bool,
     pub action_resource_transition_log_matches: bool,
     pub equipment_ledger_matches: bool,
     pub class_build_ledger_matches: bool,
@@ -129,6 +134,7 @@ pub fn verify_automatic_run_replay(
     let run_decision_kind_matches = actual_run_decision_kind == spec.expected_run_decision_kind;
     let executed_step_count_matches =
         actual_executed_step_count == spec.expected_executed_step_count;
+    let policy_decisions_match = replayed_run.policy_decisions == spec.expected_policy_decisions;
     let action_resource_transition_log_matches =
         replayed_run.final_snapshot.action_resource_transition_log
             == spec.expected_action_resource_transition_log;
@@ -149,6 +155,7 @@ pub fn verify_automatic_run_replay(
     let accepted = final_state_fingerprint_matches
         && run_decision_kind_matches
         && executed_step_count_matches
+        && policy_decisions_match
         && action_resource_transition_log_matches
         && equipment_ledger_matches
         && class_build_ledger_matches
@@ -183,6 +190,7 @@ pub fn verify_automatic_run_replay(
         expected_executed_step_count: spec.expected_executed_step_count,
         actual_executed_step_count,
         executed_step_count_matches,
+        policy_decisions_match,
         action_resource_transition_log_matches,
         equipment_ledger_matches,
         class_build_ledger_matches,
@@ -221,6 +229,7 @@ mod tests {
             expected.final_snapshot.current_state_fingerprint.clone(),
             expected.decision_kind,
             expected.executed_step_count,
+            expected.policy_decisions.clone(),
             expected
                 .final_snapshot
                 .action_resource_transition_log
@@ -247,6 +256,7 @@ mod tests {
         assert!(readout.final_state_fingerprint_matches);
         assert!(readout.run_decision_kind_matches);
         assert!(readout.executed_step_count_matches);
+        assert!(readout.policy_decisions_match);
         assert!(readout.action_resource_transition_log_matches);
         assert!(readout.equipment_ledger_matches);
         assert!(readout.class_build_ledger_matches);
@@ -272,6 +282,7 @@ mod tests {
             expected.final_snapshot.current_state_fingerprint.clone(),
             expected.decision_kind,
             expected.executed_step_count + 1,
+            expected.policy_decisions.clone(),
             expected
                 .final_snapshot
                 .action_resource_transition_log
@@ -298,6 +309,7 @@ mod tests {
         assert!(readout.final_state_fingerprint_matches);
         assert!(readout.run_decision_kind_matches);
         assert!(!readout.executed_step_count_matches);
+        assert!(readout.policy_decisions_match);
     }
 
     fn expected_run(

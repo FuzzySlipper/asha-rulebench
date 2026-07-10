@@ -21,21 +21,26 @@ pub use rulebench_combat::model::*;
 pub use rulebench_combat::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
     evaluate_effective_stats_for_combatant, fingerprint_projected_state, fingerprint_projection,
-    resolve_use_action, validate_intent_shape, CombatSessionApi, CombatSessionApiError,
-    CombatSessionArchive, CombatSessionAutoCandidateCommandSpec,
-    CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
-    CombatSessionAutoCandidatePlanReadout, CombatSessionAutomaticRunDecisionKind,
-    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
-    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
-    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
-    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
-    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
-    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionCreateReadout,
-    CombatSessionCreateRequest, CombatSessionHandle, CombatSessionIntentCommandSpec,
-    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
-    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
-    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState, CombatState,
-    EffectiveStatEvaluationError, PROJECTION_FINGERPRINT_ALGORITHM, STATE_FINGERPRINT_ALGORITHM,
+    resolve_use_action, validate_combat_automation_policy, validate_intent_shape,
+    CombatAutomationCandidateEvidence, CombatAutomationNoCandidateBehavior,
+    CombatAutomationPolicyDecisionEvidence, CombatAutomationPolicySpec,
+    CombatAutomationPolicyValidationCode, CombatAutomationPolicyValidationReadout,
+    CombatSessionApi, CombatSessionApiError, CombatSessionArchive,
+    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
+    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
+    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
+    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
+    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
+    CombatSessionCommandSpec, CombatSessionCreateReadout, CombatSessionCreateRequest,
+    CombatSessionHandle, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
+    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
+    CombatSessionState, CombatState, EffectiveStatEvaluationError,
+    FIRST_ACCEPTED_CANDIDATE_POLICY_ID, FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
+    PROJECTION_FINGERPRINT_ALGORITHM, STATE_FINGERPRINT_ALGORITHM,
 };
 pub use rulebench_content::{validate_scenario_content, validate_scenario_content_report};
 pub use rulebench_core::Team;
@@ -47,8 +52,9 @@ pub use rulebench_replay::{
 #[cfg(test)]
 mod tests {
     use super::{
-        verify_automatic_run_replay, CombatSessionApi, CombatSessionAutomaticRunReplayReadout,
-        CombatSessionAutomaticRunReplaySpec, CombatSessionHandle, RulesetMetadata,
+        verify_automatic_run_replay, CombatAutomationPolicySpec, CombatSessionApi,
+        CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
+        CombatSessionHandle, RulesetMetadata,
     };
 
     #[test]
@@ -65,10 +71,12 @@ mod tests {
         let replay_verifier: fn(
             CombatSessionAutomaticRunReplaySpec,
         ) -> CombatSessionAutomaticRunReplayReadout = verify_automatic_run_replay;
+        let automation_policy = CombatAutomationPolicySpec::first_accepted_candidate();
 
         assert!(api.list_active_sessions().is_empty());
         assert_eq!(ruleset.id, "portable.ruleset");
         assert_eq!(handle.id, "portable-session");
+        assert_eq!(automation_policy.id, "firstAcceptedCandidate");
         let _ = replay_verifier;
     }
 }

@@ -990,6 +990,143 @@ fn session_runtime_automatic_step_can_be_invoked_until_combat_ends() {
 }
 
 #[test]
+fn session_runtime_automatic_policy_is_deterministic_and_rejects_unsupported_inputs() {
+    let first = CombatSessionState::new("policy-first", hexing_bolt_fixture_scenario());
+    let second = CombatSessionState::new("policy-second", hexing_bolt_fixture_scenario());
+    let spec = CombatSessionAutomaticStepSpec::new(
+        "policy-step",
+        "Policy step",
+        "The same state and policy choose the same command.",
+        vec![17, 5],
+    );
+
+    let first_plan = first.plan_automatic_step(spec.clone());
+    let second_plan = second.plan_automatic_step(spec);
+    assert_eq!(first_plan.policy_decision, second_plan.policy_decision);
+    assert_eq!(
+        first_plan.policy_decision.policy.id,
+        FIRST_ACCEPTED_CANDIDATE_POLICY_ID
+    );
+    assert_eq!(
+        first_plan.policy_decision.selected_action_id.as_deref(),
+        Some("hexing_bolt")
+    );
+    assert_eq!(
+        first_plan.policy_decision.selected_target_id.as_deref(),
+        Some("entity-raider")
+    );
+
+    let mut multi_candidate_scenario = hexing_bolt_fixture_scenario();
+    let mut second_action = multi_candidate_scenario.actions[0].clone();
+    second_action.id = "second_bolt".to_string();
+    second_action.name = "Second Bolt".to_string();
+    multi_candidate_scenario.actions.push(second_action);
+    let mut multi_candidate_session =
+        CombatSessionState::new("policy-multiple", multi_candidate_scenario);
+    let multi_execution =
+        multi_candidate_session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
+            "policy-multiple-step",
+            "Multiple candidate policy step",
+            "The policy records ordered candidates and submits the selected entry.",
+            vec![17, 5],
+        ));
+    let evidence = &multi_execution.plan.policy_decision;
+    assert_eq!(evidence.candidate_count, 2);
+    assert_eq!(evidence.accepted_candidate_count, 2);
+    assert_eq!(evidence.selected_candidate_index, Some(0));
+    assert_eq!(
+        evidence
+            .candidates
+            .iter()
+            .map(|candidate| candidate.action_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["hexing_bolt", "second_bolt"]
+    );
+    assert_eq!(
+        multi_execution
+            .auto_candidate
+            .as_ref()
+            .and_then(|execution| execution.submitted_step.as_ref())
+            .map(|step| step.command.action_id.as_str()),
+        Some("hexing_bolt")
+    );
+
+    let mut unsupported_id = CombatAutomationPolicySpec::first_accepted_candidate();
+    unsupported_id.id = "dynamicCallback".to_string();
+    let mut unsupported_id_session =
+        CombatSessionState::new("unsupported-id", hexing_bolt_fixture_scenario());
+    let before_id = unsupported_id_session.snapshot();
+    let rejected_id = unsupported_id_session.run_automatic_combat(
+        CombatSessionAutomaticRunSpec::new(
+            "unsupported-id-run",
+            "Unsupported id",
+            "Rust rejects unknown policy ids.",
+            8,
+            vec![17, 5],
+        )
+        .with_policy(unsupported_id),
+    );
+    assert_eq!(
+        rejected_id.decision_kind,
+        CombatSessionAutomaticRunDecisionKind::RejectedByPolicy
+    );
+    assert!(rejected_id.policy_decisions.is_empty());
+    assert_eq!(unsupported_id_session.snapshot(), before_id);
+
+    let mut unsupported_version = CombatAutomationPolicySpec::first_accepted_candidate();
+    unsupported_version.version += 1;
+    let rejected_version = first.plan_automatic_step(
+        CombatSessionAutomaticStepSpec::new(
+            "unsupported-version-step",
+            "Unsupported version",
+            "Rust rejects unknown policy versions.",
+            vec![17, 5],
+        )
+        .with_policy(unsupported_version),
+    );
+    assert_eq!(
+        rejected_version.decision_kind,
+        CombatSessionAutomaticStepDecisionKind::RejectedByPolicy
+    );
+    assert_eq!(
+        rejected_version.policy_validation.code,
+        CombatAutomationPolicyValidationCode::UnsupportedPolicyVersion
+    );
+}
+
+#[test]
+fn session_runtime_automatic_policy_can_stop_when_no_candidate_is_available() {
+    let mut session = CombatSessionState::new("policy-stop", hexing_bolt_fixture_scenario());
+    let policy = CombatAutomationPolicySpec::first_accepted_candidate()
+        .with_no_candidate_behavior(CombatAutomationNoCandidateBehavior::StopRun);
+
+    let readout = session.run_automatic_combat(
+        CombatSessionAutomaticRunSpec::new(
+            "policy-stop-run",
+            "Policy stop run",
+            "Rust stops when the policy cannot choose another command.",
+            8,
+            vec![17, 5],
+        )
+        .with_policy(policy),
+    );
+
+    assert!(readout.accepted);
+    assert_eq!(
+        readout.decision_kind,
+        CombatSessionAutomaticRunDecisionKind::StoppedNoCandidate
+    );
+    assert_eq!(readout.executed_step_count, 2);
+    assert_eq!(
+        readout.steps[1].plan.decision_kind,
+        CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate
+    );
+    assert_eq!(readout.steps[1].plan.operation_kind, None);
+    assert_eq!(readout.policy_decisions.len(), 2);
+    assert_eq!(readout.policy_decisions[1].candidate_count, 0);
+}
+
+#[test]
 fn session_runtime_automatic_run_completes_fixture_combat_within_bound() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
@@ -1009,7 +1146,12 @@ fn session_runtime_automatic_run_completes_fixture_combat_within_bound() {
     );
     assert_eq!(readout.decision_kind.code(), "completedCombatEnded");
     assert_eq!(readout.max_steps, 8);
+    assert_eq!(
+        readout.policy,
+        CombatAutomationPolicySpec::first_accepted_candidate()
+    );
     assert_eq!(readout.executed_step_count, 5);
+    assert_eq!(readout.policy_decisions.len(), 5);
     assert_eq!(
         readout
             .steps
@@ -1157,6 +1299,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
             .clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
+        expected_run.policy_decisions.clone(),
         expected_run
             .final_snapshot
             .action_resource_transition_log
@@ -1184,6 +1327,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     assert!(readout.final_state_fingerprint_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
+    assert!(readout.policy_decisions_match);
     assert!(readout.action_resource_transition_log_matches);
     assert!(readout.equipment_ledger_matches);
     assert!(readout.class_build_ledger_matches);
@@ -1199,6 +1343,68 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
         readout.replayed_run.decision_kind,
         CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded
     );
+}
+
+#[test]
+fn session_runtime_automatic_run_replay_rejects_policy_decision_drift_alone() {
+    let scenario = hexing_bolt_fixture_scenario();
+    let run_spec = CombatSessionAutomaticRunSpec::new(
+        "auto-run-policy-drift",
+        "Auto run policy drift",
+        "Rust compares recorded policy decisions independently of final state.",
+        8,
+        vec![17, 5],
+    );
+    let mut expected_session =
+        CombatSessionState::new("runtime-policy-drift-expected", scenario.clone());
+    let expected_run = expected_session.run_automatic_combat(run_spec.clone());
+    let mut drifted_policy_decisions = expected_run.policy_decisions.clone();
+    drifted_policy_decisions[0].selected_candidate_index = None;
+
+    let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+        "auto-run-policy-drift-verification",
+        "Auto run policy drift verification",
+        "Only the expected policy decision transcript differs.",
+        "runtime-policy-drift-replay",
+        scenario,
+        run_spec,
+        expected_run
+            .final_snapshot
+            .current_state_fingerprint
+            .clone(),
+        expected_run.decision_kind,
+        expected_run.executed_step_count,
+        drifted_policy_decisions,
+        expected_run
+            .final_snapshot
+            .action_resource_transition_log
+            .clone(),
+        expected_run.final_snapshot.equipment_ledger.clone(),
+        expected_run.final_snapshot.class_build_ledger.clone(),
+        expected_run.final_snapshot.equipment_transition_log.clone(),
+        expected_run
+            .final_snapshot
+            .reaction_window_lifecycle_log
+            .clone(),
+        expected_run.final_snapshot.reaction_audit_log.clone(),
+        expected_run
+            .final_snapshot
+            .modifier_duration_expiration_log
+            .clone(),
+    ));
+
+    assert!(!readout.accepted);
+    assert!(readout.final_state_fingerprint_matches);
+    assert!(readout.run_decision_kind_matches);
+    assert!(readout.executed_step_count_matches);
+    assert!(!readout.policy_decisions_match);
+    assert!(readout.action_resource_transition_log_matches);
+    assert!(readout.equipment_ledger_matches);
+    assert!(readout.class_build_ledger_matches);
+    assert!(readout.equipment_transition_log_matches);
+    assert!(readout.reaction_window_lifecycle_log_matches);
+    assert!(readout.reaction_audit_log_matches);
+    assert!(readout.modifier_duration_expiration_log_matches);
 }
 
 #[test]
@@ -1238,6 +1444,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
             .clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
+        Vec::new(),
         expected_action_resource_transition_log,
         expected_run.final_snapshot.equipment_ledger.clone(),
         expected_run.final_snapshot.class_build_ledger.clone(),
@@ -1259,6 +1466,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     assert!(readout.final_state_fingerprint_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
+    assert!(!readout.policy_decisions_match);
     assert!(!readout.action_resource_transition_log_matches);
     assert!(readout.equipment_ledger_matches);
     assert!(readout.class_build_ledger_matches);

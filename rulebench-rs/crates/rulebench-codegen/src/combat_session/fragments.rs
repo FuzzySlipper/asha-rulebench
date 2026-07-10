@@ -4,8 +4,10 @@ use crate::ts_emit::{ts_string, ts_string_array};
 use rulebench_fixtures::{
     ActionResourceLedgerReadout, ActionResourceRefreshPolicy, ActionResourceState,
     ActionResourceTransitionEntry, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
-    ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatEndConditionReadout, CombatLogEntry,
-    CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
+    ClassBuildLedgerReadout, CombatAutomationCandidateEvidence,
+    CombatAutomationPolicyDecisionEvidence, CombatAutomationPolicySpec,
+    CombatAutomationPolicyValidationReadout, CombatControlHistoryEntry, CombatEndConditionReadout,
+    CombatLogEntry, CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
     CombatantEquipmentReadout, CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt,
     CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
     CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
@@ -14,6 +16,95 @@ use rulebench_fixtures::{
     ReactionOptionReadout, ReactionResponseEntry, ReactionWindowLifecycleEntry,
     ReactionWindowReadout, RulebenchRejection, ScenarioProjection, TraceEntry, TurnTransitionEntry,
 };
+
+pub(crate) fn render_automation_policy(
+    policy: &CombatAutomationPolicySpec,
+    indent: &str,
+) -> String {
+    format!(
+        "{{\n{indent}  id: {},\n{indent}  version: {},\n{indent}  noCandidateBehavior: {},\n{indent}}}",
+        ts_string(&policy.id),
+        policy.version,
+        ts_string(automatic_no_candidate_behavior(policy.no_candidate_behavior))
+    )
+}
+
+pub(crate) fn render_automation_policy_validation(
+    validation: &CombatAutomationPolicyValidationReadout,
+    indent: &str,
+) -> String {
+    format!(
+        "{{\n{indent}  accepted: {},\n{indent}  code: {},\n{indent}  reason: {},\n{indent}}}",
+        validation.accepted,
+        ts_string(automation_policy_validation_code(validation.code)),
+        ts_string(&validation.reason)
+    )
+}
+
+pub(crate) fn render_automation_candidate_evidence(
+    candidate: &CombatAutomationCandidateEvidence,
+    indent: &str,
+) -> String {
+    format!(
+        "{indent}{{\n{indent}  index: {},\n{indent}  actionId: {},\n{indent}  targetId: {},\n{indent}  accepted: {},\n{indent}  decisionKind: {},\n{indent}}},\n",
+        candidate.index,
+        ts_string(&candidate.action_id),
+        ts_string(&candidate.target_id),
+        candidate.accepted,
+        ts_string(preflight_decision_kind(candidate.decision_kind))
+    )
+}
+
+pub(crate) fn render_automation_policy_decision(
+    decision: &CombatAutomationPolicyDecisionEvidence,
+    indent: &str,
+) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!(
+        "{indent}  policy: {},\n",
+        render_automation_policy(&decision.policy, &format!("{indent}  "))
+    ));
+    out.push_str(&format!(
+        "{indent}  stateBeforeFingerprint: {},\n",
+        render_fingerprint(&decision.state_before_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  operationKind: {},\n",
+        render_optional_automatic_step_operation_kind(decision.operation_kind)
+    ));
+    out.push_str(&format!(
+        "{indent}  selectedActionId: {},\n",
+        render_optional_string(&decision.selected_action_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  selectedTargetId: {},\n",
+        render_optional_string(&decision.selected_target_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  selectedCandidateIndex: {},\n",
+        decision
+            .selected_candidate_index
+            .map(|index| index.to_string())
+            .unwrap_or_else(|| "null".to_string())
+    ));
+    out.push_str(&format!(
+        "{indent}  candidateCount: {},\n{indent}  acceptedCandidateCount: {},\n",
+        decision.candidate_count, decision.accepted_candidate_count
+    ));
+    out.push_str(&format!("{indent}  candidates: [\n"));
+    for candidate in &decision.candidates {
+        out.push_str(&render_automation_candidate_evidence(
+            candidate,
+            &format!("{indent}    "),
+        ));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n{indent}}}",
+        ts_string(&decision.reason)
+    ));
+    out
+}
 
 pub(crate) fn render_reaction_window(window: &ReactionWindowReadout, indent: &str) -> String {
     let mut out = String::from("{\n");

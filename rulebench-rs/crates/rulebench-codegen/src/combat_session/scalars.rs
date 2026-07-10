@@ -1,13 +1,15 @@
 use crate::ts_emit::ts_string;
 
 use rulebench_fixtures::{
-    ActionResourceKind, ActionResourceTransitionKind, CombatControlCommandKind,
-    CombatControlDecisionKind, CombatEndConditionKind, CombatLifecyclePhase,
-    CombatSessionAutomaticStepOperationKind, CombatSessionCandidateSelectionDecisionKind,
-    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CommandDecisionKind,
-    CommandOutcomeClass, CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure,
-    ReactionDecisionKind, ReactionResponseKind, ReactionWindow, ReactionWindowLifecycleKind,
-    ReactionWindowStatus, StateFingerprint, TracePhase, TraceStatus,
+    ActionResourceKind, ActionResourceTransitionKind, CombatAutomationNoCandidateBehavior,
+    CombatAutomationPolicyValidationCode, CombatControlCommandKind, CombatControlDecisionKind,
+    CombatEndConditionKind, CombatLifecyclePhase, CombatSessionAutomaticRunDecisionKind,
+    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepOperationKind,
+    CombatSessionCandidateSelectionDecisionKind, CombatSessionScriptCommandKind,
+    CombatSessionScriptDecisionKind, CommandDecisionKind, CommandOutcomeClass,
+    CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure, ReactionDecisionKind,
+    ReactionResponseKind, ReactionWindow, ReactionWindowLifecycleKind, ReactionWindowStatus,
+    StateFingerprint, TracePhase, TraceStatus,
 };
 
 pub(crate) fn render_fingerprint(fingerprint: &StateFingerprint, _indent: &str) -> String {
@@ -41,8 +43,65 @@ pub(crate) fn render_optional_automatic_step_operation_kind(
     value: Option<CombatSessionAutomaticStepOperationKind>,
 ) -> String {
     value
-        .map(|kind| ts_string(kind.code()))
+        .map(|kind| ts_string(automatic_step_operation_kind(kind)))
         .unwrap_or_else(|| "null".to_string())
+}
+
+pub(crate) fn automatic_no_candidate_behavior(
+    behavior: CombatAutomationNoCandidateBehavior,
+) -> &'static str {
+    match behavior {
+        CombatAutomationNoCandidateBehavior::AdvanceTurn => "advanceTurn",
+        CombatAutomationNoCandidateBehavior::StopRun => "stopRun",
+    }
+}
+
+pub(crate) fn automation_policy_validation_code(
+    code: CombatAutomationPolicyValidationCode,
+) -> &'static str {
+    match code {
+        CombatAutomationPolicyValidationCode::Accepted => "accepted",
+        CombatAutomationPolicyValidationCode::UnsupportedPolicyId => "unsupportedPolicyId",
+        CombatAutomationPolicyValidationCode::UnsupportedPolicyVersion => {
+            "unsupportedPolicyVersion"
+        }
+    }
+}
+
+pub(crate) fn automatic_step_operation_kind(
+    kind: CombatSessionAutomaticStepOperationKind,
+) -> &'static str {
+    match kind {
+        CombatSessionAutomaticStepOperationKind::ConditionalEnd => "conditionalEnd",
+        CombatSessionAutomaticStepOperationKind::SubmitCandidate => "submitCandidate",
+        CombatSessionAutomaticStepOperationKind::AdvanceTurn => "advanceTurn",
+    }
+}
+
+pub(crate) fn automatic_step_decision_kind(
+    kind: CombatSessionAutomaticStepDecisionKind,
+) -> &'static str {
+    match kind {
+        CombatSessionAutomaticStepDecisionKind::ConditionalEnd => "conditionalEnd",
+        CombatSessionAutomaticStepDecisionKind::SubmitCandidate => "submitCandidate",
+        CombatSessionAutomaticStepDecisionKind::AdvanceTurn => "advanceTurn",
+        CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+        CombatSessionAutomaticStepDecisionKind::RejectedByPolicy => "rejectedByPolicy",
+        CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
+    }
+}
+
+pub(crate) fn automatic_run_decision_kind(
+    kind: CombatSessionAutomaticRunDecisionKind,
+) -> &'static str {
+    match kind {
+        CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded => "completedCombatEnded",
+        CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps => "stoppedAtMaxSteps",
+        CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+        CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit => "rejectedByStepLimit",
+        CombatSessionAutomaticRunDecisionKind::RejectedByPolicy => "rejectedByPolicy",
+        CombatSessionAutomaticRunDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
+    }
 }
 
 pub(crate) fn control_command_kind(kind: CombatControlCommandKind) -> &'static str {

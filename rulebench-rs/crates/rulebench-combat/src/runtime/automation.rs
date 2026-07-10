@@ -2,6 +2,9 @@
 
 use super::*;
 
+mod policy;
+pub use policy::*;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionCandidateSelectionSpec {
     pub id: String,
@@ -83,6 +86,7 @@ pub struct CombatSessionAutoCandidateCommandSpec {
     pub title: String,
     pub summary: String,
     pub roll_stream: Vec<i32>,
+    pub policy: CombatAutomationPolicySpec,
 }
 
 impl CombatSessionAutoCandidateCommandSpec {
@@ -97,7 +101,13 @@ impl CombatSessionAutoCandidateCommandSpec {
             title: title.into(),
             summary: summary.into(),
             roll_stream,
+            policy: CombatAutomationPolicySpec::first_accepted_candidate(),
         }
+    }
+
+    pub fn with_policy(mut self, policy: CombatAutomationPolicySpec) -> Self {
+        self.policy = policy;
+        self
     }
 }
 
@@ -106,6 +116,7 @@ pub enum CombatSessionAutoCandidateDecisionKind {
     Accepted,
     RejectedByUnavailableCandidates,
     RejectedByNoAcceptedCandidate,
+    RejectedByPolicy,
 }
 
 impl CombatSessionAutoCandidateDecisionKind {
@@ -118,12 +129,15 @@ impl CombatSessionAutoCandidateDecisionKind {
             CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate => {
                 "rejectedByNoAcceptedCandidate"
             }
+            CombatSessionAutoCandidateDecisionKind::RejectedByPolicy => "rejectedByPolicy",
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionAutoCandidatePlanReadout {
+    pub policy: CombatAutomationPolicySpec,
+    pub policy_validation: CombatAutomationPolicyValidationReadout,
     pub accepted: bool,
     pub decision_kind: CombatSessionAutoCandidateDecisionKind,
     pub current_actor_id: Option<String>,
@@ -131,6 +145,8 @@ pub struct CombatSessionAutoCandidatePlanReadout {
     pub accepted_candidate_count: usize,
     pub selected_action_id: Option<String>,
     pub selected_target_id: Option<String>,
+    pub selected_candidate_index: Option<usize>,
+    pub candidate_order: Vec<CombatAutomationCandidateEvidence>,
     pub unavailable_reason: Option<CurrentActorOptionsUnavailableReason>,
     pub reason: String,
     pub selection: Option<CombatSessionCandidateSelectionReadout>,
@@ -148,6 +164,7 @@ pub struct CombatSessionAutomaticStepSpec {
     pub title: String,
     pub summary: String,
     pub roll_stream: Vec<i32>,
+    pub policy: CombatAutomationPolicySpec,
 }
 
 impl CombatSessionAutomaticStepSpec {
@@ -162,7 +179,13 @@ impl CombatSessionAutomaticStepSpec {
             title: title.into(),
             summary: summary.into(),
             roll_stream,
+            policy: CombatAutomationPolicySpec::first_accepted_candidate(),
         }
+    }
+
+    pub fn with_policy(mut self, policy: CombatAutomationPolicySpec) -> Self {
+        self.policy = policy;
+        self
     }
 }
 
@@ -189,6 +212,8 @@ pub enum CombatSessionAutomaticStepDecisionKind {
     SubmitCandidate,
     AdvanceTurn,
     RejectedByLifecycle,
+    RejectedByPolicy,
+    StoppedNoCandidate,
 }
 
 impl CombatSessionAutomaticStepDecisionKind {
@@ -198,6 +223,8 @@ impl CombatSessionAutomaticStepDecisionKind {
             CombatSessionAutomaticStepDecisionKind::SubmitCandidate => "submitCandidate",
             CombatSessionAutomaticStepDecisionKind::AdvanceTurn => "advanceTurn",
             CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            CombatSessionAutomaticStepDecisionKind::RejectedByPolicy => "rejectedByPolicy",
+            CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
         }
     }
 }
@@ -211,6 +238,8 @@ pub struct CombatSessionAutomaticStepPlanReadout {
     pub current_actor_id: Option<String>,
     pub combat_end_condition: CombatEndConditionReadout,
     pub auto_candidate_plan: Option<CombatSessionAutoCandidatePlanReadout>,
+    pub policy_validation: CombatAutomationPolicyValidationReadout,
+    pub policy_decision: CombatAutomationPolicyDecisionEvidence,
     pub reason: String,
 }
 
@@ -228,6 +257,7 @@ pub struct CombatSessionAutomaticRunSpec {
     pub summary: String,
     pub max_steps: u32,
     pub roll_stream: Vec<i32>,
+    pub policy: CombatAutomationPolicySpec,
 }
 
 impl CombatSessionAutomaticRunSpec {
@@ -244,7 +274,13 @@ impl CombatSessionAutomaticRunSpec {
             summary: summary.into(),
             max_steps,
             roll_stream,
+            policy: CombatAutomationPolicySpec::first_accepted_candidate(),
         }
+    }
+
+    pub fn with_policy(mut self, policy: CombatAutomationPolicySpec) -> Self {
+        self.policy = policy;
+        self
     }
 }
 
@@ -254,6 +290,8 @@ pub enum CombatSessionAutomaticRunDecisionKind {
     StoppedAtMaxSteps,
     RejectedByLifecycle,
     RejectedByStepLimit,
+    RejectedByPolicy,
+    StoppedNoCandidate,
 }
 
 impl CombatSessionAutomaticRunDecisionKind {
@@ -263,6 +301,8 @@ impl CombatSessionAutomaticRunDecisionKind {
             CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps => "stoppedAtMaxSteps",
             CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
             CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit => "rejectedByStepLimit",
+            CombatSessionAutomaticRunDecisionKind::RejectedByPolicy => "rejectedByPolicy",
+            CombatSessionAutomaticRunDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
         }
     }
 }
@@ -275,8 +315,10 @@ pub struct CombatSessionAutomaticRunReadout {
     pub accepted: bool,
     pub decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub max_steps: u32,
+    pub policy: CombatAutomationPolicySpec,
     pub executed_step_count: u32,
     pub steps: Vec<CombatSessionAutomaticStepExecutionReadout>,
+    pub policy_decisions: Vec<CombatAutomationPolicyDecisionEvidence>,
     pub final_snapshot: CombatSessionSnapshot,
     pub reason: String,
 }
@@ -288,6 +330,7 @@ pub(super) fn combat_session_automatic_run_readout(
     accepted: bool,
     decision_kind: CombatSessionAutomaticRunDecisionKind,
     max_steps: u32,
+    policy: CombatAutomationPolicySpec,
     steps: Vec<CombatSessionAutomaticStepExecutionReadout>,
     final_snapshot: CombatSessionSnapshot,
     reason: impl Into<String>,
@@ -299,7 +342,12 @@ pub(super) fn combat_session_automatic_run_readout(
         accepted,
         decision_kind,
         max_steps,
+        policy,
         executed_step_count: steps.len() as u32,
+        policy_decisions: steps
+            .iter()
+            .map(|step| step.plan.policy_decision.clone())
+            .collect(),
         steps,
         final_snapshot,
         reason: reason.into(),
@@ -307,61 +355,162 @@ pub(super) fn combat_session_automatic_run_readout(
 }
 
 pub(super) fn plan_automatic_step(
+    policy: CombatAutomationPolicySpec,
+    state_before_fingerprint: StateFingerprint,
     lifecycle_phase: CombatLifecyclePhase,
     current_actor_id: Option<String>,
     combat_end_condition: CombatEndConditionReadout,
     auto_candidate_plan: impl FnOnce() -> CombatSessionAutoCandidatePlanReadout,
 ) -> CombatSessionAutomaticStepPlanReadout {
-    if lifecycle_phase == CombatLifecyclePhase::Ended {
-        return CombatSessionAutomaticStepPlanReadout {
-            accepted: false,
-            decision_kind: CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle,
-            operation_kind: None,
+    let policy_validation = validate_combat_automation_policy(&policy);
+    if !policy_validation.accepted {
+        let reason = policy_validation.reason.clone();
+        return automatic_step_plan_readout(
+            policy,
+            state_before_fingerprint,
+            false,
+            CombatSessionAutomaticStepDecisionKind::RejectedByPolicy,
+            None,
             lifecycle_phase,
             current_actor_id,
             combat_end_condition,
-            auto_candidate_plan: None,
-            reason: "Automatic combat step rejected because combat is already ended.".to_string(),
-        };
+            None,
+            policy_validation,
+            reason,
+        );
+    }
+    if lifecycle_phase == CombatLifecyclePhase::Ended {
+        return automatic_step_plan_readout(
+            policy,
+            state_before_fingerprint,
+            false,
+            CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle,
+            None,
+            lifecycle_phase,
+            current_actor_id,
+            combat_end_condition,
+            None,
+            policy_validation,
+            "Automatic combat step rejected because combat is already ended.",
+        );
     }
 
     if combat_end_condition.combat_should_end {
-        return CombatSessionAutomaticStepPlanReadout {
-            accepted: true,
-            decision_kind: CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
-            operation_kind: Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd),
+        return automatic_step_plan_readout(
+            policy,
+            state_before_fingerprint,
+            true,
+            CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
+            Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd),
             lifecycle_phase,
             current_actor_id,
             combat_end_condition,
-            auto_candidate_plan: None,
-            reason: "Automatic combat step planned conditional combat end.".to_string(),
-        };
+            None,
+            policy_validation,
+            "Automatic combat step planned conditional combat end.",
+        );
     }
 
     let candidate_plan = auto_candidate_plan();
     if candidate_plan.accepted {
-        return CombatSessionAutomaticStepPlanReadout {
-            accepted: true,
-            decision_kind: CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
-            operation_kind: Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate),
+        return automatic_step_plan_readout(
+            policy,
+            state_before_fingerprint,
+            true,
+            CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
+            Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate),
             lifecycle_phase,
             current_actor_id,
             combat_end_condition,
-            auto_candidate_plan: Some(candidate_plan),
-            reason: "Automatic combat step planned first accepted command candidate.".to_string(),
-        };
+            Some(candidate_plan),
+            policy_validation,
+            "Automatic combat step planned first accepted command candidate.",
+        );
     }
 
-    CombatSessionAutomaticStepPlanReadout {
-        accepted: true,
-        decision_kind: CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
-        operation_kind: Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn),
+    let stop = policy.no_candidate_behavior == CombatAutomationNoCandidateBehavior::StopRun;
+    automatic_step_plan_readout(
+        policy,
+        state_before_fingerprint,
+        true,
+        if stop {
+            CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate
+        } else {
+            CombatSessionAutomaticStepDecisionKind::AdvanceTurn
+        },
+        if stop {
+            None
+        } else {
+            Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn)
+        },
         lifecycle_phase,
         current_actor_id,
         combat_end_condition,
-        auto_candidate_plan: Some(candidate_plan),
-        reason: "Automatic combat step planned turn advancement because no accepted command candidate is available."
-            .to_string(),
+        Some(candidate_plan),
+        policy_validation,
+        if stop {
+            "Automatic combat step stopped because policy found no accepted command candidate."
+        } else {
+            "Automatic combat step planned turn advancement because no accepted command candidate is available."
+        },
+    )
+}
+
+fn automatic_step_plan_readout(
+    policy: CombatAutomationPolicySpec,
+    state_before_fingerprint: StateFingerprint,
+    accepted: bool,
+    decision_kind: CombatSessionAutomaticStepDecisionKind,
+    operation_kind: Option<CombatSessionAutomaticStepOperationKind>,
+    lifecycle_phase: CombatLifecyclePhase,
+    current_actor_id: Option<String>,
+    combat_end_condition: CombatEndConditionReadout,
+    auto_candidate_plan: Option<CombatSessionAutoCandidatePlanReadout>,
+    policy_validation: CombatAutomationPolicyValidationReadout,
+    reason: impl Into<String>,
+) -> CombatSessionAutomaticStepPlanReadout {
+    let reason = reason.into();
+    let (
+        candidate_count,
+        accepted_candidate_count,
+        selected_action_id,
+        selected_target_id,
+        selected_candidate_index,
+        candidates,
+    ) = auto_candidate_plan
+        .as_ref()
+        .map_or((0, 0, None, None, None, Vec::new()), |plan| {
+            (
+                plan.candidate_count,
+                plan.accepted_candidate_count,
+                plan.selected_action_id.clone(),
+                plan.selected_target_id.clone(),
+                plan.selected_candidate_index,
+                plan.candidate_order.clone(),
+            )
+        });
+    CombatSessionAutomaticStepPlanReadout {
+        accepted,
+        decision_kind,
+        operation_kind,
+        lifecycle_phase,
+        current_actor_id,
+        combat_end_condition,
+        auto_candidate_plan,
+        policy_validation,
+        policy_decision: CombatAutomationPolicyDecisionEvidence {
+            policy,
+            state_before_fingerprint,
+            operation_kind,
+            selected_action_id,
+            selected_target_id,
+            selected_candidate_index,
+            candidate_count,
+            accepted_candidate_count,
+            candidates,
+            reason: reason.clone(),
+        },
+        reason,
     }
 }
 
@@ -444,15 +593,50 @@ pub(super) fn plan_auto_candidate_command(
     spec: CombatSessionAutoCandidateCommandSpec,
     candidates: CommandCandidateSummary,
 ) -> CombatSessionAutoCandidatePlanReadout {
+    let policy = spec.policy.clone();
+    let policy_validation = validate_combat_automation_policy(&policy);
     let candidate_count = candidates.candidates.len();
     let accepted_candidate_count = candidates
         .candidates
         .iter()
         .filter(|candidate| candidate.accepted)
         .count();
+    let candidate_order = candidates
+        .candidates
+        .iter()
+        .enumerate()
+        .map(|(index, candidate)| CombatAutomationCandidateEvidence {
+            index,
+            action_id: candidate.action_id.clone(),
+            target_id: candidate.target_id.clone(),
+            accepted: candidate.accepted,
+            decision_kind: candidate.decision_kind,
+        })
+        .collect::<Vec<_>>();
+
+    if !policy_validation.accepted {
+        return CombatSessionAutoCandidatePlanReadout {
+            policy,
+            policy_validation: policy_validation.clone(),
+            accepted: false,
+            decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByPolicy,
+            current_actor_id: candidates.current_actor_id,
+            candidate_count,
+            accepted_candidate_count,
+            selected_action_id: None,
+            selected_target_id: None,
+            selected_candidate_index: None,
+            candidate_order,
+            unavailable_reason: None,
+            reason: policy_validation.reason,
+            selection: None,
+        };
+    }
 
     if !candidates.available {
         return CombatSessionAutoCandidatePlanReadout {
+            policy,
+            policy_validation,
             accepted: false,
             decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates,
             current_actor_id: candidates.current_actor_id,
@@ -460,19 +644,24 @@ pub(super) fn plan_auto_candidate_command(
             accepted_candidate_count,
             selected_action_id: None,
             selected_target_id: None,
+            selected_candidate_index: None,
+            candidate_order,
             unavailable_reason: candidates.unavailable_reason,
             reason: candidate_selection_unavailable_reason(candidates.unavailable_reason),
             selection: None,
         };
     }
 
-    let Some(candidate) = candidates
+    let Some((selected_candidate_index, candidate)) = candidates
         .candidates
         .iter()
-        .find(|candidate| candidate.accepted)
-        .cloned()
+        .enumerate()
+        .find(|(_, candidate)| candidate.accepted)
+        .map(|(index, candidate)| (index, candidate.clone()))
     else {
         return CombatSessionAutoCandidatePlanReadout {
+            policy,
+            policy_validation,
             accepted: false,
             decision_kind: CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate,
             current_actor_id: candidates.current_actor_id,
@@ -480,6 +669,8 @@ pub(super) fn plan_auto_candidate_command(
             accepted_candidate_count,
             selected_action_id: None,
             selected_target_id: None,
+            selected_candidate_index: None,
+            candidate_order,
             unavailable_reason: None,
             reason:
                 "No accepted command candidates are available for deterministic auto submission."
@@ -503,6 +694,8 @@ pub(super) fn plan_auto_candidate_command(
     );
 
     CombatSessionAutoCandidatePlanReadout {
+        policy,
+        policy_validation,
         accepted: selection.accepted,
         decision_kind: CombatSessionAutoCandidateDecisionKind::Accepted,
         current_actor_id: selection.current_actor_id.clone(),
@@ -510,6 +703,8 @@ pub(super) fn plan_auto_candidate_command(
         accepted_candidate_count,
         selected_action_id: Some(selected_action_id),
         selected_target_id: Some(selected_target_id),
+        selected_candidate_index: Some(selected_candidate_index),
+        candidate_order,
         unavailable_reason: None,
         reason: "First accepted command candidate planned for deterministic auto submission."
             .to_string(),

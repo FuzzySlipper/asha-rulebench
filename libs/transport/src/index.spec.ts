@@ -785,7 +785,32 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.accepted).toBe(true);
       expect(result.value.decisionKind).toBe("completedCombatEnded");
       expect(result.value.maxSteps).toBe(8);
+      expect(result.value.policy).toEqual({
+        id: "firstAcceptedCandidate",
+        version: 1,
+        noCandidateBehavior: "advanceTurn",
+      });
       expect(result.value.executedStepCount).toBe(5);
+      expect(
+        result.value.stepDecisions.map(
+          (step) => step.policyValidation.code,
+        ),
+      ).toEqual(["accepted", "accepted", "accepted", "accepted", "accepted"]);
+      expect(result.value.policyDecisions).toHaveLength(5);
+      expect(
+        result.value.policyDecisions.map(
+          (decision) => decision.selectedCandidateIndex,
+        ),
+      ).toEqual([0, null, null, 0, null]);
+      expect(result.value.policyDecisions[0]?.candidates).toEqual([
+        {
+          index: 0,
+          actionId: "hexing_bolt",
+          targetId: "entity-raider",
+          accepted: true,
+          decisionKind: "accepted",
+        },
+      ]);
       expect(
         result.value.stepDecisions.map((step) => step.decisionKind),
       ).toEqual([
@@ -1006,6 +1031,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.expectedExecutedStepCount).toBe(5);
       expect(result.value.actualExecutedStepCount).toBe(5);
       expect(result.value.executedStepCountMatches).toBe(true);
+      expect(result.value.policyDecisionsMatch).toBe(true);
       expect(result.value.actionResourceTransitionLogMatches).toBe(true);
       expect(result.value.equipmentLedgerMatches).toBe(true);
       expect(result.value.classBuildLedgerMatches).toBe(true);

@@ -262,9 +262,12 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
     out.push_str(&format!("      accepted: {},\n", readout.accepted));
     out.push_str(&format!(
         "      decisionKind: {},\n",
-        ts_string(readout.decision_kind.code())
+        ts_string(automatic_run_decision_kind(readout.decision_kind))
     ));
     out.push_str(&format!("      maxSteps: {},\n", readout.max_steps));
+    out.push_str("      policy: ");
+    out.push_str(&render_automation_policy(&readout.policy, "      "));
+    out.push_str(",\n");
     out.push_str(&format!(
         "      executedStepCount: {},\n",
         readout.executed_step_count
@@ -276,17 +279,32 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
         out.push_str(&format!("          accepted: {},\n", step.plan.accepted));
         out.push_str(&format!(
             "          decisionKind: {},\n",
-            ts_string(step.plan.decision_kind.code())
+            ts_string(automatic_step_decision_kind(step.plan.decision_kind))
         ));
         out.push_str(&format!(
             "          operationKind: {},\n",
             render_optional_automatic_step_operation_kind(step.plan.operation_kind)
         ));
         out.push_str(&format!(
+            "          policyValidation: {},\n",
+            render_automation_policy_validation(&step.plan.policy_validation, "          ")
+        ));
+        out.push_str(&format!(
+            "          policyDecision: {},\n",
+            render_automation_policy_decision(&step.plan.policy_decision, "          ")
+        ));
+        out.push_str(&format!(
             "          reason: {},\n",
             ts_string(&step.plan.reason)
         ));
         out.push_str("        },\n");
+    }
+    out.push_str("      ],\n");
+    out.push_str("      policyDecisions: [\n");
+    for decision in &readout.policy_decisions {
+        out.push_str("        ");
+        out.push_str(&render_automation_policy_decision(decision, "        "));
+        out.push_str(",\n");
     }
     out.push_str("      ],\n");
     out.push_str(&format!(
@@ -456,6 +474,10 @@ pub(crate) fn render_automatic_run_replay_readout(
     out.push_str(&format!(
         "      executedStepCountMatches: {},\n",
         readout.executed_step_count_matches
+    ));
+    out.push_str(&format!(
+        "      policyDecisionsMatch: {},\n",
+        readout.policy_decisions_match
     ));
     out.push_str(&format!(
         "      actionResourceTransitionLogMatches: {},\n",

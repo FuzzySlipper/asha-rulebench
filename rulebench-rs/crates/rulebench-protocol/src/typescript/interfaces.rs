@@ -645,6 +645,164 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             ],
         },
         Interface {
+            name: "RulebenchCombatAutomationPolicySpecDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "number",
+                },
+                Field {
+                    name: "noCandidateBehavior",
+                    ty: "RulebenchCombatAutomationNoCandidateBehaviorDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatAutomationPolicyValidationReadoutDto",
+            fields: &[
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "code",
+                    ty: "RulebenchCombatAutomationPolicyValidationCodeDto",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatAutomationCandidateEvidenceDto",
+            fields: &[
+                Field {
+                    name: "index",
+                    ty: "number",
+                },
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchCommandPreflightDecisionKindDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatAutomationPolicyDecisionEvidenceDto",
+            fields: &[
+                Field {
+                    name: "policy",
+                    ty: "RulebenchCombatAutomationPolicySpecDto",
+                },
+                Field {
+                    name: "stateBeforeFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "operationKind",
+                    ty: "RulebenchAutomaticStepOperationKindDto | null",
+                },
+                Field {
+                    name: "selectedActionId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "selectedTargetId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "selectedCandidateIndex",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "candidateCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "acceptedCandidateCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "candidates",
+                    ty: "readonly RulebenchCombatAutomationCandidateEvidenceDto[]",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAutomaticStepSpecDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "rollStream",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "policy",
+                    ty: "RulebenchCombatAutomationPolicySpecDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAutomaticRunSpecDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "maxSteps",
+                    ty: "number",
+                },
+                Field {
+                    name: "rollStream",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "policy",
+                    ty: "RulebenchCombatAutomationPolicySpecDto",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchAutomaticRunReadoutDto",
             fields: &[
                 Field {
@@ -672,12 +830,20 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "number",
                 },
                 Field {
+                    name: "policy",
+                    ty: "RulebenchCombatAutomationPolicySpecDto",
+                },
+                Field {
                     name: "executedStepCount",
                     ty: "number",
                 },
                 Field {
                     name: "stepDecisions",
                     ty: "readonly RulebenchAutomaticStepDecisionDto[]",
+                },
+                Field {
+                    name: "policyDecisions",
+                    ty: "readonly RulebenchCombatAutomationPolicyDecisionEvidenceDto[]",
                 },
                 Field {
                     name: "finalLifecyclePhase",
@@ -829,6 +995,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "boolean",
                 },
                 Field {
+                    name: "policyDecisionsMatch",
+                    ty: "boolean",
+                },
+                Field {
                     name: "actionResourceTransitionLogMatches",
                     ty: "boolean",
                 },
@@ -884,6 +1054,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "operationKind",
                     ty: "RulebenchAutomaticStepOperationKindDto | null",
+                },
+                Field {
+                    name: "policyValidation",
+                    ty: "RulebenchCombatAutomationPolicyValidationReadoutDto",
+                },
+                Field {
+                    name: "policyDecision",
+                    ty: "RulebenchCombatAutomationPolicyDecisionEvidenceDto",
                 },
                 Field {
                     name: "reason",

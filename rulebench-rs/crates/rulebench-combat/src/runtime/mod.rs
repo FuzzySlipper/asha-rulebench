@@ -18,14 +18,19 @@ use automation::{
     plan_candidate_command,
 };
 pub use automation::{
-    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
-    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
-    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
-    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
-    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
-    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
-    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
+    validate_combat_automation_policy, CombatAutomationCandidateEvidence,
+    CombatAutomationNoCandidateBehavior, CombatAutomationPolicyDecisionEvidence,
+    CombatAutomationPolicySpec, CombatAutomationPolicyValidationCode,
+    CombatAutomationPolicyValidationReadout, CombatSessionAutoCandidateCommandSpec,
+    CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
+    CombatSessionAutoCandidatePlanReadout, CombatSessionAutomaticRunDecisionKind,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
+    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
+    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
+    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
+    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
+    CombatSessionCandidateSelectionSpec, FIRST_ACCEPTED_CANDIDATE_POLICY_ID,
+    FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
 };
 pub use script::{
     CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
@@ -441,17 +446,23 @@ impl CombatSessionState {
         spec: CombatSessionAutomaticStepSpec,
     ) -> CombatSessionAutomaticStepPlanReadout {
         let end_condition = self.combat_end_condition();
+        let state_before_fingerprint = self.snapshot().current_state_fingerprint;
         plan_automatic_step(
+            spec.policy.clone(),
+            state_before_fingerprint,
             self.lifecycle.phase,
             self.turn_order.current_actor_id.clone(),
             end_condition,
             || {
-                self.plan_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
-                    spec.id,
-                    spec.title,
-                    spec.summary,
-                    spec.roll_stream,
-                ))
+                self.plan_auto_candidate_command(
+                    CombatSessionAutoCandidateCommandSpec::new(
+                        spec.id,
+                        spec.title,
+                        spec.summary,
+                        spec.roll_stream,
+                    )
+                    .with_policy(spec.policy),
+                )
             },
         )
     }
@@ -468,14 +479,17 @@ impl CombatSessionState {
             ),
             Some(CombatSessionAutomaticStepOperationKind::SubmitCandidate) => (
                 None,
-                Some(self.submit_auto_candidate_command(
-                    CombatSessionAutoCandidateCommandSpec::new(
-                        spec.id,
-                        spec.title,
-                        spec.summary,
-                        spec.roll_stream,
-                    ),
-                )),
+                plan.auto_candidate_plan.clone().map(|candidate_plan| {
+                    let submitted_step = candidate_plan
+                        .selection
+                        .as_ref()
+                        .and_then(|selection| selection.command.clone())
+                        .map(|command| self.submit_intent_command(command));
+                    CombatSessionAutoCandidateExecutionReadout {
+                        plan: candidate_plan,
+                        submitted_step,
+                    }
+                }),
             ),
             Some(CombatSessionAutomaticStepOperationKind::AdvanceTurn) => (
                 Some(self.submit_control_command(CombatControlCommandSpec::advance_turn())),
@@ -495,6 +509,21 @@ impl CombatSessionState {
         &mut self,
         spec: CombatSessionAutomaticRunSpec,
     ) -> CombatSessionAutomaticRunReadout {
+        let policy_validation = validate_combat_automation_policy(&spec.policy);
+        if !policy_validation.accepted {
+            return combat_session_automatic_run_readout(
+                spec.id,
+                spec.title,
+                spec.summary,
+                false,
+                CombatSessionAutomaticRunDecisionKind::RejectedByPolicy,
+                spec.max_steps,
+                spec.policy,
+                Vec::new(),
+                self.snapshot(),
+                policy_validation.reason,
+            );
+        }
         if self.lifecycle.phase == CombatLifecyclePhase::Ended {
             return combat_session_automatic_run_readout(
                 spec.id,
@@ -503,6 +532,7 @@ impl CombatSessionState {
                 false,
                 CombatSessionAutomaticRunDecisionKind::RejectedByLifecycle,
                 spec.max_steps,
+                spec.policy,
                 Vec::new(),
                 self.snapshot(),
                 "Automatic combat run rejected because combat is already ended.",
@@ -517,6 +547,7 @@ impl CombatSessionState {
                 false,
                 CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit,
                 spec.max_steps,
+                spec.policy,
                 Vec::new(),
                 self.snapshot(),
                 "Automatic combat run rejected because max steps is zero.",
@@ -530,22 +561,51 @@ impl CombatSessionState {
             }
 
             steps.push(
-                self.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
-                    format!("{}-step-{step_index}", spec.id),
-                    format!("{} step {}", spec.title, step_index + 1),
-                    spec.summary.clone(),
-                    spec.roll_stream.clone(),
-                )),
+                self.submit_automatic_step(
+                    CombatSessionAutomaticStepSpec::new(
+                        format!("{}-step-{step_index}", spec.id),
+                        format!("{} step {}", spec.title, step_index + 1),
+                        spec.summary.clone(),
+                        spec.roll_stream.clone(),
+                    )
+                    .with_policy(spec.policy.clone()),
+                ),
             );
+            if steps.last().is_some_and(|step| {
+                step.plan.decision_kind
+                    == CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate
+                    || step.plan.decision_kind
+                        == CombatSessionAutomaticStepDecisionKind::RejectedByPolicy
+            }) {
+                break;
+            }
         }
 
         let final_snapshot = self.snapshot();
         let combat_ended = final_snapshot.lifecycle.phase == CombatLifecyclePhase::Ended;
+        let stopped_no_candidate = steps.last().is_some_and(|step| {
+            step.plan.decision_kind == CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate
+        });
+        let rejected_by_policy = steps.last().is_some_and(|step| {
+            step.plan.decision_kind == CombatSessionAutomaticStepDecisionKind::RejectedByPolicy
+        });
         let (accepted, decision_kind, reason) = if combat_ended {
             (
                 true,
                 CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded,
                 "Automatic combat run completed because combat reached ended lifecycle.",
+            )
+        } else if rejected_by_policy {
+            (
+                false,
+                CombatSessionAutomaticRunDecisionKind::RejectedByPolicy,
+                "Automatic combat run rejected by policy validation.",
+            )
+        } else if stopped_no_candidate {
+            (
+                true,
+                CombatSessionAutomaticRunDecisionKind::StoppedNoCandidate,
+                "Automatic combat run stopped because policy found no accepted candidate.",
             )
         } else {
             (
@@ -562,6 +622,7 @@ impl CombatSessionState {
             accepted,
             decision_kind,
             spec.max_steps,
+            spec.policy,
             steps,
             final_snapshot,
             reason,

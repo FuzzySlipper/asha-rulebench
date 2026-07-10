@@ -40,11 +40,15 @@ export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'select
 
 export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByReactionWindow' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';
 
-export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';
+export type RulebenchCombatAutomationNoCandidateBehaviorDto = 'advanceTurn' | 'stopRun';
+
+export type RulebenchCombatAutomationPolicyValidationCodeDto = 'accepted' | 'unsupportedPolicyId' | 'unsupportedPolicyVersion';
+
+export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit' | 'rejectedByPolicy' | 'stoppedNoCandidate';
 
 export type RulebenchAutomaticRunReplayDecisionKindDto = 'verified' | 'mismatchedEvidence';
 
-export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle';
+export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn' | 'rejectedByLifecycle' | 'rejectedByPolicy' | 'stoppedNoCandidate';
 
 export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';
 
@@ -287,6 +291,56 @@ export interface RulebenchReactionAuditEntryDto {
   readonly reason: string;
 }
 
+export interface RulebenchCombatAutomationPolicySpecDto {
+  readonly id: string;
+  readonly version: number;
+  readonly noCandidateBehavior: RulebenchCombatAutomationNoCandidateBehaviorDto;
+}
+
+export interface RulebenchCombatAutomationPolicyValidationReadoutDto {
+  readonly accepted: boolean;
+  readonly code: RulebenchCombatAutomationPolicyValidationCodeDto;
+  readonly reason: string;
+}
+
+export interface RulebenchCombatAutomationCandidateEvidenceDto {
+  readonly index: number;
+  readonly actionId: string;
+  readonly targetId: string;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchCommandPreflightDecisionKindDto;
+}
+
+export interface RulebenchCombatAutomationPolicyDecisionEvidenceDto {
+  readonly policy: RulebenchCombatAutomationPolicySpecDto;
+  readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
+  readonly operationKind: RulebenchAutomaticStepOperationKindDto | null;
+  readonly selectedActionId: string | null;
+  readonly selectedTargetId: string | null;
+  readonly selectedCandidateIndex: number | null;
+  readonly candidateCount: number;
+  readonly acceptedCandidateCount: number;
+  readonly candidates: readonly RulebenchCombatAutomationCandidateEvidenceDto[];
+  readonly reason: string;
+}
+
+export interface RulebenchAutomaticStepSpecDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly rollStream: readonly number[];
+  readonly policy: RulebenchCombatAutomationPolicySpecDto;
+}
+
+export interface RulebenchAutomaticRunSpecDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly maxSteps: number;
+  readonly rollStream: readonly number[];
+  readonly policy: RulebenchCombatAutomationPolicySpecDto;
+}
+
 export interface RulebenchAutomaticRunReadoutDto {
   readonly id: string;
   readonly title: string;
@@ -294,8 +348,10 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly accepted: boolean;
   readonly decisionKind: RulebenchAutomaticRunDecisionKindDto;
   readonly maxSteps: number;
+  readonly policy: RulebenchCombatAutomationPolicySpecDto;
   readonly executedStepCount: number;
   readonly stepDecisions: readonly RulebenchAutomaticStepDecisionDto[];
+  readonly policyDecisions: readonly RulebenchCombatAutomationPolicyDecisionEvidenceDto[];
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalState: RulebenchFinalStateDto;
   readonly finalActionResourceLedger: RulebenchActionResourceLedgerDto;
@@ -335,6 +391,7 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly expectedExecutedStepCount: number;
   readonly actualExecutedStepCount: number;
   readonly executedStepCountMatches: boolean;
+  readonly policyDecisionsMatch: boolean;
   readonly actionResourceTransitionLogMatches: boolean;
   readonly equipmentLedgerMatches: boolean;
   readonly classBuildLedgerMatches: boolean;
@@ -351,6 +408,8 @@ export interface RulebenchAutomaticStepDecisionDto {
   readonly accepted: boolean;
   readonly decisionKind: RulebenchAutomaticStepDecisionKindDto;
   readonly operationKind: RulebenchAutomaticStepOperationKindDto | null;
+  readonly policyValidation: RulebenchCombatAutomationPolicyValidationReadoutDto;
+  readonly policyDecision: RulebenchCombatAutomationPolicyDecisionEvidenceDto;
   readonly reason: string;
 }
 

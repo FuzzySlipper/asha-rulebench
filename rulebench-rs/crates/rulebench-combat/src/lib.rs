@@ -27,17 +27,21 @@ pub use modifiers::{
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
-    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
-    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
-    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
-    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
-    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
-    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
-    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
-    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
-    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
-    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
-    CombatSessionState,
+    validate_combat_automation_policy, CombatAutomationCandidateEvidence,
+    CombatAutomationNoCandidateBehavior, CombatAutomationPolicyDecisionEvidence,
+    CombatAutomationPolicySpec, CombatAutomationPolicyValidationCode,
+    CombatAutomationPolicyValidationReadout, CombatSessionAutoCandidateCommandSpec,
+    CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
+    CombatSessionAutoCandidatePlanReadout, CombatSessionAutomaticRunDecisionKind,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
+    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
+    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
+    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
+    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
+    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
+    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
+    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
+    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
+    FIRST_ACCEPTED_CANDIDATE_POLICY_ID, FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
 };
 pub use state::CombatState;
