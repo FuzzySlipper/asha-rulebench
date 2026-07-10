@@ -41,3 +41,8 @@ pub use randomness::{
     ReplayRandomnessDiagnosticCode, ReplayRandomnessSource, ReplayRandomnessValidationReport,
     ReplayRollGenerationSpec, REPLAY_RANDOMNESS_ALGORITHM_VERSION,
 };
+mod comparison;
+pub use comparison::{
+    compare_replay_archive_entries, compare_replay_packages, ReplayComparisonDifference,
+    ReplayComparisonDifferenceCode, ReplayComparisonReadout,
+};
