@@ -23,6 +23,7 @@ pub use audit::{
 };
 pub use modifiers::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
+    evaluate_effective_stats_for_combatant, EffectiveStatEvaluationError,
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{

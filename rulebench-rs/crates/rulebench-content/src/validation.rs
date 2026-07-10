@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     Combatant, ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity,
-    ContentValidationReport, RulebenchScenario,
+    ContentValidationReport, RulebenchScenario, StatDefinitionKind,
 };
 use rulebench_ruleset::{
     ActionDefinition, AttackCheckDeclaration, RuleModuleValidationError, TargetKind,
@@ -248,6 +248,119 @@ fn validate_stat_definitions(
             ));
         }
     }
+
+    let definitions = scenario
+        .stat_definitions
+        .iter()
+        .filter(|stat| !stat.id.is_empty())
+        .map(|stat| (stat.id.as_str(), stat))
+        .collect::<HashMap<_, _>>();
+
+    for stat in &scenario.stat_definitions {
+        match (&stat.kind, &stat.formula) {
+            (StatDefinitionKind::Base, Some(_)) => diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::BaseStatFormulaNotAllowed,
+                Some(stat.id.clone()),
+                format!("Base stat {} must not declare a derived formula.", stat.id),
+            )),
+            (StatDefinitionKind::Derived, None) => diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::MissingDerivedStatFormula,
+                Some(stat.id.clone()),
+                format!("Derived stat {} must declare a formula.", stat.id),
+            )),
+            (_, Some(formula)) => {
+                if !formula.shape_is_valid() {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::InvalidDerivedStatFormula,
+                        Some(stat.id.clone()),
+                        format!(
+                            "Derived stat {} uses malformed {} formula operands.",
+                            stat.id,
+                            formula.code()
+                        ),
+                    ));
+                }
+
+                for referenced_stat_id in formula.referenced_stat_ids() {
+                    if !definitions.contains_key(referenced_stat_id) {
+                        diagnostics.push(ContentDiagnostic::error(
+                            ContentDiagnosticCode::UnknownDerivedStatReference,
+                            Some(referenced_stat_id.to_string()),
+                            format!(
+                                "Derived stat {} references unknown stat {}.",
+                                stat.id, referenced_stat_id
+                            ),
+                        ));
+                    }
+                }
+            }
+            (StatDefinitionKind::Base, None) => {}
+        }
+    }
+
+    let mut visiting = Vec::new();
+    let mut visited = HashSet::new();
+    for stat in &scenario.stat_definitions {
+        if stat.kind == StatDefinitionKind::Derived {
+            validate_derived_formula_cycles(
+                stat.id.as_str(),
+                &definitions,
+                &mut visiting,
+                &mut visited,
+                diagnostics,
+            );
+        }
+    }
+}
+
+fn validate_derived_formula_cycles(
+    stat_id: &str,
+    definitions: &HashMap<&str, &crate::StatDefinition>,
+    visiting: &mut Vec<String>,
+    visited: &mut HashSet<String>,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    if visited.contains(stat_id) {
+        return;
+    }
+    if let Some(cycle_start) = visiting.iter().position(|entry| entry == stat_id) {
+        let mut cycle = visiting[cycle_start..].to_vec();
+        cycle.push(stat_id.to_string());
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::DerivedStatFormulaCycle,
+            Some(stat_id.to_string()),
+            format!(
+                "Derived stat formula cycle detected: {}.",
+                cycle.join(" -> ")
+            ),
+        ));
+        return;
+    }
+
+    let Some(stat) = definitions.get(stat_id) else {
+        return;
+    };
+    let Some(formula) = stat.formula.as_ref() else {
+        return;
+    };
+
+    visiting.push(stat_id.to_string());
+    for referenced_stat_id in formula.referenced_stat_ids() {
+        if definitions
+            .get(referenced_stat_id)
+            .is_some_and(|definition| definition.kind == StatDefinitionKind::Derived)
+        {
+            validate_derived_formula_cycles(
+                referenced_stat_id,
+                definitions,
+                visiting,
+                visited,
+                diagnostics,
+            );
+        }
+    }
+    visiting.pop();
+    visited.insert(stat_id.to_string());
 }
 
 fn validate_modifiers(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {
@@ -317,12 +430,8 @@ fn validate_combatant_class_and_stat_references(
             }
         }
 
-        for stat in combatant
-            .stats
-            .base_stats
-            .iter()
-            .chain(combatant.stats.derived_stats.iter())
-        {
+        let mut seen_base_stat_ids = HashSet::new();
+        for stat in &combatant.stats.base_stats {
             if scenario.stat_definition_by_id(&stat.id).is_none() {
                 diagnostics.push(ContentDiagnostic::error(
                     ContentDiagnosticCode::MissingCombatantStatDefinition,
@@ -333,6 +442,42 @@ fn validate_combatant_class_and_stat_references(
                     ),
                 ));
             }
+            if !seen_base_stat_ids.insert(stat.id.clone()) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::DuplicateCombatantBaseStat,
+                    Some(stat.id.clone()),
+                    format!(
+                        "Combatant {} declares base stat {} more than once.",
+                        combatant.id, stat.id
+                    ),
+                ));
+            }
+        }
+
+        for definition in scenario.stat_definitions.iter().filter(|definition| {
+            definition.kind == StatDefinitionKind::Base && !definition.id.is_empty()
+        }) {
+            if !seen_base_stat_ids.contains(&definition.id) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingCombatantBaseStat,
+                    Some(definition.id.clone()),
+                    format!(
+                        "Combatant {} is missing base stat {}.",
+                        combatant.id, definition.id
+                    ),
+                ));
+            }
+        }
+
+        for stat in &combatant.stats.derived_stats {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::AuthoredDerivedStatValue,
+                Some(stat.id.clone()),
+                format!(
+                    "Combatant {} declares derived stat {} as input; derived values come from formulas.",
+                    combatant.id, stat.id
+                ),
+            ));
         }
 
         for modifier in &combatant.active_modifiers {
@@ -508,7 +653,7 @@ fn validate_action_references(
     }
 
     if let (Some(actor), Some(attack)) = (actor, action.attack_check()) {
-        validate_actor_attack_stat(action, attack, actor, diagnostics);
+        validate_actor_attack_stat(scenario, action, attack, actor, diagnostics);
     }
     validate_hit_modifier(scenario, action, diagnostics);
     validate_effect_operations(action, diagnostics);
@@ -562,17 +707,32 @@ fn validate_hit_modifier(
 }
 
 fn validate_actor_attack_stat(
+    scenario: &RulebenchScenario,
     action: &ActionDefinition,
     attack: &AttackCheckDeclaration,
     actor: &Combatant,
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
-    if actor.stat_by_id(&attack.modifier_stat_id).is_none() {
+    let Some(definition) = scenario.stat_definition_by_id(&attack.modifier_stat_id) else {
         diagnostics.push(ContentDiagnostic::error(
             ContentDiagnosticCode::MissingAttackModifierStat,
             Some(attack.modifier_stat_id.clone()),
             format!(
                 "Action {} references attack modifier stat {} that actor {} does not have.",
+                action.id, attack.modifier_stat_id, actor.id
+            ),
+        ));
+        return;
+    };
+
+    if definition.kind == StatDefinitionKind::Base
+        && actor.stat_by_id(&attack.modifier_stat_id).is_none()
+    {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::MissingAttackModifierStat,
+            Some(attack.modifier_stat_id.clone()),
+            format!(
+                "Action {} references base attack modifier stat {} that actor {} does not have.",
                 action.id, attack.modifier_stat_id, actor.id
             ),
         ));

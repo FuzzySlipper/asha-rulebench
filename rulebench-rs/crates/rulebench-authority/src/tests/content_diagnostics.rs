@@ -366,6 +366,7 @@ fn content_diagnostics_report_empty_stat_definition_id() {
         id: String::new(),
         label: "Empty".to_string(),
         kind: StatDefinitionKind::Base,
+        formula: None,
         summary: "Invalid stat definition fixture.".to_string(),
     });
 
@@ -397,6 +398,103 @@ fn content_diagnostics_report_duplicate_stat_definition_ids() {
         ContentDiagnosticCode::DuplicateStatDefinitionId
     );
     assert_eq!(diagnostics[0].content_id, Some("mind".to_string()));
+}
+
+#[test]
+fn content_diagnostics_require_well_formed_derived_stat_formulas() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario
+        .stat_definition_by_id("initiative")
+        .expect("fixture has initiative");
+    scenario
+        .stat_definitions
+        .iter_mut()
+        .find(|definition| definition.id == "initiative")
+        .expect("fixture has initiative")
+        .formula = None;
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::MissingDerivedStatFormula
+    );
+    assert_eq!(
+        ContentDiagnosticCode::MissingDerivedStatFormula.code(),
+        "missingDerivedStatFormula"
+    );
+}
+
+#[test]
+fn content_diagnostics_reject_unknown_and_cyclic_derived_stat_references() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario
+        .stat_definitions
+        .iter_mut()
+        .find(|definition| definition.id == "initiative")
+        .expect("fixture has initiative")
+        .formula = Some(DerivedStatFormula::StatReference {
+        stat_id: "missing-stat".to_string(),
+    });
+    scenario.stat_definitions.push(StatDefinition {
+        id: "focus".to_string(),
+        label: "Focus".to_string(),
+        kind: StatDefinitionKind::Derived,
+        formula: Some(DerivedStatFormula::StatReference {
+            stat_id: "focus".to_string(),
+        }),
+        summary: "Intentional cycle fixture.".to_string(),
+    });
+
+    let diagnostics = validate_scenario_content(&scenario);
+    let codes = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        codes,
+        vec![
+            ContentDiagnosticCode::UnknownDerivedStatReference,
+            ContentDiagnosticCode::DerivedStatFormulaCycle,
+        ]
+    );
+}
+
+#[test]
+fn content_diagnostics_reject_malformed_and_authored_derived_values() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario
+        .stat_definitions
+        .iter_mut()
+        .find(|definition| definition.id == "initiative")
+        .expect("fixture has initiative")
+        .formula = Some(DerivedStatFormula::Sum {
+        operands: vec![DerivedStatFormula::Constant { value: 1 }],
+    });
+    scenario.combatants[0]
+        .stats
+        .derived_stats
+        .push(NamedNumber {
+            id: "initiative".to_string(),
+            label: "Initiative".to_string(),
+            value: 999,
+        });
+
+    let diagnostics = validate_scenario_content(&scenario);
+    let codes = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        codes,
+        vec![
+            ContentDiagnosticCode::InvalidDerivedStatFormula,
+            ContentDiagnosticCode::AuthoredDerivedStatValue,
+        ]
+    );
 }
 
 #[test]

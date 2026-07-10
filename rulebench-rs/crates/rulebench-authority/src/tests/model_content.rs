@@ -512,6 +512,31 @@ fn effective_stat_readout_applies_permanent_modifier_contribution() {
 }
 
 #[test]
+fn derived_stats_evaluate_from_effective_inputs_and_explain_the_formula() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[0]
+        .active_modifiers
+        .push(ActiveModifier::temporary("rattled", "rattled", "one turn"));
+
+    let readout = evaluate_effective_stats_for_combatant(&scenario, "entity-adept")
+        .expect("fixture formula evaluates");
+    let initiative = readout
+        .stats
+        .iter()
+        .find(|stat| stat.stat_id == "initiative")
+        .expect("derived initiative is evaluated");
+
+    assert_eq!(initiative.kind, StatDefinitionKind::Derived);
+    assert!(matches!(
+        initiative.formula,
+        Some(DerivedStatFormula::Difference { .. })
+    ));
+    assert_eq!(initiative.base_value, 2);
+    assert_eq!(initiative.total_modifier_delta, 0);
+    assert_eq!(initiative.effective_value, 2);
+}
+
+#[test]
 fn effective_stat_readout_rejects_missing_combatant() {
     let scenario = hexing_bolt_fixture_scenario();
 

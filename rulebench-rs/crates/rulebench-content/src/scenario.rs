@@ -181,6 +181,8 @@ pub struct CombatantEffectiveStatReadout {
 pub struct EffectiveStatReadout {
     pub stat_id: String,
     pub stat_label: String,
+    pub kind: crate::StatDefinitionKind,
+    pub formula: Option<crate::DerivedStatFormula>,
     pub base_value: i32,
     pub total_modifier_delta: i32,
     pub effective_value: i32,

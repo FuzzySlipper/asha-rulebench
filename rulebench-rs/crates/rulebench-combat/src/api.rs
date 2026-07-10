@@ -395,6 +395,7 @@ mod tests {
                 id: "mind".to_string(),
                 label: "Mind".to_string(),
                 kind: StatDefinitionKind::Base,
+                formula: None,
                 summary: "Attack stat.".to_string(),
             }],
             modifiers: vec![ModifierDefinition {

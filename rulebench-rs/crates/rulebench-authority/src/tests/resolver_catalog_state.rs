@@ -15,10 +15,7 @@ fn scenario_carries_combatant_stat_blocks() {
         .expect("fixture has raider");
 
     assert_eq!(adept.stat_by_id("mind").map(|stat| stat.value), Some(4));
-    assert_eq!(
-        adept.stat_by_id("initiative").map(|stat| stat.value),
-        Some(3)
-    );
+    assert!(adept.stat_by_id("initiative").is_none());
     assert_eq!(raider.stat_by_id("body").map(|stat| stat.value), Some(3));
 }
 
@@ -395,6 +392,39 @@ fn resolver_uses_effective_actor_stat_for_attack_modifier() {
             (1, RollRequestKind::DamageRoll, Some(5), false),
         ]
     );
+}
+
+#[test]
+fn resolver_uses_derived_actor_stat_for_attack_modifier() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0]
+        .attack_check_mut()
+        .expect("fixture uses an attack check")
+        .modifier_stat_id = "initiative".to_string();
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[12, 5],
+    );
+
+    assert!(receipt.accepted);
+    assert_eq!(
+        receipt.attack_roll.as_ref().map(|roll| roll.modifier),
+        Some(3)
+    );
+    assert_eq!(
+        receipt.attack_roll.as_ref().map(|roll| roll.total),
+        Some(15)
+    );
+    assert!(receipt
+        .trace
+        .iter()
+        .any(|entry| entry.message == "Derived attack stat evaluated."));
+    assert!(receipt
+        .trace
+        .iter()
+        .any(|entry| entry.detail.contains("total 15 beats Nerve 13")));
 }
 
 #[test]

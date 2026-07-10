@@ -295,9 +295,40 @@ fn resolve_accepted_action(
         ),
     ];
 
+    if scenario
+        .stat_definition_by_id(&attack.modifier_stat_id)
+        .is_some_and(|definition| definition.kind == StatDefinitionKind::Derived)
+    {
+        if let Some(readout) =
+            effective_stats_for_combatant(scenario, &intent.actor_id).and_then(|readout| {
+                readout
+                    .stats
+                    .into_iter()
+                    .find(|stat| stat.stat_id == attack.modifier_stat_id)
+            })
+        {
+            trace.push(TraceEntry::new(
+                3,
+                TracePhase::Resolution,
+                TraceStatus::Info,
+                "Derived attack stat evaluated.",
+                format!(
+                    "{} formula produced effective value {} for attack resolution.",
+                    readout
+                        .formula
+                        .as_ref()
+                        .map_or("derived", DerivedStatFormula::code),
+                    readout.effective_value
+                ),
+            ));
+        }
+    }
+
+    let resolution_sequence = trace.len() as u32 + 1;
+
     if attack_roll.outcome == AttackOutcome::Miss {
         trace.push(TraceEntry::new(
-            3,
+            resolution_sequence,
             TracePhase::Resolution,
             TraceStatus::Accepted,
             "Miss branch selected.",
@@ -307,7 +338,7 @@ fn resolve_accepted_action(
             ),
         ));
         trace.push(TraceEntry::new(
-            4,
+            resolution_sequence + 1,
             TracePhase::Commit,
             TraceStatus::Accepted,
             "DomainEvents committed.",
@@ -350,7 +381,7 @@ fn resolve_accepted_action(
     };
 
     trace.push(TraceEntry::new(
-        3,
+        resolution_sequence,
         TracePhase::Resolution,
         TraceStatus::Accepted,
         "Hit branch selected.",
@@ -360,7 +391,7 @@ fn resolve_accepted_action(
         ),
     ));
     trace.push(TraceEntry::new(
-        4,
+        resolution_sequence + 1,
         TracePhase::Commit,
         TraceStatus::Accepted,
         "DomainEvents committed.",

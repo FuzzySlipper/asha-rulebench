@@ -22,7 +22,7 @@ pub use scenario::{
     ItemDefinition, ModifierDefinition, ModifierStatAdjustment, ModifierStatAdjustmentContribution,
     RulebenchScenario, UseActionIntent,
 };
-pub use stats::{StatBlock, StatDefinition, StatDefinitionKind};
+pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
 pub use validation::{validate_scenario_content, validate_scenario_content_report};
 
 #[cfg(test)]

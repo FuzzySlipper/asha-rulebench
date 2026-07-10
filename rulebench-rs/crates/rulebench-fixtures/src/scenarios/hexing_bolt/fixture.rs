@@ -355,20 +355,34 @@ fn hexing_bolt_stat_definitions() -> Vec<StatDefinition> {
             id: "mind".to_string(),
             label: "Mind".to_string(),
             kind: StatDefinitionKind::Base,
+            formula: None,
             summary: "Mental force used by Hexing Bolt attack rolls.".to_string(),
         },
         StatDefinition {
             id: "body".to_string(),
             label: "Body".to_string(),
             kind: StatDefinitionKind::Base,
+            formula: None,
             summary: "Physical force for future melee and durability checks.".to_string(),
         },
         StatDefinition {
             id: "initiative".to_string(),
             label: "Initiative".to_string(),
             kind: StatDefinitionKind::Derived,
-            summary: "Turn-order readiness value; formula intentionally not modeled here."
-                .to_string(),
+            formula: Some(DerivedStatFormula::Difference {
+                minuend: Box::new(DerivedStatFormula::Sum {
+                    operands: vec![
+                        DerivedStatFormula::StatReference {
+                            stat_id: "mind".to_string(),
+                        },
+                        DerivedStatFormula::StatReference {
+                            stat_id: "body".to_string(),
+                        },
+                    ],
+                }),
+                subtrahend: Box::new(DerivedStatFormula::Constant { value: 3 }),
+            }),
+            summary: "Turn-order readiness derived from mind and body.".to_string(),
         },
     ]
 }
@@ -441,11 +455,7 @@ fn adept_initial() -> Combatant {
                     value: 2,
                 },
             ],
-            derived_stats: vec![NamedNumber {
-                id: "initiative".to_string(),
-                label: "Initiative".to_string(),
-                value: 3,
-            }],
+            derived_stats: Vec::new(),
         },
         defenses: vec![
             NamedNumber {
@@ -491,11 +501,7 @@ fn raider_initial() -> Combatant {
                     value: 3,
                 },
             ],
-            derived_stats: vec![NamedNumber {
-                id: "initiative".to_string(),
-                label: "Initiative".to_string(),
-                value: 1,
-            }],
+            derived_stats: Vec::new(),
         },
         defenses: vec![
             NamedNumber {

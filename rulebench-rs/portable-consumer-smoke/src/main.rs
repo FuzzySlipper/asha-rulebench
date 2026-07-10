@@ -73,7 +73,7 @@ fn scenario() -> RulebenchScenario {
         abilities: vec![AbilityDefinition { id: "bolt-ability".to_string(), name: "Consumer Bolt".to_string(), kind: AbilityDefinitionKind::Ability, summary: "Standalone action ability.".to_string(), tags: vec![] }],
         selected_ability_id: Some("bolt-ability".to_string()),
         classes: vec![], selected_class_id: None,
-        stat_definitions: vec![StatDefinition { id: "mind".to_string(), label: "Mind".to_string(), kind: StatDefinitionKind::Base, summary: "Attack stat.".to_string() }],
+        stat_definitions: vec![StatDefinition { id: "mind".to_string(), label: "Mind".to_string(), kind: StatDefinitionKind::Base, formula: None, summary: "Attack stat.".to_string() }],
         modifiers: vec![ModifierDefinition { id: "rattled".to_string(), label: "Rattled".to_string(), summary: "Consumer modifier.".to_string(), default_tenure: ModifierTenure::Temporary, stat_adjustments: vec![] }],
         items: vec![], selected_item_id: None,
         actions: vec![action.clone()], selected_action: action,
