@@ -62,6 +62,8 @@ Future local Rust crates may be added only when a task explicitly calls for incu
 The selected concrete live adapter lives at
 `rulebench-rs/hosts/rulebench-process-host`. It binds loopback and is reached
 through the Angular same-origin proxy; `rulebench-bridge` remains host-neutral.
+The matching TypeScript client lives at `libs/transport/src/live.ts`; preserve
+its generated-DTO-only API and fake/live implementation parity.
 
 ## Local Commands
 

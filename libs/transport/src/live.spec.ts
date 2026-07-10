@@ -1,0 +1,263 @@
+import { describe, expect, it } from "vitest";
+import type {
+  RulebenchCombatAutomationPolicySpecDto,
+  RulebenchProtocolHandshakeDto,
+  RulebenchScenarioOptionDto,
+} from "@asha-rulebench/protocol";
+import {
+  createLiveRulebenchTransport,
+  RULEBENCH_PROTOCOL_VERSION,
+} from "./live";
+import { createFakeRulebenchLiveTransport } from "./live-fake";
+
+const handshake: RulebenchProtocolHandshakeDto = {
+  protocolId: "asha-rulebench.protocol",
+  protocolVersion: RULEBENCH_PROTOCOL_VERSION,
+  authoritySurface: "asha-rulebench.local-authority.v0",
+};
+
+describe("live Rulebench transport", () => {
+  it("maps every public operation to the versioned host route without changing request DTOs", async () => {
+    const calls: Array<{
+      readonly url: string;
+      readonly method: string | undefined;
+      readonly version: string | null;
+      readonly body: BodyInit | null | undefined;
+    }> = [];
+    const responseBodies: unknown[] = [
+      handshake,
+      [],
+      [],
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+    ];
+    const fetchRequest: typeof fetch = async (input, init) => {
+      calls.push({
+        url: String(input),
+        method: init?.method,
+        version: new Headers(init?.headers).get("x-rulebench-protocol-version"),
+        body: init?.body,
+      });
+      return Response.json(responseBodies.shift());
+    };
+    const transport = createLiveRulebenchTransport({
+      apiBaseUrl: "http://rulebench.test/api/rulebench/v1/",
+      fetch: fetchRequest,
+    });
+    const createRequest = {
+      sessionId: "session/one",
+      scenarioId: "hexing-bolt-hit",
+    };
+    const intent = {
+      actorId: "adept",
+      actionId: "hexing-bolt",
+      targetId: "raider",
+    };
+    const intentCommand = {
+      id: "step-1",
+      title: "Hexing Bolt",
+      summary: "Adept attacks Raider.",
+      intent,
+      rollStream: [17, 5],
+    };
+    const policy: RulebenchCombatAutomationPolicySpecDto = {
+      id: "first-accepted-candidate",
+      version: 1,
+      noCandidateBehavior: "advanceTurn",
+    };
+    const automaticStep = {
+      id: "auto-step",
+      title: "Automatic step",
+      summary: "Run one authority-selected step.",
+      rollStream: [17, 5],
+      policy,
+    };
+    const automaticRun = {
+      ...automaticStep,
+      id: "auto-run",
+      title: "Automatic run",
+      maxSteps: 10,
+    };
+
+    await transport.connect();
+    await transport.listScenarios();
+    await transport.listSessions();
+    await transport.createSession(createRequest);
+    await transport.getSession(createRequest.sessionId);
+    await transport.closeSession(createRequest.sessionId);
+    await transport.getCurrentActorOptions(createRequest.sessionId);
+    await transport.preflightIntent(createRequest.sessionId, intent);
+    await transport.listCandidates(createRequest.sessionId);
+    await transport.submitIntent(createRequest.sessionId, intentCommand);
+    await transport.submitControl(createRequest.sessionId, {
+      kind: "advanceTurn",
+    });
+    await transport.runAutomaticStep(createRequest.sessionId, automaticStep);
+    await transport.runAutomaticCombat(createRequest.sessionId, automaticRun);
+
+    expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
+      "GET http://rulebench.test/api/rulebench/v1/handshake",
+      "GET http://rulebench.test/api/rulebench/v1/scenarios",
+      "GET http://rulebench.test/api/rulebench/v1/sessions",
+      "POST http://rulebench.test/api/rulebench/v1/sessions",
+      "GET http://rulebench.test/api/rulebench/v1/sessions/session%2Fone",
+      "DELETE http://rulebench.test/api/rulebench/v1/sessions/session%2Fone",
+      "GET http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/options",
+      "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/preflight",
+      "GET http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/candidates",
+      "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/intents",
+      "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/controls",
+      "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-step",
+      "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-run",
+    ]);
+    expect(calls.every((call) => call.version === "1")).toBe(true);
+    expect(calls[3]?.body).toBe(JSON.stringify(createRequest));
+    expect(calls[7]?.body).toBe(JSON.stringify(intent));
+    expect(calls[9]?.body).toBe(JSON.stringify(intentCommand));
+    expect(calls[11]?.body).toBe(JSON.stringify(automaticStep));
+    expect(calls[12]?.body).toBe(JSON.stringify(automaticRun));
+  });
+
+  it("tracks a verified handshake and rejects a mismatched protocol without repairing it", async () => {
+    const connected = createLiveRulebenchTransport({
+      fetch: async () => Response.json(handshake),
+    });
+    const connectedResult = await connected.connect();
+
+    expect(connectedResult).toEqual({ ok: true, value: handshake });
+    expect(connected.connectionState()).toEqual({
+      kind: "connected",
+      handshake,
+    });
+
+    const mismatched = createLiveRulebenchTransport({
+      fetch: async () => Response.json({ ...handshake, protocolVersion: 2 }),
+    });
+    const mismatchResult = await mismatched.connect();
+
+    expect(mismatchResult).toEqual({
+      ok: false,
+      error: {
+        kind: "protocol",
+        code: "handshakeMismatch",
+        message:
+          "Expected asha-rulebench.protocol v1; received asha-rulebench.protocol v2.",
+        retryable: false,
+      },
+    });
+    expect(mismatched.connectionState().kind).toBe("disconnected");
+  });
+
+  it("preserves host errors and classifies malformed or unreachable responses", async () => {
+    const hostError = {
+      kind: "bridge",
+      code: "unknownSession",
+      message: "Unknown combat session handle: missing.",
+      retryable: false,
+    };
+    const rejected = createLiveRulebenchTransport({
+      fetch: async () => Response.json(hostError, { status: 404 }),
+    });
+    await expect(rejected.getSession("missing")).resolves.toEqual({
+      ok: false,
+      error: hostError,
+    });
+
+    const malformed = createLiveRulebenchTransport({
+      fetch: async () => new Response("not json", { status: 200 }),
+    });
+    await expect(malformed.listScenarios()).resolves.toEqual({
+      ok: false,
+      error: {
+        kind: "serialization",
+        code: "invalidJsonResponse",
+        message: "Rulebench host returned invalid JSON with HTTP 200.",
+        retryable: false,
+      },
+    });
+
+    const unreachable = createLiveRulebenchTransport({
+      fetch: async () => {
+        throw new TypeError("connection refused");
+      },
+    });
+    await expect(unreachable.listSessions()).resolves.toEqual({
+      ok: false,
+      error: {
+        kind: "network",
+        code: "requestFailed",
+        message: "connection refused",
+        retryable: true,
+      },
+    });
+    expect(unreachable.connectionState().kind).toBe("disconnected");
+  });
+
+  it("cancels in-flight requests when disconnected and cleans up external abort listeners", async () => {
+    const fetchRequest: typeof fetch = async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    const transport = createLiveRulebenchTransport({ fetch: fetchRequest });
+
+    const pending = transport.listSessions();
+    transport.disconnect();
+
+    await expect(pending).resolves.toEqual({
+      ok: false,
+      error: {
+        kind: "cancellation",
+        code: "requestAborted",
+        message: "Rulebench host request was cancelled.",
+        retryable: false,
+      },
+    });
+    expect(transport.connectionState()).toEqual({
+      kind: "disconnected",
+      error: null,
+    });
+  });
+});
+
+describe("fake live Rulebench transport", () => {
+  it("has interface parity and returns configured authority evidence by identity", async () => {
+    const scenarios: readonly RulebenchScenarioOptionDto[] = [
+      { id: "scenario", title: "Scenario", summary: "Authority fixture." },
+    ];
+    const transport = createFakeRulebenchLiveTransport({
+      connect: async () => ({ ok: true, value: handshake }),
+      listScenarios: async () => ({ ok: true, value: scenarios }),
+    });
+
+    await transport.connect();
+    const result = await transport.listScenarios();
+
+    expect(result.ok && result.value).toBe(scenarios);
+    expect(transport.connectionState()).toEqual({
+      kind: "connected",
+      handshake,
+    });
+    await expect(transport.listSessions()).resolves.toEqual({
+      ok: false,
+      error: {
+        kind: "fake",
+        code: "handlerNotConfigured",
+        message: "Fake live transport handler is not configured: listSessions.",
+        retryable: false,
+      },
+    });
+  });
+});

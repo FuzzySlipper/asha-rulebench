@@ -48,7 +48,10 @@ pnpm run check:rust-boundaries
 
 `pnpm dev` starts both the loopback Rust process host and the Angular server.
 Angular remains the only `0.0.0.0` LAN-facing process and proxies the versioned
-`/api/rulebench/v1` path to Rust on the same origin.
+`/api/rulebench/v1` path to Rust on the same origin. The typed client in
+`libs/transport/src/live.ts` owns protocol handshakes, generated DTO requests,
+classified host errors, and request cancellation. Stores and components must
+consume that public transport boundary rather than call the host directly.
 
 ## Source Material
 
