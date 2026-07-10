@@ -1,4 +1,4 @@
-use super::super::*;
+use super::super::test_support::*;
 
 #[test]
 fn session_runtime_accepts_hit_command_and_advances_state() {

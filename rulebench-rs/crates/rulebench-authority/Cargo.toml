@@ -3,13 +3,11 @@ name = "rulebench-authority"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Local ASHA Rulebench authority incubation crate."
+description = "Rulebench command entrypoints and integration test harness."
 
 [lints]
 workspace = true
 
 [dependencies]
-rulebench-bridge = { path = "../rulebench-bridge" }
 rulebench-codegen = { path = "../rulebench-codegen" }
 rulebench-fixtures = { path = "../rulebench-fixtures" }
-rulebench-rules = { path = "../rulebench-rules" }

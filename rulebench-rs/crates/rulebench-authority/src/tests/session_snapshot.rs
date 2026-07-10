@@ -1,4 +1,4 @@
-use super::super::*;
+use super::super::test_support::*;
 
 #[test]
 fn session_runtime_snapshot_reads_initial_state() {

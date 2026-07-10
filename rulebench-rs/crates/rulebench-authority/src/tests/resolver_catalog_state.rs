@@ -1,4 +1,4 @@
-use super::super::*;
+use super::super::test_support::*;
 
 #[test]
 fn scenario_carries_combatant_stat_blocks() {
@@ -857,7 +857,7 @@ fn combat_session_rejected_step_preserves_prior_authority_state_without_events()
 #[test]
 fn combat_state_projects_initial_scenario_facts() {
     let scenario = hexing_bolt_fixture_scenario();
-    let state = crate::state::CombatState::from_scenario(&scenario);
+    let state = CombatState::from_scenario(&scenario);
 
     let projection = state.project("Initial combat state.");
 
@@ -876,7 +876,7 @@ fn combat_state_applies_hit_damage_and_condition() {
     let receipt = accepted_hexing_bolt_fixture_receipt();
     let damage = receipt.damage.as_ref().expect("fixture hit has damage");
     let modifier = receipt.modifier.as_ref().expect("fixture hit has modifier");
-    let mut state = crate::state::CombatState::from_scenario(&scenario);
+    let mut state = CombatState::from_scenario(&scenario);
 
     assert_eq!(state.active_modifiers_for("entity-raider"), Some(&[][..]));
     state.apply_hit(damage, modifier);
@@ -903,7 +903,7 @@ fn combat_state_preserves_prior_state_for_miss_noop_projection() {
     let first_step =
         resolve_combat_session_step("hexing-bolt-opening-exchange", "adept-hexing-bolt-hit")
             .expect("hit step exists");
-    let state = crate::state::CombatState::from_projection(&first_step.state_after);
+    let state = CombatState::from_projection(&first_step.state_after);
 
     let projection = state.project("Attack missed; no authority state changed.");
 
@@ -919,7 +919,7 @@ fn combat_state_preserves_prior_state_for_rejection_projection() {
     let miss_step =
         resolve_combat_session_step("hexing-bolt-opening-exchange", "adept-hexing-bolt-miss")
             .expect("miss step exists");
-    let state = crate::state::CombatState::from_projection(&miss_step.state_after);
+    let state = CombatState::from_projection(&miss_step.state_after);
 
     let projection = state.project("No authority state changed; intent rejected.");
 
@@ -936,8 +936,7 @@ fn combat_state_applies_projected_state_back_to_scenario() {
     let receipt = accepted_hexing_bolt_fixture_receipt();
     let projection = receipt.projection.as_ref().expect("fixture has projection");
 
-    let next_scenario =
-        crate::state::CombatState::from_projection(projection).apply_to_scenario(scenario);
+    let next_scenario = CombatState::from_projection(projection).apply_to_scenario(scenario);
 
     assert_eq!(next_scenario.combatants[1].hit_points.current, 9);
     assert_eq!(
@@ -952,7 +951,7 @@ fn combat_state_applies_active_modifiers_back_to_scenario() {
     let receipt = accepted_hexing_bolt_fixture_receipt();
     let damage = receipt.damage.as_ref().expect("fixture hit has damage");
     let modifier = receipt.modifier.as_ref().expect("fixture hit has modifier");
-    let mut state = crate::state::CombatState::from_scenario(&scenario);
+    let mut state = CombatState::from_scenario(&scenario);
 
     state.apply_hit(damage, modifier);
     let next_scenario = state.apply_to_scenario(scenario);

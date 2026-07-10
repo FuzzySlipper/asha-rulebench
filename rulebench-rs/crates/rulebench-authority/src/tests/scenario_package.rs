@@ -1,6 +1,4 @@
-use rulebench_fixtures::ScenarioPackageValidationError;
-
-use crate::hexing_bolt_scenario_package;
+use super::super::test_support::{hexing_bolt_scenario_package, ScenarioPackageValidationError};
 
 #[test]
 fn hexing_bolt_conforms_to_the_fixture_owned_scenario_package_contract() {

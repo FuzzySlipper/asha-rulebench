@@ -30,7 +30,7 @@ Boundary and adapter layers:
 Rulebench-local layers:
 
 - `rulebench-fixtures`: authored scenarios, fixtures, goldens, and regression packs.
-- `rulebench-authority`: Rulebench facade/testbench and current compatibility surface.
+- `rulebench-authority`: stable catalog/session emitter commands and the Rulebench integration test harness; it has no library compatibility API.
 
 The boundaries add useful friction. A game repo should be able to share portable
 rule behavior without inheriting Rulebench fixtures, generators, or UI machinery.
@@ -82,7 +82,7 @@ and tests. Do not add a path dependency simply to preserve an old import path.
 ## Migration Posture
 
 - Empty crates are intentional reservation boundaries, not implemented feature claims.
-- Move behavior by concern, preserving public compatibility through `rulebench-rules` and `rulebench-authority` while callers migrate.
+- Move behavior by concern, preserving portable compatibility through `rulebench-rules`; migrate Rulebench callers directly to fixture, protocol, bridge, or codegen owners rather than adding authority forwards.
 - Do not create circular dependencies to preserve an old import path.
 - Keep scenario-specific assumptions in `rulebench-fixtures` or the Rulebench harness.
 - Keep host choice out of `rulebench-bridge`; concrete native, WASM, process, or service adapters can be added after the live bridge design is selected.

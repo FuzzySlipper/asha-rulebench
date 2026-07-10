@@ -1,4 +1,4 @@
-use super::super::*;
+use super::super::test_support::*;
 
 #[test]
 fn content_diagnostics_report_empty_ruleset_id() {

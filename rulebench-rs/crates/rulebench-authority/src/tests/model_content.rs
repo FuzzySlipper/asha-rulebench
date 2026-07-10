@@ -1,4 +1,4 @@
-use super::super::*;
+use super::super::test_support::*;
 
 #[test]
 fn accepted_intent_shape_emits_one_domain_event() {
