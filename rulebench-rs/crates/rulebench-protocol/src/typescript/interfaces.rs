@@ -6,6 +6,92 @@ type Interface = ProtocolInterface;
 pub fn interfaces() -> &'static [ProtocolInterface] {
     &[
         Interface {
+            name: "RulebenchProtocolRequestContextDto",
+            fields: &[Field {
+                name: "protocolVersion",
+                ty: "number",
+            }],
+        },
+        Interface {
+            name: "RulebenchProtocolHandshakeDto",
+            fields: &[
+                Field {
+                    name: "protocolId",
+                    ty: "string",
+                },
+                Field {
+                    name: "protocolVersion",
+                    ty: "number",
+                },
+                Field {
+                    name: "authoritySurface",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchScenarioOptionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatSessionCreateRequestDto",
+            fields: &[
+                Field {
+                    name: "sessionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatSessionIntentCommandDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "intent",
+                    ty: "RulebenchUseActionIntentDto",
+                },
+                Field {
+                    name: "rollStream",
+                    ty: "readonly number[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatControlCommandDto",
+            fields: &[Field {
+                name: "kind",
+                ty: "RulebenchCombatControlCommandKindDto",
+            }],
+        },
+        Interface {
             name: "RulebenchCombatSessionHandleDto",
             fields: &[Field {
                 name: "id",

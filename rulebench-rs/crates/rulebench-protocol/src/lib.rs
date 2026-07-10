@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod authoring;
+mod bridge;
 mod content;
 mod replay;
 mod session;
@@ -15,6 +16,13 @@ mod typescript;
 pub use authoring::{
     validate_ruleset_definition, RuleModuleConfigurationDto, RuleModuleDeclarationDto,
     RulesetAuthoringError, RulesetDefinitionDto,
+};
+pub use bridge::{
+    AutomaticRunRequestDto, AutomaticStepRequestDto, CombatAutomationNoCandidateBehaviorDto,
+    CombatAutomationPolicyDto, CombatControlCommandDto, CombatControlCommandKindDto,
+    CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, ProtocolHandshakeDto,
+    ProtocolRequestContextDto, ScenarioOptionDto, UseActionIntentDto, PROTOCOL_ID,
+    PROTOCOL_VERSION,
 };
 pub use content::{
     ContentFingerprintDto, ContentImportDiagnosticDto, ContentImportReadoutDto,

@@ -114,6 +114,39 @@ export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMi
 
 export type RulebenchReplayArchiveErrorKindDto = 'invalidPackage' | 'storage' | 'notFound' | 'corrupt' | 'unsupportedVersion';
 
+export interface RulebenchProtocolRequestContextDto {
+  readonly protocolVersion: number;
+}
+
+export interface RulebenchProtocolHandshakeDto {
+  readonly protocolId: string;
+  readonly protocolVersion: number;
+  readonly authoritySurface: string;
+}
+
+export interface RulebenchScenarioOptionDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+}
+
+export interface RulebenchCombatSessionCreateRequestDto {
+  readonly sessionId: string;
+  readonly scenarioId: string;
+}
+
+export interface RulebenchCombatSessionIntentCommandDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly intent: RulebenchUseActionIntentDto;
+  readonly rollStream: readonly number[];
+}
+
+export interface RulebenchCombatControlCommandDto {
+  readonly kind: RulebenchCombatControlCommandKindDto;
+}
+
 export interface RulebenchCombatSessionHandleDto {
   readonly id: string;
 }
