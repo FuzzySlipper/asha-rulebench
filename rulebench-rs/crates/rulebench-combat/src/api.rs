@@ -337,6 +337,61 @@ mod tests {
         );
     }
 
+    #[test]
+    fn api_manually_completes_combat_through_authoritative_readbacks() {
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new("manual", valid_scenario()))
+            .expect("valid combat session is created");
+        let session = created.session;
+
+        assert!(
+            api.start_session(&session)
+                .expect("session starts")
+                .accepted
+        );
+        let options = api
+            .current_actor_options(&session)
+            .expect("options are externally readable");
+        assert_eq!(options.current_actor_id, Some("adept".to_string()));
+
+        let intent = UseActionIntent::new("adept", "api_bolt", "raider");
+        assert!(
+            api.preflight_command(&session, intent.clone())
+                .expect("preflight readback")
+                .accepted
+        );
+        assert!(
+            api.submit_intent(
+                &session,
+                CombatSessionIntentCommandSpec::new(
+                    "manual-hit",
+                    "Manual API hit",
+                    "A caller submits the selected intent.",
+                    intent,
+                    vec![20, 20],
+                ),
+            )
+            .expect("intent submission")
+            .receipt
+            .accepted
+        );
+
+        let end = api
+            .submit_control(&session, CombatControlCommandSpec::end_if_condition_met())
+            .expect("conditional end readback");
+        assert!(end.accepted);
+        let snapshot = api.snapshot(&session).expect("final snapshot");
+        assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(snapshot.combat_log.len(), 1);
+        assert_eq!(snapshot.audit_log.len(), 1);
+        assert!(snapshot.combat_end_condition.combat_should_end);
+        assert_eq!(
+            snapshot.current_actor_options.lifecycle_phase,
+            CombatLifecyclePhase::Ended
+        );
+    }
+
     fn invalid_scenario() -> RulebenchScenario {
         let mut scenario = valid_scenario();
         scenario.selected_ruleset_id = "missing-ruleset".to_string();
@@ -489,7 +544,21 @@ mod tests {
                 modifier_id: "marked".to_string(),
                 modifier_label: "marked".to_string(),
                 modifier_duration: "one turn".to_string(),
-                operations: Vec::new(),
+                operations: vec![
+                    rulebench_ruleset::HitEffectOperation::Damage(
+                        rulebench_ruleset::DamageEffectOperation {
+                            damage_bonus: 1,
+                            damage_type: "force".to_string(),
+                        },
+                    ),
+                    rulebench_ruleset::HitEffectOperation::ApplyModifier(
+                        rulebench_ruleset::ModifierEffectOperation {
+                            modifier_id: "marked".to_string(),
+                            modifier_label: "marked".to_string(),
+                            modifier_duration: "one turn".to_string(),
+                        },
+                    ),
+                ],
             },
             action_text: "Mind versus Nerve.".to_string(),
             effect_text: "Minimal hit effect.".to_string(),
