@@ -15,6 +15,7 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             summary: "A focused two-combatant fixture for proving board, event, trace, and final-state readouts.".to_string(),
             seed_label: "roll-stream:17,5".to_string(),
         },
+        content_pack_set: None,
         rulesets: vec![hexing_bolt_ruleset()],
         selected_ruleset_id: "asha-rulebench.hexing-bolt.v0".to_string(),
         grid: Grid {

@@ -17,6 +17,21 @@ pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> Content
 pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDiagnostic> {
     let mut diagnostics = Vec::new();
 
+    if scenario
+        .content_pack_set
+        .as_ref()
+        .is_some_and(|reference| !reference.is_self_consistent())
+    {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::InvalidContentPackSetReference,
+            scenario
+                .content_pack_set
+                .as_ref()
+                .map(|reference| reference.root.id.clone()),
+            "Scenario content pack-set reference is not internally consistent.",
+        ));
+    }
+
     validate_rulesets(scenario, &mut diagnostics);
     validate_entities(scenario, &mut diagnostics);
     validate_abilities(scenario, &mut diagnostics);

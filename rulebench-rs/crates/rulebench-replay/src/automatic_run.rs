@@ -5,8 +5,8 @@ use rulebench_combat::{
     ActionResourceTransitionEntry, ClassBuildLedgerReadout, CombatAutomationPolicyDecisionEvidence,
     CombatFinalizationReadout, CombatSessionAutomaticRunDecisionKind,
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec, CombatSessionState,
-    EquipmentLedgerReadout, EquipmentTransitionEntry, ModifierDurationExpirationEntry,
-    ReactionAuditEntry, ReactionWindowLifecycleEntry,
+    ContentPackSetReference, EquipmentLedgerReadout, EquipmentTransitionEntry,
+    ModifierDurationExpirationEntry, ReactionAuditEntry, ReactionWindowLifecycleEntry,
 };
 use rulebench_core::StateFingerprint;
 
@@ -102,6 +102,9 @@ pub struct CombatSessionAutomaticRunReplayReadout {
     pub actual_final_state_fingerprint: StateFingerprint,
     pub final_state_fingerprint_matches: bool,
     pub finalization_matches: bool,
+    pub expected_content_pack_set: Option<ContentPackSetReference>,
+    pub actual_content_pack_set: Option<ContentPackSetReference>,
+    pub content_pack_set_matches: bool,
     pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub actual_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub run_decision_kind_matches: bool,
@@ -123,6 +126,7 @@ pub struct CombatSessionAutomaticRunReplayReadout {
 pub fn verify_automatic_run_replay(
     spec: CombatSessionAutomaticRunReplaySpec,
 ) -> CombatSessionAutomaticRunReplayReadout {
+    let expected_content_pack_set = spec.initial_scenario.content_pack_set.clone();
     let mut replay_session =
         CombatSessionState::new(spec.initial_session_id.clone(), spec.initial_scenario);
     let replayed_run = replay_session.run_automatic_combat(spec.run);
@@ -137,6 +141,8 @@ pub fn verify_automatic_run_replay(
         actual_final_state_fingerprint == spec.expected_final_state_fingerprint;
     let finalization_matches =
         replayed_run.final_snapshot.finalization == spec.expected_finalization;
+    let actual_content_pack_set = replayed_run.final_snapshot.content_pack_set.clone();
+    let content_pack_set_matches = actual_content_pack_set == expected_content_pack_set;
     let run_decision_kind_matches = actual_run_decision_kind == spec.expected_run_decision_kind;
     let executed_step_count_matches =
         actual_executed_step_count == spec.expected_executed_step_count;
@@ -160,6 +166,7 @@ pub fn verify_automatic_run_replay(
             == spec.expected_modifier_duration_expiration_log;
     let accepted = final_state_fingerprint_matches
         && finalization_matches
+        && content_pack_set_matches
         && run_decision_kind_matches
         && executed_step_count_matches
         && policy_decisions_match
@@ -192,6 +199,9 @@ pub fn verify_automatic_run_replay(
         actual_final_state_fingerprint,
         final_state_fingerprint_matches,
         finalization_matches,
+        expected_content_pack_set,
+        actual_content_pack_set,
+        content_pack_set_matches,
         expected_run_decision_kind: spec.expected_run_decision_kind,
         actual_run_decision_kind,
         run_decision_kind_matches,
@@ -216,14 +226,17 @@ mod tests {
     use super::*;
     use rulebench_combat::ActionResourceCost;
     use rulebench_combat::{
-        ActionDefinition, AttackCheckDeclaration, CheckDeclaration, CombatSessionState,
+        fingerprint_content_pack_set, ActionDefinition, AttackCheckDeclaration, CheckDeclaration,
+        CombatSessionState, ContentFingerprint, ContentPackReference, ContentPackSetReference,
         DefenseReference, Grid, HitEffect, RulebenchScenario, ScenarioMetadata, TargetKind,
         TargetSelection, TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,
+        CONTENT_PACK_FINGERPRINT_ALGORITHM,
     };
 
     #[test]
     fn automatic_run_replay_verifies_matching_evidence() {
-        let scenario = minimal_replay_scenario();
+        let mut scenario = minimal_replay_scenario();
+        scenario.content_pack_set = Some(test_pack_set_reference());
         let run = zero_step_run();
         let expected = expected_run(scenario.clone(), run.clone());
 
@@ -264,6 +277,11 @@ mod tests {
         );
         assert!(readout.final_state_fingerprint_matches);
         assert!(readout.finalization_matches);
+        assert!(readout.content_pack_set_matches);
+        assert_eq!(
+            readout.actual_content_pack_set,
+            readout.expected_content_pack_set
+        );
         assert!(readout.run_decision_kind_matches);
         assert!(readout.executed_step_count_matches);
         assert!(readout.policy_decisions_match);
@@ -396,6 +414,7 @@ mod tests {
                 summary: "Minimal no-mutation replay scenario.".to_string(),
                 seed_label: "replay-test".to_string(),
             },
+            content_pack_set: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "placeholder-rules".to_string(),
             grid: Grid {
@@ -415,6 +434,23 @@ mod tests {
             selected_item_id: None,
             actions: Vec::new(),
             selected_action,
+        }
+    }
+
+    fn test_pack_set_reference() -> ContentPackSetReference {
+        let root = ContentPackReference {
+            id: "replay.content".to_string(),
+            version: "1.0.0".to_string(),
+            fingerprint: ContentFingerprint {
+                algorithm: CONTENT_PACK_FINGERPRINT_ALGORITHM.to_string(),
+                value: "0123456789abcdef".to_string(),
+            },
+        };
+        let packs = vec![root.clone()];
+        ContentPackSetReference {
+            fingerprint: fingerprint_content_pack_set(&root, &packs),
+            root,
+            packs,
         }
     }
 }

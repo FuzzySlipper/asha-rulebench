@@ -24,6 +24,7 @@ impl ContentDiagnosticSeverity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentDiagnosticCode {
+    InvalidContentPackSetReference,
     EmptyRulesetId,
     DuplicateRulesetId,
     SelectedRulesetMissingFromCatalog,
@@ -133,6 +134,9 @@ pub enum ContentDiagnosticCode {
 impl ContentDiagnosticCode {
     pub const fn code(self) -> &'static str {
         match self {
+            ContentDiagnosticCode::InvalidContentPackSetReference => {
+                "invalidContentPackSetReference"
+            }
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
             ContentDiagnosticCode::DuplicateRulesetId => "duplicateRulesetId",
             ContentDiagnosticCode::SelectedRulesetMissingFromCatalog => {

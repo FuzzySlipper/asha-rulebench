@@ -1157,6 +1157,7 @@ mod tests {
                 summary: "Minimal valid session API scenario.".to_string(),
                 seed_label: "combat-api".to_string(),
             },
+            content_pack_set: None,
             rulesets: vec![RulesetMetadata {
                 id: "combat-api.v0".to_string(),
                 name: "Combat API Rules".to_string(),

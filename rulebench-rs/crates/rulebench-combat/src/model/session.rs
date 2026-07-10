@@ -2,11 +2,12 @@
 use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase,
-    CombatTurnOrder, CommandOutcomeClass, EquipmentLedgerReadout, EquipmentTransitionEntry,
-    LifecycleTransitionEntry, LifecycleTransitionTrigger, ModifierDurationExpirationEntry,
-    ReactionAuditEntry, ReactionWindowLifecycleEntry, ReactionWindowReadout, RollConsumptionEntry,
-    RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint,
-    TargetLegality, TurnTransitionEntry, UseActionIntent,
+    CombatTurnOrder, CommandOutcomeClass, ContentPackSetReference, EquipmentLedgerReadout,
+    EquipmentTransitionEntry, LifecycleTransitionEntry, LifecycleTransitionTrigger,
+    ModifierDurationExpirationEntry, ReactionAuditEntry, ReactionWindowLifecycleEntry,
+    ReactionWindowReadout, RollConsumptionEntry, RulebenchReceipt, RulebenchRejection,
+    RulebenchScenario, ScenarioProjection, StateFingerprint, TargetLegality, TurnTransitionEntry,
+    UseActionIntent,
 };
 use rulebench_ruleset::{ActionResourceCost, CombatEndPolicy};
 
@@ -378,6 +379,7 @@ pub struct CombatSessionStepReadout {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSnapshot {
     pub session_id: String,
+    pub content_pack_set: Option<ContentPackSetReference>,
     pub next_step_index: u32,
     pub lifecycle: CombatLifecycle,
     pub lifecycle_transition_log: Vec<LifecycleTransitionEntry>,

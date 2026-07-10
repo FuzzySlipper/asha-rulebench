@@ -1,4 +1,4 @@
-use crate::{ActiveModifier, ScenarioMetadata, StatBlock, StatDefinition};
+use crate::{ActiveModifier, ContentPackSetReference, ScenarioMetadata, StatBlock, StatDefinition};
 use rulebench_core::{BoundedValue, GridPosition, NamedNumber, Team};
 use rulebench_ruleset::{
     AbilityDefinition, ActionDefinition, ActionResourcePool, ModifierTenure, RulesetMetadata,
@@ -49,6 +49,7 @@ impl Combatant {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
+    pub content_pack_set: Option<ContentPackSetReference>,
     pub rulesets: Vec<RulesetMetadata>,
     pub selected_ruleset_id: String,
     pub grid: Grid,

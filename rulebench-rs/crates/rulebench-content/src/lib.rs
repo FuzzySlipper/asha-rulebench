@@ -6,15 +6,29 @@
 #![forbid(unsafe_code)]
 
 mod active_modifier;
+mod canonical;
 mod diagnostics;
+mod pack;
+mod pack_validation;
 mod scenario;
 mod stats;
 mod validation;
 
 pub use active_modifier::ActiveModifier;
+pub use canonical::{canonicalize_content_pack, fingerprint_content_pack_set};
 pub use diagnostics::{
     ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity, ContentValidationReport,
     ScenarioMetadata,
+};
+pub use pack::{
+    CanonicalContentPack, ContentDefinitionKind, ContentFingerprint, ContentPackCatalogs,
+    ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity, ContentPackProvenance,
+    ContentPackReference, ContentPackSetReference, ContentPackSourceKind,
+    CONTENT_PACK_FINGERPRINT_ALGORITHM, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
+};
+pub use pack_validation::{
+    resolve_content_pack_set, ContentPackDiagnostic, ContentPackDiagnosticCode,
+    ContentPackValidationReport, ResolvedContentPackSet,
 };
 pub use scenario::{
     ClassDefinition, ClassLevelGrant, ClassLevelInput, Combatant, CombatantEffectiveStatReadout,
@@ -53,6 +67,33 @@ mod tests {
         assert_eq!(report.error_count, diagnostics.len());
     }
 
+    #[test]
+    fn scenario_validation_rejects_tampered_content_pack_set_reference() {
+        let mut scenario = incomplete_scenario();
+        let pack_reference = ContentPackReference {
+            id: "rules.core".to_string(),
+            version: "1.0.0".to_string(),
+            fingerprint: ContentFingerprint {
+                algorithm: CONTENT_PACK_FINGERPRINT_ALGORITHM.to_string(),
+                value: "0000000000000000".to_string(),
+            },
+        };
+        scenario.content_pack_set = Some(ContentPackSetReference {
+            root: pack_reference.clone(),
+            packs: vec![pack_reference],
+            fingerprint: ContentFingerprint {
+                algorithm: CONTENT_PACK_SET_FINGERPRINT_ALGORITHM.to_string(),
+                value: "tampered".to_string(),
+            },
+        });
+
+        let diagnostics = validate_scenario_content(&scenario);
+
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == ContentDiagnosticCode::InvalidContentPackSetReference
+        }));
+    }
+
     fn incomplete_scenario() -> RulebenchScenario {
         let selected_action = test_action();
         RulebenchScenario {
@@ -62,6 +103,7 @@ mod tests {
                 summary: "An intentionally incomplete authored content graph.".to_string(),
                 seed_label: "content-validation".to_string(),
             },
+            content_pack_set: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "missing-ruleset".to_string(),
             grid: Grid {

@@ -371,6 +371,7 @@ mod tests {
                 summary: "Minimal state test scenario.".to_string(),
                 seed_label: "state-test".to_string(),
             },
+            content_pack_set: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "test-rules".to_string(),
             grid: Grid {
