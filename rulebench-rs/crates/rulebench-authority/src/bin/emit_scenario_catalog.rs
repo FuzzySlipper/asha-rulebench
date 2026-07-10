@@ -5,7 +5,7 @@ use rulebench_authority::{
     scenario_catalog_summaries, AttackOutcome, Combatant, ContentDiagnostic,
     ContentDiagnosticSeverity, ContentValidationReadout, ContentValidationReport, DomainEvent,
     FinalCombatantState, RulebenchScenario, RulesetCatalogReadout, RulesetMetadata,
-    ScenarioCatalogSummary, ScenarioOutcomeClass, TracePhase, TraceStatus,
+    ScenarioCatalogSummary, ScenarioOutcomeClass, TracePhase, TraceStatus, VisibilityRequirement,
 };
 
 fn main() {
@@ -323,6 +323,9 @@ fn render_combatant(combatant: &Combatant, final_state: &FinalCombatantState) ->
 
 fn render_action(scenario: &RulebenchScenario) -> String {
     let action = &scenario.selected_action;
+    let attack = action
+        .attack_check()
+        .expect("catalog fixture action uses an attack check");
     let mut out = String::from("      selectedAction: {\n");
     out.push_str(&format!("        id: {},\n", ts_string(&action.id)));
     out.push_str(&format!("        name: {},\n", ts_string(&action.name)));
@@ -332,29 +335,29 @@ fn render_action(scenario: &RulebenchScenario) -> String {
     ));
     out.push_str(&format!(
         "        targetIds: {},\n",
-        ts_string_array(&action.target_ids)
+        ts_string_array(&action.targeting.target_ids)
     ));
-    out.push_str(&format!("        range: {},\n", action.range));
+    out.push_str(&format!(
+        "        range: {},\n",
+        action.targeting.maximum_range
+    ));
     out.push_str(&format!(
         "        lineOfSightRequired: {},\n",
-        action.line_of_sight_required
+        action.targeting.visibility_requirement == VisibilityRequirement::Required
     ));
     out.push_str(&format!(
         "        visibleTargetIds: {},\n",
-        ts_string_array(&action.visible_target_ids)
+        ts_string_array(&action.targeting.visible_target_ids)
     ));
     out.push_str("        attack: {\n");
-    out.push_str(&format!(
-        "          modifier: {},\n",
-        action.attack.modifier
-    ));
+    out.push_str(&format!("          modifier: {},\n", attack.modifier));
     out.push_str(&format!(
         "          defenseId: {},\n",
-        ts_string(&action.attack.defense_id)
+        ts_string(&attack.defense.id)
     ));
     out.push_str(&format!(
         "          defenseLabel: {},\n",
-        ts_string(&action.attack.defense_label)
+        ts_string(&attack.defense.label)
     ));
     out.push_str("        },\n");
     out.push_str("        hit: {\n");

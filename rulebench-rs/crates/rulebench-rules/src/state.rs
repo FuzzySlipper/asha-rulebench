@@ -243,16 +243,23 @@ mod tests {
             ability_id: "test-ability".to_string(),
             name: "Test Action".to_string(),
             actor_id: "entity-adept".to_string(),
-            target_ids: vec!["entity-raider".to_string()],
-            range: 1,
-            line_of_sight_required: false,
-            visible_target_ids: vec!["entity-raider".to_string()],
-            attack: AttackSpec {
+            targeting: TargetingDeclaration {
+                target_kind: TargetKind::Combatant,
+                selection: TargetSelection::Single,
+                team_constraint: TargetTeamConstraint::Hostile,
+                maximum_range: 1,
+                visibility_requirement: VisibilityRequirement::Ignored,
+                target_ids: vec!["entity-raider".to_string()],
+                visible_target_ids: vec!["entity-raider".to_string()],
+            },
+            check: CheckDeclaration::Attack(AttackCheckDeclaration {
                 modifier: 0,
                 modifier_stat_id: "attack".to_string(),
-                defense_id: "defense".to_string(),
-                defense_label: "Defense".to_string(),
-            },
+                defense: DefenseReference {
+                    id: "defense".to_string(),
+                    label: "Defense".to_string(),
+                },
+            }),
             hit: HitEffect {
                 damage_bonus: 0,
                 damage_type: "test".to_string(),

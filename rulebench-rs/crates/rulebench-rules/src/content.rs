@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use crate::model::{
-    ActionDefinition, Combatant, ContentDiagnostic, ContentDiagnosticCode,
+    ActionDefinition, AttackCheckDeclaration, Combatant, ContentDiagnostic, ContentDiagnosticCode,
     ContentDiagnosticSeverity, ContentValidationReport, RuleModuleValidationError,
-    RulebenchScenario,
+    RulebenchScenario, TargetKind, TargetSelection,
 };
 
 pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> ContentValidationReport {
@@ -428,12 +428,37 @@ fn validate_action_references(
         ));
     }
 
+    if action.targeting.target_kind != TargetKind::Combatant
+        || action.targeting.selection != TargetSelection::Single
+    {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::UnsupportedTargetingDeclaration,
+            Some(action.id.clone()),
+            format!(
+                "Action {} declares targeting that the current action-resolution module does not support.",
+                action.id
+            ),
+        ));
+    }
+
+    if action.attack_check().is_none() {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::UnsupportedCheckDeclaration,
+            Some(action.id.clone()),
+            format!(
+                "Action {} declares a check that the current action-resolution module does not support.",
+                action.id
+            ),
+        ));
+    }
+
     let target_ids = action
+        .targeting
         .target_ids
         .iter()
         .map(String::as_str)
         .collect::<HashSet<_>>();
-    for target_id in &action.target_ids {
+    for target_id in &action.targeting.target_ids {
         let target = scenario
             .combatants
             .iter()
@@ -450,7 +475,7 @@ fn validate_action_references(
         }
     }
 
-    for visible_target_id in &action.visible_target_ids {
+    for visible_target_id in &action.targeting.visible_target_ids {
         if !target_ids.contains(visible_target_id.as_str()) {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::VisibleTargetOutsideTargetIds,
@@ -463,18 +488,20 @@ fn validate_action_references(
         }
     }
 
-    if let Some(actor) = actor {
-        validate_actor_attack_stat(action, actor, diagnostics);
+    if let (Some(actor), Some(attack)) = (actor, action.attack_check()) {
+        validate_actor_attack_stat(action, attack, actor, diagnostics);
     }
     validate_hit_modifier(scenario, action, diagnostics);
 
-    for target_id in &action.target_ids {
+    for target_id in &action.targeting.target_ids {
         if let Some(target) = scenario
             .combatants
             .iter()
             .find(|combatant| combatant.id == *target_id)
         {
-            validate_target_defense(action, target, diagnostics);
+            if let Some(attack) = action.attack_check() {
+                validate_target_defense(action, attack, target, diagnostics);
+            }
         }
     }
 }
@@ -500,16 +527,17 @@ fn validate_hit_modifier(
 
 fn validate_actor_attack_stat(
     action: &ActionDefinition,
+    attack: &AttackCheckDeclaration,
     actor: &Combatant,
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
-    if actor.stat_by_id(&action.attack.modifier_stat_id).is_none() {
+    if actor.stat_by_id(&attack.modifier_stat_id).is_none() {
         diagnostics.push(ContentDiagnostic::error(
             ContentDiagnosticCode::MissingAttackModifierStat,
-            Some(action.attack.modifier_stat_id.clone()),
+            Some(attack.modifier_stat_id.clone()),
             format!(
                 "Action {} references attack modifier stat {} that actor {} does not have.",
-                action.id, action.attack.modifier_stat_id, actor.id
+                action.id, attack.modifier_stat_id, actor.id
             ),
         ));
     }
@@ -517,20 +545,21 @@ fn validate_actor_attack_stat(
 
 fn validate_target_defense(
     action: &ActionDefinition,
+    attack: &AttackCheckDeclaration,
     target: &Combatant,
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
     if !target
         .defenses
         .iter()
-        .any(|defense| defense.id == action.attack.defense_id)
+        .any(|defense| defense.id == attack.defense.id)
     {
         diagnostics.push(ContentDiagnostic::error(
             ContentDiagnosticCode::MissingTargetDefense,
-            Some(action.attack.defense_id.clone()),
+            Some(attack.defense.id.clone()),
             format!(
                 "Action {} references defense {} that target {} does not have.",
-                action.id, action.attack.defense_id, target.id
+                action.id, attack.defense.id, target.id
             ),
         ));
     }

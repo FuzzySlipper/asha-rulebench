@@ -63,16 +63,23 @@ fn hexing_bolt_action() -> ActionDefinition {
         ability_id: "ability.hexing-bolt".to_string(),
         name: "Hexing Bolt".to_string(),
         actor_id: "entity-adept".to_string(),
-        target_ids: vec!["entity-raider".to_string()],
-        range: 10,
-        line_of_sight_required: true,
-        visible_target_ids: vec!["entity-raider".to_string()],
-        attack: AttackSpec {
+        targeting: TargetingDeclaration {
+            target_kind: TargetKind::Combatant,
+            selection: TargetSelection::Single,
+            team_constraint: TargetTeamConstraint::Hostile,
+            maximum_range: 10,
+            visibility_requirement: VisibilityRequirement::Required,
+            target_ids: vec!["entity-raider".to_string()],
+            visible_target_ids: vec!["entity-raider".to_string()],
+        },
+        check: CheckDeclaration::Attack(AttackCheckDeclaration {
             modifier: 4,
             modifier_stat_id: "mind".to_string(),
-            defense_id: "nerve".to_string(),
-            defense_label: "Nerve".to_string(),
-        },
+            defense: DefenseReference {
+                id: "nerve".to_string(),
+                label: "Nerve".to_string(),
+            },
+        }),
         hit: HitEffect {
             damage_bonus: 4,
             damage_type: "psychic".to_string(),

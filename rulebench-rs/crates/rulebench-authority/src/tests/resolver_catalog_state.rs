@@ -277,7 +277,10 @@ fn content_validation_report_does_not_change_hexing_bolt_resolution() {
 #[test]
 fn resolver_uses_actor_stat_for_attack_modifier() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].attack.modifier = 99;
+    scenario.actions[0]
+        .attack_check_mut()
+        .expect("fixture uses an attack check")
+        .modifier = 99;
 
     let receipt = resolve_use_action(
         &scenario,
@@ -350,7 +353,10 @@ fn resolver_uses_effective_actor_stat_for_attack_modifier() {
 #[test]
 fn resolver_rejects_missing_attack_modifier_stat_source() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].attack.modifier_stat_id = "missing_mind".to_string();
+    scenario.actions[0]
+        .attack_check_mut()
+        .expect("fixture uses an attack check")
+        .modifier_stat_id = "missing_mind".to_string();
 
     let receipt = resolve_use_action(
         &scenario,

@@ -328,23 +328,105 @@ pub struct ActionDefinition {
     pub ability_id: String,
     pub name: String,
     pub actor_id: String,
-    pub target_ids: Vec<String>,
-    pub range: u32,
-    pub line_of_sight_required: bool,
-    pub visible_target_ids: Vec<String>,
-    pub attack: AttackSpec,
+    pub targeting: TargetingDeclaration,
+    pub check: CheckDeclaration,
     pub hit: HitEffect,
     pub action_text: String,
     pub effect_text: String,
 }
 
-/// The attack/check inputs declared by an action.
+impl ActionDefinition {
+    pub fn attack_check(&self) -> Option<&AttackCheckDeclaration> {
+        match &self.check {
+            CheckDeclaration::Attack(attack) => Some(attack),
+            CheckDeclaration::SavingThrow(_) | CheckDeclaration::Contested(_) => None,
+        }
+    }
+
+    pub fn attack_check_mut(&mut self) -> Option<&mut AttackCheckDeclaration> {
+        match &mut self.check {
+            CheckDeclaration::Attack(attack) => Some(attack),
+            CheckDeclaration::SavingThrow(_) | CheckDeclaration::Contested(_) => None,
+        }
+    }
+}
+
+/// The target legality inputs declared by an action.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AttackSpec {
+pub struct TargetingDeclaration {
+    pub target_kind: TargetKind,
+    pub selection: TargetSelection,
+    pub team_constraint: TargetTeamConstraint,
+    pub maximum_range: u32,
+    pub visibility_requirement: VisibilityRequirement,
+    pub target_ids: Vec<String>,
+    pub visible_target_ids: Vec<String>,
+}
+
+/// Declared target shapes. Area targeting is reserved for later authority work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetKind {
+    Combatant,
+    Area,
+}
+
+/// Declared target cardinality. Multi-target resolution is not yet implemented.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetSelection {
+    Single,
+    Multiple,
+}
+
+/// The team relationship required for a target to be legal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetTeamConstraint {
+    Hostile,
+    Ally,
+    Any,
+}
+
+/// Whether a target must be listed as visible before resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VisibilityRequirement {
+    Required,
+    Ignored,
+}
+
+/// The check declaration used to resolve an action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckDeclaration {
+    Attack(AttackCheckDeclaration),
+    SavingThrow(SavingThrowCheckDeclaration),
+    Contested(ContestedCheckDeclaration),
+}
+
+/// The currently supported attack-versus-defense check declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttackCheckDeclaration {
     pub modifier: i32,
     pub modifier_stat_id: String,
-    pub defense_id: String,
-    pub defense_label: String,
+    pub defense: DefenseReference,
+}
+
+/// A named defense referenced by a check declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DefenseReference {
+    pub id: String,
+    pub label: String,
+}
+
+/// A declared saving throw. Its evaluation is intentionally not implemented yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SavingThrowCheckDeclaration {
+    pub save_stat_id: String,
+    pub difficulty_class: i32,
+}
+
+/// A declared contested check. Its evaluation is intentionally not implemented yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContestedCheckDeclaration {
+    pub actor_stat_id: String,
+    pub target_stat_id: String,
 }
 
 /// The operation set applied after an accepted hit.

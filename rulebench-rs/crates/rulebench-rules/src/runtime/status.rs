@@ -422,6 +422,7 @@ fn current_actor_action_option(
     projection: &ScenarioProjection,
 ) -> CurrentActorActionOption {
     let target_options = action
+        .targeting
         .visible_target_ids
         .iter()
         .filter_map(|target_id| projected_combatant_by_id(projection, target_id))

@@ -429,8 +429,8 @@ fn session_runtime_candidate_selection_rejects_missing_candidate() {
 #[test]
 fn session_runtime_candidate_selection_rejects_candidate_failed_by_preflight() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].target_ids = vec!["entity-adept".to_string()];
-    scenario.actions[0].visible_target_ids = vec!["entity-adept".to_string()];
+    scenario.actions[0].targeting.target_ids = vec!["entity-adept".to_string()];
+    scenario.actions[0].targeting.visible_target_ids = vec!["entity-adept".to_string()];
     scenario.selected_action = scenario.actions[0].clone();
     let session = CombatSessionState::new("runtime-self-target-candidate", scenario);
     let candidates = session.current_actor_command_candidates();

@@ -126,8 +126,17 @@ pub fn resolve_use_action(
             trace,
         );
     }
+    let Some(attack) = action.attack_check() else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
 
-    let Some(attack_modifier) = attack_modifier(scenario, actor, action) else {
+    let Some(attack_modifier) = attack_modifier(scenario, actor, attack) else {
         return rejected_with_projection(
             scenario,
             intent,
@@ -209,7 +218,7 @@ pub fn resolve_use_action(
         scenario,
         intent,
         target,
-        action,
+        attack,
         attack_modifier,
         hit_operations,
         target_legality,
@@ -234,19 +243,19 @@ fn resolve_accepted_action(
     scenario: &RulebenchScenario,
     intent: UseActionIntent,
     target: &Combatant,
-    action: &ActionDefinition,
+    attack: &AttackCheckDeclaration,
     attack_modifier: i32,
     hit_operations: HitOperations<'_>,
     target_legality: TargetLegality,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
-    let defense_value = defense_value(target, &action.attack.defense_id);
+    let defense_value = defense_value(target, &attack.defense.id);
     let total = roll_stream[0] + attack_modifier;
     let attack_roll = AttackRollResult {
         roll: roll_stream[0],
         modifier: attack_modifier,
         total,
-        defense_id: action.attack.defense_id.clone(),
+        defense_id: attack.defense.id.clone(),
         defense_value,
         outcome: if total >= defense_value {
             AttackOutcome::Hit
@@ -283,7 +292,7 @@ fn resolve_accepted_action(
             "Miss branch selected.",
             format!(
                 "Roll stream supplied {}; total {} misses {} {}.",
-                attack_roll.roll, attack_roll.total, action.attack.defense_label, defense_value
+                attack_roll.roll, attack_roll.total, attack.defense.label, defense_value
             ),
         ));
         trace.push(TraceEntry::new(
@@ -336,7 +345,7 @@ fn resolve_accepted_action(
         "Hit branch selected.",
         format!(
             "Roll stream supplied {}; total {} beats {} {}.",
-            attack_roll.roll, attack_roll.total, action.attack.defense_label, defense_value
+            attack_roll.roll, attack_roll.total, attack.defense.label, defense_value
         ),
     ));
     trace.push(TraceEntry::new(
@@ -629,21 +638,41 @@ pub(crate) fn validate_target_legality(
     target: &Combatant,
     action: &ActionDefinition,
 ) -> TargetLegality {
-    if actor.team == target.team {
+    if action.targeting.target_kind != TargetKind::Combatant
+        || action.targeting.selection != TargetSelection::Single
+    {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target declaration is not supported.".to_string(),
+        };
+    }
+    if action.targeting.team_constraint == TargetTeamConstraint::Hostile
+        && actor.team == target.team
+    {
         return TargetLegality {
             target_id: target.id.clone(),
             accepted: false,
             reason: "Target is not hostile.".to_string(),
         };
     }
-    if range_between(actor.position, target.position) > action.range {
+    if action.targeting.team_constraint == TargetTeamConstraint::Ally && actor.team != target.team {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target is not allied.".to_string(),
+        };
+    }
+    if range_between(actor.position, target.position) > action.targeting.maximum_range {
         return TargetLegality {
             target_id: target.id.clone(),
             accepted: false,
             reason: "Target is outside range.".to_string(),
         };
     }
-    if action.line_of_sight_required && !action.visible_target_ids.contains(&target.id) {
+    if action.targeting.visibility_requirement == VisibilityRequirement::Required
+        && !action.targeting.visible_target_ids.contains(&target.id)
+    {
         return TargetLegality {
             target_id: target.id.clone(),
             accepted: false,
@@ -680,12 +709,12 @@ fn defense_value(target: &Combatant, defense_id: &str) -> i32 {
 fn attack_modifier(
     scenario: &RulebenchScenario,
     actor: &Combatant,
-    action: &ActionDefinition,
+    attack: &AttackCheckDeclaration,
 ) -> Option<i32> {
     effective_stats_for_combatant(scenario, &actor.id)?
         .stats
         .into_iter()
-        .find(|stat| stat.stat_id == action.attack.modifier_stat_id)
+        .find(|stat| stat.stat_id == attack.modifier_stat_id)
         .map(|stat| stat.effective_value)
 }
 

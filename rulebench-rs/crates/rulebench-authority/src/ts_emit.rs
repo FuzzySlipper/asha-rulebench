@@ -1,6 +1,6 @@
 use rulebench_authority::{
     AttackOutcome, Combatant, DomainEvent, FinalCombatantState, RulebenchScenario, TraceEntry,
-    TracePhase, TraceStatus,
+    TracePhase, TraceStatus, VisibilityRequirement,
 };
 
 pub(crate) fn render_scenario_readout(
@@ -206,6 +206,9 @@ fn render_combatant(
 
 fn render_action(scenario: &RulebenchScenario, indent: &str) -> String {
     let action = &scenario.selected_action;
+    let attack = action
+        .attack_check()
+        .expect("catalog fixture action uses an attack check");
     let mut out = String::from("");
     out.push_str(&format!("{indent}  selectedAction: {{\n"));
     out.push_str(&format!("{indent}    id: {},\n", ts_string(&action.id)));
@@ -216,29 +219,29 @@ fn render_action(scenario: &RulebenchScenario, indent: &str) -> String {
     ));
     out.push_str(&format!(
         "{indent}    targetIds: {},\n",
-        ts_string_array(&action.target_ids)
+        ts_string_array(&action.targeting.target_ids)
     ));
-    out.push_str(&format!("{indent}    range: {},\n", action.range));
+    out.push_str(&format!(
+        "{indent}    range: {},\n",
+        action.targeting.maximum_range
+    ));
     out.push_str(&format!(
         "{indent}    lineOfSightRequired: {},\n",
-        action.line_of_sight_required
+        action.targeting.visibility_requirement == VisibilityRequirement::Required
     ));
     out.push_str(&format!(
         "{indent}    visibleTargetIds: {},\n",
-        ts_string_array(&action.visible_target_ids)
+        ts_string_array(&action.targeting.visible_target_ids)
     ));
     out.push_str(&format!("{indent}    attack: {{\n"));
-    out.push_str(&format!(
-        "{indent}      modifier: {},\n",
-        action.attack.modifier
-    ));
+    out.push_str(&format!("{indent}      modifier: {},\n", attack.modifier));
     out.push_str(&format!(
         "{indent}      defenseId: {},\n",
-        ts_string(&action.attack.defense_id)
+        ts_string(&attack.defense.id)
     ));
     out.push_str(&format!(
         "{indent}      defenseLabel: {},\n",
-        ts_string(&action.attack.defense_label)
+        ts_string(&attack.defense.label)
     ));
     out.push_str(&format!("{indent}    }},\n"));
     out.push_str(&format!("{indent}    hit: {{\n"));

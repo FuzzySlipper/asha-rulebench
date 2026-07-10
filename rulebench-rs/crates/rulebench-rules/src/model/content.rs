@@ -53,6 +53,8 @@ pub enum ContentDiagnosticCode {
     MissingActionAbility,
     MissingActionActor,
     MissingActionTarget,
+    UnsupportedTargetingDeclaration,
+    UnsupportedCheckDeclaration,
     VisibleTargetOutsideTargetIds,
     MissingAttackModifierStat,
     MissingTargetDefense,
@@ -111,6 +113,10 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::MissingActionAbility => "missingActionAbility",
             ContentDiagnosticCode::MissingActionActor => "missingActionActor",
             ContentDiagnosticCode::MissingActionTarget => "missingActionTarget",
+            ContentDiagnosticCode::UnsupportedTargetingDeclaration => {
+                "unsupportedTargetingDeclaration"
+            }
+            ContentDiagnosticCode::UnsupportedCheckDeclaration => "unsupportedCheckDeclaration",
             ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
             ContentDiagnosticCode::MissingAttackModifierStat => "missingAttackModifierStat",
             ContentDiagnosticCode::MissingTargetDefense => "missingTargetDefense",

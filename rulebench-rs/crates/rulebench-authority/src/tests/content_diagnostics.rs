@@ -80,6 +80,38 @@ fn content_diagnostics_report_invalid_ruleset_module_declarations() {
 }
 
 #[test]
+fn content_diagnostics_reject_unimplemented_targeting_and_check_declarations() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0].targeting.target_kind = TargetKind::Area;
+    scenario.actions[0].targeting.selection = TargetSelection::Multiple;
+    scenario.actions[0].check = CheckDeclaration::SavingThrow(SavingThrowCheckDeclaration {
+        save_stat_id: "mind".to_string(),
+        difficulty_class: 12,
+    });
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(
+        diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code)
+            .collect::<Vec<_>>(),
+        vec![
+            ContentDiagnosticCode::UnsupportedTargetingDeclaration,
+            ContentDiagnosticCode::UnsupportedCheckDeclaration,
+        ]
+    );
+    assert_eq!(
+        ContentDiagnosticCode::UnsupportedTargetingDeclaration.code(),
+        "unsupportedTargetingDeclaration"
+    );
+    assert_eq!(
+        ContentDiagnosticCode::UnsupportedCheckDeclaration.code(),
+        "unsupportedCheckDeclaration"
+    );
+}
+
+#[test]
 fn content_diagnostics_report_empty_action_id() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0].id.clear();
@@ -582,8 +614,8 @@ fn content_diagnostics_report_missing_action_actor() {
 #[test]
 fn content_diagnostics_report_missing_action_target() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].target_ids = vec!["entity-missing-target".to_string()];
-    scenario.actions[0].visible_target_ids = vec!["entity-missing-target".to_string()];
+    scenario.actions[0].targeting.target_ids = vec!["entity-missing-target".to_string()];
+    scenario.actions[0].targeting.visible_target_ids = vec!["entity-missing-target".to_string()];
 
     let diagnostics = validate_scenario_content(&scenario);
 
@@ -602,6 +634,7 @@ fn content_diagnostics_report_missing_action_target() {
 fn content_diagnostics_report_visible_target_outside_target_ids() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0]
+        .targeting
         .visible_target_ids
         .push("entity-adept".to_string());
 
@@ -618,7 +651,10 @@ fn content_diagnostics_report_visible_target_outside_target_ids() {
 #[test]
 fn content_diagnostics_report_missing_attack_modifier_stat() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].attack.modifier_stat_id = "missing-mind".to_string();
+    scenario.actions[0]
+        .attack_check_mut()
+        .expect("fixture uses an attack check")
+        .modifier_stat_id = "missing-mind".to_string();
 
     let diagnostics = validate_scenario_content(&scenario);
 
@@ -633,7 +669,11 @@ fn content_diagnostics_report_missing_attack_modifier_stat() {
 #[test]
 fn content_diagnostics_report_missing_target_defense() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].attack.defense_id = "missing-nerve".to_string();
+    scenario.actions[0]
+        .attack_check_mut()
+        .expect("fixture uses an attack check")
+        .defense
+        .id = "missing-nerve".to_string();
 
     let diagnostics = validate_scenario_content(&scenario);
 

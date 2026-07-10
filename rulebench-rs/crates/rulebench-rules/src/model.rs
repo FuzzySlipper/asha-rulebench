@@ -21,11 +21,13 @@ pub use projection::*;
 pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};
 pub use rulebench_ruleset::{
     validate_rule_modules, AbilityDefinition, AbilityDefinitionKind, ActionDefinition,
-    ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, AttackSpec,
-    DamageEffectOperation, HitEffect, HitEffectOperation, ModifierEffectOperation, ModifierTenure,
+    ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, AttackCheckDeclaration,
+    CheckDeclaration, ContestedCheckDeclaration, DamageEffectOperation, DefenseReference,
+    HitEffect, HitEffectOperation, ModifierEffectOperation, ModifierTenure,
     RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
-    RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,
-    ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry,
+    RulesetMetadata, SavingThrowCheckDeclaration, TargetKind, TargetSelection,
+    TargetTeamConstraint, TargetingDeclaration, TurnControlModuleConfiguration, TurnOrderPolicy,
+    ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry, VisibilityRequirement,
 };
 pub use scenario::*;
 pub use session::*;
