@@ -34,3 +34,10 @@ pub use archive_storage::{
     InMemoryReplayArchiveStorage, ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage,
     ReplayArchiveStorageError,
 };
+mod randomness;
+pub use randomness::{
+    generate_replay_randomness, reproduce_replay_roll_stream, validate_replay_randomness,
+    ReplayCommandRandomnessProvenance, ReplayGeneratedRollRequest, ReplayRandomnessDiagnostic,
+    ReplayRandomnessDiagnosticCode, ReplayRandomnessSource, ReplayRandomnessValidationReport,
+    ReplayRollGenerationSpec, REPLAY_RANDOMNESS_ALGORITHM_VERSION,
+};

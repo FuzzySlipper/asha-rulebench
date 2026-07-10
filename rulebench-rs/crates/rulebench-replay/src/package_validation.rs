@@ -17,6 +17,7 @@ pub enum ReplayPackageDiagnosticCode {
     EmptyFinalStateFingerprint,
     InvalidFingerprintKind,
     UnknownEvidenceCommand,
+    InvalidRandomnessProvenance,
 }
 
 impl ReplayPackageDiagnosticCode {
@@ -35,6 +36,7 @@ impl ReplayPackageDiagnosticCode {
             Self::EmptyFinalStateFingerprint => "emptyReplayFinalStateFingerprint",
             Self::InvalidFingerprintKind => "invalidReplayFingerprintKind",
             Self::UnknownEvidenceCommand => "unknownReplayEvidenceCommand",
+            Self::InvalidRandomnessProvenance => "invalidReplayRandomnessProvenance",
         }
     }
 }
@@ -169,6 +171,19 @@ pub fn validate_replay_package(package: &ReplayPackage) -> ReplayPackageValidati
                 format!("Replay evidence references unknown command sequence {sequence}."),
             );
         }
+    }
+
+    for randomness_diagnostic in crate::validate_replay_randomness(package).diagnostics {
+        push(
+            &mut diagnostics,
+            ReplayPackageDiagnosticCode::InvalidRandomnessProvenance,
+            &randomness_diagnostic.path,
+            format!(
+                "{}: {}",
+                randomness_diagnostic.code.code(),
+                randomness_diagnostic.message
+            ),
+        );
     }
 
     ReplayPackageValidationReport {

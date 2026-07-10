@@ -84,6 +84,16 @@ impl ReplayCommand {
             Self::Reaction(_) => "reaction",
         }
     }
+
+    pub fn supplied_roll_stream(&self) -> &[i32] {
+        match self {
+            Self::Intent(value) => &value.roll_stream,
+            Self::SelectedCandidate(value) => &value.roll_stream,
+            Self::AutomaticStep(value) => &value.roll_stream,
+            Self::AutomaticRun(value) => &value.roll_stream,
+            Self::Control(_) | Self::Equipment(_) | Self::Reaction(_) => &[],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -92,6 +102,7 @@ pub struct ReplayEvidence {
     pub command_audit: Vec<CommandAuditEntry>,
     pub rolls: Vec<ReplayRollEvidence>,
     pub trace: Vec<ReplayTraceEvidence>,
+    pub randomness: Vec<crate::ReplayCommandRandomnessProvenance>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
