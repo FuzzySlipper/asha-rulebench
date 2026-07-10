@@ -9,6 +9,8 @@ import type {
   RulebenchCombatSessionSummaryDto,
   RulebenchContentValidationCatalogDto,
   RulebenchContentValidationReadoutDto,
+  RulebenchContentImportCatalogDto,
+  RulebenchContentImportReadoutDto,
   RulebenchRulesetCatalogDto,
   RulebenchScenarioCatalogDto,
   RulebenchScenarioCatalogSummaryDto,
@@ -16,12 +18,16 @@ import type {
 } from "@asha-rulebench/protocol";
 import { rustBackedCombatSessionCatalog } from "./generated/rust-combat-session";
 import {
+  rustBackedContentImportCatalog,
   rustBackedContentValidationCatalog,
   rustBackedRulesetCatalog,
   rustBackedScenarioCatalog,
 } from "./generated/rust-scenario-catalog";
 
 export interface RulebenchTransport {
+  readonly loadContentImportExamples: () => Promise<
+    Result<readonly RulebenchContentImportReadoutDto[]>
+  >;
   readonly loadRulesetCatalog: () => Promise<
     Result<RulebenchRulesetCatalogDto>
   >;
@@ -59,6 +65,8 @@ export const defaultRulesetCatalog: RulebenchRulesetCatalogDto =
   rustBackedRulesetCatalog;
 export const defaultContentValidationCatalog: RulebenchContentValidationCatalogDto =
   rustBackedContentValidationCatalog;
+export const defaultContentImportCatalog: RulebenchContentImportCatalogDto =
+  rustBackedContentImportCatalog;
 export const defaultContentValidationScenarioId: string =
   firstContentValidationScenarioId(defaultContentValidationCatalog);
 export const defaultContentValidationReport: RulebenchContentValidationReadoutDto =
@@ -124,7 +132,12 @@ export const createFakeRulebenchTransport = (
   sessionCatalog: RulebenchCombatSessionCatalogDto = defaultCombatSessionCatalog,
   rulesetCatalog: RulebenchRulesetCatalogDto = defaultRulesetCatalog,
   validationCatalog: RulebenchContentValidationCatalogDto = defaultContentValidationCatalog,
+  importCatalog: RulebenchContentImportCatalogDto = defaultContentImportCatalog,
 ): RulebenchTransport => ({
+  loadContentImportExamples: async () => ({
+    ok: true,
+    value: importCatalog.examples,
+  }),
   loadRulesetCatalog: async () => ({ ok: true, value: rulesetCatalog }),
   loadContentValidationReport: async (
     scenarioId: string = firstContentValidationScenarioId(validationCatalog),

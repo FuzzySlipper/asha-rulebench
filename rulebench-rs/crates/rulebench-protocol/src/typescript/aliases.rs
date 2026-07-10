@@ -9,6 +9,8 @@ pub fn aliases() -> &'static [super::ProtocolAlias] {
         "export type RulebenchRulesetCompatibilityErrorCodeDto = 'unknownRulesetId' | 'newerRulesetVersion' | 'incompatibleRulesetVersion' | 'incompatibleRulesetModules';",
         "export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
         "export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';",
+        "export type RulebenchContentImportDiagnosticSeverityDto = 'error' | 'warning';",
+        "export type RulebenchContentDefinitionKindDto = 'ruleset' | 'entity' | 'ability' | 'class' | 'stat' | 'modifier' | 'item' | 'action';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
         "export type RulebenchLifecycleTransitionTriggerDto = 'explicitStart' | 'commandStart' | 'explicitEnd' | 'conditionalEnd';",

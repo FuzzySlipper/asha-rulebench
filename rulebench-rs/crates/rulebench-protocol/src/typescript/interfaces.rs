@@ -2161,6 +2161,101 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             }],
         },
         Interface {
+            name: "RulebenchContentImportCatalogDto",
+            fields: &[Field {
+                name: "examples",
+                ty: "readonly RulebenchContentImportReadoutDto[]",
+            }],
+        },
+        Interface {
+            name: "RulebenchContentImportReadoutDto",
+            fields: &[
+                Field {
+                    name: "exampleId",
+                    ty: "string",
+                },
+                Field {
+                    name: "pack",
+                    ty: "RulebenchContentPackIdentityDto",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "errorCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "warningCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "diagnostics",
+                    ty: "readonly RulebenchContentImportDiagnosticDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentPackIdentityDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "fingerprint",
+                    ty: "RulebenchContentFingerprintDto | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentFingerprintDto",
+            fields: &[
+                Field {
+                    name: "algorithm",
+                    ty: "string",
+                },
+                Field {
+                    name: "value",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentImportDiagnosticDto",
+            fields: &[
+                Field {
+                    name: "severity",
+                    ty: "RulebenchContentImportDiagnosticSeverityDto",
+                },
+                Field {
+                    name: "code",
+                    ty: "string",
+                },
+                Field {
+                    name: "path",
+                    ty: "string",
+                },
+                Field {
+                    name: "referenceId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "definitionKind",
+                    ty: "RulebenchContentDefinitionKindDto | null",
+                },
+                Field {
+                    name: "message",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchContentValidationReadoutDto",
             fields: &[
                 Field {

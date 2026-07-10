@@ -1,8 +1,10 @@
 import { InjectionToken, Injectable, signal } from '@angular/core';
 import type { Provider, Signal } from '@angular/core';
 import {
+  projectContentImportReadout,
   projectRulebenchCombatSessionStep,
   projectRulebenchScenario,
+  type RulebenchContentImportView,
   type RulebenchCombatSessionStepView,
   type RulebenchScenarioView,
 } from '@asha-rulebench/domain';
@@ -165,6 +167,28 @@ export class SessionStore {
   }
 }
 
+@Injectable()
+export class ContentStore {
+  private readonly _imports = signal<AsyncState<readonly RulebenchContentImportView[]>>({ kind: 'idle' });
+  readonly imports: Signal<AsyncState<readonly RulebenchContentImportView[]>> = this._imports.asReadonly();
+
+  constructor(
+    private readonly transport: RulebenchTransport,
+    private readonly clock: ClockPort,
+  ) {}
+
+  async loadImportExamples(): Promise<void> {
+    this._imports.set({ kind: 'loading' });
+    const result = await this.transport.loadContentImportExamples();
+    this._imports.set(
+      result.ok
+        ? { kind: 'data', value: result.value.map(projectContentImportReadout) }
+        : { kind: 'error', error: result.error },
+    );
+    this.clock.now();
+  }
+}
+
 export function provideRulebenchStoreKernel(): Provider[] {
   return [
     { provide: RULEBENCH_TRANSPORT, useFactory: () => createFakeRulebenchTransport() },
@@ -173,6 +197,11 @@ export function provideRulebenchStoreKernel(): Provider[] {
       provide: SessionStore,
       deps: [RULEBENCH_TRANSPORT, RULEBENCH_CLOCK],
       useFactory: (transport: RulebenchTransport, clock: ClockPort) => new SessionStore(transport, clock),
+    },
+    {
+      provide: ContentStore,
+      deps: [RULEBENCH_TRANSPORT, RULEBENCH_CLOCK],
+      useFactory: (transport: RulebenchTransport, clock: ClockPort) => new ContentStore(transport, clock),
     },
   ];
 }

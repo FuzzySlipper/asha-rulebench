@@ -6,7 +6,54 @@ import type {
   RulebenchFinalStateDto,
   RulebenchScenarioReadoutDto,
   RulebenchTraceEntryDto,
+  RulebenchContentImportDiagnosticDto,
+  RulebenchContentImportReadoutDto,
 } from '@asha-rulebench/protocol';
+
+export interface RulebenchContentImportView {
+  readonly exampleId: string;
+  readonly packLabel: string;
+  readonly fingerprintLabel: string;
+  readonly statusLabel: string;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly diagnostics: readonly RulebenchContentImportDiagnosticView[];
+}
+
+export interface RulebenchContentImportDiagnosticView {
+  readonly severityLabel: string;
+  readonly code: string;
+  readonly locationLabel: string;
+  readonly message: string;
+}
+
+export function projectContentImportReadout(readout: RulebenchContentImportReadoutDto): RulebenchContentImportView {
+  return {
+    exampleId: readout.exampleId,
+    packLabel: `${readout.pack.id}@${readout.pack.version}`,
+    fingerprintLabel:
+      readout.pack.fingerprint === null
+        ? 'Not accepted'
+        : `${readout.pack.fingerprint.algorithm}:${readout.pack.fingerprint.value}`,
+    statusLabel: readout.accepted ? 'Accepted' : 'Rejected',
+    errorCount: readout.errorCount,
+    warningCount: readout.warningCount,
+    diagnostics: readout.diagnostics.map(projectContentImportDiagnostic),
+  };
+}
+
+function projectContentImportDiagnostic(
+  diagnostic: RulebenchContentImportDiagnosticDto,
+): RulebenchContentImportDiagnosticView {
+  const referenceLabel = diagnostic.referenceId === null ? '' : ` / ${diagnostic.referenceId}`;
+  const definitionLabel = diagnostic.definitionKind === null ? '' : ` / ${diagnostic.definitionKind}`;
+  return {
+    severityLabel: diagnostic.severity === 'error' ? 'Error' : 'Warning',
+    code: diagnostic.code,
+    locationLabel: `${diagnostic.path}${definitionLabel}${referenceLabel}`,
+    message: diagnostic.message,
+  };
+}
 
 export interface RulebenchScenarioView {
   readonly title: string;
@@ -190,7 +237,9 @@ export function projectRulebenchCombatSessionStep(
 }
 
 function projectBoard(readout: RulebenchScenarioReadoutDto): RulebenchBoardView {
-  const terrainByPosition = new Map(readout.grid.cells.map((cell) => [positionKey(cell.x, cell.y), labelTerrain(cell.terrainTags)]));
+  const terrainByPosition = new Map(
+    readout.grid.cells.map((cell) => [positionKey(cell.x, cell.y), labelTerrain(cell.terrainTags)]),
+  );
   const occupantsByPosition = new Map<string, string[]>();
 
   for (const combatant of readout.combatants) {

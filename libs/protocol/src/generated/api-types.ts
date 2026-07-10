@@ -18,6 +18,10 @@ export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 
 
 export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';
 
+export type RulebenchContentImportDiagnosticSeverityDto = 'error' | 'warning';
+
+export type RulebenchContentDefinitionKindDto = 'ruleset' | 'entity' | 'ability' | 'class' | 'stat' | 'modifier' | 'item' | 'action';
+
 export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';
 
 export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
@@ -755,6 +759,39 @@ export interface RulebenchScenarioCatalogDto {
 
 export interface RulebenchContentValidationCatalogDto {
   readonly reports: readonly RulebenchContentValidationReadoutDto[];
+}
+
+export interface RulebenchContentImportCatalogDto {
+  readonly examples: readonly RulebenchContentImportReadoutDto[];
+}
+
+export interface RulebenchContentImportReadoutDto {
+  readonly exampleId: string;
+  readonly pack: RulebenchContentPackIdentityDto;
+  readonly accepted: boolean;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly diagnostics: readonly RulebenchContentImportDiagnosticDto[];
+}
+
+export interface RulebenchContentPackIdentityDto {
+  readonly id: string;
+  readonly version: string;
+  readonly fingerprint: RulebenchContentFingerprintDto | null;
+}
+
+export interface RulebenchContentFingerprintDto {
+  readonly algorithm: string;
+  readonly value: string;
+}
+
+export interface RulebenchContentImportDiagnosticDto {
+  readonly severity: RulebenchContentImportDiagnosticSeverityDto;
+  readonly code: string;
+  readonly path: string;
+  readonly referenceId: string | null;
+  readonly definitionKind: RulebenchContentDefinitionKindDto | null;
+  readonly message: string;
 }
 
 export interface RulebenchContentValidationReadoutDto {

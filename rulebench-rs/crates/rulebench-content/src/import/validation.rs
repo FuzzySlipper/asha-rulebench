@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use super::{
-    AuthoredContentPack, ContentImportDiagnostic, ContentImportDiagnosticCode, ContentImportLimits,
-    ContentImportReport,
+    AuthoredContentPack, ContentImportDiagnostic, ContentImportDiagnosticCode,
+    ContentImportDiagnosticSeverity, ContentImportLimits, ContentImportReport,
 };
 use crate::{ContentDefinitionKind, ContentPackDiagnostic, CONTENT_PACK_FINGERPRINT_ALGORITHM};
 
@@ -17,6 +17,7 @@ pub(super) fn validate_authored_pack(
         "identity.version",
         &authored.identity.version,
     );
+    validate_duplicate_tags(&mut diagnostics, &authored.tags);
     validate_required_string(&mut diagnostics, "title", &authored.title);
     validate_required_string(&mut diagnostics, "summary", &authored.summary);
     validate_required_string(
@@ -38,6 +39,7 @@ pub(super) fn validate_authored_pack(
     for (path, value) in pack_strings(authored) {
         if value.len() > limits.maximum_string_bytes {
             diagnostics.push(ContentImportDiagnostic {
+                severity: ContentImportDiagnosticSeverity::Error,
                 code: ContentImportDiagnosticCode::LimitExceeded,
                 path: path.to_string(),
                 definition_kind: None,
@@ -91,6 +93,7 @@ fn validate_catalog(
 ) {
     if ids.len() > limits.maximum_definitions_per_catalog {
         diagnostics.push(ContentImportDiagnostic {
+            severity: ContentImportDiagnosticSeverity::Error,
             code: ContentImportDiagnosticCode::LimitExceeded,
             path: format!("catalogs.{}", kind.code()),
             definition_kind: Some(kind),
@@ -107,6 +110,7 @@ fn validate_catalog(
     for id in ids {
         if id.is_empty() {
             diagnostics.push(ContentImportDiagnostic {
+                severity: ContentImportDiagnosticSeverity::Error,
                 code: ContentImportDiagnosticCode::EmptyField,
                 path: format!("catalogs.{}[].id", kind.code()),
                 definition_kind: Some(kind),
@@ -124,6 +128,7 @@ fn validate_required_string(
 ) {
     if value.is_empty() {
         diagnostics.push(ContentImportDiagnostic {
+            severity: ContentImportDiagnosticSeverity::Error,
             code: ContentImportDiagnosticCode::EmptyField,
             path: path.to_string(),
             definition_kind: None,
@@ -145,6 +150,7 @@ fn validate_fingerprint(
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if algorithm != CONTENT_PACK_FINGERPRINT_ALGORITHM || !valid_value {
         diagnostics.push(ContentImportDiagnostic {
+            severity: ContentImportDiagnosticSeverity::Error,
             code: ContentImportDiagnosticCode::InvalidFingerprint,
             path: path.to_string(),
             definition_kind: None,
@@ -158,6 +164,7 @@ fn validate_fingerprint(
 
 fn limit_diagnostic(path: &str, actual: usize, maximum: usize) -> ContentImportDiagnostic {
     ContentImportDiagnostic {
+        severity: ContentImportDiagnosticSeverity::Error,
         code: ContentImportDiagnosticCode::LimitExceeded,
         path: path.to_string(),
         definition_kind: None,
@@ -175,6 +182,7 @@ fn validate_duplicate_ids(
     for id in ids {
         if !seen.insert(id) {
             diagnostics.push(ContentImportDiagnostic {
+                severity: ContentImportDiagnosticSeverity::Error,
                 code: ContentImportDiagnosticCode::DuplicateDefinition,
                 path: format!("catalogs.{}", kind.code()),
                 definition_kind: Some(kind),
@@ -183,6 +191,22 @@ fn validate_duplicate_ids(
                     "Content {} id {id} is declared more than once.",
                     kind.code()
                 ),
+            });
+        }
+    }
+}
+
+fn validate_duplicate_tags(diagnostics: &mut Vec<ContentImportDiagnostic>, tags: &[String]) {
+    let mut seen = BTreeSet::new();
+    for tag in tags {
+        if !seen.insert(tag) {
+            diagnostics.push(ContentImportDiagnostic {
+                severity: ContentImportDiagnosticSeverity::Warning,
+                code: ContentImportDiagnosticCode::DuplicateTagCanonicalized,
+                path: "tags".to_string(),
+                definition_kind: None,
+                definition_id: Some(tag.clone()),
+                message: format!("Duplicate content tag {tag} was canonicalized to one entry."),
             });
         }
     }
@@ -257,6 +281,7 @@ pub(super) fn import_pack_diagnostic(diagnostic: ContentPackDiagnostic) -> Conte
         .map(|kind| format!("catalogs.{}", kind.code()))
         .unwrap_or_else(|| "pack".to_string());
     ContentImportDiagnostic {
+        severity: ContentImportDiagnosticSeverity::Error,
         code: ContentImportDiagnosticCode::PackValidation(diagnostic.code),
         path,
         definition_kind: diagnostic.definition_kind,
@@ -269,6 +294,7 @@ pub(super) fn sort_diagnostics(diagnostics: &mut [ContentImportDiagnostic]) {
     diagnostics.sort_by(|left, right| {
         (
             &left.path,
+            left.severity,
             left.code,
             left.definition_kind,
             &left.definition_id,
@@ -276,6 +302,7 @@ pub(super) fn sort_diagnostics(diagnostics: &mut [ContentImportDiagnostic]) {
         )
             .cmp(&(
                 &right.path,
+                right.severity,
                 right.code,
                 right.definition_kind,
                 &right.definition_id,

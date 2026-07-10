@@ -42,7 +42,15 @@ pub use rulebench_combat::{
     FIRST_ACCEPTED_CANDIDATE_POLICY_ID, FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
     PROJECTION_FINGERPRINT_ALGORITHM, STATE_FINGERPRINT_ALGORITHM,
 };
-pub use rulebench_content::{validate_scenario_content, validate_scenario_content_report};
+pub use rulebench_content::{
+    import_content_pack, validate_scenario_content, validate_scenario_content_report,
+    AuthoredContentPack, CanonicalContentPack, ContentDefinitionKind, ContentFingerprint,
+    ContentImportContext, ContentImportDiagnostic, ContentImportDiagnosticCode,
+    ContentImportDiagnosticSeverity, ContentImportLimits, ContentImportReport, ContentPackCatalogs,
+    ContentPackCollisionPolicy, ContentPackDefinition, ContentPackDiagnosticCode,
+    ContentPackIdentity, ContentPackProvenance, ContentPackReference, ContentPackSourceKind,
+    EntityDefinition, ImportedContentPack,
+};
 pub use rulebench_core::Team;
 pub use rulebench_replay::{
     verify_automatic_run_replay, CombatSessionAutomaticRunReplayDecisionKind,

@@ -24,7 +24,8 @@ pub use diagnostics::{
 };
 pub use import::{
     import_content_pack, AuthoredContentPack, ContentImportContext, ContentImportDiagnostic,
-    ContentImportDiagnosticCode, ContentImportLimits, ContentImportReport, ImportedContentPack,
+    ContentImportDiagnosticCode, ContentImportDiagnosticSeverity, ContentImportLimits,
+    ContentImportReport, ImportedContentPack,
 };
 pub use pack::{
     CanonicalContentPack, ContentDefinitionKind, ContentDefinitionReference, ContentFingerprint,

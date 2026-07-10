@@ -44,6 +44,7 @@ describe('SessionStore', () => {
   it('loads a scenario through transport and exposes projected async data', async () => {
     const store = new SessionStore(
       {
+        ...createFakeRulebenchTransport(),
         loadCatalog: async () => ({ ok: true, value: defaultScenarioCatalog.summaries }),
         loadScenario: async () => ({ ok: true, value: defaultScenarioReadout }),
         loadSessionCatalog: async () => ({ ok: true, value: defaultCombatSessionCatalog.summaries }),
@@ -220,6 +221,7 @@ describe('SessionStore', () => {
     const summaries: readonly RulebenchScenarioCatalogSummaryDto[] = [];
     const sessionSummaries: readonly RulebenchCombatSessionSummaryDto[] = [];
     const transport: RulebenchTransport = {
+      ...createFakeRulebenchTransport(),
       loadCatalog: async () => ({ ok: true, value: summaries }),
       loadScenario: async () => ({ ok: false, error }),
       loadSessionCatalog: async () => ({ ok: true, value: sessionSummaries }),

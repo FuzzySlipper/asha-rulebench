@@ -9,18 +9,37 @@ import {
   defaultCombatSessionStepReadout,
   defaultContentValidationCatalog,
   defaultContentValidationReport,
+  defaultContentImportCatalog,
   defaultRulesetCatalog,
   defaultScenarioCatalog,
   defaultScenarioReadout,
 } from "./index";
 import { rustBackedCombatSessionCatalog } from "./generated/rust-combat-session";
 import {
+  rustBackedContentImportCatalog,
   rustBackedContentValidationCatalog,
   rustBackedRulesetCatalog,
   rustBackedScenarioCatalog,
 } from "./generated/rust-scenario-catalog";
 
 describe("RulebenchTransport fixtures", () => {
+  it("delivers generated Rust content import outcomes without TS validation", async () => {
+    expect(defaultContentImportCatalog).toBe(rustBackedContentImportCatalog);
+    const result = await createFakeRulebenchTransport().loadContentImportExamples();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.map((example) => example.exampleId)).toEqual([
+        "content-import-valid",
+        "content-import-warning",
+        "content-import-error",
+      ]);
+      expect(result.value[2]?.diagnostics[0]?.code).toBe(
+        "missingContentPackDependency",
+      );
+    }
+  });
+
   it("uses the checked Rust-backed ruleset catalog as the default transport payload", async () => {
     expect(defaultRulesetCatalog).toBe(rustBackedRulesetCatalog);
 

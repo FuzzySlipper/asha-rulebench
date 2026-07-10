@@ -90,6 +90,31 @@ fn structural_limits_reject_before_canonicalization() {
 }
 
 #[test]
+fn duplicate_tags_are_canonicalized_with_a_stable_warning() {
+    let ruleset = ruleset();
+    let mut authored = authored_pack(&ruleset, false);
+    authored.tags = vec!["test".to_string(), "test".to_string()];
+
+    let imported = import_content_pack(
+        authored,
+        ContentImportLimits::default(),
+        ContentImportContext::empty(),
+    )
+    .expect("warning-only import should succeed");
+
+    assert_eq!(imported.pack.tags, vec!["test"]);
+    assert_eq!(imported.diagnostics.len(), 1);
+    assert_eq!(
+        imported.diagnostics[0].severity,
+        ContentImportDiagnosticSeverity::Warning
+    );
+    assert_eq!(
+        imported.diagnostics[0].code,
+        ContentImportDiagnosticCode::DuplicateTagCanonicalized
+    );
+}
+
+#[test]
 fn incompatible_ruleset_is_rejected_without_an_accepted_pack() {
     let ruleset = ruleset();
     let mut authored = authored_pack(&ruleset, false);

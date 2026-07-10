@@ -46,11 +46,27 @@ impl ContentImportContext<'_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ContentImportDiagnosticSeverity {
+    Error,
+    Warning,
+}
+
+impl ContentImportDiagnosticSeverity {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ContentImportDiagnosticSeverity::Error => "error",
+            ContentImportDiagnosticSeverity::Warning => "warning",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContentImportDiagnosticCode {
     EmptyField,
     InvalidFingerprint,
     LimitExceeded,
     DuplicateDefinition,
+    DuplicateTagCanonicalized,
     PackValidation(ContentPackDiagnosticCode),
 }
 
@@ -61,6 +77,9 @@ impl ContentImportDiagnosticCode {
             ContentImportDiagnosticCode::InvalidFingerprint => "invalidContentFingerprint",
             ContentImportDiagnosticCode::LimitExceeded => "contentImportLimitExceeded",
             ContentImportDiagnosticCode::DuplicateDefinition => "duplicateContentImportDefinition",
+            ContentImportDiagnosticCode::DuplicateTagCanonicalized => {
+                "duplicateContentTagCanonicalized"
+            }
             ContentImportDiagnosticCode::PackValidation(code) => code.code(),
         }
     }
@@ -68,6 +87,7 @@ impl ContentImportDiagnosticCode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentImportDiagnostic {
+    pub severity: ContentImportDiagnosticSeverity,
     pub code: ContentImportDiagnosticCode,
     pub path: String,
     pub definition_kind: Option<ContentDefinitionKind>,
@@ -85,6 +105,7 @@ pub struct ContentImportReport {
 pub struct ImportedContentPack {
     pub pack: CanonicalContentPack,
     pub resolved_set: ResolvedContentPackSet,
+    pub diagnostics: Vec<ContentImportDiagnostic>,
 }
 
 pub fn import_content_pack(
@@ -94,7 +115,10 @@ pub fn import_content_pack(
 ) -> Result<ImportedContentPack, ContentImportReport> {
     let mut diagnostics = validate_authored_pack(&authored, limits);
     sort_diagnostics(&mut diagnostics);
-    if !diagnostics.is_empty() {
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == ContentImportDiagnosticSeverity::Error)
+    {
         return Err(rejected(diagnostics));
     }
 
@@ -106,13 +130,13 @@ pub fn import_content_pack(
     rulesets.extend(pack.catalogs.rulesets.clone());
 
     match resolve_content_pack_set(&root, &available_packs, &rulesets) {
-        Ok(resolved_set) => Ok(ImportedContentPack { pack, resolved_set }),
+        Ok(resolved_set) => Ok(ImportedContentPack {
+            pack,
+            resolved_set,
+            diagnostics,
+        }),
         Err(report) => {
-            let mut diagnostics = report
-                .diagnostics
-                .into_iter()
-                .map(import_pack_diagnostic)
-                .collect::<Vec<_>>();
+            diagnostics.extend(report.diagnostics.into_iter().map(import_pack_diagnostic));
             sort_diagnostics(&mut diagnostics);
             Err(rejected(diagnostics))
         }
