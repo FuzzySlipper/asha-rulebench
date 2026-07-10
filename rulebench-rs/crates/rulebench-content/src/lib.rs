@@ -18,9 +18,9 @@ pub use diagnostics::{
 };
 pub use scenario::{
     ClassDefinition, Combatant, CombatantEffectiveStatReadout,
-    CombatantModifierStatAdjustmentReadout, EffectiveStatReadout, EntityDefinition, Grid, GridCell,
-    ItemDefinition, ModifierDefinition, ModifierStatAdjustment, ModifierStatAdjustmentContribution,
-    RulebenchScenario, UseActionIntent,
+    CombatantModifierStatAdjustmentReadout, DamageAdjustment, DamageAdjustmentPolicy,
+    EffectiveStatReadout, EntityDefinition, Grid, GridCell, ItemDefinition, ModifierDefinition,
+    ModifierStatAdjustment, ModifierStatAdjustmentContribution, RulebenchScenario, UseActionIntent,
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
 pub use validation::{validate_scenario_content, validate_scenario_content_report};

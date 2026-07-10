@@ -193,10 +193,17 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
           {
             sequence: 4,
+            phase: 'resolution',
+            status: 'accepted',
+            message: 'Damage vitality resolved.',
+            detail: 'Requested 9 psychic; 9 applied after mitigation, with 0 absorbed by temporary vitality.',
+          },
+          {
+            sequence: 4,
             phase: 'commit',
             status: 'accepted',
             message: 'DomainEvents committed.',
-            detail: 'ActionUsed, AttackRolled, DamageApplied, and ModifierApplied became accepted facts.',
+            detail: 'ActionUsed, AttackRolled, vitality effects, and ModifierApplied became accepted facts.',
           },
         ],
         finalState: {
@@ -848,10 +855,17 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
           {
             sequence: 4,
+            phase: 'resolution',
+            status: 'accepted',
+            message: 'Damage vitality resolved.',
+            detail: 'Requested 9 psychic; 9 applied after mitigation, with 0 absorbed by temporary vitality.',
+          },
+          {
+            sequence: 4,
             phase: 'commit',
             status: 'accepted',
             message: 'DomainEvents committed.',
-            detail: 'ActionUsed, AttackRolled, DamageApplied, and ModifierApplied became accepted facts.',
+            detail: 'ActionUsed, AttackRolled, vitality effects, and ModifierApplied became accepted facts.',
           },
         ],
         finalState: {
@@ -1355,7 +1369,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           accepted: true,
           rejection: null,
           eventCount: 4,
-          traceCount: 4,
+          traceCount: 5,
           rollConsumption: [
             {
               sequence: 0,
@@ -1630,7 +1644,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           accepted: true,
           rejection: null,
           eventCount: 4,
-          traceCount: 4,
+          traceCount: 5,
           rollConsumption: [
             {
               sequence: 0,
@@ -1660,7 +1674,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           accepted: true,
           rejection: null,
           eventCount: 4,
-          traceCount: 4,
+          traceCount: 5,
           rollConsumption: [
             {
               sequence: 0,
@@ -2006,7 +2020,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             accepted: true,
             rejection: null,
             eventCount: 4,
-            traceCount: 4,
+            traceCount: 5,
             rollConsumption: [
               {
                 sequence: 0,
@@ -2036,7 +2050,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             accepted: true,
             rejection: null,
             eventCount: 4,
-            traceCount: 4,
+            traceCount: 5,
             rollConsumption: [
               {
                 sequence: 0,

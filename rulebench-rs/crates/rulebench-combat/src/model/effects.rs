@@ -119,9 +119,30 @@ pub enum ContestedCheckOutcome {
 pub struct DamageOutcome {
     pub target_id: String,
     pub damage_type: String,
+    pub requested_amount: i32,
+    pub amount: i32,
+    pub temporary_vitality_absorbed: i32,
+    pub temporary_vitality_after: i32,
+    pub before: BoundedValue,
+    pub after: BoundedValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealingOutcome {
+    pub target_id: String,
+    pub healing_type: String,
+    pub requested_amount: i32,
     pub amount: i32,
     pub before: BoundedValue,
     pub after: BoundedValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemporaryVitalityOutcome {
+    pub target_id: String,
+    pub requested_amount: i32,
+    pub before: i32,
+    pub after: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,6 +191,15 @@ pub enum DomainEvent {
         target_id: String,
         amount: i32,
         damage_type: String,
+    },
+    HealingApplied {
+        target_id: String,
+        amount: i32,
+        healing_type: String,
+    },
+    TemporaryVitalityGranted {
+        target_id: String,
+        amount: i32,
     },
     ModifierApplied {
         target_id: String,

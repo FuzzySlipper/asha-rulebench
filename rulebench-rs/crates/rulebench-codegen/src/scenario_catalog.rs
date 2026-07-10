@@ -472,6 +472,22 @@ fn render_event(sequence: u32, event: &DomainEvent) -> String {
             &format!("Raider took {amount} psychic damage."),
             &[target_id.as_str()],
         ),
+        DomainEvent::HealingApplied {
+            target_id, amount, ..
+        } => event_block(
+            sequence,
+            "HealingApplied",
+            &format!("Raider recovered {amount} vitality."),
+            &[target_id.as_str()],
+        ),
+        DomainEvent::TemporaryVitalityGranted {
+            target_id, amount, ..
+        } => event_block(
+            sequence,
+            "TemporaryVitalityGranted",
+            &format!("Raider gained {amount} temporary vitality."),
+            &[target_id.as_str()],
+        ),
         DomainEvent::ModifierApplied { target_id, .. } => event_block(
             sequence,
             "ModifierApplied",

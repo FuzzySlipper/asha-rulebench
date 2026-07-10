@@ -7,8 +7,9 @@ use combatant::CombatantState;
 use crate::model::{
     ActionResourceKind, ActionResourceLedgerReadout, ActionResourceRefreshDecisionKind,
     ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
-    ActiveModifier, CombatantActionResourceReadout, DamageOutcome,
+    ActiveModifier, CombatantActionResourceReadout, DamageOutcome, HealingOutcome,
     ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario, ScenarioProjection,
+    TemporaryVitalityOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,10 +53,31 @@ impl CombatState {
         for combatant in &mut self.combatants {
             if combatant.id == damage.target_id {
                 combatant.hit_points = damage.after;
+                combatant.temporary_vitality = damage.temporary_vitality_after;
             }
             if combatant.id == modifier.target_id {
                 combatant.apply_modifier(modifier);
             }
+        }
+    }
+
+    pub fn apply_healing(&mut self, healing: &HealingOutcome) {
+        if let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == healing.target_id)
+        {
+            combatant.hit_points = healing.after;
+        }
+    }
+
+    pub fn apply_temporary_vitality(&mut self, vitality: &TemporaryVitalityOutcome) {
+        if let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == vitality.target_id)
+        {
+            combatant.temporary_vitality = vitality.after;
         }
     }
 
@@ -169,6 +191,7 @@ impl CombatState {
                 .find(|state| state.id == combatant.id)
             {
                 combatant.hit_points = state.hit_points;
+                combatant.temporary_vitality = state.temporary_vitality;
                 combatant.active_modifiers = state.active_modifiers.clone();
                 combatant.conditions = state.condition_labels();
             }
@@ -226,6 +249,7 @@ mod tests {
                 current: 12,
                 max: 12,
             },
+            temporary_vitality: 0,
             class_ids: Vec::new(),
             stats: StatBlock {
                 base_stats: Vec::new(),

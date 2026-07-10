@@ -152,6 +152,34 @@ fn validate_entities(scenario: &RulebenchScenario, diagnostics: &mut Vec<Content
                 format!("Entity id {} appears more than once.", entity.id),
             ));
         }
+
+        let mut adjustments_by_type = HashMap::new();
+        for adjustment in &entity.damage_adjustments {
+            if adjustment.damage_type.is_empty() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::EmptyDamageAdjustmentType,
+                    Some(entity.id.clone()),
+                    format!(
+                        "Entity {} declares a damage adjustment with an empty type.",
+                        entity.id
+                    ),
+                ));
+                continue;
+            }
+            if adjustments_by_type
+                .insert(adjustment.damage_type.clone(), adjustment.policy)
+                .is_some()
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::ConflictingDamageAdjustment,
+                    Some(adjustment.damage_type.clone()),
+                    format!(
+                        "Entity {} declares more than one adjustment for damage type {}.",
+                        entity.id, adjustment.damage_type
+                    ),
+                ));
+            }
+        }
     }
 }
 

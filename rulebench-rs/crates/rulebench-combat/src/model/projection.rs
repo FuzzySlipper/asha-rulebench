@@ -1,7 +1,7 @@
 /// Authoritative action receipts and projected combat state.
 use super::{
-    AttackRollResult, BoundedValue, DamageOutcome, DomainEvent, ModifierOutcome,
-    RulebenchRejection, TargetLegality, TraceEntry, UseActionIntent,
+    AttackRollResult, BoundedValue, DamageOutcome, DomainEvent, HealingOutcome, ModifierOutcome,
+    RulebenchRejection, TargetLegality, TemporaryVitalityOutcome, TraceEntry, UseActionIntent,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,6 +9,7 @@ pub struct FinalCombatantState {
     pub id: String,
     pub name: String,
     pub hit_points: BoundedValue,
+    pub temporary_vitality: i32,
     pub conditions: Vec<String>,
 }
 
@@ -57,6 +58,8 @@ pub struct RulebenchReceipt {
     pub target_legality: Option<TargetLegality>,
     pub attack_roll: Option<AttackRollResult>,
     pub damage: Option<DamageOutcome>,
+    pub healing: Option<HealingOutcome>,
+    pub temporary_vitality: Option<TemporaryVitalityOutcome>,
     pub modifier: Option<ModifierOutcome>,
     pub roll_consumption: Vec<RollConsumptionEntry>,
     pub events: Vec<DomainEvent>,

@@ -23,6 +23,7 @@ pub struct Combatant {
     pub team: Team,
     pub position: GridPosition,
     pub hit_points: BoundedValue,
+    pub temporary_vitality: i32,
     pub class_ids: Vec<String>,
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
@@ -131,6 +132,31 @@ pub struct EntityDefinition {
     pub name: String,
     pub summary: String,
     pub tags: Vec<String>,
+    pub damage_adjustments: Vec<DamageAdjustment>,
+}
+
+/// A typed response an entity applies to a matching damage type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DamageAdjustment {
+    pub damage_type: String,
+    pub policy: DamageAdjustmentPolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DamageAdjustmentPolicy {
+    Resistance,
+    Vulnerability,
+    Immunity,
+}
+
+impl DamageAdjustmentPolicy {
+    pub const fn code(self) -> &'static str {
+        match self {
+            DamageAdjustmentPolicy::Resistance => "resistance",
+            DamageAdjustmentPolicy::Vulnerability => "vulnerability",
+            DamageAdjustmentPolicy::Immunity => "immunity",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

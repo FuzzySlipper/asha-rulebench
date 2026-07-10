@@ -631,6 +631,7 @@ impl HitEffect {
             .find_map(|operation| match operation {
                 HitEffectOperation::Damage(damage) => Some(damage),
                 HitEffectOperation::Heal(_)
+                | HitEffectOperation::GrantTemporaryVitality(_)
                 | HitEffectOperation::ApplyModifier(_)
                 | HitEffectOperation::Move(_)
                 | HitEffectOperation::ChangeResource(_)
@@ -644,6 +645,7 @@ impl HitEffect {
             .find_map(|operation| match operation {
                 HitEffectOperation::Damage(_)
                 | HitEffectOperation::Heal(_)
+                | HitEffectOperation::GrantTemporaryVitality(_)
                 | HitEffectOperation::Move(_)
                 | HitEffectOperation::ChangeResource(_)
                 | HitEffectOperation::OpenReactionWindow(_) => None,
@@ -657,6 +659,7 @@ impl HitEffect {
 pub enum HitEffectOperation {
     Damage(DamageEffectOperation),
     Heal(HealingEffectOperation),
+    GrantTemporaryVitality(TemporaryVitalityEffectOperation),
     ApplyModifier(ModifierEffectOperation),
     Move(MovementEffectOperation),
     ChangeResource(ResourceChangeEffectOperation),
@@ -668,6 +671,9 @@ impl HitEffectOperation {
         match self {
             HitEffectOperation::Damage(_) => EffectOperationId::Damage,
             HitEffectOperation::Heal(_) => EffectOperationId::Heal,
+            HitEffectOperation::GrantTemporaryVitality(_) => {
+                EffectOperationId::GrantTemporaryVitality
+            }
             HitEffectOperation::ApplyModifier(_) => EffectOperationId::ApplyModifier,
             HitEffectOperation::Move(_) => EffectOperationId::Move,
             HitEffectOperation::ChangeResource(_) => EffectOperationId::ChangeResource,
@@ -678,7 +684,10 @@ impl HitEffectOperation {
     pub const fn is_currently_supported(&self) -> bool {
         matches!(
             self,
-            HitEffectOperation::Damage(_) | HitEffectOperation::ApplyModifier(_)
+            HitEffectOperation::Damage(_)
+                | HitEffectOperation::Heal(_)
+                | HitEffectOperation::GrantTemporaryVitality(_)
+                | HitEffectOperation::ApplyModifier(_)
         )
     }
 }
@@ -688,6 +697,7 @@ impl HitEffectOperation {
 pub enum EffectOperationId {
     Damage,
     Heal,
+    GrantTemporaryVitality,
     ApplyModifier,
     Move,
     ChangeResource,
@@ -701,6 +711,7 @@ impl EffectOperationId {
         match self {
             EffectOperationId::Damage => "damage",
             EffectOperationId::Heal => "heal",
+            EffectOperationId::GrantTemporaryVitality => "grantTemporaryVitality",
             EffectOperationId::ApplyModifier => "applyModifier",
             EffectOperationId::Move => "move",
             EffectOperationId::ChangeResource => "changeResource",
@@ -716,11 +727,18 @@ pub struct DamageEffectOperation {
     pub damage_type: String,
 }
 
-/// A healing operation declaration. Runtime application is not implemented yet.
+/// A capped healing operation declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HealingEffectOperation {
     pub healing_bonus: i32,
     pub healing_type: String,
+}
+
+/// A temporary vitality operation declaration. Higher values replace lower
+/// current temporary vitality rather than stacking.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TemporaryVitalityEffectOperation {
+    pub vitality_bonus: i32,
 }
 
 /// A modifier application operation declaration.
@@ -849,7 +867,7 @@ mod tests {
         assert_eq!(damage.id(), EffectOperationId::Damage);
         assert!(damage.is_currently_supported());
         assert_eq!(healing.id(), EffectOperationId::Heal);
-        assert!(!healing.is_currently_supported());
+        assert!(healing.is_currently_supported());
     }
 
     #[test]

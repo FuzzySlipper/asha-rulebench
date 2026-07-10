@@ -13,6 +13,7 @@ pub(super) struct CombatantState {
     pub(super) id: String,
     pub(super) name: String,
     pub(super) hit_points: BoundedValue,
+    pub(super) temporary_vitality: i32,
     pub(super) active_modifiers: Vec<ActiveModifier>,
     pub(super) conditions: Vec<String>,
     pub(super) action_resources: Vec<ActionResourceState>,
@@ -24,6 +25,7 @@ impl CombatantState {
             id: combatant.id.clone(),
             name: combatant.name.clone(),
             hit_points: combatant.hit_points,
+            temporary_vitality: combatant.temporary_vitality,
             active_modifiers: combatant.active_modifiers.clone(),
             conditions: combatant.conditions.clone(),
             action_resources: default_action_resources(),
@@ -35,6 +37,7 @@ impl CombatantState {
             id: self.id.clone(),
             name: self.name.clone(),
             hit_points: self.hit_points,
+            temporary_vitality: self.temporary_vitality,
             conditions: self.condition_labels(),
         }
     }
@@ -44,6 +47,7 @@ impl CombatantState {
             id: combatant.id.clone(),
             name: combatant.name.clone(),
             hit_points: combatant.hit_points,
+            temporary_vitality: combatant.temporary_vitality,
             active_modifiers: Vec::new(),
             conditions: combatant.conditions.clone(),
             action_resources: default_action_resources(),
@@ -67,6 +71,7 @@ impl CombatantState {
     pub(super) fn apply_projection(&mut self, combatant: &FinalCombatantState) {
         self.name = combatant.name.clone();
         self.hit_points = combatant.hit_points;
+        self.temporary_vitality = combatant.temporary_vitality;
         self.active_modifiers = Vec::new();
         self.conditions = combatant.conditions.clone();
     }

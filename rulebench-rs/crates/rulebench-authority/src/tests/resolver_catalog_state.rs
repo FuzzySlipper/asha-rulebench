@@ -460,6 +460,10 @@ fn resolver_applies_effects_after_failed_saving_throw_and_records_the_decision()
     assert!(receipt
         .trace
         .iter()
+        .any(|entry| entry.message == "Damage vitality resolved."));
+    assert!(receipt
+        .trace
+        .iter()
         .any(|entry| entry.detail.contains("ties save")));
 }
 
@@ -565,6 +569,154 @@ fn resolver_contested_tie_favors_target_and_actor_win_applies_effects() {
         .trace
         .iter()
         .any(|entry| entry.detail.contains("ties favor the target")));
+}
+
+#[test]
+fn resolver_applies_typed_damage_adjustments_before_temporary_vitality() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[1].temporary_vitality = 3;
+    scenario.entities[1].damage_adjustments = vec![DamageAdjustment {
+        damage_type: "psychic".to_string(),
+        policy: DamageAdjustmentPolicy::Resistance,
+    }];
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    );
+
+    let damage = receipt.damage.expect("hit resolves damage");
+    assert_eq!(damage.requested_amount, 9);
+    assert_eq!(damage.amount, 4);
+    assert_eq!(damage.temporary_vitality_absorbed, 3);
+    assert_eq!(damage.after.current, 17);
+    assert_eq!(damage.temporary_vitality_after, 0);
+    assert_eq!(
+        receipt
+            .projection
+            .map(|projection| projection.combatants[1].temporary_vitality),
+        Some(0)
+    );
+}
+
+#[test]
+fn resolver_applies_immunity_and_vulnerability_to_terminal_damage() {
+    let mut immune_scenario = hexing_bolt_fixture_scenario();
+    immune_scenario.entities[1].damage_adjustments = vec![DamageAdjustment {
+        damage_type: "psychic".to_string(),
+        policy: DamageAdjustmentPolicy::Immunity,
+    }];
+    let immune_receipt = resolve_use_action(
+        &immune_scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    );
+    assert_eq!(
+        immune_receipt.damage.as_ref().map(|damage| damage.amount),
+        Some(0)
+    );
+    assert_eq!(
+        immune_receipt
+            .projection
+            .as_ref()
+            .map(|projection| projection.combatants[1].hit_points.current),
+        Some(18)
+    );
+
+    let mut vulnerable_scenario = hexing_bolt_fixture_scenario();
+    vulnerable_scenario.combatants[1].hit_points.current = 10;
+    vulnerable_scenario.entities[1].damage_adjustments = vec![DamageAdjustment {
+        damage_type: "psychic".to_string(),
+        policy: DamageAdjustmentPolicy::Vulnerability,
+    }];
+    let vulnerable_receipt = resolve_use_action(
+        &vulnerable_scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    );
+    assert_eq!(
+        vulnerable_receipt
+            .damage
+            .as_ref()
+            .map(|damage| damage.amount),
+        Some(18)
+    );
+    assert_eq!(
+        vulnerable_receipt
+            .projection
+            .as_ref()
+            .map(|projection| projection.combatants[1].hit_points.current),
+        Some(0)
+    );
+}
+
+#[test]
+fn resolver_applies_capped_healing_and_replace_only_temporary_vitality() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[1].hit_points.current = 16;
+    scenario.combatants[1].temporary_vitality = 4;
+    scenario.actions[0]
+        .hit
+        .operations
+        .push(HitEffectOperation::Heal(HealingEffectOperation {
+            healing_bonus: 99,
+            healing_type: "vitality".to_string(),
+        }));
+    scenario.actions[0]
+        .hit
+        .operations
+        .push(HitEffectOperation::GrantTemporaryVitality(
+            TemporaryVitalityEffectOperation { vitality_bonus: 10 },
+        ));
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    );
+
+    assert_eq!(
+        receipt.damage.as_ref().map(|damage| damage.after.current),
+        Some(11)
+    );
+    assert_eq!(
+        receipt.healing.as_ref().map(|healing| healing.amount),
+        Some(7)
+    );
+    assert_eq!(
+        receipt
+            .temporary_vitality
+            .as_ref()
+            .map(|vitality| (vitality.before, vitality.after)),
+        Some((0, 10))
+    );
+    assert!(matches!(
+        receipt.events.as_slice(),
+        [
+            DomainEvent::ActionUsed { .. },
+            DomainEvent::AttackRolled { .. },
+            DomainEvent::DamageApplied { .. },
+            DomainEvent::HealingApplied { .. },
+            DomainEvent::TemporaryVitalityGranted { .. },
+            DomainEvent::ModifierApplied { .. },
+        ]
+    ));
+    assert!(receipt
+        .trace
+        .iter()
+        .any(|entry| entry.message == "Healing vitality resolved."));
+    assert!(receipt
+        .trace
+        .iter()
+        .any(|entry| entry.message == "Temporary vitality resolved."));
+    assert_eq!(
+        receipt.projection.map(|projection| (
+            projection.combatants[1].hit_points.current,
+            projection.combatants[1].temporary_vitality,
+        )),
+        Some((18, 10))
+    );
 }
 
 fn enable_check_handlers(scenario: &mut RulebenchScenario, handlers: Vec<CheckHandlerKind>) {

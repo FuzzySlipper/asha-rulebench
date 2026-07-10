@@ -24,7 +24,8 @@ pub use rulebench_ruleset::{
     RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
     RulesetArtifactProvenance, RulesetCompatibilityError, RulesetMetadata, RulesetModuleProvenance,
     SavingThrowCheckDeclaration, TargetKind, TargetSelection, TargetTeamConstraint,
-    TargetingDeclaration, TurnControlModuleConfiguration, TurnOrderPolicy,
-    ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry, VisibilityRequirement,
+    TargetingDeclaration, TemporaryVitalityEffectOperation, TurnControlModuleConfiguration,
+    TurnOrderPolicy, ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry,
+    VisibilityRequirement,
 };
 pub use session::*;

@@ -418,6 +418,7 @@ mod tests {
             name: id.to_string(),
             summary: "Minimal entity.".to_string(),
             tags: Vec::new(),
+            damage_adjustments: Vec::new(),
         }
     }
 
@@ -432,6 +433,7 @@ mod tests {
                 current: hit_points,
                 max: hit_points,
             },
+            temporary_vitality: 0,
             class_ids: Vec::new(),
             stats: StatBlock {
                 base_stats: vec![NamedNumber {

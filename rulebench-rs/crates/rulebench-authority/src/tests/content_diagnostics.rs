@@ -112,14 +112,14 @@ fn content_diagnostics_reject_unimplemented_targeting_and_check_declarations() {
 }
 
 #[test]
-fn content_diagnostics_reject_unimplemented_effect_operations() {
+fn content_diagnostics_reject_deferred_effect_operations() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0]
         .hit
         .operations
-        .push(HitEffectOperation::Heal(HealingEffectOperation {
-            healing_bonus: 3,
-            healing_type: "vitality".to_string(),
+        .push(HitEffectOperation::Move(MovementEffectOperation {
+            maximum_distance: 3,
+            movement_kind: MovementKind::Push,
         }));
 
     let diagnostics = validate_scenario_content(&scenario);
@@ -133,7 +133,7 @@ fn content_diagnostics_reject_unimplemented_effect_operations() {
         ContentDiagnosticCode::UnsupportedEffectOperation.code(),
         "unsupportedEffectOperation"
     );
-    assert!(diagnostics[0].message.contains("heal"));
+    assert!(diagnostics[0].message.contains("move"));
 }
 
 #[test]
@@ -221,6 +221,7 @@ fn content_diagnostics_report_empty_entity_id() {
         name: "Nameless".to_string(),
         summary: "Invalid entity fixture.".to_string(),
         tags: Vec::new(),
+        damage_adjustments: Vec::new(),
     });
 
     let diagnostics = validate_scenario_content(&scenario);
@@ -244,6 +245,29 @@ fn content_diagnostics_report_duplicate_entity_ids() {
         ContentDiagnosticCode::DuplicateEntityId
     );
     assert_eq!(diagnostics[0].content_id, Some("entity.adept".to_string()));
+}
+
+#[test]
+fn content_diagnostics_reject_conflicting_damage_adjustments() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.entities[1].damage_adjustments = vec![
+        DamageAdjustment {
+            damage_type: "psychic".to_string(),
+            policy: DamageAdjustmentPolicy::Resistance,
+        },
+        DamageAdjustment {
+            damage_type: "psychic".to_string(),
+            policy: DamageAdjustmentPolicy::Vulnerability,
+        },
+    ];
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::ConflictingDamageAdjustment
+    );
 }
 
 #[test]

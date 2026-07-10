@@ -305,12 +305,14 @@ fn hexing_bolt_entities() -> Vec<EntityDefinition> {
             name: "Adept".to_string(),
             summary: "A focused caster entity used as the Hexing Bolt actor.".to_string(),
             tags: vec!["ally".to_string(), "caster".to_string()],
+            damage_adjustments: Vec::new(),
         },
         EntityDefinition {
             id: "entity.raider".to_string(),
             name: "Raider".to_string(),
             summary: "A hostile raider entity used as the Hexing Bolt target.".to_string(),
             tags: vec!["enemy".to_string(), "skirmisher".to_string()],
+            damage_adjustments: Vec::new(),
         },
     ]
 }
@@ -441,6 +443,7 @@ fn adept_initial() -> Combatant {
             current: 24,
             max: 24,
         },
+        temporary_vitality: 0,
         class_ids: vec!["class.hex-adept".to_string()],
         stats: StatBlock {
             base_stats: vec![
@@ -487,6 +490,7 @@ fn raider_initial() -> Combatant {
             current: 18,
             max: 18,
         },
+        temporary_vitality: 0,
         class_ids: vec!["class.raider".to_string()],
         stats: StatBlock {
             base_stats: vec![

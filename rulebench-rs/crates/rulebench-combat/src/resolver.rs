@@ -804,11 +804,8 @@ fn resolve_accepted_action(
     }
 
     let damage_roll = roll_stream[1];
-    let damage = apply_damage(
-        target,
-        damage_roll + hit_operations.damage.damage_bonus,
-        &hit_operations.damage.damage_type,
-    );
+    let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
+    let damage = vitality_effects.damage.clone();
     let modifier = ModifierOutcome {
         target_id: target.id.clone(),
         modifier_id: hit_operations.modifier.modifier_id.clone(),
@@ -826,12 +823,13 @@ fn resolve_accepted_action(
             attack_roll.roll, attack_roll.total, attack.defense.label, defense_value
         ),
     ));
+    append_vitality_trace(&mut trace, &vitality_effects);
     trace.push(TraceEntry::new(
         resolution_sequence + 1,
         TracePhase::Commit,
         TraceStatus::Accepted,
         "DomainEvents committed.",
-        "ActionUsed, AttackRolled, DamageApplied, and ModifierApplied became accepted facts.",
+        "ActionUsed, AttackRolled, vitality effects, and ModifierApplied became accepted facts.",
     ));
 
     accepted_hit_receipt(
@@ -840,6 +838,8 @@ fn resolve_accepted_action(
         target_legality,
         attack_roll,
         damage,
+        vitality_effects.healing,
+        vitality_effects.temporary_vitality,
         modifier,
         trace,
         vec![
@@ -887,6 +887,8 @@ fn accepted_non_effect_receipt(
         target_legality: Some(target_legality),
         attack_roll: None,
         damage: None,
+        healing: None,
+        temporary_vitality: None,
         modifier: None,
         roll_consumption,
         events: vec![
@@ -917,26 +919,30 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
         mut trace,
         roll_consumption,
     } = resolution;
-    let damage = apply_damage(
-        target,
-        damage_roll + hit_operations.damage.damage_bonus,
-        &hit_operations.damage.damage_type,
-    );
+    let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
+    let damage = vitality_effects.damage.clone();
     let modifier = ModifierOutcome {
         target_id: target.id.clone(),
         modifier_id: hit_operations.modifier.modifier_id.clone(),
         label: hit_operations.modifier.modifier_label.clone(),
         duration: hit_operations.modifier.modifier_duration.clone(),
     };
+    append_vitality_trace(&mut trace, &vitality_effects);
     trace.push(TraceEntry::new(
         trace.len() as u32 + 1,
         TracePhase::Commit,
         TraceStatus::Accepted,
         "DomainEvents committed.",
-        "ActionUsed, check resolution, DamageApplied, and ModifierApplied became accepted facts.",
+        "ActionUsed, check resolution, vitality effects, and ModifierApplied became accepted facts.",
     ));
     let mut state = CombatState::from_scenario(scenario);
     state.apply_hit(&damage, &modifier);
+    if let Some(healing) = &vitality_effects.healing {
+        state.apply_healing(healing);
+    }
+    if let Some(temporary_vitality) = &vitality_effects.temporary_vitality {
+        state.apply_temporary_vitality(temporary_vitality);
+    }
 
     RulebenchReceipt {
         accepted: true,
@@ -946,29 +952,63 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
         target_legality: Some(target_legality),
         attack_roll: None,
         damage: Some(damage.clone()),
+        healing: vitality_effects.healing.clone(),
+        temporary_vitality: vitality_effects.temporary_vitality.clone(),
         modifier: Some(modifier.clone()),
         roll_consumption,
-        events: vec![
-            DomainEvent::ActionUsed {
-                actor_id: intent.actor_id,
-                action_id: intent.action_id,
-                target_id: intent.target_id,
-            },
+        events: accepted_check_effect_events(
+            &intent,
             check_event,
-            DomainEvent::DamageApplied {
-                target_id: damage.target_id.clone(),
-                amount: damage.amount,
-                damage_type: damage.damage_type.clone(),
-            },
-            DomainEvent::ModifierApplied {
-                target_id: modifier.target_id.clone(),
-                modifier_id: modifier.modifier_id.clone(),
-                duration: modifier.duration.clone(),
-            },
-        ],
+            &damage,
+            vitality_effects.healing.as_ref(),
+            vitality_effects.temporary_vitality.as_ref(),
+            &modifier,
+        ),
         trace,
         projection: Some(state.project("Check failed and effects were applied.")),
     }
+}
+
+fn accepted_check_effect_events(
+    intent: &UseActionIntent,
+    check_event: DomainEvent,
+    damage: &DamageOutcome,
+    healing: Option<&HealingOutcome>,
+    temporary_vitality: Option<&TemporaryVitalityOutcome>,
+    modifier: &ModifierOutcome,
+) -> Vec<DomainEvent> {
+    let mut events = vec![
+        DomainEvent::ActionUsed {
+            actor_id: intent.actor_id.clone(),
+            action_id: intent.action_id.clone(),
+            target_id: intent.target_id.clone(),
+        },
+        check_event,
+        DomainEvent::DamageApplied {
+            target_id: damage.target_id.clone(),
+            amount: damage.amount,
+            damage_type: damage.damage_type.clone(),
+        },
+    ];
+    if let Some(healing) = healing {
+        events.push(DomainEvent::HealingApplied {
+            target_id: healing.target_id.clone(),
+            amount: healing.amount,
+            healing_type: healing.healing_type.clone(),
+        });
+    }
+    if let Some(temporary_vitality) = temporary_vitality {
+        events.push(DomainEvent::TemporaryVitalityGranted {
+            target_id: temporary_vitality.target_id.clone(),
+            amount: temporary_vitality.after - temporary_vitality.before,
+        });
+    }
+    events.push(DomainEvent::ModifierApplied {
+        target_id: modifier.target_id.clone(),
+        modifier_id: modifier.modifier_id.clone(),
+        duration: modifier.duration.clone(),
+    });
+    events
 }
 
 fn accepted_shape(intent: UseActionIntent, mut trace: Vec<TraceEntry>) -> RulebenchReceipt {
@@ -987,6 +1027,8 @@ fn accepted_shape(intent: UseActionIntent, mut trace: Vec<TraceEntry>) -> Rulebe
         target_legality: None,
         attack_roll: None,
         damage: None,
+        healing: None,
+        temporary_vitality: None,
         modifier: None,
         roll_consumption: Vec::new(),
         events: vec![DomainEvent::IntentShapeAccepted {
@@ -1019,6 +1061,8 @@ fn rejected(
         target_legality: None,
         attack_roll: None,
         damage: None,
+        healing: None,
+        temporary_vitality: None,
         modifier: None,
         roll_consumption: Vec::new(),
         events: Vec::new(),
@@ -1033,12 +1077,20 @@ fn accepted_hit_receipt(
     target_legality: TargetLegality,
     attack_roll: AttackRollResult,
     damage: DamageOutcome,
+    healing: Option<HealingOutcome>,
+    temporary_vitality: Option<TemporaryVitalityOutcome>,
     modifier: ModifierOutcome,
     trace: Vec<TraceEntry>,
     roll_consumption: Vec<RollConsumptionEntry>,
 ) -> RulebenchReceipt {
     let mut state = CombatState::from_scenario(scenario);
     state.apply_hit(&damage, &modifier);
+    if let Some(healing) = &healing {
+        state.apply_healing(healing);
+    }
+    if let Some(temporary_vitality) = &temporary_vitality {
+        state.apply_temporary_vitality(temporary_vitality);
+    }
 
     RulebenchReceipt {
         accepted: true,
@@ -1048,9 +1100,18 @@ fn accepted_hit_receipt(
         target_legality: Some(target_legality),
         attack_roll: Some(attack_roll.clone()),
         damage: Some(damage.clone()),
+        healing: healing.clone(),
+        temporary_vitality: temporary_vitality.clone(),
         modifier: Some(modifier.clone()),
         roll_consumption,
-        events: accepted_hit_events(&intent, &attack_roll, &damage, &modifier),
+        events: accepted_hit_events(
+            &intent,
+            &attack_roll,
+            &damage,
+            healing.as_ref(),
+            temporary_vitality.as_ref(),
+            &modifier,
+        ),
         trace,
         projection: Some(state.project("Raider is damaged and rattled; Adept is unchanged.")),
     }
@@ -1072,6 +1133,8 @@ fn accepted_miss_receipt(
         target_legality: Some(target_legality),
         attack_roll: Some(attack_roll.clone()),
         damage: None,
+        healing: None,
+        temporary_vitality: None,
         modifier: None,
         roll_consumption,
         events: vec![
@@ -1101,9 +1164,11 @@ fn accepted_hit_events(
     intent: &UseActionIntent,
     attack_roll: &AttackRollResult,
     damage: &DamageOutcome,
+    healing: Option<&HealingOutcome>,
+    temporary_vitality: Option<&TemporaryVitalityOutcome>,
     modifier: &ModifierOutcome,
 ) -> Vec<DomainEvent> {
-    vec![
+    let mut events = vec![
         DomainEvent::ActionUsed {
             actor_id: intent.actor_id.clone(),
             action_id: intent.action_id.clone(),
@@ -1122,12 +1187,26 @@ fn accepted_hit_events(
             amount: damage.amount,
             damage_type: damage.damage_type.clone(),
         },
-        DomainEvent::ModifierApplied {
-            target_id: modifier.target_id.clone(),
-            modifier_id: modifier.modifier_id.clone(),
-            duration: modifier.duration.clone(),
-        },
-    ]
+    ];
+    if let Some(healing) = healing {
+        events.push(DomainEvent::HealingApplied {
+            target_id: healing.target_id.clone(),
+            amount: healing.amount,
+            healing_type: healing.healing_type.clone(),
+        });
+    }
+    if let Some(temporary_vitality) = temporary_vitality {
+        events.push(DomainEvent::TemporaryVitalityGranted {
+            target_id: temporary_vitality.target_id.clone(),
+            amount: temporary_vitality.after - temporary_vitality.before,
+        });
+    }
+    events.push(DomainEvent::ModifierApplied {
+        target_id: modifier.target_id.clone(),
+        modifier_id: modifier.modifier_id.clone(),
+        duration: modifier.duration.clone(),
+    });
+    events
 }
 
 fn rejected_with_projection(
@@ -1174,6 +1253,8 @@ fn rejected_with_projection_and_rolls(
         target_legality,
         attack_roll: None,
         damage: None,
+        healing: None,
+        temporary_vitality: None,
         modifier: None,
         roll_consumption,
         events: Vec::new(),
@@ -1311,27 +1392,197 @@ fn attack_modifier(
 #[derive(Debug, Clone, Copy)]
 struct HitOperations<'a> {
     damage: &'a DamageEffectOperation,
+    healing: Option<&'a HealingEffectOperation>,
+    temporary_vitality: Option<&'a TemporaryVitalityEffectOperation>,
     modifier: &'a ModifierEffectOperation,
 }
 
+struct AppliedVitalityEffects {
+    damage: DamageOutcome,
+    healing: Option<HealingOutcome>,
+    temporary_vitality: Option<TemporaryVitalityOutcome>,
+}
+
 fn hit_operations(action: &ActionDefinition) -> Option<HitOperations<'_>> {
+    if action.hit.operations.is_empty()
+        || action
+            .hit
+            .operations
+            .iter()
+            .any(|operation| !operation.is_currently_supported())
+    {
+        return None;
+    }
+
     Some(HitOperations {
         damage: action.hit.damage_operation()?,
+        healing: action
+            .hit
+            .operations
+            .iter()
+            .find_map(|operation| match operation {
+                HitEffectOperation::Heal(healing) => Some(healing),
+                _ => None,
+            }),
+        temporary_vitality: action
+            .hit
+            .operations
+            .iter()
+            .find_map(|operation| match operation {
+                HitEffectOperation::GrantTemporaryVitality(vitality) => Some(vitality),
+                _ => None,
+            }),
         modifier: action.hit.modifier_operation()?,
     })
 }
 
-fn apply_damage(target: &Combatant, amount: i32, damage_type: &str) -> DamageOutcome {
+fn apply_damage(
+    scenario: &RulebenchScenario,
+    target: &Combatant,
+    amount: i32,
+    damage_type: &str,
+) -> DamageOutcome {
     let before = target.hit_points;
-    let next = before.current.saturating_sub(amount).max(0);
+    let requested_amount = amount.max(0);
+    let adjusted_amount = match scenario
+        .entity_by_id(&target.entity_id)
+        .and_then(|entity| {
+            entity
+                .damage_adjustments
+                .iter()
+                .find(|adjustment| adjustment.damage_type == damage_type)
+        })
+        .map(|adjustment| adjustment.policy)
+    {
+        Some(DamageAdjustmentPolicy::Immunity) => 0,
+        Some(DamageAdjustmentPolicy::Resistance) => requested_amount / 2,
+        Some(DamageAdjustmentPolicy::Vulnerability) => requested_amount.saturating_mul(2),
+        None => requested_amount,
+    };
+    let temporary_vitality_absorbed = target.temporary_vitality.min(adjusted_amount);
+    let remaining_damage = adjusted_amount - temporary_vitality_absorbed;
+    let next = before.current.saturating_sub(remaining_damage).max(0);
     DamageOutcome {
         target_id: target.id.clone(),
         damage_type: damage_type.to_string(),
-        amount: before.current - next,
+        requested_amount,
+        amount: adjusted_amount,
+        temporary_vitality_absorbed,
+        temporary_vitality_after: target.temporary_vitality - temporary_vitality_absorbed,
         before,
         after: BoundedValue {
             current: next,
             max: before.max,
         },
+    }
+}
+
+fn apply_vitality_effects(
+    scenario: &RulebenchScenario,
+    target: &Combatant,
+    damage_roll: i32,
+    operations: HitOperations<'_>,
+) -> AppliedVitalityEffects {
+    // The operation order is fixed: mitigate damage, let temporary vitality
+    // absorb it, cap healing at max HP, then replace lower temporary vitality.
+    let damage = apply_damage(
+        scenario,
+        target,
+        damage_roll + operations.damage.damage_bonus,
+        &operations.damage.damage_type,
+    );
+    let mut after_damage = target.clone();
+    after_damage.hit_points = damage.after;
+    after_damage.temporary_vitality = damage.temporary_vitality_after;
+    let healing = operations
+        .healing
+        .map(|operation| apply_healing(&after_damage, operation));
+    let mut after_healing = after_damage;
+    if let Some(outcome) = &healing {
+        after_healing.hit_points = outcome.after;
+    }
+    let temporary_vitality = operations
+        .temporary_vitality
+        .map(|operation| grant_temporary_vitality(&after_healing, operation));
+
+    AppliedVitalityEffects {
+        damage,
+        healing,
+        temporary_vitality,
+    }
+}
+
+fn append_vitality_trace(trace: &mut Vec<TraceEntry>, effects: &AppliedVitalityEffects) {
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Resolution,
+        TraceStatus::Accepted,
+        "Damage vitality resolved.",
+        format!(
+            "Requested {} {}; {} applied after mitigation, with {} absorbed by temporary vitality.",
+            effects.damage.requested_amount,
+            effects.damage.damage_type,
+            effects.damage.amount,
+            effects.damage.temporary_vitality_absorbed
+        ),
+    ));
+    if let Some(healing) = &effects.healing {
+        trace.push(TraceEntry::new(
+            trace.len() as u32 + 1,
+            TracePhase::Resolution,
+            TraceStatus::Accepted,
+            "Healing vitality resolved.",
+            format!(
+                "Requested {} {} healing; {} applied within the hit point cap.",
+                healing.requested_amount, healing.healing_type, healing.amount
+            ),
+        ));
+    }
+    if let Some(temporary_vitality) = &effects.temporary_vitality {
+        trace.push(TraceEntry::new(
+            trace.len() as u32 + 1,
+            TracePhase::Resolution,
+            TraceStatus::Accepted,
+            "Temporary vitality resolved.",
+            format!(
+                "Requested {}; temporary vitality changed from {} to {}.",
+                temporary_vitality.requested_amount,
+                temporary_vitality.before,
+                temporary_vitality.after
+            ),
+        ));
+    }
+}
+
+fn apply_healing(target: &Combatant, operation: &HealingEffectOperation) -> HealingOutcome {
+    let before = target.hit_points;
+    let requested_amount = operation.healing_bonus.max(0);
+    let next = before
+        .current
+        .saturating_add(requested_amount)
+        .min(before.max);
+    HealingOutcome {
+        target_id: target.id.clone(),
+        healing_type: operation.healing_type.clone(),
+        requested_amount,
+        amount: next - before.current,
+        before,
+        after: BoundedValue {
+            current: next,
+            max: before.max,
+        },
+    }
+}
+
+fn grant_temporary_vitality(
+    target: &Combatant,
+    operation: &TemporaryVitalityEffectOperation,
+) -> TemporaryVitalityOutcome {
+    let requested_amount = operation.vitality_bonus.max(0);
+    TemporaryVitalityOutcome {
+        target_id: target.id.clone(),
+        requested_amount,
+        before: target.temporary_vitality,
+        after: target.temporary_vitality.max(requested_amount),
     }
 }
