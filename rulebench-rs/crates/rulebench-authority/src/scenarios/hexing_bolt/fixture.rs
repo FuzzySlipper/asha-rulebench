@@ -51,6 +51,9 @@ fn hexing_bolt_ruleset() -> RulesetMetadata {
         name: "Hexing Bolt Fixture Rules".to_string(),
         version: "0.0.0".to_string(),
         summary: "Local single-action fixture ruleset for authority incubation.".to_string(),
+        modules: vec![RuleModuleDeclaration::action_resolution(
+            ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight(),
+        )],
     }
 }
 

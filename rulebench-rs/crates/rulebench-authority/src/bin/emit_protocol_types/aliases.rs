@@ -5,7 +5,7 @@ pub(crate) fn aliases() -> &'static [&'static str] {
         "export type RulebenchAttackOutcomeDto = 'hit' | 'miss';",
         "export type RulebenchTracePhaseDto = 'proposal' | 'validation' | 'resolution' | 'commit';",
         "export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';",
-        "export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';",
+        "export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';",
         "export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';",
         "export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",

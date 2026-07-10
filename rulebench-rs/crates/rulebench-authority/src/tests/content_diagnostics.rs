@@ -62,6 +62,24 @@ fn content_diagnostics_report_selected_ruleset_missing_from_catalog() {
 }
 
 #[test]
+fn content_diagnostics_report_invalid_ruleset_module_declarations() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.rulesets[0].modules.clear();
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::MissingRequiredRulesetModule
+    );
+    assert_eq!(
+        ContentDiagnosticCode::MissingRequiredRulesetModule.code(),
+        "missingRequiredRulesetModule"
+    );
+}
+
+#[test]
 fn content_diagnostics_report_empty_action_id() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0].id.clear();

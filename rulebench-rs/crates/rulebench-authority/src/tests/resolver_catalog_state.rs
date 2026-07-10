@@ -107,6 +107,28 @@ fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
 }
 
 #[test]
+fn resolver_rejects_rulesets_with_invalid_module_declarations() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.rulesets[0].modules.clear();
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    );
+
+    assert!(!receipt.accepted);
+    assert_eq!(
+        receipt.rejection,
+        Some(RulebenchRejection::InvalidRulesetModules)
+    );
+    assert_eq!(
+        RulebenchRejection::InvalidRulesetModules.code(),
+        "invalidRulesetModules"
+    );
+}
+
+#[test]
 fn item_equipment_content_does_not_change_hexing_bolt_resolution() {
     let scenario = hexing_bolt_fixture_scenario();
 

@@ -10,7 +10,7 @@ export type RulebenchTracePhaseDto = 'proposal' | 'validation' | 'resolution' | 
 
 export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';
 
-export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';
+export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';
 
 export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
 

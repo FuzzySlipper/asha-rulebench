@@ -26,6 +26,11 @@ pub enum ContentDiagnosticCode {
     EmptyRulesetId,
     DuplicateRulesetId,
     SelectedRulesetMissingFromCatalog,
+    UnknownRulesetModule,
+    MissingRequiredRulesetModule,
+    DuplicateRulesetModule,
+    IncompatibleRulesetModuleVersion,
+    RulesetModuleConfigurationMismatch,
     EmptyAbilityId,
     DuplicateAbilityId,
     EmptyEntityId,
@@ -66,6 +71,15 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::DuplicateRulesetId => "duplicateRulesetId",
             ContentDiagnosticCode::SelectedRulesetMissingFromCatalog => {
                 "selectedRulesetMissingFromCatalog"
+            }
+            ContentDiagnosticCode::UnknownRulesetModule => "unknownRulesetModule",
+            ContentDiagnosticCode::MissingRequiredRulesetModule => "missingRequiredRulesetModule",
+            ContentDiagnosticCode::DuplicateRulesetModule => "duplicateRulesetModule",
+            ContentDiagnosticCode::IncompatibleRulesetModuleVersion => {
+                "incompatibleRulesetModuleVersion"
+            }
+            ContentDiagnosticCode::RulesetModuleConfigurationMismatch => {
+                "rulesetModuleConfigurationMismatch"
             }
             ContentDiagnosticCode::EmptyAbilityId => "emptyAbilityId",
             ContentDiagnosticCode::DuplicateAbilityId => "duplicateAbilityId",

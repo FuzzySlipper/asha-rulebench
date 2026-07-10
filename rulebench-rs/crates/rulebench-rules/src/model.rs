@@ -20,8 +20,12 @@ pub use effects::*;
 pub use projection::*;
 pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};
 pub use rulebench_ruleset::{
-    AbilityDefinition, AbilityDefinitionKind, ActionDefinition, AttackSpec, DamageEffectOperation,
-    HitEffect, HitEffectOperation, ModifierEffectOperation, ModifierTenure, RulesetMetadata,
+    validate_rule_modules, AbilityDefinition, AbilityDefinitionKind, ActionDefinition,
+    ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, AttackSpec,
+    DamageEffectOperation, HitEffect, HitEffectOperation, ModifierEffectOperation, ModifierTenure,
+    RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
+    RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,
+    ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry,
 };
 pub use scenario::*;
 pub use session::*;

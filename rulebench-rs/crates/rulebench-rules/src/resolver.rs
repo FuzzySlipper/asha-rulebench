@@ -74,6 +74,26 @@ pub fn resolve_use_action(
         );
     }
 
+    let Some(ruleset) = scenario.selected_ruleset() else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidRulesetModules,
+            None,
+            trace,
+        );
+    };
+    let Ok(module_registry) = ruleset.validate_modules() else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidRulesetModules,
+            None,
+            trace,
+        );
+    };
+    let action_resolution = module_registry.action_resolution();
+
     let Some(actor) = scenario
         .combatants
         .iter()
@@ -141,7 +161,8 @@ pub fn resolve_use_action(
         );
     };
 
-    let target_legality = validate_target_legality(actor, target, action);
+    let target_legality =
+        validate_target_legality_for_module(actor, target, action, action_resolution);
     if !target_legality.accepted {
         let rejection = target_legality_rejection(&target_legality);
         return rejected_with_projection(scenario, intent, rejection, Some(target_legality), trace);
@@ -194,6 +215,19 @@ pub fn resolve_use_action(
         target_legality,
         roll_stream,
     )
+}
+
+fn validate_target_legality_for_module(
+    actor: &Combatant,
+    target: &Combatant,
+    action: &ActionDefinition,
+    configuration: &ActionResolutionModuleConfiguration,
+) -> TargetLegality {
+    match configuration.targeting_policy {
+        ActionResolutionTargetingPolicy::DeclaredTargetsAndLineOfSight => {
+            validate_target_legality(actor, target, action)
+        }
+    }
 }
 
 fn resolve_accepted_action(

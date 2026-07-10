@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use crate::model::{
     ActionDefinition, Combatant, ContentDiagnostic, ContentDiagnosticCode,
-    ContentDiagnosticSeverity, ContentValidationReport, RulebenchScenario,
+    ContentDiagnosticSeverity, ContentValidationReport, RuleModuleValidationError,
+    RulebenchScenario,
 };
 
 pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> ContentValidationReport {
@@ -80,6 +81,18 @@ fn validate_rulesets(scenario: &RulebenchScenario, diagnostics: &mut Vec<Content
                 format!("Ruleset id {} appears more than once.", ruleset.id),
             ));
         }
+
+        if let Err(error) = ruleset.validate_modules() {
+            diagnostics.push(ContentDiagnostic::error(
+                ruleset_module_validation_code(&error),
+                Some(ruleset.id.clone()),
+                format!(
+                    "Ruleset {} has an invalid behavior-module declaration: {}.",
+                    ruleset.id,
+                    error.code()
+                ),
+            ));
+        }
     }
 
     if scenario
@@ -94,6 +107,26 @@ fn validate_rulesets(scenario: &RulebenchScenario, diagnostics: &mut Vec<Content
                 scenario.selected_ruleset_id
             ),
         ));
+    }
+}
+
+fn ruleset_module_validation_code(error: &RuleModuleValidationError) -> ContentDiagnosticCode {
+    match error {
+        RuleModuleValidationError::UnknownModuleCode { .. } => {
+            ContentDiagnosticCode::UnknownRulesetModule
+        }
+        RuleModuleValidationError::MissingRequiredModule { .. } => {
+            ContentDiagnosticCode::MissingRequiredRulesetModule
+        }
+        RuleModuleValidationError::DuplicateModuleDeclaration { .. } => {
+            ContentDiagnosticCode::DuplicateRulesetModule
+        }
+        RuleModuleValidationError::IncompatibleModuleVersion { .. } => {
+            ContentDiagnosticCode::IncompatibleRulesetModuleVersion
+        }
+        RuleModuleValidationError::ConfigurationDoesNotMatchModule { .. } => {
+            ContentDiagnosticCode::RulesetModuleConfigurationMismatch
+        }
     }
 }
 
