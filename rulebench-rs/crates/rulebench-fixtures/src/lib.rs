@@ -16,7 +16,10 @@ pub use catalog::*;
 pub use content_import::{
     content_import_examples, ContentImportExample, ContentImportExampleOutcome,
 };
-pub use goldens::{FixtureGoldenArtifact, FixtureGoldenArtifactKind, FixtureGoldenManifest};
+pub use goldens::{
+    FixtureGoldenArtifact, FixtureGoldenArtifactKind, FixtureGoldenContentReviewAttachment,
+    FixtureGoldenManifest,
+};
 pub use package::{
     ScenarioPackage, ScenarioPackageContentReference, ScenarioPackageDisplayMetadata,
     ScenarioPackageEvidenceExpectation, ScenarioPackageEvidenceKind, ScenarioPackageIdentity,
