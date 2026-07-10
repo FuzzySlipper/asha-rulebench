@@ -15,9 +15,7 @@ pub use rulebench_combat::{
     CombatSessionState,
 };
 
-mod replay;
-
-pub use replay::{
+pub use rulebench_replay::{
     verify_automatic_run_replay, CombatSessionAutomaticRunReplayDecisionKind,
     CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
 };

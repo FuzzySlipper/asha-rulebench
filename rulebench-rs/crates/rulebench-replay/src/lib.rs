@@ -1,4 +1,13 @@
 //! Audit, replay packages, and verification.
 //!
-//! This reserved boundary will own persisted replay specifications, comparison
-//! diagnostics, and audit readbacks. Combat execution remains in combat.
+//! Combat execution remains in `rulebench-combat`; this crate owns replay
+//! specifications and immutable evidence comparison.
+
+#![forbid(unsafe_code)]
+
+mod automatic_run;
+
+pub use automatic_run::{
+    verify_automatic_run_replay, CombatSessionAutomaticRunReplayDecisionKind,
+    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
+};

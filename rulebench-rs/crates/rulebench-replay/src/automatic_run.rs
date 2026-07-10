@@ -1,0 +1,283 @@
+//! Bounded automatic-combat replay specifications and evidence verification.
+
+use rulebench_combat::RulebenchScenario;
+use rulebench_combat::{
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionState,
+};
+use rulebench_core::StateFingerprint;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticRunReplaySpec {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub initial_session_id: String,
+    pub initial_scenario: RulebenchScenario,
+    pub run: CombatSessionAutomaticRunSpec,
+    pub expected_final_state_fingerprint: StateFingerprint,
+    pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
+    pub expected_executed_step_count: u32,
+}
+
+impl CombatSessionAutomaticRunReplaySpec {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        summary: impl Into<String>,
+        initial_session_id: impl Into<String>,
+        initial_scenario: RulebenchScenario,
+        run: CombatSessionAutomaticRunSpec,
+        expected_final_state_fingerprint: StateFingerprint,
+        expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
+        expected_executed_step_count: u32,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            initial_session_id: initial_session_id.into(),
+            initial_scenario,
+            run,
+            expected_final_state_fingerprint,
+            expected_run_decision_kind,
+            expected_executed_step_count,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatSessionAutomaticRunReplayDecisionKind {
+    Verified,
+    MismatchedEvidence,
+}
+
+impl CombatSessionAutomaticRunReplayDecisionKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatSessionAutomaticRunReplayDecisionKind::Verified => "verified",
+            CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence => "mismatchedEvidence",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSessionAutomaticRunReplayReadout {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub accepted: bool,
+    pub decision_kind: CombatSessionAutomaticRunReplayDecisionKind,
+    pub expected_final_state_fingerprint: StateFingerprint,
+    pub actual_final_state_fingerprint: StateFingerprint,
+    pub final_state_fingerprint_matches: bool,
+    pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
+    pub actual_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
+    pub run_decision_kind_matches: bool,
+    pub expected_executed_step_count: u32,
+    pub actual_executed_step_count: u32,
+    pub executed_step_count_matches: bool,
+    pub replayed_run: CombatSessionAutomaticRunReadout,
+    pub reason: String,
+}
+
+pub fn verify_automatic_run_replay(
+    spec: CombatSessionAutomaticRunReplaySpec,
+) -> CombatSessionAutomaticRunReplayReadout {
+    let mut replay_session =
+        CombatSessionState::new(spec.initial_session_id.clone(), spec.initial_scenario);
+    let replayed_run = replay_session.run_automatic_combat(spec.run);
+    let actual_final_state_fingerprint = replayed_run
+        .final_snapshot
+        .current_state_fingerprint
+        .clone();
+    let actual_run_decision_kind = replayed_run.decision_kind;
+    let actual_executed_step_count = replayed_run.executed_step_count;
+
+    let final_state_fingerprint_matches =
+        actual_final_state_fingerprint == spec.expected_final_state_fingerprint;
+    let run_decision_kind_matches = actual_run_decision_kind == spec.expected_run_decision_kind;
+    let executed_step_count_matches =
+        actual_executed_step_count == spec.expected_executed_step_count;
+    let accepted =
+        final_state_fingerprint_matches && run_decision_kind_matches && executed_step_count_matches;
+    let decision_kind = if accepted {
+        CombatSessionAutomaticRunReplayDecisionKind::Verified
+    } else {
+        CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence
+    };
+    let reason = if accepted {
+        "Automatic run replay verified expected final evidence.".to_string()
+    } else {
+        "Automatic run replay produced evidence that does not match expected final evidence."
+            .to_string()
+    };
+
+    CombatSessionAutomaticRunReplayReadout {
+        id: spec.id,
+        title: spec.title,
+        summary: spec.summary,
+        accepted,
+        decision_kind,
+        expected_final_state_fingerprint: spec.expected_final_state_fingerprint,
+        actual_final_state_fingerprint,
+        final_state_fingerprint_matches,
+        expected_run_decision_kind: spec.expected_run_decision_kind,
+        actual_run_decision_kind,
+        run_decision_kind_matches,
+        expected_executed_step_count: spec.expected_executed_step_count,
+        actual_executed_step_count,
+        executed_step_count_matches,
+        replayed_run,
+        reason,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rulebench_combat::{
+        ActionDefinition, AttackCheckDeclaration, CheckDeclaration, CombatSessionState,
+        DefenseReference, Grid, HitEffect, RulebenchScenario, ScenarioMetadata, TargetKind,
+        TargetSelection, TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,
+    };
+
+    #[test]
+    fn automatic_run_replay_verifies_matching_evidence() {
+        let scenario = minimal_replay_scenario();
+        let run = zero_step_run();
+        let expected = expected_run(scenario.clone(), run.clone());
+
+        let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+            "matching",
+            "Matching replay",
+            "Replay matches expected evidence.",
+            "matching-session",
+            scenario,
+            run,
+            expected.final_snapshot.current_state_fingerprint.clone(),
+            expected.decision_kind,
+            expected.executed_step_count,
+        ));
+
+        assert!(readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            CombatSessionAutomaticRunReplayDecisionKind::Verified
+        );
+        assert!(readout.final_state_fingerprint_matches);
+        assert!(readout.run_decision_kind_matches);
+        assert!(readout.executed_step_count_matches);
+    }
+
+    #[test]
+    fn automatic_run_replay_reports_mismatched_roll_evidence_count() {
+        let scenario = minimal_replay_scenario();
+        let run = zero_step_run();
+        let expected = expected_run(scenario.clone(), run.clone());
+
+        let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+            "mismatch",
+            "Mismatch replay",
+            "Replay reports mismatched evidence.",
+            "mismatch-session",
+            scenario,
+            run,
+            expected.final_snapshot.current_state_fingerprint.clone(),
+            expected.decision_kind,
+            expected.executed_step_count + 1,
+        ));
+
+        assert!(!readout.accepted);
+        assert_eq!(
+            readout.decision_kind,
+            CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence
+        );
+        assert!(readout.final_state_fingerprint_matches);
+        assert!(readout.run_decision_kind_matches);
+        assert!(!readout.executed_step_count_matches);
+    }
+
+    fn expected_run(
+        scenario: RulebenchScenario,
+        run: CombatSessionAutomaticRunSpec,
+    ) -> CombatSessionAutomaticRunReadout {
+        let mut session = CombatSessionState::new("expected-session", scenario);
+        session.run_automatic_combat(run)
+    }
+
+    fn zero_step_run() -> CombatSessionAutomaticRunSpec {
+        CombatSessionAutomaticRunSpec::new(
+            "zero-step",
+            "Zero step",
+            "Replay evidence without mutation.",
+            0,
+            Vec::new(),
+        )
+    }
+
+    fn minimal_replay_scenario() -> RulebenchScenario {
+        let selected_action = ActionDefinition {
+            id: "placeholder".to_string(),
+            ruleset_id: "placeholder-rules".to_string(),
+            ability_id: "placeholder-ability".to_string(),
+            name: "Placeholder".to_string(),
+            actor_id: "placeholder-actor".to_string(),
+            targeting: TargetingDeclaration {
+                target_kind: TargetKind::Combatant,
+                selection: TargetSelection::Single,
+                team_constraint: TargetTeamConstraint::Hostile,
+                maximum_range: 0,
+                visibility_requirement: VisibilityRequirement::Ignored,
+                target_ids: Vec::new(),
+                visible_target_ids: Vec::new(),
+            },
+            check: CheckDeclaration::Attack(AttackCheckDeclaration {
+                modifier: 0,
+                modifier_stat_id: "placeholder-stat".to_string(),
+                defense: DefenseReference {
+                    id: "placeholder-defense".to_string(),
+                    label: "Placeholder defense".to_string(),
+                },
+            }),
+            hit: HitEffect {
+                damage_bonus: 0,
+                damage_type: "placeholder".to_string(),
+                modifier_id: "placeholder-modifier".to_string(),
+                modifier_label: "Placeholder modifier".to_string(),
+                modifier_duration: "placeholder".to_string(),
+                operations: Vec::new(),
+            },
+            action_text: "Placeholder action.".to_string(),
+            effect_text: "Placeholder effect.".to_string(),
+        };
+
+        RulebenchScenario {
+            metadata: ScenarioMetadata {
+                id: "replay-test".to_string(),
+                title: "Replay test".to_string(),
+                summary: "Minimal no-mutation replay scenario.".to_string(),
+                seed_label: "replay-test".to_string(),
+            },
+            rulesets: Vec::new(),
+            selected_ruleset_id: "placeholder-rules".to_string(),
+            grid: Grid {
+                width: 0,
+                height: 0,
+                cells: Vec::new(),
+            },
+            combatants: Vec::new(),
+            entities: Vec::new(),
+            abilities: Vec::new(),
+            selected_ability_id: None,
+            classes: Vec::new(),
+            selected_class_id: None,
+            stat_definitions: Vec::new(),
+            modifiers: Vec::new(),
+            items: Vec::new(),
+            selected_item_id: None,
+            actions: Vec::new(),
+            selected_action,
+        }
+    }
+}
