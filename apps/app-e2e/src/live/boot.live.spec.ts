@@ -46,6 +46,26 @@ liveScenario('boot live evidence @live', async ({ page, collector, liveBaseUrl }
   await liveWorkspace.getByRole('button', { name: 'End', exact: true }).click();
   await liveWorkspace.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(liveWorkspace.getByRole('region', { name: 'Live session state' })).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await liveWorkspace.getByLabel('Session').fill(`live-automatic-${Date.now()}`);
+  await liveWorkspace.getByRole('button', { name: 'Create session' }).click();
+  await liveWorkspace.getByRole('button', { name: 'Start', exact: true }).click();
+  await liveWorkspace.getByRole('button', { name: 'Run step', exact: true }).click();
+  await expect(liveWorkspace.getByRole('region', { name: 'Automatic next decision' })).toContainText('Submit Candidate');
+  await liveWorkspace.getByLabel('Max steps').fill('1');
+  await liveWorkspace.getByRole('button', { name: 'Run bounded', exact: true }).click();
+  await expect(liveWorkspace.getByRole('region', { name: 'Automatic run status' })).toContainText('Stopped At Max Steps');
+  await collector.milestone('automatic rust decisions rendered', {
+    screenshot: true,
+    layerSnapshot: {
+      nextDecision: await liveWorkspace.getByRole('region', { name: 'Automatic next decision' }).innerText(),
+      boundedRun: await liveWorkspace.getByRole('region', { name: 'Automatic run status' }).innerText(),
+      policy: await liveWorkspace.getByRole('region', { name: 'Automatic policy status' }).innerText(),
+    },
+  });
+  await liveWorkspace.getByRole('button', { name: 'End', exact: true }).click();
+  await liveWorkspace.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(liveWorkspace.getByRole('region', { name: 'Live session state' })).toHaveCount(0);
   await collector.milestone('shell rendered', {
     screenshot: true,
     layerSnapshot: {

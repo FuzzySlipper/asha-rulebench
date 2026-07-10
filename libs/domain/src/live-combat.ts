@@ -1,10 +1,37 @@
 import type {
+  RulebenchLiveAutomaticRunDto,
+  RulebenchLiveAutomaticStepDto,
   RulebenchLiveCandidateSummaryDto,
   RulebenchLiveCommandExecutionDto,
   RulebenchLiveCurrentActorOptionsDto,
   RulebenchLivePreflightDto,
   RulebenchLiveSessionSnapshotDto,
 } from "@asha-rulebench/protocol";
+
+export interface RulebenchLiveAutomaticStepView {
+  readonly accepted: boolean;
+  readonly decisionLabel: string;
+  readonly operationLabel: string | null;
+  readonly policyLabel: string;
+  readonly selectedActionId: string | null;
+  readonly selectedTargetId: string | null;
+  readonly candidateCount: number;
+  readonly acceptedCandidateCount: number;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveAutomaticRunView {
+  readonly id: string;
+  readonly accepted: boolean;
+  readonly decisionLabel: string;
+  readonly policyLabel: string;
+  readonly maxSteps: number;
+  readonly executedStepCount: number;
+  readonly reason: string;
+  readonly steps: readonly RulebenchLiveAutomaticStepView[];
+  readonly finalLifecycleLabel: string;
+  readonly finalFingerprintLabel: string;
+}
 
 export interface RulebenchLiveSessionView {
   readonly sessionId: string;
@@ -255,6 +282,40 @@ export function projectLiveCommandExecution(
     stateChanged:
       execution.step.stateBeforeFingerprint.value !==
       execution.step.stateAfterFingerprint.value,
+  };
+}
+
+export function projectLiveAutomaticStep(
+  step: RulebenchLiveAutomaticStepDto,
+): RulebenchLiveAutomaticStepView {
+  return {
+    accepted: step.accepted,
+    decisionLabel: labelCode(step.decisionKind),
+    operationLabel:
+      step.operationKind === null ? null : labelCode(step.operationKind),
+    policyLabel: `${step.policyId} v${step.policyVersion}`,
+    selectedActionId: step.selectedActionId,
+    selectedTargetId: step.selectedTargetId,
+    candidateCount: step.candidateCount,
+    acceptedCandidateCount: step.acceptedCandidateCount,
+    reason: step.reason,
+  };
+}
+
+export function projectLiveAutomaticRun(
+  run: RulebenchLiveAutomaticRunDto,
+): RulebenchLiveAutomaticRunView {
+  return {
+    id: run.id,
+    accepted: run.accepted,
+    decisionLabel: labelCode(run.decisionKind),
+    policyLabel: `${run.policyId} v${run.policyVersion}`,
+    maxSteps: run.maxSteps,
+    executedStepCount: run.executedStepCount,
+    reason: run.reason,
+    steps: run.steps.map(projectLiveAutomaticStep),
+    finalLifecycleLabel: labelCode(run.finalSnapshot.lifecyclePhase),
+    finalFingerprintLabel: `${run.finalSnapshot.stateFingerprint.algorithm}:${run.finalSnapshot.stateFingerprint.value}`,
   };
 }
 

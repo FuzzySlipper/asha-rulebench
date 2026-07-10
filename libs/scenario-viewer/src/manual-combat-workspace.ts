@@ -119,6 +119,31 @@ import { LiveCombatStore } from '@asha-rulebench/store';
             </div>
           </section>
 
+          <section class="detail" aria-label="Automatic combat controls">
+            <div class="heading"><div><h3>Automatic control</h3><p class="meta">firstAcceptedCandidate v1 · Rust selects each operation</p></div><div class="toolbar"><button type="button" [attr.aria-pressed]="noCandidateBehavior() === 'advanceTurn'" (click)="noCandidateBehavior.set('advanceTurn')">Advance turn</button><button type="button" [attr.aria-pressed]="noCandidateBehavior() === 'stopRun'" (click)="noCandidateBehavior.set('stopRun')">Stop run</button></div></div>
+            <div class="field-row">
+              <label>Max steps <input class="roll" #maxSteps type="number" min="1" [value]="maxStepsInput()" (input)="maxStepsInput.set(maxSteps.value)" /></label>
+              <label>Roll stream <input #autoRolls [value]="automaticRollInput()" (input)="automaticRollInput.set(autoRolls.value)" /></label>
+              <button type="button" [disabled]="!canRunAutomatic()" (click)="runAutomaticStep()">Run step</button>
+              <button type="button" [disabled]="!canRunAutomatic()" (click)="runAutomaticCombat()">Run bounded</button>
+              <button type="button" [disabled]="!automationBusy()" (click)="cancelAutomation()">Stop</button>
+            </div>
+            <p class="reason">Replay verification: unavailable on the current live host protocol</p>
+            <div class="evidence-grid">
+              <section class="evidence" aria-label="Automatic next decision"><h4>Next decision</h4>
+                @if (automaticStep().kind === 'data') { <p [class.accepted]="automaticStep().value.accepted" [class.rejected]="!automaticStep().value.accepted">{{ automaticStep().value.decisionLabel }} · {{ automaticStep().value.operationLabel ?? 'No operation' }}</p><p class="reason">{{ automaticStep().value.selectedActionId ?? 'No action' }} → {{ automaticStep().value.selectedTargetId ?? 'No target' }}</p><p class="reason">{{ automaticStep().value.reason }}</p> }
+                @if (automaticStep().kind === 'loading') { <p class="state">Rust is selecting one operation</p> }
+                @if (automaticStep().kind === 'error') { <p role="alert">{{ automaticStep().error.message }}</p> }
+              </section>
+              <section class="evidence" aria-label="Automatic run status"><h4>Bounded run</h4>
+                @if (automaticRun().kind === 'data') { <p [class.accepted]="automaticRun().value.accepted" [class.rejected]="!automaticRun().value.accepted">{{ automaticRun().value.decisionLabel }}</p><p>{{ automaticRun().value.executedStepCount }}/{{ automaticRun().value.maxSteps }} steps · {{ automaticRun().value.finalLifecycleLabel }}</p><p class="reason">{{ automaticRun().value.reason }}</p><p class="fingerprint">{{ automaticRun().value.finalFingerprintLabel }}</p> }
+                @if (automaticRun().kind === 'loading') { <p class="state">Rust is running within the step guard</p> }
+                @if (automaticRun().kind === 'error') { <p role="alert">{{ automaticRun().error.message }}</p> }
+              </section>
+              <section class="evidence" aria-label="Automatic policy status"><h4>Policy configuration</h4><p>firstAcceptedCandidate v1</p><p class="reason">No candidate: {{ noCandidateBehavior() === 'advanceTurn' ? 'Advance turn' : 'Stop run' }}</p><p class="reason">Guard: {{ maxStepsInput() }} steps</p></section>
+            </div>
+          </section>
+
           <div class="evidence-grid">
             <section class="evidence" aria-label="Live preflight evidence"><h4>Preflight</h4>
               @if (preflight().kind === 'data') { <p [class.accepted]="preflight().value.accepted" [class.rejected]="!preflight().value.accepted">{{ preflight().value.decisionLabel }}</p><p class="reason">{{ preflight().value.reason }}</p> }
@@ -157,12 +182,17 @@ export class ManualCombatWorkspaceComponent implements OnInit {
   protected readonly candidates = computed(() => this.store.candidates());
   protected readonly preflight = computed(() => this.store.preflight());
   protected readonly submission = computed(() => this.store.submission());
+  protected readonly automaticStep = computed(() => this.store.automaticStep());
+  protected readonly automaticRun = computed(() => this.store.automaticRun());
   protected readonly selectedScenarioId = computed(() => this.store.selectedScenarioId());
   protected readonly selectedSessionId = computed(() => this.store.selectedSessionId());
   protected readonly intent = computed(() => this.store.intent());
   protected readonly sessionIdInput = signal('manual-session');
   protected readonly attackRollInput = signal('17');
   protected readonly damageRollInput = signal('5');
+  protected readonly automaticRollInput = signal('17,5,2,5,17,5');
+  protected readonly maxStepsInput = signal('8');
+  protected readonly noCandidateBehavior = signal<'advanceTurn' | 'stopRun'>('advanceTurn');
   private commandSequence = 0;
   protected readonly busy = computed(() =>
     [this.snapshot(), this.options(), this.candidates(), this.preflight(), this.submission(), this.store.control()].some((state) => state.kind === 'loading'),
@@ -173,6 +203,11 @@ export class ManualCombatWorkspaceComponent implements OnInit {
   protected readonly canSubmit = computed(() =>
     this.intent().actorId.length > 0 && this.intent().actionId.length > 0 && this.intent().targetId.length > 0 && this.rollStream() !== null,
   );
+  protected readonly automationBusy = computed(() => this.automaticStep().kind === 'loading' || this.automaticRun().kind === 'loading');
+  protected readonly canRunAutomatic = computed(() => {
+    const snapshot = this.snapshot();
+    return snapshot.kind === 'data' && snapshot.value.lifecycleLabel === 'In Progress' && !this.automationBusy() && this.automaticRollStream() !== null && this.maxSteps() !== null;
+  });
 
   ngOnInit(): void { void this.initialize(); }
   protected connect(): void { void this.initialize(); }
@@ -204,6 +239,33 @@ export class ManualCombatWorkspaceComponent implements OnInit {
     this.commandSequence += 1;
     void this.store.submitIntent({ id: `manual-${this.commandSequence}`, title: 'Manual command', summary: 'Submitted from the Rulebench manual control workspace.', rollStream }).then(() => this.refreshEvidence());
   }
+  protected runAutomaticStep(): void {
+    const rollStream = this.automaticRollStream();
+    if (rollStream === null) return;
+    this.commandSequence += 1;
+    void this.store.runAutomaticStep({
+      id: `automatic-step-${this.commandSequence}`,
+      title: 'Automatic step',
+      summary: 'One Rust-selected automatic operation.',
+      rollStream,
+      policy: this.automationPolicy(),
+    }).then(() => this.refreshEvidence());
+  }
+  protected runAutomaticCombat(): void {
+    const rollStream = this.automaticRollStream();
+    const maxSteps = this.maxSteps();
+    if (rollStream === null || maxSteps === null) return;
+    this.commandSequence += 1;
+    void this.store.runAutomaticCombat({
+      id: `automatic-run-${this.commandSequence}`,
+      title: 'Bounded automatic run',
+      summary: 'Rust-selected operations within the configured step guard.',
+      maxSteps,
+      rollStream,
+      policy: this.automationPolicy(),
+    }).then(() => this.refreshEvidence());
+  }
+  protected cancelAutomation(): void { this.store.cancelAutomation(); }
   private async initialize(): Promise<void> {
     await this.store.connect();
     if (this.store.connection().kind !== 'data') return;
@@ -213,5 +275,16 @@ export class ManualCombatWorkspaceComponent implements OnInit {
     const attack = Number(this.attackRollInput());
     const damage = Number(this.damageRollInput());
     return Number.isInteger(attack) && Number.isInteger(damage) ? [attack, damage] : null;
+  }
+  private automaticRollStream(): readonly number[] | null {
+    const values = this.automaticRollInput().split(',').map((value) => Number(value.trim()));
+    return values.length > 0 && values.every(Number.isInteger) ? values : null;
+  }
+  private maxSteps(): number | null {
+    const value = Number(this.maxStepsInput());
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+  private automationPolicy(): { readonly id: string; readonly version: number; readonly noCandidateBehavior: 'advanceTurn' | 'stopRun' } {
+    return { id: 'firstAcceptedCandidate', version: 1, noCandidateBehavior: this.noCandidateBehavior() };
   }
 }

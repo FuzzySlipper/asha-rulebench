@@ -1,11 +1,15 @@
 import { Injectable, InjectionToken, signal } from "@angular/core";
 import type { Provider, Signal } from "@angular/core";
 import {
+  projectLiveAutomaticRun,
+  projectLiveAutomaticStep,
   projectLiveCandidates,
   projectLiveCommandExecution,
   projectLiveOptions,
   projectLivePreflight,
   projectLiveSessionSnapshot,
+  type RulebenchLiveAutomaticRunView,
+  type RulebenchLiveAutomaticStepView,
   type RulebenchLiveCandidateSummaryView,
   type RulebenchLiveCommandExecutionView,
   type RulebenchLiveOptionsView,
@@ -14,6 +18,8 @@ import {
 } from "@asha-rulebench/domain";
 import { browserClock, type ClockPort } from "@asha-rulebench/platform";
 import type {
+  RulebenchAutomaticRunSpecDto,
+  RulebenchAutomaticStepSpecDto,
   RulebenchCombatControlCommandKindDto,
   RulebenchLiveTransportErrorDto,
   RulebenchProtocolHandshakeDto,
@@ -85,6 +91,14 @@ export class LiveCombatStore {
   });
   readonly control: Signal<LiveState<RulebenchLiveSessionView>> =
     this._control.asReadonly();
+  private readonly _automaticStep = signal<
+    LiveState<RulebenchLiveAutomaticStepView>
+  >({ kind: "idle" });
+  readonly automaticStep = this._automaticStep.asReadonly();
+  private readonly _automaticRun = signal<
+    LiveState<RulebenchLiveAutomaticRunView>
+  >({ kind: "idle" });
+  readonly automaticRun = this._automaticRun.asReadonly();
   private readonly _selectedScenarioId = signal<string | null>(null);
   readonly selectedScenarioId = this._selectedScenarioId.asReadonly();
   private readonly _selectedSessionId = signal<string | null>(null);
@@ -96,6 +110,8 @@ export class LiveCombatStore {
   });
   readonly intent = this._intent.asReadonly();
   private lifecycleGeneration = 0;
+  private automationGeneration = 0;
+  private automationController: AbortController | null = null;
   private sessionGeneration = 0;
 
   constructor(
@@ -287,6 +303,71 @@ export class LiveCombatStore {
     this.clock.now();
   }
 
+  async runAutomaticStep(spec: RulebenchAutomaticStepSpecDto): Promise<void> {
+    const request = this.currentRequest();
+    if (request === null) return;
+    const automation = this.beginAutomation();
+    this._automaticStep.set({ kind: "loading" });
+    const result = await this.transport.runAutomaticStep(
+      request.sessionId,
+      spec,
+      { signal: automation.controller.signal },
+    );
+    if (!this.isCurrentAutomation(request, automation.generation)) return;
+    this.automationController = null;
+    if (result.ok) {
+      this._automaticStep.set({
+        kind: "data",
+        value: projectLiveAutomaticStep(result.value),
+      });
+      if (result.value.snapshot !== null) {
+        this._snapshot.set({
+          kind: "data",
+          value: projectLiveSessionSnapshot(result.value.snapshot),
+        });
+      }
+    } else {
+      this._automaticStep.set({ kind: "error", error: result.error });
+    }
+    this.clock.now();
+  }
+
+  async runAutomaticCombat(spec: RulebenchAutomaticRunSpecDto): Promise<void> {
+    const request = this.currentRequest();
+    if (request === null) return;
+    const automation = this.beginAutomation();
+    this._automaticRun.set({ kind: "loading" });
+    const result = await this.transport.runAutomaticCombat(
+      request.sessionId,
+      spec,
+      { signal: automation.controller.signal },
+    );
+    if (!this.isCurrentAutomation(request, automation.generation)) return;
+    this.automationController = null;
+    if (result.ok) {
+      this._automaticRun.set({
+        kind: "data",
+        value: projectLiveAutomaticRun(result.value),
+      });
+      this._snapshot.set({
+        kind: "data",
+        value: projectLiveSessionSnapshot(result.value.finalSnapshot),
+      });
+    } else {
+      this._automaticRun.set({ kind: "error", error: result.error });
+    }
+    this.clock.now();
+  }
+
+  cancelAutomation(): void {
+    this.automationGeneration += 1;
+    this.automationController?.abort();
+    this.automationController = null;
+    this._automaticStep.set({ kind: "idle" });
+    this._automaticRun.set({ kind: "idle" });
+    this.clock.now();
+  }
+
   async closeSession(): Promise<void> {
     const request = this.currentRequest();
     if (request === null) return;
@@ -314,6 +395,7 @@ export class LiveCombatStore {
   }
 
   private selectSessionIdentity(sessionId: string): void {
+    this.cancelAutomation();
     this.sessionGeneration += 1;
     this._selectedSessionId.set(sessionId);
     this._options.set({ kind: "idle" });
@@ -324,6 +406,7 @@ export class LiveCombatStore {
   }
 
   private clearSessionState(): void {
+    this.cancelAutomation();
     this.sessionGeneration += 1;
     this._selectedSessionId.set(null);
     this._snapshot.set({ kind: "idle" });
@@ -349,6 +432,27 @@ export class LiveCombatStore {
     return (
       this._selectedSessionId() === sessionId &&
       this.sessionGeneration === generation
+    );
+  }
+
+  private beginAutomation(): {
+    readonly generation: number;
+    readonly controller: AbortController;
+  } {
+    this.automationGeneration += 1;
+    this.automationController?.abort();
+    const controller = new AbortController();
+    this.automationController = controller;
+    return { generation: this.automationGeneration, controller };
+  }
+
+  private isCurrentAutomation(
+    request: { readonly sessionId: string; readonly generation: number },
+    automationGeneration: number,
+  ): boolean {
+    return (
+      this.isCurrent(request.sessionId, request.generation) &&
+      this.automationGeneration === automationGeneration
     );
   }
 }

@@ -179,3 +179,28 @@ test("completes a supported scenario through the visible manual workspace", asyn
   await workspace.getByRole("button", { name: "Close", exact: true }).click();
   await expect(workspace.getByText("e2e-visible-manual-session · Ended")).toHaveCount(0);
 });
+
+test("shows Rust automatic step and bounded-run decisions", async ({ page }) => {
+  await page.goto("/");
+  const workspace = page.getByRole("region", { name: "Live combat controls" });
+  await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
+  await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
+  await workspace.getByLabel("Session").fill("e2e-visible-automatic-session");
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  await workspace.getByRole("button", { name: "Start", exact: true }).click();
+
+  await workspace.getByRole("button", { name: "Run step", exact: true }).click();
+  await expect(workspace.getByRole("region", { name: "Automatic next decision" })).toContainText("Submit Candidate");
+  await expect(workspace.getByRole("region", { name: "Live session state" })).toContainText("Raider9/18 HP · Active");
+
+  await workspace.getByLabel("Max steps").fill("1");
+  await workspace.getByRole("button", { name: "Run bounded", exact: true }).click();
+  const runStatus = workspace.getByRole("region", { name: "Automatic run status" });
+  await expect(runStatus).toContainText("Stopped At Max Steps");
+  await expect(runStatus).toContainText("1/1 steps");
+  await expect(workspace.getByText("Replay verification: unavailable on the current live host protocol")).toBeVisible();
+
+  await workspace.getByRole("button", { name: "End", exact: true }).click();
+  await workspace.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(workspace.getByRole("region", { name: "Live session state" })).toHaveCount(0);
+});

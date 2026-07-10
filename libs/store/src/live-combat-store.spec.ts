@@ -3,6 +3,9 @@ import type { ClockPort } from "@asha-rulebench/platform";
 import type {
   RulebenchLiveCandidateSummaryDto,
   RulebenchLiveCommandExecutionDto,
+  RulebenchLiveAutomaticRunDto,
+  RulebenchLiveAutomaticStepDto,
+  RulebenchCombatAutomationPolicySpecDto,
   RulebenchLivePreflightDto,
   RulebenchLiveSessionSnapshotDto,
 } from "@asha-rulebench/protocol";
@@ -231,6 +234,142 @@ describe("LiveCombatStore", () => {
     expect(store.selectedSessionId()).toBeNull();
     expect(store.snapshot()).toEqual({ kind: "idle" });
     expect(store.sessions()).toEqual({ kind: "data", value: [] });
+  });
+
+  it("projects Rust automatic step and bounded-run decisions and applies returned snapshots", async () => {
+    const finalSnapshot = makeLiveSessionSnapshot({
+      raiderHitPoints: 9,
+      fingerprint: "automatic",
+    });
+    const automaticStep: RulebenchLiveAutomaticStepDto = {
+      accepted: true,
+      decisionKind: "submitCandidate",
+      operationKind: "submitCandidate",
+      lifecyclePhase: "inProgress",
+      currentActorId: "entity-adept",
+      policyId: "firstAcceptedCandidate",
+      policyVersion: 1,
+      selectedActionId: "hexing_bolt",
+      selectedTargetId: "entity-raider",
+      candidateCount: 1,
+      acceptedCandidateCount: 1,
+      submittedStep: null,
+      reason: "Rust selected the first accepted candidate.",
+      snapshot: finalSnapshot,
+    };
+    const transport = createFakeRulebenchLiveTransport({
+      getSession: async () => ({ ok: true, value: makeLiveSessionSnapshot() }),
+      runAutomaticStep: async () => ({ ok: true, value: automaticStep }),
+      runAutomaticCombat: async () => ({
+        ok: true,
+        value: {
+          id: "run",
+          title: "Run",
+          summary: "Bounded run.",
+          accepted: true,
+          decisionKind: "stoppedAtMaxSteps",
+          maxSteps: 1,
+          executedStepCount: 1,
+          policyId: "firstAcceptedCandidate",
+          policyVersion: 1,
+          steps: [automaticStep],
+          finalSnapshot,
+          reason: "Run reached its configured step limit.",
+        },
+      }),
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+    await store.selectSession("live-session");
+    const policy: RulebenchCombatAutomationPolicySpecDto = {
+      id: "firstAcceptedCandidate",
+      version: 1,
+      noCandidateBehavior: "advanceTurn",
+    };
+
+    await store.runAutomaticStep({
+      id: "step",
+      title: "Step",
+      summary: "Step.",
+      rollStream: [17, 5],
+      policy,
+    });
+    expect(store.automaticStep()).toMatchObject({
+      kind: "data",
+      value: {
+        decisionLabel: "Submit Candidate",
+        selectedActionId: "hexing_bolt",
+      },
+    });
+    await store.runAutomaticCombat({
+      id: "run",
+      title: "Run",
+      summary: "Run.",
+      maxSteps: 1,
+      rollStream: [17, 5],
+      policy,
+    });
+    expect(store.automaticRun()).toMatchObject({
+      kind: "data",
+      value: {
+        executedStepCount: 1,
+        maxSteps: 1,
+        decisionLabel: "Stopped At Max Steps",
+      },
+    });
+    expect(store.snapshot()).toMatchObject({
+      kind: "data",
+      value: { fingerprintLabel: "test:automatic" },
+    });
+  });
+
+  it("interrupts a pending automatic run without allowing its late response to overwrite state", async () => {
+    const run =
+      deferred<RulebenchLiveTransportResult<RulebenchLiveAutomaticRunDto>>();
+    const transport = createFakeRulebenchLiveTransport({
+      getSession: async () => ({ ok: true, value: makeLiveSessionSnapshot() }),
+      runAutomaticCombat: async () => run.promise,
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+    await store.selectSession("live-session");
+    const pending = store.runAutomaticCombat({
+      id: "run",
+      title: "Run",
+      summary: "Run.",
+      maxSteps: 2,
+      rollStream: [17, 5],
+      policy: {
+        id: "firstAcceptedCandidate",
+        version: 1,
+        noCandidateBehavior: "stopRun",
+      },
+    });
+    expect(store.automaticRun()).toEqual({ kind: "loading" });
+
+    store.cancelAutomation();
+    run.resolve({
+      ok: true,
+      value: {
+        id: "late",
+        title: "Late",
+        summary: "Late.",
+        accepted: true,
+        decisionKind: "stoppedAtMaxSteps",
+        maxSteps: 2,
+        executedStepCount: 0,
+        policyId: "firstAcceptedCandidate",
+        policyVersion: 1,
+        steps: [],
+        finalSnapshot: makeLiveSessionSnapshot({ fingerprint: "late" }),
+        reason: "Late response.",
+      },
+    });
+    await pending;
+
+    expect(store.automaticRun()).toEqual({ kind: "idle" });
+    expect(store.snapshot()).toMatchObject({
+      kind: "data",
+      value: { fingerprintLabel: "test:state-0" },
+    });
   });
 });
 
