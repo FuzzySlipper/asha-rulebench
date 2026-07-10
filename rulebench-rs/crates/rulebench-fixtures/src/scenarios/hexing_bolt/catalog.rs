@@ -1,6 +1,11 @@
 use super::fixture::{hexing_bolt_fixture_scenario, turn_control_fixture_scenario};
-use crate::content::validate_scenario_content_report;
-use crate::model::*;
+use crate::{
+    ContentValidationReadout, RulesetCatalogReadout, ScenarioCatalogCase, ScenarioCatalogSummary,
+    ScenarioOutcomeClass,
+};
+use rulebench_rules::{
+    validate_scenario_content_report, RulebenchScenario, ScenarioMetadata, UseActionIntent,
+};
 
 pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
     vec![

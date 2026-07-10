@@ -2,7 +2,6 @@ use crate::model::{
     CombatControlHistoryReadout, CombatSessionError, CombatSessionStepReadout,
     CombatSessionSummary, CombatSessionTranscript,
 };
-use crate::scenarios::hexing_bolt;
 use crate::{
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunReplayReadout,
     CombatSessionScriptReadout,
@@ -34,22 +33,22 @@ pub fn resolve_combat_session_step(
 }
 
 pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
-    hexing_bolt::session::combat_session_transcripts()
+    rulebench_fixtures::combat_session_transcripts()
 }
 
 pub fn combat_session_control_history_readouts() -> Vec<CombatControlHistoryReadout> {
-    hexing_bolt::session::combat_session_control_history_readouts()
+    rulebench_fixtures::combat_session_control_history_readouts()
 }
 
 pub fn combat_session_script_readouts() -> Vec<CombatSessionScriptReadout> {
-    hexing_bolt::session::combat_session_script_readouts()
+    rulebench_fixtures::combat_session_script_readouts()
 }
 
 pub fn combat_session_automatic_run_readouts() -> Vec<CombatSessionAutomaticRunReadout> {
-    hexing_bolt::session::combat_session_automatic_run_readouts()
+    rulebench_fixtures::combat_session_automatic_run_readouts()
 }
 
 pub fn combat_session_automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayReadout>
 {
-    hexing_bolt::session::combat_session_automatic_run_replay_readouts()
+    rulebench_fixtures::combat_session_automatic_run_replay_readouts()
 }

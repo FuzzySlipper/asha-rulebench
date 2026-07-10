@@ -11,7 +11,6 @@
 mod catalog;
 mod catalog_types;
 mod fixtures;
-mod scenarios;
 mod session;
 
 pub mod audit {

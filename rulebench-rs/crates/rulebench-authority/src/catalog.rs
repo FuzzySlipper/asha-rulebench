@@ -3,7 +3,6 @@ use crate::model::{
     ScenarioCatalogResolution, ScenarioCatalogSummary,
 };
 use crate::resolver::resolve_use_action;
-use crate::scenarios::hexing_bolt;
 
 pub fn scenario_catalog_summaries() -> Vec<ScenarioCatalogSummary> {
     scenario_catalog_cases()
@@ -13,15 +12,15 @@ pub fn scenario_catalog_summaries() -> Vec<ScenarioCatalogSummary> {
 }
 
 pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
-    hexing_bolt::catalog::scenario_catalog_cases()
+    rulebench_fixtures::scenario_catalog_cases()
 }
 
 pub fn ruleset_catalog_readout() -> RulesetCatalogReadout {
-    hexing_bolt::catalog::ruleset_catalog_readout()
+    rulebench_fixtures::ruleset_catalog_readout()
 }
 
 pub fn content_validation_readouts() -> Vec<ContentValidationReadout> {
-    hexing_bolt::catalog::content_validation_readouts()
+    rulebench_fixtures::content_validation_readouts()
 }
 
 pub fn resolve_catalog_scenario(

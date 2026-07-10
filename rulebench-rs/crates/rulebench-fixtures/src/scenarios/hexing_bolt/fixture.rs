@@ -1,10 +1,9 @@
-use crate::model::*;
-use crate::resolver::resolve_use_action;
-use rulebench_fixtures::{
+use crate::{
     ScenarioPackage, ScenarioPackageContentReference, ScenarioPackageDisplayMetadata,
     ScenarioPackageEvidenceExpectation, ScenarioPackageEvidenceKind, ScenarioPackageIdentity,
     ScenarioPackageInitialState, ScenarioPackageRulesetReference, ScenarioPackageScript,
 };
+use rulebench_rules::*;
 
 pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
     let selected_action = hexing_bolt_action();
@@ -334,7 +333,7 @@ fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
 }
 
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
-    resolve_use_action(
+    rulebench_rules::resolve_use_action(
         &hexing_bolt_fixture_scenario(),
         UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
         &[17, 5],
@@ -342,7 +341,7 @@ pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
 }
 
 pub fn rejected_target_fixture_receipt() -> RulebenchReceipt {
-    resolve_use_action(
+    rulebench_rules::resolve_use_action(
         &hexing_bolt_fixture_scenario(),
         UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
         &[17, 5],

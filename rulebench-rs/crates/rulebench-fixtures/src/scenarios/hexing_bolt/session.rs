@@ -1,12 +1,5 @@
 use super::fixture::hexing_bolt_fixture_scenario;
-use crate::model::*;
-use crate::runtime::{
-    verify_automatic_run_replay, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
-    CombatSessionAutomaticRunSpec, CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec,
-    CombatSessionIntentCommandSpec, CombatSessionScriptReadout, CombatSessionScriptSpec,
-    CombatSessionScriptStepSpec, CombatSessionState,
-};
+use rulebench_rules::*;
 
 pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
     vec![hexing_bolt_opening_exchange_session()]
