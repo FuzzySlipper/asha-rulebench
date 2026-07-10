@@ -2835,5 +2835,212 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
             ],
         },
+        Interface {
+            name: "RulebenchReplayArchiveMetadataDto",
+            fields: &[
+                Field {
+                    name: "packageId",
+                    ty: "string",
+                },
+                Field {
+                    name: "sessionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "completedAt",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayPackageReviewDto",
+            fields: &[
+                Field {
+                    name: "packageVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "packageId",
+                    ty: "string",
+                },
+                Field {
+                    name: "sessionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "commandCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "finalStateFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "fingerprintKind",
+                    ty: "string",
+                },
+                Field {
+                    name: "narrationTitle",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "narrationSummary",
+                    ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayMismatchDto",
+            fields: &[
+                Field {
+                    name: "commandSequence",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "commandId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "dimension",
+                    ty: "RulebenchReplayMismatchDimensionDto",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayVerificationReadoutDto",
+            fields: &[
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchReplayVerificationDecisionKindDto",
+                },
+                Field {
+                    name: "verifiedStepCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "mismatch",
+                    ty: "RulebenchReplayMismatchDto | null",
+                },
+                Field {
+                    name: "finalStateFingerprint",
+                    ty: "RulebenchStateFingerprintDto | null",
+                },
+                Field {
+                    name: "finalized",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayComparisonDifferenceDto",
+            fields: &[
+                Field {
+                    name: "code",
+                    ty: "RulebenchReplayComparisonDifferenceCodeDto",
+                },
+                Field {
+                    name: "path",
+                    ty: "string",
+                },
+                Field {
+                    name: "commandSequence",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "commandId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "expectedSummary",
+                    ty: "string",
+                },
+                Field {
+                    name: "actualSummary",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayComparisonReadoutDto",
+            fields: &[
+                Field {
+                    name: "matches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "expectedPackageId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actualPackageId",
+                    ty: "string",
+                },
+                Field {
+                    name: "comparedCommandCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "firstDifference",
+                    ty: "RulebenchReplayComparisonDifferenceDto | null",
+                },
+                Field {
+                    name: "differences",
+                    ty: "readonly RulebenchReplayComparisonDifferenceDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayArchiveErrorDto",
+            fields: &[
+                Field {
+                    name: "kind",
+                    ty: "RulebenchReplayArchiveErrorKindDto",
+                },
+                Field {
+                    name: "code",
+                    ty: "string",
+                },
+                Field {
+                    name: "message",
+                    ty: "string",
+                },
+                Field {
+                    name: "retryable",
+                    ty: "boolean",
+                },
+            ],
+        },
     ]
 }

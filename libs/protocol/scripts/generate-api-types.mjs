@@ -9,7 +9,7 @@ const rustManifestPath = join(process.cwd(), 'rulebench-rs/Cargo.toml');
 export function renderApiTypes() {
   const result = spawnSync(
     'cargo',
-    ['run', '--quiet', '--manifest-path', rustManifestPath, '-p', 'rulebench-protocol', '--bin', 'emit_protocol_types'],
+    ['run', '--quiet', '--manifest-path', rustManifestPath, '-p', 'rulebench-codegen', '--bin', 'emit_protocol_types'],
     { cwd: process.cwd(), encoding: 'utf8' },
   );
 

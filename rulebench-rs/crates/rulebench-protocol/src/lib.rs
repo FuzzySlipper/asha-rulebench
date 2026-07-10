@@ -8,6 +8,7 @@
 
 mod authoring;
 mod content;
+mod replay;
 mod session;
 mod typescript;
 
@@ -18,6 +19,11 @@ pub use authoring::{
 pub use content::{
     ContentFingerprintDto, ContentImportDiagnosticDto, ContentImportReadoutDto,
     ContentPackIdentityDto,
+};
+pub use replay::{
+    ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayComparisonDifferenceDto,
+    ReplayComparisonReadoutDto, ReplayMismatchDto, ReplayPackageReviewDto,
+    ReplayStateFingerprintDto, ReplayVerificationReadoutDto,
 };
 pub use session::CombatSessionHandleDto;
 pub use typescript::{render_api_types, ProtocolAlias, ProtocolField, ProtocolInterface};

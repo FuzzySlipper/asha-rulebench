@@ -15,6 +15,10 @@ mod ts_emit;
 
 pub use scenario_catalog::render_scenario_catalog;
 
+pub fn render_protocol_types() -> String {
+    rulebench_protocol::render_api_types()
+}
+
 pub fn render_combat_session_catalog() -> String {
     use combat_session::renderers::{
         render_automatic_run_readout, render_automatic_run_replay_readout,
@@ -61,12 +65,19 @@ pub fn render_combat_session_catalog() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_combat_session_catalog, render_scenario_catalog};
+    use super::{render_combat_session_catalog, render_protocol_types, render_scenario_catalog};
 
     const GENERATED_SCENARIO_CATALOG: &str =
         include_str!("../../../../libs/transport/src/generated/rust-scenario-catalog.ts");
     const GENERATED_COMBAT_SESSION: &str =
         include_str!("../../../../libs/transport/src/generated/rust-combat-session.ts");
+    const GENERATED_PROTOCOL_TYPES: &str =
+        include_str!("../../../../libs/protocol/src/generated/api-types.ts");
+
+    #[test]
+    fn protocol_renderer_matches_the_committed_artifact() {
+        assert_eq!(render_protocol_types(), GENERATED_PROTOCOL_TYPES);
+    }
 
     #[test]
     fn scenario_catalog_renderer_matches_the_committed_artifact() {

@@ -106,6 +106,14 @@ export type RulebenchTurnOrderPolicyDto = 'explicit';
 
 export type RulebenchRuleModuleConfigurationDto = RulebenchActionResolutionModuleConfigurationDto | RulebenchTurnControlModuleConfigurationDto;
 
+export type RulebenchReplayVerificationDecisionKindDto = 'verified' | 'invalidPackage' | 'mismatchedEvidence';
+
+export type RulebenchReplayMismatchDimensionDto = 'decision' | 'stateBeforeFingerprint' | 'acceptedEvents' | 'commandAudit' | 'rolls' | 'trace' | 'stateAfterFingerprint' | 'finalStateFingerprint';
+
+export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMismatch' | 'replayContentMismatch' | 'replayRulesetMismatch' | 'replayCommandCountMismatch' | 'replayCommandMismatch' | 'replayDecisionMismatch' | 'replayAcceptedEventsMismatch' | 'replayCommandAuditMismatch' | 'replayRollsMismatch' | 'replayTraceMismatch' | 'replayStateBeforeFingerprintMismatch' | 'replayStateAfterFingerprintMismatch' | 'replayFinalStateFingerprintMismatch';
+
+export type RulebenchReplayArchiveErrorKindDto = 'invalidPackage' | 'storage' | 'notFound' | 'corrupt' | 'unsupportedVersion';
+
 export interface RulebenchCombatSessionHandleDto {
   readonly id: string;
 }
@@ -979,4 +987,68 @@ export interface RulebenchFinalCombatantStateDto {
   readonly name: string;
   readonly hitPoints: RulebenchBoundedValueDto;
   readonly conditions: readonly string[];
+}
+
+export interface RulebenchReplayArchiveMetadataDto {
+  readonly packageId: string;
+  readonly sessionId: string;
+  readonly scenarioId: string;
+  readonly rulesetId: string;
+  readonly rulesetVersion: string;
+  readonly completedAt: string;
+}
+
+export interface RulebenchReplayPackageReviewDto {
+  readonly packageVersion: string;
+  readonly packageId: string;
+  readonly sessionId: string;
+  readonly scenarioId: string;
+  readonly rulesetId: string;
+  readonly rulesetVersion: string;
+  readonly commandCount: number;
+  readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly fingerprintKind: string;
+  readonly narrationTitle: string | null;
+  readonly narrationSummary: string | null;
+}
+
+export interface RulebenchReplayMismatchDto {
+  readonly commandSequence: number | null;
+  readonly commandId: string | null;
+  readonly dimension: RulebenchReplayMismatchDimensionDto;
+  readonly reason: string;
+}
+
+export interface RulebenchReplayVerificationReadoutDto {
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchReplayVerificationDecisionKindDto;
+  readonly verifiedStepCount: number;
+  readonly mismatch: RulebenchReplayMismatchDto | null;
+  readonly finalStateFingerprint: RulebenchStateFingerprintDto | null;
+  readonly finalized: boolean;
+}
+
+export interface RulebenchReplayComparisonDifferenceDto {
+  readonly code: RulebenchReplayComparisonDifferenceCodeDto;
+  readonly path: string;
+  readonly commandSequence: number | null;
+  readonly commandId: string | null;
+  readonly expectedSummary: string;
+  readonly actualSummary: string;
+}
+
+export interface RulebenchReplayComparisonReadoutDto {
+  readonly matches: boolean;
+  readonly expectedPackageId: string;
+  readonly actualPackageId: string;
+  readonly comparedCommandCount: number;
+  readonly firstDifference: RulebenchReplayComparisonDifferenceDto | null;
+  readonly differences: readonly RulebenchReplayComparisonDifferenceDto[];
+}
+
+export interface RulebenchReplayArchiveErrorDto {
+  readonly kind: RulebenchReplayArchiveErrorKindDto;
+  readonly code: string;
+  readonly message: string;
+  readonly retryable: boolean;
 }
