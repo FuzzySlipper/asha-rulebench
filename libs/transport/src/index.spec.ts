@@ -121,6 +121,7 @@ describe("RulebenchTransport fixtures", () => {
         "hexing-bolt-miss",
         "hexing-bolt-self-target-rejected",
         "turn-control-hit",
+        "hexing-bolt-veteran-hit",
       ]);
     }
     expect(result.ok).toBe(true);

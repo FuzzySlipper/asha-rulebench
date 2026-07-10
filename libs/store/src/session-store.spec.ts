@@ -35,6 +35,7 @@ describe('SessionStore', () => {
         'hexing-bolt-miss',
         'hexing-bolt-self-target-rejected',
         'turn-control-hit',
+        'hexing-bolt-veteran-hit',
       ]);
     }
     expect(store.selectedScenarioId()).toBe('hexing-bolt-hit');
