@@ -1,8 +1,8 @@
-use crate::fragments::*;
-use crate::scalars::*;
+use crate::combat_session::fragments::*;
+use crate::combat_session::scalars::*;
 use crate::ts_emit::{render_scenario_readout, ts_string};
 
-use rulebench_authority::{
+use rulebench_fixtures::{
     CombatControlHistoryReadout, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticRunReplayReadout, CombatSessionScriptReadout, CombatSessionStepReadout,
     CombatSessionSummary, ScenarioMetadata,

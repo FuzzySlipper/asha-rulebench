@@ -1,7 +1,7 @@
-use crate::scalars::*;
+use crate::combat_session::scalars::*;
 use crate::ts_emit::{ts_string, ts_string_array};
 
-use rulebench_authority::{
+use rulebench_fixtures::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     ActionUsageEntry, ActionUsageSummary, ActiveModifier, CombatControlHistoryEntry,
     CombatEndConditionReadout, CombatLogEntry, CombatSessionScriptStepReadout,

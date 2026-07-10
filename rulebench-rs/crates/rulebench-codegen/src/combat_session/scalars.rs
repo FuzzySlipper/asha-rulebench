@@ -1,11 +1,12 @@
 use crate::ts_emit::ts_string;
 
-use rulebench_authority::{
+use rulebench_fixtures::{
     ActionResourceKind, ActionResourceTransitionKind, CombatControlCommandKind,
     CombatControlDecisionKind, CombatEndConditionKind, CombatLifecyclePhase,
-    CombatSessionAutomaticStepOperationKind, CombatSessionScriptCommandKind,
-    CombatSessionScriptDecisionKind, CommandDecisionKind, CommandOutcomeClass,
-    CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure, StateFingerprint,
+    CombatSessionAutomaticStepOperationKind, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CommandDecisionKind,
+    CommandOutcomeClass, CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure,
+    StateFingerprint,
 };
 
 pub(crate) fn render_fingerprint(fingerprint: &StateFingerprint, _indent: &str) -> String {
@@ -88,19 +89,17 @@ pub(crate) fn script_decision_kind(kind: CombatSessionScriptDecisionKind) -> &'s
 }
 
 pub(crate) fn candidate_selection_decision_kind(
-    kind: rulebench_authority::CombatSessionCandidateSelectionDecisionKind,
+    kind: CombatSessionCandidateSelectionDecisionKind,
 ) -> &'static str {
     match kind {
-        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::Accepted => "accepted",
-        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates => {
+        CombatSessionCandidateSelectionDecisionKind::Accepted => "accepted",
+        CombatSessionCandidateSelectionDecisionKind::RejectedByUnavailableCandidates => {
             "rejectedByUnavailableCandidates"
         }
-        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate => {
+        CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate => {
             "rejectedByMissingCandidate"
         }
-        rulebench_authority::CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight => {
-            "rejectedByPreflight"
-        }
+        CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight => "rejectedByPreflight",
     }
 }
 

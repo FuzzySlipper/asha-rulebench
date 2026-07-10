@@ -37,6 +37,7 @@ pub use rulebench_combat::{
     CombatSessionState, CombatState, PROJECTION_FINGERPRINT_ALGORITHM, STATE_FINGERPRINT_ALGORITHM,
 };
 pub use rulebench_content::{validate_scenario_content, validate_scenario_content_report};
+pub use rulebench_core::Team;
 pub use rulebench_replay::{
     verify_automatic_run_replay, CombatSessionAutomaticRunReplayDecisionKind,
     CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,

@@ -23,6 +23,7 @@ pub use registry::{
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRegistry,
     ScenarioPackageRegistryError, ScenarioPackageSelectionError,
 };
+pub use rulebench_rules::*;
 pub use scenarios::hexing_bolt::{
     accepted_hexing_bolt_fixture_receipt, combat_session_automatic_run_readouts,
     combat_session_automatic_run_replay_readouts, combat_session_control_history_readouts,
@@ -45,6 +46,23 @@ pub fn registered_scenario_packages() -> Vec<ScenarioPackage> {
 
 pub fn aggregated_scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
     scenario_package_registry().scenario_catalog_cases()
+}
+
+pub fn resolve_catalog_scenario(
+    id: &str,
+) -> Result<ScenarioCatalogResolution, ScenarioCatalogError> {
+    let Some(case) = aggregated_scenario_catalog_cases()
+        .into_iter()
+        .find(|case| case.summary.id == id)
+    else {
+        return Err(ScenarioCatalogError::UnknownScenarioId);
+    };
+    let receipt = resolve_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
+    Ok(ScenarioCatalogResolution {
+        case: case.summary,
+        scenario: case.scenario,
+        receipt,
+    })
 }
 
 pub fn aggregated_ruleset_catalog_readout() -> RulesetCatalogReadout {

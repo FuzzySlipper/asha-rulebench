@@ -1,14 +1,15 @@
-use rulebench_authority::{
-    AttackOutcome, Combatant, DomainEvent, FinalCombatantState, RulebenchScenario, TraceEntry,
-    TracePhase, TraceStatus, VisibilityRequirement,
+use rulebench_fixtures::{
+    AttackOutcome, Combatant, DomainEvent, FinalCombatantState, RulebenchScenario,
+    ScenarioProjection, TargetLegality, Team, TraceEntry, TracePhase, TraceStatus,
+    VisibilityRequirement,
 };
 
 pub(crate) fn render_scenario_readout(
     scenario: &RulebenchScenario,
     events: &[DomainEvent],
     trace: &[TraceEntry],
-    final_state: &rulebench_authority::ScenarioProjection,
-    target: &rulebench_authority::TargetLegality,
+    final_state: &ScenarioProjection,
+    target: &TargetLegality,
     indent: &str,
 ) -> String {
     let mut out = String::from("{\n");
@@ -86,10 +87,7 @@ pub(crate) fn render_scenario_readout(
     out
 }
 
-pub(crate) fn render_final_state(
-    final_state: &rulebench_authority::ScenarioProjection,
-    indent: &str,
-) -> String {
+pub(crate) fn render_final_state(final_state: &ScenarioProjection, indent: &str) -> String {
     let mut out = String::from("");
     out.push_str(&format!("{indent}  finalState: {{\n"));
     out.push_str(&format!(
@@ -173,8 +171,8 @@ fn render_combatant(
     out.push_str(&format!(
         "{indent}      team: {},\n",
         ts_string(match combatant.team {
-            rulebench_authority::Team::Ally => "ally",
-            rulebench_authority::Team::Enemy => "enemy",
+            Team::Ally => "ally",
+            Team::Enemy => "enemy",
         })
     ));
     out.push_str(&format!(
