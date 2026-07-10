@@ -3,9 +3,10 @@ use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase,
     CombatTurnOrder, CommandOutcomeClass, EquipmentLedgerReadout, EquipmentTransitionEntry,
-    LifecycleTransitionEntry, ModifierDurationExpirationEntry, RollConsumptionEntry,
-    RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint,
-    TargetLegality, TurnTransitionEntry, UseActionIntent,
+    LifecycleTransitionEntry, ModifierDurationExpirationEntry, ReactionAuditEntry,
+    ReactionWindowLifecycleEntry, ReactionWindowReadout, RollConsumptionEntry, RulebenchReceipt,
+    RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint, TargetLegality,
+    TurnTransitionEntry, UseActionIntent,
 };
 use rulebench_ruleset::ActionResourceCost;
 
@@ -70,6 +71,7 @@ pub enum CommandPreflightDecisionKind {
     RejectedByActionLookup,
     RejectedByActionOwnership,
     RejectedByAbilityAvailability,
+    RejectedByReactionWindow,
     RejectedByTargetLookup,
     RejectedByTargetLegality,
     RejectedByActionResource,
@@ -88,6 +90,7 @@ impl CommandPreflightDecisionKind {
             CommandPreflightDecisionKind::RejectedByAbilityAvailability => {
                 "rejectedByAbilityAvailability"
             }
+            CommandPreflightDecisionKind::RejectedByReactionWindow => "rejectedByReactionWindow",
             CommandPreflightDecisionKind::RejectedByTargetLookup => "rejectedByTargetLookup",
             CommandPreflightDecisionKind::RejectedByTargetLegality => "rejectedByTargetLegality",
             CommandPreflightDecisionKind::RejectedByActionResource => "rejectedByActionResource",
@@ -203,6 +206,7 @@ pub enum CurrentActorOptionsUnavailableReason {
     CurrentActorDefeated,
     NoMatchingActions,
     NoAvailableResources,
+    ReactionWindowOpen,
     NoVisibleActiveTargets,
 }
 
@@ -214,6 +218,7 @@ impl CurrentActorOptionsUnavailableReason {
             CurrentActorOptionsUnavailableReason::CurrentActorDefeated => "currentActorDefeated",
             CurrentActorOptionsUnavailableReason::NoMatchingActions => "noMatchingActions",
             CurrentActorOptionsUnavailableReason::NoAvailableResources => "noAvailableResources",
+            CurrentActorOptionsUnavailableReason::ReactionWindowOpen => "reactionWindowOpen",
             CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets => {
                 "noVisibleActiveTargets"
             }
@@ -332,6 +337,9 @@ pub struct CombatSessionSnapshot {
     pub action_usage_log: Vec<ActionUsageEntry>,
     pub action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     pub equipment_transition_log: Vec<EquipmentTransitionEntry>,
+    pub reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
+    pub reaction_audit_log: Vec<ReactionAuditEntry>,
+    pub current_reaction_window: Option<ReactionWindowReadout>,
     pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub action_resource_ledger: ActionResourceLedgerReadout,

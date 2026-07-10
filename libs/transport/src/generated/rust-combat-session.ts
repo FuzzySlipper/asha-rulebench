@@ -1559,6 +1559,11 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       ],
       equipmentTransitionLog: [
       ],
+      currentReactionWindow: null,
+      reactionWindowLifecycleLog: [
+      ],
+      reactionAuditLog: [
+      ],
       modifierDurationExpirationLog: [
 {
           sequence: 0,
@@ -1980,6 +1985,11 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       ],
       equipmentTransitionLog: [
       ],
+      currentReactionWindow: null,
+      reactionWindowLifecycleLog: [
+      ],
+      reactionAuditLog: [
+      ],
       modifierDurationExpirationLog: [
 {
           sequence: 0,
@@ -2020,6 +2030,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       equipmentLedgerMatches: true,
       classBuildLedgerMatches: true,
       equipmentTransitionLogMatches: true,
+      reactionWindowLifecycleLogMatches: true,
+      reactionAuditLogMatches: true,
       modifierDurationExpirationLogMatches: true,
       replayedRun: {
         id: 'hexing-bolt-bounded-automatic-run',
@@ -2423,6 +2435,11 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
         equipmentTransitionLog: [
+        ],
+        currentReactionWindow: null,
+        reactionWindowLifecycleLog: [
+        ],
+        reactionAuditLog: [
         ],
         modifierDurationExpirationLog: [
       {

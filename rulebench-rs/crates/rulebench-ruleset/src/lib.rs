@@ -729,6 +729,15 @@ impl HitEffect {
                 HitEffectOperation::ApplyModifier(modifier) => Some(modifier),
             })
     }
+
+    pub fn reaction_hook_operation(&self) -> Option<&ReactionHookEffectOperation> {
+        self.operations
+            .iter()
+            .find_map(|operation| match operation {
+                HitEffectOperation::OpenReactionWindow(hook) => Some(hook),
+                _ => None,
+            })
+    }
 }
 
 /// A typed effect operation selected by an action declaration.
@@ -765,6 +774,7 @@ impl HitEffectOperation {
                 | HitEffectOperation::Heal(_)
                 | HitEffectOperation::GrantTemporaryVitality(_)
                 | HitEffectOperation::ApplyModifier(_)
+                | HitEffectOperation::OpenReactionWindow(_)
         )
     }
 }
@@ -847,17 +857,36 @@ pub struct ResourceChangeEffectOperation {
     pub delta: i32,
 }
 
-/// A reaction-window declaration. Runtime window handling is not implemented yet.
+/// A closed reaction-window declaration interpreted by Rust authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReactionHookEffectOperation {
     pub hook_id: String,
     pub window: ReactionWindow,
+    pub eligible_reactor_ids: Vec<String>,
+    pub options: Vec<ReactionOptionDeclaration>,
+    pub maximum_nested_depth: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReactionOptionDeclaration {
+    pub id: String,
+    pub reactor_id: String,
+    pub opens_nested_window: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReactionWindow {
     BeforeEffect,
     AfterEffect,
+}
+
+impl ReactionWindow {
+    pub const fn code(self) -> &'static str {
+        match self {
+            ReactionWindow::BeforeEffect => "beforeEffect",
+            ReactionWindow::AfterEffect => "afterEffect",
+        }
+    }
 }
 
 /// Whether a modifier declaration survives beyond a temporary combat window.

@@ -7,6 +7,7 @@ mod control;
 mod effects;
 mod equipment;
 mod projection;
+mod reactions;
 mod session;
 
 pub use action_resources::*;
@@ -16,6 +17,7 @@ pub use control::*;
 pub use effects::*;
 pub use equipment::*;
 pub use projection::*;
+pub use reactions::*;
 pub use rulebench_content::*;
 pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};
 pub use rulebench_ruleset::{
@@ -24,12 +26,12 @@ pub use rulebench_ruleset::{
     CheckDeclaration, CheckHandlerKind, ContestedCheckDeclaration, DamageEffectOperation,
     DefenseReference, EffectOperationId, HealingEffectOperation, HitEffect, HitEffectOperation,
     ModifierEffectOperation, ModifierTenure, MovementEffectOperation, MovementKind,
-    ReactionHookEffectOperation, ReactionWindow, ResourceChangeEffectOperation,
-    RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
-    RulesetArtifactProvenance, RulesetCompatibilityError, RulesetMetadata, RulesetModuleProvenance,
-    SavingThrowCheckDeclaration, TargetKind, TargetSelection, TargetTeamConstraint,
-    TargetingDeclaration, TemporaryVitalityEffectOperation, TurnControlModuleConfiguration,
-    TurnOrderPolicy, ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry,
-    VisibilityRequirement,
+    ReactionHookEffectOperation, ReactionOptionDeclaration, ReactionWindow,
+    ResourceChangeEffectOperation, RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
+    RuleModuleValidationError, RulesetArtifactProvenance, RulesetCompatibilityError,
+    RulesetMetadata, RulesetModuleProvenance, SavingThrowCheckDeclaration, TargetKind,
+    TargetSelection, TargetTeamConstraint, TargetingDeclaration, TemporaryVitalityEffectOperation,
+    TurnControlModuleConfiguration, TurnOrderPolicy, ValidatedRuleModuleDeclaration,
+    ValidatedRuleModuleRegistry, VisibilityRequirement,
 };
 pub use session::*;

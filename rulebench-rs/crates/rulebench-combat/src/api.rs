@@ -5,8 +5,8 @@ use rulebench_content::{validate_scenario_content_report, ContentValidationRepor
 use crate::model::{
     CombatControlCommandSpec, CombatControlReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    CurrentActorOptionSummary, EquipmentCommandReadout, EquipmentCommandSpec, RulebenchScenario,
-    UseActionIntent,
+    CurrentActorOptionSummary, EquipmentCommandReadout, EquipmentCommandSpec,
+    ReactionCommandReadout, ReactionCommandSpec, RulebenchScenario, UseActionIntent,
 };
 use crate::{
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
@@ -169,6 +169,16 @@ impl CombatSessionApi {
         Ok(self
             .active_session_mut(handle)?
             .submit_equipment_command(command))
+    }
+
+    pub fn submit_reaction(
+        &mut self,
+        handle: &CombatSessionHandle,
+        command: ReactionCommandSpec,
+    ) -> Result<ReactionCommandReadout, CombatSessionApiError> {
+        Ok(self
+            .active_session_mut(handle)?
+            .submit_reaction_command(command))
     }
 
     pub fn current_actor_options(
@@ -883,6 +893,208 @@ mod tests {
             .expect("class-granted action preflight")
             .accepted
         );
+    }
+
+    #[test]
+    fn api_orders_nested_reactions_and_resumes_before_effect_resolution() {
+        let mut scenario = valid_scenario();
+        let hook = ReactionHookEffectOperation {
+            hook_id: "api-before-effect".to_string(),
+            window: ReactionWindow::BeforeEffect,
+            eligible_reactor_ids: vec!["raider".to_string(), "adept".to_string()],
+            options: vec![
+                ReactionOptionDeclaration {
+                    id: "adept-counter".to_string(),
+                    reactor_id: "adept".to_string(),
+                    opens_nested_window: true,
+                },
+                ReactionOptionDeclaration {
+                    id: "raider-guard".to_string(),
+                    reactor_id: "raider".to_string(),
+                    opens_nested_window: false,
+                },
+            ],
+            maximum_nested_depth: 1,
+        };
+        scenario.actions[0]
+            .hit
+            .operations
+            .push(HitEffectOperation::OpenReactionWindow(hook.clone()));
+        scenario
+            .selected_action
+            .hit
+            .operations
+            .push(HitEffectOperation::OpenReactionWindow(hook));
+
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new(
+                "reactions",
+                scenario.clone(),
+            ))
+            .expect("reaction scenario is valid");
+        let session = created.session;
+        let command = api
+            .submit_intent(
+                &session,
+                CombatSessionIntentCommandSpec::new(
+                    "reaction-trigger",
+                    "Reaction trigger",
+                    "Pause before effects for ordered reactions.",
+                    UseActionIntent::new("adept", "api_bolt", "raider"),
+                    vec![20, 1],
+                ),
+            )
+            .expect("trigger command readout");
+        assert!(command.receipt.accepted);
+        assert_eq!(command.state_after.combatants[1].hit_points.current, 10);
+        assert_eq!(
+            command
+                .receipt
+                .projection
+                .as_ref()
+                .expect("resolver projection remains visible")
+                .combatants[1]
+                .hit_points
+                .current,
+            8
+        );
+        let pending = api.snapshot(&session).expect("pending reaction snapshot");
+        assert_eq!(pending.current_state.combatants[1].hit_points.current, 10);
+        assert_eq!(
+            resource_current(
+                &pending.action_resource_ledger.combatants[0].resources,
+                "standard-action"
+            ),
+            Some(1)
+        );
+        assert_eq!(
+            pending.current_actor_options.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::ReactionWindowOpen)
+        );
+        let root = pending
+            .current_reaction_window
+            .expect("root reaction window is visible");
+        assert_eq!(root.current_reactor_id.as_deref(), Some("adept"));
+
+        let rejected_advance = api
+            .submit_control(&session, CombatControlCommandSpec::advance_turn())
+            .expect("paused turn-control readout");
+        assert_eq!(
+            rejected_advance.decision_kind,
+            CombatControlDecisionKind::RejectedByReactionWindow
+        );
+        let rejected_end = api
+            .submit_control(&session, CombatControlCommandSpec::end_if_condition_met())
+            .expect("paused end-control readout");
+        assert_eq!(
+            rejected_end.decision_kind,
+            CombatControlDecisionKind::RejectedByReactionWindow
+        );
+        let rejected_equipment = api
+            .submit_equipment(
+                &session,
+                EquipmentCommandSpec::equip("adept", "item.not-present"),
+            )
+            .expect("paused equipment readout");
+        assert_eq!(
+            rejected_equipment.decision_kind,
+            EquipmentDecisionKind::RejectedByReactionWindow
+        );
+
+        let out_of_order = api
+            .submit_reaction(
+                &session,
+                ReactionCommandSpec::pass(root.id.clone(), "raider"),
+            )
+            .expect("out-of-order reaction readout");
+        assert_eq!(
+            out_of_order.decision_kind,
+            ReactionDecisionKind::RejectedOutOfOrder
+        );
+        let nested_open = api
+            .submit_reaction(
+                &session,
+                ReactionCommandSpec::accept(root.id.clone(), "adept", "adept-counter"),
+            )
+            .expect("nested reaction readout");
+        let nested = nested_open
+            .opened_nested_window
+            .expect("nested window opens");
+        assert_eq!(nested.depth, 1);
+        assert_eq!(nested.parent_window_id.as_deref(), Some(root.id.as_str()));
+
+        let beyond_limit = api
+            .submit_reaction(
+                &session,
+                ReactionCommandSpec::accept(nested.id.clone(), "adept", "adept-counter"),
+            )
+            .expect("bounded nesting rejection");
+        assert_eq!(
+            beyond_limit.decision_kind,
+            ReactionDecisionKind::RejectedNestedLimit
+        );
+        api.submit_reaction(
+            &session,
+            ReactionCommandSpec::pass(nested.id.clone(), "adept"),
+        )
+        .expect("nested adept pass");
+        api.submit_reaction(&session, ReactionCommandSpec::pass(nested.id, "raider"))
+            .expect("nested raider pass");
+        let resumed = api
+            .submit_reaction(
+                &session,
+                ReactionCommandSpec::pass(root.id.clone(), "raider"),
+            )
+            .expect("root raider pass");
+        assert!(resumed.resumed_pending_resolution);
+
+        let resolved = api.snapshot(&session).expect("resolved reaction snapshot");
+        assert!(resolved.current_reaction_window.is_none());
+        assert_eq!(resolved.current_state.combatants[1].hit_points.current, 8);
+        assert_eq!(
+            resource_current(
+                &resolved.action_resource_ledger.combatants[0].resources,
+                "standard-action"
+            ),
+            Some(0)
+        );
+        assert!(resolved.reaction_window_lifecycle_log.iter().any(|entry| {
+            entry.lifecycle_kind == ReactionWindowLifecycleKind::ResolutionResumed
+                && entry.window_id == root.id
+        }));
+        assert_eq!(resolved.reaction_audit_log.len(), 6);
+
+        let stale = api
+            .submit_reaction(&session, ReactionCommandSpec::pass(root.id, "adept"))
+            .expect("stale reaction readout");
+        assert_eq!(
+            stale.decision_kind,
+            ReactionDecisionKind::RejectedNoOpenWindow
+        );
+
+        let miss_session = api
+            .create_session(CombatSessionCreateRequest::new("reaction-miss", scenario))
+            .expect("miss reaction scenario is valid")
+            .session;
+        let miss = api
+            .submit_intent(
+                &miss_session,
+                CombatSessionIntentCommandSpec::new(
+                    "reaction-miss",
+                    "Reaction miss",
+                    "A missed hit effect must not open its reaction window.",
+                    UseActionIntent::new("adept", "api_bolt", "raider"),
+                    vec![1, 1],
+                ),
+            )
+            .expect("miss command readout");
+        assert_eq!(miss.step.outcome_class, CommandOutcomeClass::AcceptedMiss);
+        assert!(api
+            .snapshot(&miss_session)
+            .expect("miss snapshot")
+            .current_reaction_window
+            .is_none());
     }
 
     fn resource_current(resources: &[ActionResourceState], resource_id: &str) -> Option<i32> {

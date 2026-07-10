@@ -1160,7 +1160,7 @@ fn validate_action_references(
         validate_action_resource_costs(scenario, action, actor, diagnostics);
     }
     validate_hit_modifier(scenario, action, diagnostics);
-    validate_effect_operations(action, diagnostics);
+    validate_effect_operations(scenario, action, diagnostics);
 
     for target_id in &action.targeting.target_ids {
         if let Some(target) = scenario
@@ -1382,7 +1382,12 @@ fn validate_combatant_check_stat(
     }
 }
 
-fn validate_effect_operations(action: &ActionDefinition, diagnostics: &mut Vec<ContentDiagnostic>) {
+fn validate_effect_operations(
+    scenario: &RulebenchScenario,
+    action: &ActionDefinition,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let mut reaction_hook_count = 0;
     for operation in &action.hit.operations {
         if !operation.is_currently_supported() {
             diagnostics.push(ContentDiagnostic::error(
@@ -1395,6 +1400,93 @@ fn validate_effect_operations(action: &ActionDefinition, diagnostics: &mut Vec<C
                 ),
             ));
         }
+        if let rulebench_ruleset::HitEffectOperation::OpenReactionWindow(hook) = operation {
+            reaction_hook_count += 1;
+            if hook.hook_id.is_empty() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidReactionHookId,
+                    Some(action.id.clone()),
+                    format!("Action {} declares an empty reaction hook id.", action.id),
+                ));
+            }
+            if hook.maximum_nested_depth > 2
+                || (hook.maximum_nested_depth == 0
+                    && hook.options.iter().any(|option| option.opens_nested_window))
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidReactionNestedDepth,
+                    Some(hook.hook_id.clone()),
+                    format!(
+                        "Reaction hook {} declares unsupported nested depth {}.",
+                        hook.hook_id, hook.maximum_nested_depth
+                    ),
+                ));
+            }
+            let mut reactors = HashSet::new();
+            for reactor_id in &hook.eligible_reactor_ids {
+                if !reactors.insert(reactor_id.clone()) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::DuplicateReactionEligibleReactor,
+                        Some(hook.hook_id.clone()),
+                        format!(
+                            "Reaction hook {} declares reactor {} more than once.",
+                            hook.hook_id, reactor_id
+                        ),
+                    ));
+                }
+                if scenario
+                    .combatants
+                    .iter()
+                    .all(|combatant| combatant.id != *reactor_id)
+                {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::InvalidReactionEligibleReactor,
+                        Some(hook.hook_id.clone()),
+                        format!(
+                            "Reaction hook {} references missing reactor {}.",
+                            hook.hook_id, reactor_id
+                        ),
+                    ));
+                }
+            }
+            if hook.eligible_reactor_ids.is_empty() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidReactionEligibleReactor,
+                    Some(hook.hook_id.clone()),
+                    format!("Reaction hook {} has no eligible reactors.", hook.hook_id),
+                ));
+            }
+            let mut option_ids = HashSet::new();
+            for option in &hook.options {
+                if option.id.is_empty() || !reactors.contains(&option.reactor_id) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::InvalidReactionOption,
+                        Some(hook.hook_id.clone()),
+                        format!(
+                            "Reaction hook {} has invalid option {} for reactor {}.",
+                            hook.hook_id, option.id, option.reactor_id
+                        ),
+                    ));
+                }
+                if !option_ids.insert(option.id.clone()) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::DuplicateReactionOption,
+                        Some(hook.hook_id.clone()),
+                        format!(
+                            "Reaction hook {} declares option {} more than once.",
+                            hook.hook_id, option.id
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+    if reaction_hook_count > 1 {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::DuplicateReactionHook,
+            Some(action.id.clone()),
+            format!("Action {} declares more than one reaction hook.", action.id),
+        ));
     }
 }
 

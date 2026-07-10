@@ -517,6 +517,55 @@ fn content_diagnostics_reject_invalid_class_builds_and_grants() {
 }
 
 #[test]
+fn content_diagnostics_reject_malformed_reaction_windows() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    let hook = ReactionHookEffectOperation {
+        hook_id: String::new(),
+        window: ReactionWindow::BeforeEffect,
+        eligible_reactor_ids: vec!["missing-reactor".to_string()],
+        options: vec![
+            ReactionOptionDeclaration {
+                id: "duplicate".to_string(),
+                reactor_id: "missing-reactor".to_string(),
+                opens_nested_window: true,
+            },
+            ReactionOptionDeclaration {
+                id: "duplicate".to_string(),
+                reactor_id: "missing-reactor".to_string(),
+                opens_nested_window: false,
+            },
+        ],
+        maximum_nested_depth: 3,
+    };
+    scenario.actions[0]
+        .hit
+        .operations
+        .push(HitEffectOperation::OpenReactionWindow(hook.clone()));
+    scenario.actions[0]
+        .hit
+        .operations
+        .push(HitEffectOperation::OpenReactionWindow(hook));
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::InvalidReactionHookId));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentDiagnosticCode::InvalidReactionEligibleReactor
+    }));
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::DuplicateReactionOption));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentDiagnosticCode::InvalidReactionNestedDepth
+    }));
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::DuplicateReactionHook));
+}
+
+#[test]
 fn content_diagnostics_report_empty_stat_definition_id() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.stat_definitions.push(StatDefinition {

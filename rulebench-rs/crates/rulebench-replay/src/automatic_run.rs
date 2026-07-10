@@ -5,6 +5,7 @@ use rulebench_combat::{
     ActionResourceTransitionEntry, ClassBuildLedgerReadout, CombatSessionAutomaticRunDecisionKind,
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec, CombatSessionState,
     EquipmentLedgerReadout, EquipmentTransitionEntry, ModifierDurationExpirationEntry,
+    ReactionAuditEntry, ReactionWindowLifecycleEntry,
 };
 use rulebench_core::StateFingerprint;
 
@@ -23,6 +24,8 @@ pub struct CombatSessionAutomaticRunReplaySpec {
     pub expected_equipment_ledger: EquipmentLedgerReadout,
     pub expected_class_build_ledger: ClassBuildLedgerReadout,
     pub expected_equipment_transition_log: Vec<EquipmentTransitionEntry>,
+    pub expected_reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
+    pub expected_reaction_audit_log: Vec<ReactionAuditEntry>,
     pub expected_modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
 }
 
@@ -41,6 +44,8 @@ impl CombatSessionAutomaticRunReplaySpec {
         expected_equipment_ledger: EquipmentLedgerReadout,
         expected_class_build_ledger: ClassBuildLedgerReadout,
         expected_equipment_transition_log: Vec<EquipmentTransitionEntry>,
+        expected_reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
+        expected_reaction_audit_log: Vec<ReactionAuditEntry>,
         expected_modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     ) -> Self {
         Self {
@@ -57,6 +62,8 @@ impl CombatSessionAutomaticRunReplaySpec {
             expected_equipment_ledger,
             expected_class_build_ledger,
             expected_equipment_transition_log,
+            expected_reaction_window_lifecycle_log,
+            expected_reaction_audit_log,
             expected_modifier_duration_expiration_log,
         }
     }
@@ -97,6 +104,8 @@ pub struct CombatSessionAutomaticRunReplayReadout {
     pub equipment_ledger_matches: bool,
     pub class_build_ledger_matches: bool,
     pub equipment_transition_log_matches: bool,
+    pub reaction_window_lifecycle_log_matches: bool,
+    pub reaction_audit_log_matches: bool,
     pub modifier_duration_expiration_log_matches: bool,
     pub replayed_run: CombatSessionAutomaticRunReadout,
     pub reason: String,
@@ -129,6 +138,11 @@ pub fn verify_automatic_run_replay(
         replayed_run.final_snapshot.class_build_ledger == spec.expected_class_build_ledger;
     let equipment_transition_log_matches = replayed_run.final_snapshot.equipment_transition_log
         == spec.expected_equipment_transition_log;
+    let reaction_window_lifecycle_log_matches =
+        replayed_run.final_snapshot.reaction_window_lifecycle_log
+            == spec.expected_reaction_window_lifecycle_log;
+    let reaction_audit_log_matches =
+        replayed_run.final_snapshot.reaction_audit_log == spec.expected_reaction_audit_log;
     let modifier_duration_expiration_log_matches =
         replayed_run.final_snapshot.modifier_duration_expiration_log
             == spec.expected_modifier_duration_expiration_log;
@@ -139,6 +153,8 @@ pub fn verify_automatic_run_replay(
         && equipment_ledger_matches
         && class_build_ledger_matches
         && equipment_transition_log_matches
+        && reaction_window_lifecycle_log_matches
+        && reaction_audit_log_matches
         && modifier_duration_expiration_log_matches;
     let decision_kind = if accepted {
         CombatSessionAutomaticRunReplayDecisionKind::Verified
@@ -171,6 +187,8 @@ pub fn verify_automatic_run_replay(
         equipment_ledger_matches,
         class_build_ledger_matches,
         equipment_transition_log_matches,
+        reaction_window_lifecycle_log_matches,
+        reaction_audit_log_matches,
         modifier_duration_expiration_log_matches,
         replayed_run,
         reason,
@@ -212,6 +230,11 @@ mod tests {
             expected.final_snapshot.equipment_transition_log.clone(),
             expected
                 .final_snapshot
+                .reaction_window_lifecycle_log
+                .clone(),
+            expected.final_snapshot.reaction_audit_log.clone(),
+            expected
+                .final_snapshot
                 .modifier_duration_expiration_log
                 .clone(),
         ));
@@ -228,6 +251,8 @@ mod tests {
         assert!(readout.equipment_ledger_matches);
         assert!(readout.class_build_ledger_matches);
         assert!(readout.equipment_transition_log_matches);
+        assert!(readout.reaction_window_lifecycle_log_matches);
+        assert!(readout.reaction_audit_log_matches);
         assert!(readout.modifier_duration_expiration_log_matches);
     }
 
@@ -254,6 +279,11 @@ mod tests {
             expected.final_snapshot.equipment_ledger.clone(),
             expected.final_snapshot.class_build_ledger.clone(),
             expected.final_snapshot.equipment_transition_log.clone(),
+            expected
+                .final_snapshot
+                .reaction_window_lifecycle_log
+                .clone(),
+            expected.final_snapshot.reaction_audit_log.clone(),
             expected
                 .final_snapshot
                 .modifier_duration_expiration_log

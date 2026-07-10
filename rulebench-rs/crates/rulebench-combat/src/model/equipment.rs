@@ -57,6 +57,7 @@ impl EquipmentCommandSpec {
 pub enum EquipmentDecisionKind {
     Accepted,
     RejectedByLifecycle,
+    RejectedByReactionWindow,
     RejectedByCombatant,
     RejectedByItem,
     RejectedByOwnership,
@@ -71,6 +72,7 @@ impl EquipmentDecisionKind {
         match self {
             EquipmentDecisionKind::Accepted => "accepted",
             EquipmentDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
+            EquipmentDecisionKind::RejectedByReactionWindow => "rejectedByReactionWindow",
             EquipmentDecisionKind::RejectedByCombatant => "rejectedByCombatant",
             EquipmentDecisionKind::RejectedByItem => "rejectedByItem",
             EquipmentDecisionKind::RejectedByOwnership => "rejectedByOwnership",

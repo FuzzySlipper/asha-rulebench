@@ -6,7 +6,8 @@ use rulebench_fixtures::{
     CombatSessionAutomaticStepOperationKind, CombatSessionCandidateSelectionDecisionKind,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CommandDecisionKind,
     CommandOutcomeClass, CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure,
-    StateFingerprint,
+    ReactionDecisionKind, ReactionResponseKind, ReactionWindow, ReactionWindowLifecycleKind,
+    ReactionWindowStatus, StateFingerprint, TracePhase, TraceStatus,
 };
 
 pub(crate) fn render_fingerprint(fingerprint: &StateFingerprint, _indent: &str) -> String {
@@ -60,6 +61,7 @@ pub(crate) fn control_decision_kind(kind: CombatControlDecisionKind) -> &'static
         CombatControlDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
         CombatControlDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
         CombatControlDecisionKind::RejectedByEndCondition => "rejectedByEndCondition",
+        CombatControlDecisionKind::RejectedByReactionWindow => "rejectedByReactionWindow",
     }
 }
 
@@ -131,6 +133,65 @@ pub(crate) fn lifecycle_transition_trigger(trigger: LifecycleTransitionTrigger) 
 
 pub(crate) fn modifier_tenure(tenure: ModifierTenure) -> &'static str {
     tenure.code()
+}
+
+pub(crate) fn reaction_window_timing(timing: ReactionWindow) -> &'static str {
+    match timing {
+        ReactionWindow::BeforeEffect => "beforeEffect",
+        ReactionWindow::AfterEffect => "afterEffect",
+    }
+}
+
+pub(crate) fn reaction_window_status(status: ReactionWindowStatus) -> &'static str {
+    match status {
+        ReactionWindowStatus::Open => "open",
+        ReactionWindowStatus::Resolved => "resolved",
+    }
+}
+
+pub(crate) fn reaction_response_kind(kind: ReactionResponseKind) -> &'static str {
+    match kind {
+        ReactionResponseKind::Pass => "pass",
+        ReactionResponseKind::Accept => "accept",
+    }
+}
+
+pub(crate) fn reaction_decision_kind(kind: ReactionDecisionKind) -> &'static str {
+    match kind {
+        ReactionDecisionKind::Accepted => "accepted",
+        ReactionDecisionKind::RejectedNoOpenWindow => "rejectedNoOpenWindow",
+        ReactionDecisionKind::RejectedStaleWindow => "rejectedStaleWindow",
+        ReactionDecisionKind::RejectedOutOfOrder => "rejectedOutOfOrder",
+        ReactionDecisionKind::RejectedInvalidOption => "rejectedInvalidOption",
+        ReactionDecisionKind::RejectedNestedLimit => "rejectedNestedLimit",
+    }
+}
+
+pub(crate) fn reaction_window_lifecycle_kind(kind: ReactionWindowLifecycleKind) -> &'static str {
+    match kind {
+        ReactionWindowLifecycleKind::Opened => "opened",
+        ReactionWindowLifecycleKind::NestedOpened => "nestedOpened",
+        ReactionWindowLifecycleKind::ResponseAccepted => "responseAccepted",
+        ReactionWindowLifecycleKind::Resolved => "resolved",
+        ReactionWindowLifecycleKind::ResolutionResumed => "resolutionResumed",
+    }
+}
+
+pub(crate) fn trace_phase(phase: TracePhase) -> &'static str {
+    match phase {
+        TracePhase::Proposal => "proposal",
+        TracePhase::Validation => "validation",
+        TracePhase::Resolution => "resolution",
+        TracePhase::Commit => "commit",
+    }
+}
+
+pub(crate) fn trace_status(status: TraceStatus) -> &'static str {
+    match status {
+        TraceStatus::Accepted => "accepted",
+        TraceStatus::Rejected => "rejected",
+        TraceStatus::Info => "info",
+    }
 }
 
 pub(crate) fn combat_end_condition_kind(kind: CombatEndConditionKind) -> &'static str {

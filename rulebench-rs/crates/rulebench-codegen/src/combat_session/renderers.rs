@@ -224,6 +224,22 @@ pub(crate) fn render_script_readout(readout: &CombatSessionScriptReadout) -> Str
         out.push_str(&render_equipment_transition_entry(entry, "        "));
     }
     out.push_str("      ],\n");
+    out.push_str("      currentReactionWindow: ");
+    out.push_str(&render_optional_reaction_window(
+        readout.final_snapshot.current_reaction_window.as_ref(),
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      reactionWindowLifecycleLog: [\n");
+    for entry in &readout.final_snapshot.reaction_window_lifecycle_log {
+        out.push_str(&render_reaction_window_lifecycle_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      reactionAuditLog: [\n");
+    for entry in &readout.final_snapshot.reaction_audit_log {
+        out.push_str(&render_reaction_audit_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str("      modifierDurationExpirationLog: [\n");
     for entry in &readout.final_snapshot.modifier_duration_expiration_log {
         out.push_str(&render_modifier_duration_expiration_entry(
@@ -354,6 +370,22 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
         out.push_str(&render_equipment_transition_entry(entry, "        "));
     }
     out.push_str("      ],\n");
+    out.push_str("      currentReactionWindow: ");
+    out.push_str(&render_optional_reaction_window(
+        readout.final_snapshot.current_reaction_window.as_ref(),
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      reactionWindowLifecycleLog: [\n");
+    for entry in &readout.final_snapshot.reaction_window_lifecycle_log {
+        out.push_str(&render_reaction_window_lifecycle_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      reactionAuditLog: [\n");
+    for entry in &readout.final_snapshot.reaction_audit_log {
+        out.push_str(&render_reaction_audit_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
     out.push_str("      modifierDurationExpirationLog: [\n");
     for entry in &readout.final_snapshot.modifier_duration_expiration_log {
         out.push_str(&render_modifier_duration_expiration_entry(
@@ -440,6 +472,14 @@ pub(crate) fn render_automatic_run_replay_readout(
     out.push_str(&format!(
         "      equipmentTransitionLogMatches: {},\n",
         readout.equipment_transition_log_matches
+    ));
+    out.push_str(&format!(
+        "      reactionWindowLifecycleLogMatches: {},\n",
+        readout.reaction_window_lifecycle_log_matches
+    ));
+    out.push_str(&format!(
+        "      reactionAuditLogMatches: {},\n",
+        readout.reaction_audit_log_matches
     ));
     out.push_str(&format!(
         "      modifierDurationExpirationLogMatches: {},\n",

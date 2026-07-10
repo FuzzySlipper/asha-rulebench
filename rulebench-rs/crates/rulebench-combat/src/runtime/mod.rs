@@ -9,6 +9,7 @@ use rulebench_ruleset::ActionResourceCost;
 mod automation;
 mod control;
 mod equipment;
+mod reactions;
 mod script;
 mod status;
 
@@ -31,6 +32,20 @@ pub use script::{
     CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
     CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ActiveReactionWindow {
+    readout: ReactionWindowReadout,
+    current_reactor_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingReactionResolution {
+    receipt: RulebenchReceipt,
+    step: CombatSessionStepSummary,
+    actor_id: String,
+    resource_costs: Vec<ActionResourceCost>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionCommandSpec {
@@ -99,6 +114,10 @@ pub struct CombatSessionState {
     action_usage_log: Vec<ActionUsageEntry>,
     action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     equipment_transition_log: Vec<EquipmentTransitionEntry>,
+    reaction_window_stack: Vec<ActiveReactionWindow>,
+    reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
+    reaction_audit_log: Vec<ReactionAuditEntry>,
+    pending_reaction_resolution: Option<PendingReactionResolution>,
     modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
@@ -121,6 +140,10 @@ impl CombatSessionState {
             action_usage_log: Vec::new(),
             action_resource_transition_log: Vec::new(),
             equipment_transition_log: Vec::new(),
+            reaction_window_stack: Vec::new(),
+            reaction_window_lifecycle_log: Vec::new(),
+            reaction_audit_log: Vec::new(),
+            pending_reaction_resolution: None,
             modifier_duration_expiration_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
@@ -179,6 +202,7 @@ impl CombatSessionState {
                 &self.scenario,
                 &self.state.action_resource_ledger(),
                 &self.state.equipment_ledger(),
+                self.current_reaction_window().is_some(),
                 intent.clone(),
             ))
         } else {
@@ -186,7 +210,7 @@ impl CombatSessionState {
         };
         let rejected_preflight = preflight.as_ref().filter(|readout| !readout.accepted);
         let combat_has_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
-        let (receipt, state_after, should_apply_state, decision_kind) = if let Some(preflight) =
+        let (receipt, mut state_after, should_apply_state, decision_kind) = if let Some(preflight) =
             rejected_preflight
         {
             let state_after = self
@@ -242,7 +266,6 @@ impl CombatSessionState {
                 }
             }
         };
-        let state_after_fingerprint = fingerprint_projected_state(&state_after);
         let outcome_class = outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt));
         let preflight_decision_kind = preflight.as_ref().map(|readout| readout.decision_kind);
 
@@ -264,14 +287,6 @@ impl CombatSessionState {
             outcome_class: step.outcome_class,
         };
         let log_entry = combat_log_entry(&step, &receipt);
-        let audit_entry = command_audit_entry(
-            &step,
-            &receipt,
-            decision_kind,
-            preflight_decision_kind,
-            state_before_fingerprint,
-            state_after_fingerprint,
-        );
         let action_usage_entry = if receipt.accepted {
             self.scenario
                 .action_by_id(&command.action_id)
@@ -281,27 +296,67 @@ impl CombatSessionState {
         };
 
         self.combat_log.push(log_entry.clone());
-        self.audit_log.push(audit_entry.clone());
         if let Some(entry) = action_usage_entry {
             self.action_usage_log.push(entry);
         }
+        let reaction_hook = self
+            .scenario
+            .action_by_id(&command.action_id)
+            .and_then(|action| action.hit.reaction_hook_operation())
+            .cloned();
+        let opened_reaction_window =
+            if receipt.accepted && step.outcome_class == CommandOutcomeClass::AcceptedHit {
+                reaction_hook
+                    .as_ref()
+                    .and_then(|hook| self.open_reaction_window(hook, &step, &command.action_id))
+            } else {
+                None
+            };
+        let pauses_before_effect = opened_reaction_window.is_some()
+            && reaction_hook
+                .as_ref()
+                .is_some_and(|hook| hook.window == ReactionWindow::BeforeEffect);
+        if pauses_before_effect {
+            state_after = self
+                .state
+                .project("Authority state is paused until the reaction window resolves.");
+        }
+        let state_after_fingerprint = fingerprint_projected_state(&state_after);
+        let audit_entry = command_audit_entry(
+            &step,
+            &receipt,
+            decision_kind,
+            preflight_decision_kind,
+            state_before_fingerprint,
+            state_after_fingerprint,
+        );
+        self.audit_log.push(audit_entry.clone());
         if receipt.accepted {
             let resource_costs = self
                 .scenario
                 .action_by_id(&command.action_id)
                 .map(|action| action.resource_costs.clone())
                 .unwrap_or_default();
-            for cost in &resource_costs {
-                let spend = self.state.spend_action_resource(
-                    &command.actor_id,
-                    &cost.resource_id,
-                    cost.amount,
-                );
-                self.record_action_resource_spend_transition(&step, &spend);
+            if pauses_before_effect {
+                self.pending_reaction_resolution = Some(PendingReactionResolution {
+                    receipt: receipt.clone(),
+                    step: step.clone(),
+                    actor_id: command.actor_id.clone(),
+                    resource_costs,
+                });
+            } else {
+                for cost in &resource_costs {
+                    let spend = self.state.spend_action_resource(
+                        &command.actor_id,
+                        &cost.resource_id,
+                        cost.amount,
+                    );
+                    self.record_action_resource_spend_transition(&step, &spend);
+                }
             }
         }
         self.next_step_index += 1;
-        if should_apply_state {
+        if should_apply_state && !pauses_before_effect {
             self.apply_receipt_effects_to_state(&receipt);
         }
 
@@ -738,6 +793,7 @@ fn command_preflight_readout(
     scenario: &RulebenchScenario,
     action_resources: &ActionResourceLedgerReadout,
     equipment: &EquipmentLedgerReadout,
+    reaction_window_open: bool,
     intent: UseActionIntent,
 ) -> CommandPreflightReadout {
     if intent.actor_id.is_empty() {
@@ -783,6 +839,18 @@ fn command_preflight_readout(
             None,
             None,
             "Combat is already ended.",
+        );
+    }
+
+    if reaction_window_open {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByReactionWindow,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            None,
+            "A reaction window must resolve before another action command.",
         );
     }
 

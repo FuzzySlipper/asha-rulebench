@@ -10,9 +10,160 @@ use rulebench_fixtures::{
     CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
     CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
     EquipmentLedgerReadout, EquipmentTransitionEntry, LifecycleTransitionEntry,
-    ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, RulebenchRejection,
-    ScenarioProjection, TurnTransitionEntry,
+    ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, ReactionAuditEntry,
+    ReactionOptionReadout, ReactionResponseEntry, ReactionWindowLifecycleEntry,
+    ReactionWindowReadout, RulebenchRejection, ScenarioProjection, TraceEntry, TurnTransitionEntry,
 };
+
+pub(crate) fn render_reaction_window(window: &ReactionWindowReadout, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  id: {},\n", ts_string(&window.id)));
+    out.push_str(&format!(
+        "{indent}  hookId: {},\n",
+        ts_string(&window.hook_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  timing: {},\n",
+        ts_string(reaction_window_timing(window.timing))
+    ));
+    out.push_str(&format!("{indent}  depth: {},\n", window.depth));
+    out.push_str(&format!(
+        "{indent}  maximumNestedDepth: {},\n",
+        window.maximum_nested_depth
+    ));
+    out.push_str(&format!(
+        "{indent}  parentWindowId: {},\n",
+        render_optional_string(&window.parent_window_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  triggerStepId: {},\n",
+        ts_string(&window.trigger_step_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  triggerActionId: {},\n",
+        ts_string(&window.trigger_action_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  eligibleReactorIds: {},\n",
+        ts_string_array(&window.eligible_reactor_ids)
+    ));
+    out.push_str(&format!(
+        "{indent}  currentReactorId: {},\n",
+        render_optional_string(&window.current_reactor_id)
+    ));
+    out.push_str(&format!("{indent}  options: [\n"));
+    for option in &window.options {
+        out.push_str(&render_reaction_option(option, &format!("{indent}    ")));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!("{indent}  responses: [\n"));
+    for response in &window.responses {
+        out.push_str(&render_reaction_response(
+            response,
+            &format!("{indent}    "),
+        ));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!(
+        "{indent}  status: {},\n",
+        ts_string(reaction_window_status(window.status))
+    ));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+pub(crate) fn render_optional_reaction_window(
+    window: Option<&ReactionWindowReadout>,
+    indent: &str,
+) -> String {
+    window
+        .map(|value| render_reaction_window(value, indent))
+        .unwrap_or_else(|| "null".to_string())
+}
+
+fn render_reaction_option(option: &ReactionOptionReadout, indent: &str) -> String {
+    format!(
+        "{{\n{indent}  optionId: {},\n{indent}  reactorId: {},\n{indent}  opensNestedWindow: {},\n{indent}}},\n",
+        ts_string(&option.option_id),
+        ts_string(&option.reactor_id),
+        option.opens_nested_window
+    )
+}
+
+fn render_reaction_response(response: &ReactionResponseEntry, indent: &str) -> String {
+    format!(
+        "{{\n{indent}  sequence: {},\n{indent}  reactorId: {},\n{indent}  responseKind: {},\n{indent}  optionId: {},\n{indent}}},\n",
+        response.sequence,
+        ts_string(&response.reactor_id),
+        ts_string(reaction_response_kind(response.response_kind)),
+        render_optional_string(&response.option_id)
+    )
+}
+
+pub(crate) fn render_reaction_window_lifecycle_entry(
+    entry: &ReactionWindowLifecycleEntry,
+    indent: &str,
+) -> String {
+    format!(
+        "{{\n{indent}  sequence: {},\n{indent}  lifecycleKind: {},\n{indent}  windowId: {},\n{indent}  parentWindowId: {},\n{indent}  depth: {},\n{indent}  reactorId: {},\n{indent}  optionId: {},\n{indent}  reason: {},\n{indent}}},\n",
+        entry.sequence,
+        ts_string(reaction_window_lifecycle_kind(entry.lifecycle_kind)),
+        ts_string(&entry.window_id),
+        render_optional_string(&entry.parent_window_id),
+        entry.depth,
+        render_optional_string(&entry.reactor_id),
+        render_optional_string(&entry.option_id),
+        ts_string(&entry.reason)
+    )
+}
+
+pub(crate) fn render_reaction_audit_entry(entry: &ReactionAuditEntry, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  windowId: {},\n",
+        ts_string(&entry.window_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  reactorId: {},\n",
+        ts_string(&entry.reactor_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  responseKind: {},\n",
+        ts_string(reaction_response_kind(entry.response_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  optionId: {},\n",
+        render_optional_string(&entry.option_id)
+    ));
+    out.push_str(&format!("{indent}  accepted: {},\n", entry.accepted));
+    out.push_str(&format!(
+        "{indent}  decisionKind: {},\n",
+        ts_string(reaction_decision_kind(entry.decision_kind))
+    ));
+    out.push_str(&format!("{indent}  trace: [\n"));
+    for trace in &entry.trace {
+        out.push_str(&render_trace_entry(trace, &format!("{indent}    ")));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&entry.reason)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_trace_entry(entry: &TraceEntry, indent: &str) -> String {
+    format!(
+        "{{\n{indent}  sequence: {},\n{indent}  phase: {},\n{indent}  status: {},\n{indent}  message: {},\n{indent}  detail: {},\n{indent}}},\n",
+        entry.sequence,
+        ts_string(trace_phase(entry.phase)),
+        ts_string(trace_status(entry.status)),
+        ts_string(&entry.message),
+        ts_string(&entry.detail)
+    )
+}
 
 pub(crate) fn render_class_build_ledger(ledger: &ClassBuildLedgerReadout, indent: &str) -> String {
     let mut out = String::from("{\n");

@@ -371,6 +371,18 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "readonly RulebenchEquipmentTransitionEntryDto[]",
                 },
                 Field {
+                    name: "currentReactionWindow",
+                    ty: "RulebenchReactionWindowDto | null",
+                },
+                Field {
+                    name: "reactionWindowLifecycleLog",
+                    ty: "readonly RulebenchReactionWindowLifecycleEntryDto[]",
+                },
+                Field {
+                    name: "reactionAuditLog",
+                    ty: "readonly RulebenchReactionAuditEntryDto[]",
+                },
+                Field {
                     name: "modifierDurationExpirationLog",
                     ty: "readonly RulebenchModifierDurationExpirationEntryDto[]",
                 },
@@ -394,6 +406,241 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "currentActorId",
                     ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionOptionDto",
+            fields: &[
+                Field {
+                    name: "optionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "reactorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "opensNestedWindow",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionResponseEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "reactorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "responseKind",
+                    ty: "RulebenchReactionResponseKindDto",
+                },
+                Field {
+                    name: "optionId",
+                    ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionWindowDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "hookId",
+                    ty: "string",
+                },
+                Field {
+                    name: "timing",
+                    ty: "RulebenchReactionWindowTimingDto",
+                },
+                Field {
+                    name: "depth",
+                    ty: "number",
+                },
+                Field {
+                    name: "maximumNestedDepth",
+                    ty: "number",
+                },
+                Field {
+                    name: "parentWindowId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "triggerStepId",
+                    ty: "string",
+                },
+                Field {
+                    name: "triggerActionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "eligibleReactorIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "currentReactorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "options",
+                    ty: "readonly RulebenchReactionOptionDto[]",
+                },
+                Field {
+                    name: "responses",
+                    ty: "readonly RulebenchReactionResponseEntryDto[]",
+                },
+                Field {
+                    name: "status",
+                    ty: "RulebenchReactionWindowStatusDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionCommandSpecDto",
+            fields: &[
+                Field {
+                    name: "windowId",
+                    ty: "string",
+                },
+                Field {
+                    name: "reactorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "responseKind",
+                    ty: "RulebenchReactionResponseKindDto",
+                },
+                Field {
+                    name: "optionId",
+                    ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionCommandReadoutDto",
+            fields: &[
+                Field {
+                    name: "command",
+                    ty: "RulebenchReactionCommandSpecDto",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchReactionDecisionKindDto",
+                },
+                Field {
+                    name: "previousWindow",
+                    ty: "RulebenchReactionWindowDto | null",
+                },
+                Field {
+                    name: "nextWindow",
+                    ty: "RulebenchReactionWindowDto | null",
+                },
+                Field {
+                    name: "openedNestedWindow",
+                    ty: "RulebenchReactionWindowDto | null",
+                },
+                Field {
+                    name: "resumedPendingResolution",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "trace",
+                    ty: "readonly RulebenchTraceEntryDto[]",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionWindowLifecycleEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "lifecycleKind",
+                    ty: "RulebenchReactionWindowLifecycleKindDto",
+                },
+                Field {
+                    name: "windowId",
+                    ty: "string",
+                },
+                Field {
+                    name: "parentWindowId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "depth",
+                    ty: "number",
+                },
+                Field {
+                    name: "reactorId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "optionId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReactionAuditEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "windowId",
+                    ty: "string",
+                },
+                Field {
+                    name: "reactorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "responseKind",
+                    ty: "RulebenchReactionResponseKindDto",
+                },
+                Field {
+                    name: "optionId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchReactionDecisionKindDto",
+                },
+                Field {
+                    name: "trace",
+                    ty: "readonly RulebenchTraceEntryDto[]",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },
@@ -493,6 +740,18 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "readonly RulebenchEquipmentTransitionEntryDto[]",
                 },
                 Field {
+                    name: "currentReactionWindow",
+                    ty: "RulebenchReactionWindowDto | null",
+                },
+                Field {
+                    name: "reactionWindowLifecycleLog",
+                    ty: "readonly RulebenchReactionWindowLifecycleEntryDto[]",
+                },
+                Field {
+                    name: "reactionAuditLog",
+                    ty: "readonly RulebenchReactionAuditEntryDto[]",
+                },
+                Field {
                     name: "modifierDurationExpirationLog",
                     ty: "readonly RulebenchModifierDurationExpirationEntryDto[]",
                 },
@@ -583,6 +842,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "equipmentTransitionLogMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "reactionWindowLifecycleLogMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "reactionAuditLogMatches",
                     ty: "boolean",
                 },
                 Field {

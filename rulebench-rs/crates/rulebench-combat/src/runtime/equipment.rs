@@ -90,6 +90,12 @@ impl CombatSessionState {
                 "Equipment cannot change after combat ends.".to_string(),
             ));
         }
+        if self.current_reaction_window().is_some() {
+            return Some((
+                EquipmentDecisionKind::RejectedByReactionWindow,
+                "Equipment cannot change while a reaction window is open.".to_string(),
+            ));
+        }
         let Some(equipment) = equipment else {
             return Some((
                 EquipmentDecisionKind::RejectedByCombatant,

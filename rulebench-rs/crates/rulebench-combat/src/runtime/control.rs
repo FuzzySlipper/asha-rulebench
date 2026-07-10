@@ -12,7 +12,9 @@ impl CombatSessionState {
     }
 
     pub fn end_combat(&mut self) {
-        self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
+        if self.current_reaction_window().is_none() {
+            self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
+        }
     }
 
     pub fn submit_control_command(
@@ -47,6 +49,16 @@ impl CombatSessionState {
                 self.turn_order.clone(),
                 state_before_fingerprint,
                 "Combat is already ended.",
+            );
+        }
+
+        if self.current_reaction_window().is_some() {
+            return rejected_turn_advance_readout(
+                TurnAdvanceDecisionKind::RejectedByReactionWindow,
+                previous_turn_order,
+                self.turn_order.clone(),
+                state_before_fingerprint,
+                "Turn advancement is paused by an open reaction window.",
             );
         }
 
@@ -182,21 +194,26 @@ impl CombatSessionState {
         let state_before_fingerprint = fingerprint_projected_state(&state_before);
         let lifecycle_transition_count = self.lifecycle_transition_log.len();
 
-        let (accepted, decision_kind, reason) =
-            if self.lifecycle.phase == CombatLifecyclePhase::Ended {
-                (
-                    false,
-                    CombatControlDecisionKind::RejectedByLifecycle,
-                    "Combat is already ended.",
-                )
-            } else {
-                self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
-                (
-                    true,
-                    CombatControlDecisionKind::Accepted,
-                    "Combat explicitly ended.",
-                )
-            };
+        let (accepted, decision_kind, reason) = if self.current_reaction_window().is_some() {
+            (
+                false,
+                CombatControlDecisionKind::RejectedByReactionWindow,
+                "Combat cannot end while a reaction window is open.",
+            )
+        } else if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+            (
+                false,
+                CombatControlDecisionKind::RejectedByLifecycle,
+                "Combat is already ended.",
+            )
+        } else {
+            self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
+            (
+                true,
+                CombatControlDecisionKind::Accepted,
+                "Combat explicitly ended.",
+            )
+        };
 
         combat_control_readout(
             CombatControlCommandKind::ExplicitEnd,
@@ -222,27 +239,32 @@ impl CombatSessionState {
         let lifecycle_transition_count = self.lifecycle_transition_log.len();
         let end_condition = self.combat_end_condition();
 
-        let (accepted, decision_kind, reason) =
-            if self.lifecycle.phase == CombatLifecyclePhase::Ended {
-                (
-                    false,
-                    CombatControlDecisionKind::RejectedByLifecycle,
-                    "Combat is already ended.".to_string(),
-                )
-            } else if end_condition.combat_should_end {
-                self.end_lifecycle(LifecycleTransitionTrigger::ConditionalEnd);
-                (
-                    true,
-                    CombatControlDecisionKind::Accepted,
-                    format!("Combat conditionally ended. {}", end_condition.reason),
-                )
-            } else {
-                (
-                    false,
-                    CombatControlDecisionKind::RejectedByEndCondition,
-                    format!("Combat end condition is not met. {}", end_condition.reason),
-                )
-            };
+        let (accepted, decision_kind, reason) = if self.current_reaction_window().is_some() {
+            (
+                false,
+                CombatControlDecisionKind::RejectedByReactionWindow,
+                "Combat cannot end while a reaction window is open.".to_string(),
+            )
+        } else if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+            (
+                false,
+                CombatControlDecisionKind::RejectedByLifecycle,
+                "Combat is already ended.".to_string(),
+            )
+        } else if end_condition.combat_should_end {
+            self.end_lifecycle(LifecycleTransitionTrigger::ConditionalEnd);
+            (
+                true,
+                CombatControlDecisionKind::Accepted,
+                format!("Combat conditionally ended. {}", end_condition.reason),
+            )
+        } else {
+            (
+                false,
+                CombatControlDecisionKind::RejectedByEndCondition,
+                format!("Combat end condition is not met. {}", end_condition.reason),
+            )
+        };
 
         combat_control_readout(
             CombatControlCommandKind::EndIfConditionMet,
@@ -367,6 +389,9 @@ fn combat_control_decision_kind_for_turn_advance(
         }
         TurnAdvanceDecisionKind::RejectedByNoActiveParticipants => {
             CombatControlDecisionKind::RejectedByEmptyTurnOrder
+        }
+        TurnAdvanceDecisionKind::RejectedByReactionWindow => {
+            CombatControlDecisionKind::RejectedByReactionWindow
         }
     }
 }

@@ -203,6 +203,7 @@ pub enum TurnAdvanceDecisionKind {
     RejectedByLifecycle,
     RejectedByEmptyTurnOrder,
     RejectedByNoActiveParticipants,
+    RejectedByReactionWindow,
 }
 
 impl TurnAdvanceDecisionKind {
@@ -214,6 +215,7 @@ impl TurnAdvanceDecisionKind {
             TurnAdvanceDecisionKind::RejectedByNoActiveParticipants => {
                 "rejectedByNoActiveParticipants"
             }
+            TurnAdvanceDecisionKind::RejectedByReactionWindow => "rejectedByReactionWindow",
         }
     }
 }

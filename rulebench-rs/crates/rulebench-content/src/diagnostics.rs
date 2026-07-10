@@ -106,6 +106,13 @@ pub enum ContentDiagnosticCode {
     UnsupportedTargetingDeclaration,
     UnsupportedCheckDeclaration,
     UnsupportedEffectOperation,
+    InvalidReactionHookId,
+    DuplicateReactionHook,
+    InvalidReactionEligibleReactor,
+    DuplicateReactionEligibleReactor,
+    InvalidReactionOption,
+    DuplicateReactionOption,
+    InvalidReactionNestedDepth,
     VisibleTargetOutsideTargetIds,
     MissingAttackModifierStat,
     MissingSavingThrowStat,
@@ -228,6 +235,17 @@ impl ContentDiagnosticCode {
             }
             ContentDiagnosticCode::UnsupportedCheckDeclaration => "unsupportedCheckDeclaration",
             ContentDiagnosticCode::UnsupportedEffectOperation => "unsupportedEffectOperation",
+            ContentDiagnosticCode::InvalidReactionHookId => "invalidReactionHookId",
+            ContentDiagnosticCode::DuplicateReactionHook => "duplicateReactionHook",
+            ContentDiagnosticCode::InvalidReactionEligibleReactor => {
+                "invalidReactionEligibleReactor"
+            }
+            ContentDiagnosticCode::DuplicateReactionEligibleReactor => {
+                "duplicateReactionEligibleReactor"
+            }
+            ContentDiagnosticCode::InvalidReactionOption => "invalidReactionOption",
+            ContentDiagnosticCode::DuplicateReactionOption => "duplicateReactionOption",
+            ContentDiagnosticCode::InvalidReactionNestedDepth => "invalidReactionNestedDepth",
             ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
             ContentDiagnosticCode::MissingAttackModifierStat => "missingAttackModifierStat",
             ContentDiagnosticCode::MissingSavingThrowStat => "missingSavingThrowStat",

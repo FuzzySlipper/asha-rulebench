@@ -30,6 +30,7 @@ pub enum CombatControlDecisionKind {
     RejectedByLifecycle,
     RejectedByEmptyTurnOrder,
     RejectedByEndCondition,
+    RejectedByReactionWindow,
 }
 
 impl CombatControlDecisionKind {
@@ -40,6 +41,7 @@ impl CombatControlDecisionKind {
             CombatControlDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
             CombatControlDecisionKind::RejectedByEmptyTurnOrder => "rejectedByEmptyTurnOrder",
             CombatControlDecisionKind::RejectedByEndCondition => "rejectedByEndCondition",
+            CombatControlDecisionKind::RejectedByReactionWindow => "rejectedByReactionWindow",
         }
     }
 }

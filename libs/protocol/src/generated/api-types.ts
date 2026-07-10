@@ -28,17 +28,17 @@ export type RulebenchActionResourceKindDto = 'standardAction' | 'spellSlot' | 'c
 
 export type RulebenchActionResourceRefreshPolicyDto = { readonly kind: 'never' | 'combatStart' | 'turnStart'; readonly turns: null } | { readonly kind: 'turns'; readonly turns: number };
 
-export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByAbilityAvailability' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
+export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByAbilityAvailability' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource' | 'rejectedByReactionWindow';
 
 export type RulebenchCommandDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder';
 
 export type RulebenchCombatControlCommandKindDto = 'explicitStart' | 'explicitEnd' | 'advanceTurn' | 'endIfConditionMet';
 
-export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition';
+export type RulebenchCombatControlDecisionKindDto = 'accepted' | 'rejectedNoop' | 'rejectedByLifecycle' | 'rejectedByEmptyTurnOrder' | 'rejectedByEndCondition' | 'rejectedByReactionWindow';
 
 export type RulebenchCombatScriptCommandKindDto = 'intent' | 'control' | 'selectedCandidate';
 
-export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';
+export type RulebenchCombatScriptDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'accepted' | 'rejectedNoop' | 'rejectedByEmptyTurnOrder' | 'rejectedByReactionWindow' | 'rejectedByUnavailableCandidates' | 'rejectedByMissingCandidate';
 
 export type RulebenchAutomaticRunDecisionKindDto = 'completedCombatEnded' | 'stoppedAtMaxSteps' | 'rejectedByLifecycle' | 'rejectedByStepLimit';
 
@@ -64,9 +64,19 @@ export type RulebenchEquipmentTransitionKindDto = 'equip' | 'unequip';
 
 export type RulebenchEquipmentCommandKindDto = 'equip' | 'unequip';
 
-export type RulebenchEquipmentDecisionKindDto = 'accepted' | 'rejectedByLifecycle' | 'rejectedByCombatant' | 'rejectedByItem' | 'rejectedByOwnership' | 'rejectedByEquippedState' | 'rejectedBySlotConflict' | 'rejectedByRequirement' | 'rejectedByResourceConflict';
+export type RulebenchEquipmentDecisionKindDto = 'accepted' | 'rejectedByLifecycle' | 'rejectedByReactionWindow' | 'rejectedByCombatant' | 'rejectedByItem' | 'rejectedByOwnership' | 'rejectedByEquippedState' | 'rejectedBySlotConflict' | 'rejectedByRequirement' | 'rejectedByResourceConflict';
 
-export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noAvailableResources' | 'noVisibleActiveTargets';
+export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noAvailableResources' | 'noVisibleActiveTargets' | 'reactionWindowOpen';
+
+export type RulebenchReactionWindowTimingDto = 'beforeEffect' | 'afterEffect';
+
+export type RulebenchReactionWindowStatusDto = 'open' | 'resolved';
+
+export type RulebenchReactionResponseKindDto = 'pass' | 'accept';
+
+export type RulebenchReactionDecisionKindDto = 'accepted' | 'rejectedNoOpenWindow' | 'rejectedStaleWindow' | 'rejectedOutOfOrder' | 'rejectedInvalidOption' | 'rejectedNestedLimit';
+
+export type RulebenchReactionWindowLifecycleKindDto = 'opened' | 'nestedOpened' | 'responseAccepted' | 'resolved' | 'resolutionResumed';
 
 export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';
 
@@ -193,6 +203,9 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
   readonly equipmentTransitionLog: readonly RulebenchEquipmentTransitionEntryDto[];
+  readonly currentReactionWindow: RulebenchReactionWindowDto | null;
+  readonly reactionWindowLifecycleLog: readonly RulebenchReactionWindowLifecycleEntryDto[];
+  readonly reactionAuditLog: readonly RulebenchReactionAuditEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
 }
 
@@ -201,6 +214,77 @@ export interface RulebenchCombatTurnOrderDto {
   readonly currentTurnIndex: number;
   readonly participantOrder: readonly string[];
   readonly currentActorId: string | null;
+}
+
+export interface RulebenchReactionOptionDto {
+  readonly optionId: string;
+  readonly reactorId: string;
+  readonly opensNestedWindow: boolean;
+}
+
+export interface RulebenchReactionResponseEntryDto {
+  readonly sequence: number;
+  readonly reactorId: string;
+  readonly responseKind: RulebenchReactionResponseKindDto;
+  readonly optionId: string | null;
+}
+
+export interface RulebenchReactionWindowDto {
+  readonly id: string;
+  readonly hookId: string;
+  readonly timing: RulebenchReactionWindowTimingDto;
+  readonly depth: number;
+  readonly maximumNestedDepth: number;
+  readonly parentWindowId: string | null;
+  readonly triggerStepId: string;
+  readonly triggerActionId: string;
+  readonly eligibleReactorIds: readonly string[];
+  readonly currentReactorId: string | null;
+  readonly options: readonly RulebenchReactionOptionDto[];
+  readonly responses: readonly RulebenchReactionResponseEntryDto[];
+  readonly status: RulebenchReactionWindowStatusDto;
+}
+
+export interface RulebenchReactionCommandSpecDto {
+  readonly windowId: string;
+  readonly reactorId: string;
+  readonly responseKind: RulebenchReactionResponseKindDto;
+  readonly optionId: string | null;
+}
+
+export interface RulebenchReactionCommandReadoutDto {
+  readonly command: RulebenchReactionCommandSpecDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchReactionDecisionKindDto;
+  readonly previousWindow: RulebenchReactionWindowDto | null;
+  readonly nextWindow: RulebenchReactionWindowDto | null;
+  readonly openedNestedWindow: RulebenchReactionWindowDto | null;
+  readonly resumedPendingResolution: boolean;
+  readonly trace: readonly RulebenchTraceEntryDto[];
+  readonly reason: string;
+}
+
+export interface RulebenchReactionWindowLifecycleEntryDto {
+  readonly sequence: number;
+  readonly lifecycleKind: RulebenchReactionWindowLifecycleKindDto;
+  readonly windowId: string;
+  readonly parentWindowId: string | null;
+  readonly depth: number;
+  readonly reactorId: string | null;
+  readonly optionId: string | null;
+  readonly reason: string;
+}
+
+export interface RulebenchReactionAuditEntryDto {
+  readonly sequence: number;
+  readonly windowId: string;
+  readonly reactorId: string;
+  readonly responseKind: RulebenchReactionResponseKindDto;
+  readonly optionId: string | null;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchReactionDecisionKindDto;
+  readonly trace: readonly RulebenchTraceEntryDto[];
+  readonly reason: string;
 }
 
 export interface RulebenchAutomaticRunReadoutDto {
@@ -227,6 +311,9 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
   readonly equipmentTransitionLog: readonly RulebenchEquipmentTransitionEntryDto[];
+  readonly currentReactionWindow: RulebenchReactionWindowDto | null;
+  readonly reactionWindowLifecycleLog: readonly RulebenchReactionWindowLifecycleEntryDto[];
+  readonly reactionAuditLog: readonly RulebenchReactionAuditEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
   readonly combatLogEntryCount: number;
   readonly auditEntryCount: number;
@@ -252,6 +339,8 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly equipmentLedgerMatches: boolean;
   readonly classBuildLedgerMatches: boolean;
   readonly equipmentTransitionLogMatches: boolean;
+  readonly reactionWindowLifecycleLogMatches: boolean;
+  readonly reactionAuditLogMatches: boolean;
   readonly modifierDurationExpirationLogMatches: boolean;
   readonly replayedRun: RulebenchAutomaticRunReadoutDto;
   readonly reason: string;

@@ -74,6 +74,7 @@ impl CombatSessionState {
             &current_state,
             &self.state.action_resource_ledger(),
             &self.state.equipment_ledger(),
+            self.current_reaction_window().is_some(),
         )
     }
 
@@ -87,6 +88,7 @@ impl CombatSessionState {
             &current_state,
             &self.state.action_resource_ledger(),
             &self.state.equipment_ledger(),
+            self.current_reaction_window().is_some(),
         );
 
         current_actor_command_candidates(
@@ -106,6 +108,7 @@ impl CombatSessionState {
             &current_scenario,
             &self.state.action_resource_ledger(),
             &self.state.equipment_ledger(),
+            self.current_reaction_window().is_some(),
             intent,
         )
     }
@@ -126,6 +129,9 @@ impl CombatSessionState {
             action_usage_log: self.action_usage_log.clone(),
             action_resource_transition_log: self.action_resource_transition_log.clone(),
             equipment_transition_log: self.equipment_transition_log.clone(),
+            reaction_window_lifecycle_log: self.reaction_window_lifecycle_log.clone(),
+            reaction_audit_log: self.reaction_audit_log.clone(),
+            current_reaction_window: self.current_reaction_window().cloned(),
             modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
             action_resource_ledger: self.state.action_resource_ledger(),
@@ -141,6 +147,7 @@ impl CombatSessionState {
                 &current_state,
                 &self.state.action_resource_ledger(),
                 &self.state.equipment_ledger(),
+                self.current_reaction_window().is_some(),
             ),
             current_state,
             current_state_fingerprint,
@@ -274,6 +281,7 @@ fn current_actor_option_summary(
     projection: &ScenarioProjection,
     action_resources: &ActionResourceLedgerReadout,
     equipment: &EquipmentLedgerReadout,
+    reaction_window_open: bool,
 ) -> CurrentActorOptionSummary {
     let current_actor_id = turn_order.current_actor_id.clone();
     let current_actor_defeated = current_actor_id
@@ -288,6 +296,17 @@ fn current_actor_option_summary(
             current_actor_id,
             current_actor_defeated,
             CurrentActorOptionsUnavailableReason::CombatEnded,
+            Vec::new(),
+        );
+    }
+
+    if reaction_window_open {
+        return unavailable_current_actor_options(
+            lifecycle,
+            turn_order,
+            current_actor_id,
+            current_actor_defeated,
+            CurrentActorOptionsUnavailableReason::ReactionWindowOpen,
             Vec::new(),
         );
     }
@@ -416,6 +435,7 @@ fn current_actor_id_command_candidates(
                     scenario,
                     action_resources,
                     equipment,
+                    false,
                     intent.clone(),
                 );
 

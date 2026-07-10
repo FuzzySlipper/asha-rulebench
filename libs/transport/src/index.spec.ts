@@ -1010,6 +1010,8 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.equipmentLedgerMatches).toBe(true);
       expect(result.value.classBuildLedgerMatches).toBe(true);
       expect(result.value.equipmentTransitionLogMatches).toBe(true);
+      expect(result.value.reactionWindowLifecycleLogMatches).toBe(true);
+      expect(result.value.reactionAuditLogMatches).toBe(true);
       expect(result.value.modifierDurationExpirationLogMatches).toBe(true);
       expect(result.value.replayedRun.id).toBe(
         "hexing-bolt-bounded-automatic-run",

@@ -536,6 +536,9 @@ fn candidate_selection_unavailable_reason(
         Some(CurrentActorOptionsUnavailableReason::NoAvailableResources) => {
             "No command candidates are available because the current actor cannot cover any action resource costs."
         }
+        Some(CurrentActorOptionsUnavailableReason::ReactionWindowOpen) => {
+            "No command candidates are available until the open reaction window resolves."
+        }
         Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets) => {
             "No command candidates are available because there are no visible active targets."
         }

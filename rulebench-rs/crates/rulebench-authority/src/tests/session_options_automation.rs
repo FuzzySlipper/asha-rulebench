@@ -1166,6 +1166,11 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
         expected_run.final_snapshot.equipment_transition_log.clone(),
         expected_run
             .final_snapshot
+            .reaction_window_lifecycle_log
+            .clone(),
+        expected_run.final_snapshot.reaction_audit_log.clone(),
+        expected_run
+            .final_snapshot
             .modifier_duration_expiration_log
             .clone(),
     ));
@@ -1183,6 +1188,8 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     assert!(readout.equipment_ledger_matches);
     assert!(readout.class_build_ledger_matches);
     assert!(readout.equipment_transition_log_matches);
+    assert!(readout.reaction_window_lifecycle_log_matches);
+    assert!(readout.reaction_audit_log_matches);
     assert!(readout.modifier_duration_expiration_log_matches);
     assert_eq!(
         readout.actual_final_state_fingerprint,
@@ -1235,6 +1242,11 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
         expected_run.final_snapshot.equipment_ledger.clone(),
         expected_run.final_snapshot.class_build_ledger.clone(),
         expected_run.final_snapshot.equipment_transition_log.clone(),
+        expected_run
+            .final_snapshot
+            .reaction_window_lifecycle_log
+            .clone(),
+        expected_run.final_snapshot.reaction_audit_log.clone(),
         expected_modifier_duration_expiration_log,
     ));
 
@@ -1251,6 +1263,8 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     assert!(readout.equipment_ledger_matches);
     assert!(readout.class_build_ledger_matches);
     assert!(readout.equipment_transition_log_matches);
+    assert!(readout.reaction_window_lifecycle_log_matches);
+    assert!(readout.reaction_audit_log_matches);
     assert!(!readout.modifier_duration_expiration_log_matches);
     assert_eq!(
         readout.actual_executed_step_count,
