@@ -1,7 +1,7 @@
 use rulebench_rules::{
     ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, CheckHandlerKind,
-    RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
-    RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,
+    CombatEndPolicy, RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
+    RuleModuleValidationError, RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,
 };
 
 /// Stable wire form of a ruleset definition authored outside Rust authority.
@@ -31,6 +31,8 @@ pub enum RuleModuleConfigurationDto {
     },
     TurnControl {
         turn_order_policy: String,
+        combat_end_policy: String,
+        objective_side: Option<String>,
     },
 }
 
@@ -41,6 +43,8 @@ pub enum RulesetAuthoringError {
     UnsupportedActionResolutionTargetingPolicy { policy: String },
     UnsupportedCheckHandler { handler: String },
     UnsupportedTurnOrderPolicy { policy: String },
+    UnsupportedCombatEndPolicy { policy: String },
+    InvalidCombatEndPolicyConfiguration { policy: String },
 }
 
 impl RulesetAuthoringError {
@@ -53,6 +57,12 @@ impl RulesetAuthoringError {
             RulesetAuthoringError::UnsupportedCheckHandler { .. } => "unsupportedCheckHandler",
             RulesetAuthoringError::UnsupportedTurnOrderPolicy { .. } => {
                 "unsupportedTurnOrderPolicy"
+            }
+            RulesetAuthoringError::UnsupportedCombatEndPolicy { .. } => {
+                "unsupportedCombatEndPolicy"
+            }
+            RulesetAuthoringError::InvalidCombatEndPolicyConfiguration { .. } => {
+                "invalidCombatEndPolicyConfiguration"
             }
         }
     }
@@ -98,8 +108,14 @@ fn convert_module_declaration(
         }),
         RuleModuleConfigurationDto::TurnControl {
             turn_order_policy: configured_policy,
+            combat_end_policy,
+            objective_side,
         } => RuleModuleConfiguration::TurnControl(TurnControlModuleConfiguration {
             turn_order_policy: parse_turn_order_policy(configured_policy)?,
+            combat_end_policy: parse_combat_end_policy(
+                combat_end_policy,
+                objective_side.as_deref(),
+            )?,
         }),
     };
     Ok(RuleModuleDeclaration {
@@ -107,6 +123,29 @@ fn convert_module_declaration(
         version: declaration.version.clone(),
         configuration,
     })
+}
+
+fn parse_combat_end_policy(
+    policy: &str,
+    objective_side: Option<&str>,
+) -> Result<CombatEndPolicy, RulesetAuthoringError> {
+    match (policy, objective_side) {
+        ("lastSideStanding", None) => Ok(CombatEndPolicy::LastSideStanding),
+        ("explicitOnly", None) => Ok(CombatEndPolicy::ExplicitOnly),
+        ("objectiveSideVictory", Some(side_id)) if !side_id.is_empty() => {
+            Ok(CombatEndPolicy::ObjectiveSideVictory {
+                side_id: side_id.to_string(),
+            })
+        }
+        ("lastSideStanding" | "explicitOnly" | "objectiveSideVictory", _) => {
+            Err(RulesetAuthoringError::InvalidCombatEndPolicyConfiguration {
+                policy: policy.to_string(),
+            })
+        }
+        _ => Err(RulesetAuthoringError::UnsupportedCombatEndPolicy {
+            policy: policy.to_string(),
+        }),
+    }
 }
 
 fn parse_check_handler(handler: &str) -> Result<CheckHandlerKind, RulesetAuthoringError> {
@@ -199,5 +238,65 @@ mod tests {
         let error = validate_ruleset_definition(&definition).expect_err("policy is invalid");
 
         assert_eq!(error.code(), "unsupportedActionResolutionTargetingPolicy");
+    }
+
+    #[test]
+    fn authored_objective_side_policy_converts_to_authority_configuration() {
+        let mut definition = valid_definition();
+        definition.modules.push(RuleModuleDeclarationDto {
+            module: "turnControl".to_string(),
+            version: "1".to_string(),
+            configuration: RuleModuleConfigurationDto::TurnControl {
+                turn_order_policy: "explicit".to_string(),
+                combat_end_policy: "objectiveSideVictory".to_string(),
+                objective_side: Some("heroes".to_string()),
+            },
+        });
+
+        let ruleset = validate_ruleset_definition(&definition).expect("policy is valid");
+        let turn_control = ruleset
+            .validate_modules()
+            .expect("modules remain valid")
+            .turn_control()
+            .cloned()
+            .expect("turn control is configured");
+
+        assert_eq!(
+            turn_control.combat_end_policy.objective_side_id(),
+            Some("heroes")
+        );
+    }
+
+    #[test]
+    fn authored_combat_end_policy_rejects_unknown_or_incomplete_configuration() {
+        let mut definition = valid_definition();
+        definition.modules.push(RuleModuleDeclarationDto {
+            module: "turnControl".to_string(),
+            version: "1".to_string(),
+            configuration: RuleModuleConfigurationDto::TurnControl {
+                turn_order_policy: "explicit".to_string(),
+                combat_end_policy: "objectiveSideVictory".to_string(),
+                objective_side: None,
+            },
+        });
+        assert_eq!(
+            validate_ruleset_definition(&definition)
+                .expect_err("objective side is required")
+                .code(),
+            "invalidCombatEndPolicyConfiguration"
+        );
+
+        if let RuleModuleConfigurationDto::TurnControl {
+            combat_end_policy, ..
+        } = &mut definition.modules[1].configuration
+        {
+            *combat_end_policy = "unknownPolicy".to_string();
+        }
+        assert_eq!(
+            validate_ruleset_definition(&definition)
+                .expect_err("unknown policy is rejected")
+                .code(),
+            "unsupportedCombatEndPolicy"
+        );
     }
 }

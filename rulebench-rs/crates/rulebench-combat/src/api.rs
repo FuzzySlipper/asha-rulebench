@@ -62,6 +62,7 @@ pub enum CombatSessionApiError {
     EmptySessionId,
     DuplicateSessionId { session_id: String },
     UnknownSessionId { session_id: String },
+    SessionNotFinalized { session_id: String },
     InvalidScenario { report: ContentValidationReport },
 }
 
@@ -71,6 +72,7 @@ impl CombatSessionApiError {
             CombatSessionApiError::EmptySessionId => "emptySessionId",
             CombatSessionApiError::DuplicateSessionId { .. } => "duplicateSessionId",
             CombatSessionApiError::UnknownSessionId { .. } => "unknownSessionId",
+            CombatSessionApiError::SessionNotFinalized { .. } => "sessionNotFinalized",
             CombatSessionApiError::InvalidScenario { .. } => "invalidScenario",
         }
     }
@@ -239,10 +241,14 @@ impl CombatSessionApi {
         &mut self,
         session: &CombatSessionHandle,
     ) -> Result<CombatSessionArchive, CombatSessionApiError> {
-        let Some(active_session) = self.active_sessions.remove(&session.id) else {
-            return Err(CombatSessionApiError::UnknownSessionId {
+        let active_session = self.active_session(session)?;
+        if active_session.finalization().is_none() {
+            return Err(CombatSessionApiError::SessionNotFinalized {
                 session_id: session.id.clone(),
             });
+        }
+        let Some(active_session) = self.active_sessions.remove(&session.id) else {
+            unreachable!("active session was checked before removal");
         };
         let archive = CombatSessionArchive {
             session: session.clone(),
@@ -352,6 +358,13 @@ mod tests {
         api.create_session(request.clone())
             .expect("first create succeeds");
         assert_eq!(
+            api.close_session(&request.session)
+                .expect_err("active combat must finalize before archival")
+                .code(),
+            "sessionNotFinalized"
+        );
+        assert_eq!(api.list_active_sessions().len(), 1);
+        assert_eq!(
             api.create_session(request)
                 .expect_err("duplicate session id is rejected")
                 .code(),
@@ -360,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn api_manually_completes_combat_through_authoritative_readbacks() {
+    fn api_lethal_intent_completes_combat_through_authoritative_readbacks() {
         let mut api = CombatSessionApi::new();
         let created = api
             .create_session(CombatSessionCreateRequest::new("manual", valid_scenario()))
@@ -399,11 +412,13 @@ mod tests {
             .accepted
         );
 
+        let finalized = api.snapshot(&session).expect("lethal intent finalizes");
         let end = api
             .submit_control(&session, CombatControlCommandSpec::end_if_condition_met())
             .expect("conditional end readback");
-        assert!(end.accepted);
+        assert!(!end.accepted);
         let snapshot = api.snapshot(&session).expect("final snapshot");
+        assert_eq!(snapshot, finalized);
         assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ended);
         assert_eq!(snapshot.combat_log.len(), 1);
         assert_eq!(snapshot.audit_log.len(), 1);
@@ -942,7 +957,7 @@ mod tests {
                     "Reaction trigger",
                     "Pause before effects for ordered reactions.",
                     UseActionIntent::new("adept", "api_bolt", "raider"),
-                    vec![20, 1],
+                    vec![20, 20],
                 ),
             )
             .expect("trigger command readout");
@@ -957,7 +972,7 @@ mod tests {
                 .combatants[1]
                 .hit_points
                 .current,
-            8
+            0
         );
         let pending = api.snapshot(&session).expect("pending reaction snapshot");
         assert_eq!(pending.current_state.combatants[1].hit_points.current, 10);
@@ -1051,7 +1066,15 @@ mod tests {
 
         let resolved = api.snapshot(&session).expect("resolved reaction snapshot");
         assert!(resolved.current_reaction_window.is_none());
-        assert_eq!(resolved.current_state.combatants[1].hit_points.current, 8);
+        assert_eq!(resolved.current_state.combatants[1].hit_points.current, 0);
+        assert_eq!(resolved.lifecycle.phase, CombatLifecyclePhase::Ended);
+        assert_eq!(
+            resolved
+                .finalization
+                .as_ref()
+                .map(|finalization| finalization.outcome_kind),
+            Some(CombatOutcomeKind::Victory)
+        );
         assert_eq!(
             resource_current(
                 &resolved.action_resource_ledger.combatants[0].resources,
@@ -1065,12 +1088,17 @@ mod tests {
         }));
         assert_eq!(resolved.reaction_audit_log.len(), 6);
 
+        let before_stale = api.snapshot(&session).expect("final snapshot is readable");
         let stale = api
             .submit_reaction(&session, ReactionCommandSpec::pass(root.id, "adept"))
             .expect("stale reaction readout");
         assert_eq!(
             stale.decision_kind,
             ReactionDecisionKind::RejectedNoOpenWindow
+        );
+        assert_eq!(
+            api.snapshot(&session).expect("post-end snapshot is stable"),
+            before_stale
         );
 
         let miss_session = api
@@ -1208,6 +1236,11 @@ mod tests {
             entity_id: id.to_string(),
             name: id.to_string(),
             team,
+            side_id: match team {
+                Team::Ally => "ally",
+                Team::Enemy => "enemy",
+            }
+            .to_string(),
             initiative: 0,
             position: GridPosition { x, y: 0 },
             hit_points: BoundedValue {

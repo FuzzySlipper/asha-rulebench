@@ -448,16 +448,8 @@ fn session_runtime_control_command_ends_combat_and_rejects_repeated_end() {
         after_repeat.lifecycle_transition_log,
         before_repeat.lifecycle_transition_log
     );
-    assert_eq!(session.control_history().len(), 2);
-    assert_eq!(session.control_history()[1].sequence, 1);
-    assert_eq!(
-        session.control_history()[1].decision_kind,
-        CombatControlDecisionKind::RejectedByLifecycle
-    );
-    assert_eq!(
-        session.control_history()[1].lifecycle_transition_sequence,
-        None
-    );
+    assert_eq!(session.control_history().len(), 1);
+    assert_eq!(after_repeat, before_repeat);
 }
 
 #[test]
@@ -546,7 +538,7 @@ fn session_runtime_control_command_rejects_conditional_end_while_combat_can_cont
     assert_eq!(readout.decision_kind.code(), "rejectedByEndCondition");
     assert_eq!(
         readout.reason,
-        "Combat end condition is not met. Combat can continue because both sides have active combatants."
+        "Combat end condition is not met. Combat can continue because multiple configured sides have active combatants."
     );
     assert_eq!(readout.previous_lifecycle, before_attempt.lifecycle);
     assert_eq!(readout.next_lifecycle, before_attempt.lifecycle);
@@ -605,11 +597,8 @@ fn session_runtime_control_command_rejects_conditional_end_after_combat_already_
         after_attempt.lifecycle_transition_log,
         before_attempt.lifecycle_transition_log
     );
-    assert_eq!(session.control_history().len(), 1);
-    assert_eq!(
-        session.control_history()[0].decision_kind,
-        CombatControlDecisionKind::RejectedByLifecycle
-    );
+    assert!(session.control_history().is_empty());
+    assert_eq!(after_attempt, before_attempt);
 }
 
 #[test]
@@ -738,7 +727,7 @@ fn session_runtime_repeated_end_combat_preserves_first_end_snapshot() {
     assert_eq!(before_repeat.lifecycle.phase, CombatLifecyclePhase::Ended);
     assert_eq!(before_repeat.lifecycle.started_at_step, Some(0));
     assert_eq!(before_repeat.lifecycle.ended_at_step, Some(1));
-    assert_eq!(before_repeat.next_step_index, 2);
+    assert_eq!(before_repeat.next_step_index, 1);
     assert_eq!(after_repeat.lifecycle, before_repeat.lifecycle);
     assert_eq!(after_repeat.turn_order, before_repeat.turn_order);
     assert_eq!(after_repeat.next_step_index, before_repeat.next_step_index);
@@ -799,11 +788,11 @@ fn session_runtime_rejects_commands_after_combat_end() {
     assert_eq!(state_before_attempt, state_after_attempt);
     assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
     assert_eq!(session.lifecycle().ended_at_step, ended_at_step);
-    assert_eq!(session.next_step_index(), 2);
+    assert_eq!(session.next_step_index(), 1);
 }
 
 #[test]
-fn session_runtime_records_post_end_attempt_in_log_and_audit() {
+fn session_runtime_returns_post_end_rejection_without_mutating_logs_or_audit() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
     session.submit_command(CombatSessionCommandSpec::new(
@@ -816,6 +805,7 @@ fn session_runtime_records_post_end_attempt_in_log_and_audit() {
     ));
     session.end_combat();
 
+    let before_attempt = session.snapshot();
     let readout = session.submit_command(CombatSessionCommandSpec::new(
         "runtime-post-end",
         "Runtime post-end command",
@@ -827,8 +817,8 @@ fn session_runtime_records_post_end_attempt_in_log_and_audit() {
 
     assert_eq!(readout.combat_log[0].id, "log-runtime-post-end");
     assert!(readout.combat_log[0].event_types.is_empty());
-    assert_eq!(session.combat_log().len(), 2);
-    assert_eq!(session.audit_log().len(), 2);
+    assert_eq!(session.combat_log().len(), 1);
+    assert_eq!(session.audit_log().len(), 1);
     assert_eq!(readout.audit_entry.id, "audit-runtime-post-end");
     assert_eq!(readout.audit_entry.sequence, 1);
     assert_eq!(
@@ -846,7 +836,7 @@ fn session_runtime_records_post_end_attempt_in_log_and_audit() {
     );
     assert_eq!(readout.audit_entry.event_count, 0);
     assert_eq!(readout.audit_entry.trace_count, 2);
-    assert_eq!(session.audit_log()[1], readout.audit_entry);
+    assert_eq!(session.snapshot(), before_attempt);
 }
 
 #[test]
@@ -1146,8 +1136,13 @@ fn session_runtime_advances_turns_and_rounds() {
 
 #[test]
 fn session_runtime_skips_a_combatant_defeated_between_turns() {
-    let mut session =
-        CombatSessionState::new("runtime-defeated-turn-skip", hexing_bolt_fixture_scenario());
+    let mut scenario = turn_control_fixture_scenario();
+    scenario.rulesets[0].modules[1] = RuleModuleDeclaration::turn_control(
+        TurnControlModuleConfiguration::explicit_turn_order_with_end_policy(
+            CombatEndPolicy::ExplicitOnly,
+        ),
+    );
+    let mut session = CombatSessionState::new("runtime-defeated-turn-skip", scenario);
     session.submit_intent_command(CombatSessionIntentCommandSpec::new(
         "defeat-raider",
         "Defeat Raider",
@@ -1924,23 +1919,8 @@ fn session_runtime_control_command_rejects_turn_advance_after_end() {
         after_attempt.turn_transition_log,
         before_attempt.turn_transition_log
     );
-    assert_eq!(session.control_history().len(), 1);
-    let history = &session.control_history()[0];
-    assert_eq!(history.sequence, 0);
-    assert_eq!(history.command_kind, CombatControlCommandKind::AdvanceTurn);
-    assert!(!history.accepted);
-    assert_eq!(
-        history.decision_kind,
-        CombatControlDecisionKind::RejectedByLifecycle
-    );
-    assert_eq!(
-        history.previous_lifecycle_phase,
-        CombatLifecyclePhase::Ended
-    );
-    assert_eq!(history.next_lifecycle_phase, CombatLifecyclePhase::Ended);
-    assert_eq!(history.lifecycle_transition_sequence, None);
-    assert_eq!(history.turn_transition_sequence, None);
-    assert_eq!(history.reason, "Combat is already ended.");
+    assert!(session.control_history().is_empty());
+    assert_eq!(after_attempt, before_attempt);
 }
 
 #[test]

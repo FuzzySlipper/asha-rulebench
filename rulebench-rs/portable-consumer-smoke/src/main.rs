@@ -84,8 +84,9 @@ fn scenario() -> RulebenchScenario {
 fn entity(id: &str) -> EntityDefinition { EntityDefinition { id: id.to_string(), name: id.to_string(), summary: id.to_string(), tags: vec![], damage_adjustments: vec![] } }
 
 fn combatant(id: &str, entity_id: &str, team: Team, x: u32, hit_points: i32, mind: i32, nerve: i32, is_actor: bool) -> Combatant {
+    let side_id = match team { Team::Ally => "ally", Team::Enemy => "enemy" };
     Combatant {
-        id: id.to_string(), entity_id: entity_id.to_string(), name: id.to_string(), team, initiative: 0, position: GridPosition { x, y: 0 }, hit_points: BoundedValue { current: hit_points, max: hit_points }, temporary_vitality: 0,
+        id: id.to_string(), entity_id: entity_id.to_string(), name: id.to_string(), team, side_id: side_id.to_string(), initiative: 0, position: GridPosition { x, y: 0 }, hit_points: BoundedValue { current: hit_points, max: hit_points }, temporary_vitality: 0,
         class_inputs: vec![], stats: StatBlock { base_stats: vec![NamedNumber { id: "mind".to_string(), label: "Mind".to_string(), value: mind }], derived_stats: vec![] },
         defenses: vec![NamedNumber { id: "nerve".to_string(), label: "Nerve".to_string(), value: nerve }], resource_pools: vec![ActionResourcePool::standard_action()], inventory_item_ids: vec![], equipped_item_ids: vec![], base_ability_ids: if is_actor { vec!["bolt-ability".to_string()] } else { vec![] }, active_modifiers: vec![], conditions: vec![], is_actor,
     }

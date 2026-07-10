@@ -9,6 +9,7 @@ use rulebench_ruleset::ActionResourceCost;
 mod automation;
 mod control;
 mod equipment;
+mod finalization;
 mod reactions;
 mod script;
 mod status;
@@ -127,6 +128,7 @@ pub struct CombatSessionState {
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
     lifecycle_transition_log: Vec<LifecycleTransitionEntry>,
+    finalization: Option<CombatFinalizationReadout>,
     next_step_index: u32,
     lifecycle: CombatLifecycle,
     turn_order: CombatTurnOrder,
@@ -153,6 +155,7 @@ impl CombatSessionState {
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
             lifecycle_transition_log: Vec::new(),
+            finalization: None,
             next_step_index: 0,
             lifecycle: CombatLifecycle::ready(),
             turn_order,
@@ -196,6 +199,18 @@ impl CombatSessionState {
         roll_stream: Vec<i32>,
         preflight_enabled: bool,
     ) -> CombatSessionStepReadout {
+        if self.lifecycle.phase == CombatLifecyclePhase::Ended {
+            return self.post_end_command_readout(
+                id,
+                title,
+                summary,
+                outcome_class,
+                intent,
+                roll_stream,
+                preflight_enabled,
+            );
+        }
+
         self.scenario = self.state.apply_to_scenario(self.scenario.clone());
         let turn_context = self.turn_order.clone();
         let state_before = self.state.project("State before command resolution.");
@@ -214,7 +229,6 @@ impl CombatSessionState {
             None
         };
         let rejected_preflight = preflight.as_ref().filter(|readout| !readout.accepted);
-        let combat_has_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
         let (receipt, mut state_after, should_apply_state, decision_kind) = if let Some(preflight) =
             rejected_preflight
         {
@@ -226,16 +240,6 @@ impl CombatSessionState {
                 state_after,
                 false,
                 command_decision_kind_for_preflight(preflight.decision_kind),
-            )
-        } else if combat_has_ended {
-            let state_after = self
-                .state
-                .project("No authority state changed; combat already ended.");
-            (
-                ended_combat_receipt(intent.clone(), state_after.clone()),
-                state_after,
-                false,
-                CommandDecisionKind::RejectedByLifecycle,
             )
         } else {
             match self.turn_order.current_actor_id.as_deref() {
@@ -363,6 +367,7 @@ impl CombatSessionState {
         self.next_step_index += 1;
         if should_apply_state && !pauses_before_effect {
             self.apply_receipt_effects_to_state(&receipt);
+            self.finalize_if_condition_met();
         }
 
         CombatSessionStepReadout {
@@ -376,6 +381,66 @@ impl CombatSessionState {
             audit_entry,
             state_before,
             state_after,
+        }
+    }
+
+    fn post_end_command_readout(
+        &self,
+        id: String,
+        title: String,
+        summary: String,
+        outcome_class: Option<CommandOutcomeClass>,
+        intent: UseActionIntent,
+        roll_stream: Vec<i32>,
+        preflight_enabled: bool,
+    ) -> CombatSessionStepReadout {
+        let scenario = self.state.apply_to_scenario(self.scenario.clone());
+        let state = self
+            .state
+            .project("No authority state changed; combat already ended.");
+        let state_fingerprint = fingerprint_projected_state(&state);
+        let receipt = ended_combat_receipt(intent.clone(), state.clone());
+        let outcome_class = outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt));
+        let step = CombatSessionStepSummary {
+            id,
+            index: self.next_step_index,
+            title,
+            summary,
+            outcome_class,
+            log_index: self.next_step_index + 1,
+        };
+        let command = CommandAttempt {
+            step_id: step.id.clone(),
+            step_index: step.index,
+            actor_id: intent.actor_id,
+            action_id: intent.action_id,
+            target_id: intent.target_id,
+            roll_stream,
+            outcome_class,
+        };
+        let log_entry = combat_log_entry(&step, &receipt);
+        let preflight_decision_kind =
+            preflight_enabled.then_some(CommandPreflightDecisionKind::RejectedByLifecycle);
+        let audit_entry = command_audit_entry(
+            &step,
+            &receipt,
+            CommandDecisionKind::RejectedByLifecycle,
+            preflight_decision_kind,
+            state_fingerprint.clone(),
+            state_fingerprint,
+        );
+
+        CombatSessionStepReadout {
+            session_id: self.session_id.clone(),
+            step,
+            command,
+            scenario,
+            receipt,
+            combat_log: vec![log_entry],
+            action_resource_ledger: self.state.action_resource_ledger(),
+            audit_entry,
+            state_before: state.clone(),
+            state_after: state,
         }
     }
 

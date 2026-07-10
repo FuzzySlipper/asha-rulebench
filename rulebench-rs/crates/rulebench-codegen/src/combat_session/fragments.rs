@@ -7,13 +7,13 @@ use rulebench_fixtures::{
     ClassBuildLedgerReadout, CombatAutomationCandidateEvidence,
     CombatAutomationPolicyDecisionEvidence, CombatAutomationPolicySpec,
     CombatAutomationPolicyValidationReadout, CombatControlHistoryEntry, CombatEndConditionReadout,
-    CombatLogEntry, CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
-    CombatantEquipmentReadout, CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt,
-    CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
-    CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
-    EquipmentLedgerReadout, EquipmentTransitionEntry, LifecycleTransitionEntry,
-    ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, ReactionAuditEntry,
-    ReactionOptionReadout, ReactionResponseEntry, ReactionWindowLifecycleEntry,
+    CombatEndPolicy, CombatFinalizationReadout, CombatLogEntry, CombatSessionScriptStepReadout,
+    CombatSessionStepSummary, CombatTurnOrder, CombatantEquipmentReadout, CombatantVitalityEntry,
+    CombatantVitalitySummary, CommandAttempt, CommandAuditEntry, CommandPreflightDecisionKind,
+    CurrentActorActionOption, CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason,
+    CurrentActorTargetOption, EquipmentLedgerReadout, EquipmentTransitionEntry,
+    LifecycleTransitionEntry, ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger,
+    ReactionAuditEntry, ReactionOptionReadout, ReactionResponseEntry, ReactionWindowLifecycleEntry,
     ReactionWindowReadout, RulebenchRejection, ScenarioProjection, TraceEntry, TurnTransitionEntry,
 };
 
@@ -971,6 +971,12 @@ pub(crate) fn render_combat_end_condition(
     indent: &str,
 ) -> String {
     let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  policy: "));
+    out.push_str(&render_combat_end_policy(
+        &readout.policy,
+        &format!("{indent}  "),
+    ));
+    out.push_str(",\n");
     out.push_str(&format!(
         "{indent}  combatShouldEnd: {},\n",
         readout.combat_should_end
@@ -978,6 +984,22 @@ pub(crate) fn render_combat_end_condition(
     out.push_str(&format!(
         "{indent}  conditionKind: {},\n",
         ts_string(combat_end_condition_kind(readout.condition_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  outcomeKind: {},\n",
+        ts_string(combat_outcome_kind(readout.outcome_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  activeSides: {},\n",
+        ts_string_array(&readout.active_sides)
+    ));
+    out.push_str(&format!(
+        "{indent}  defeatedSides: {},\n",
+        ts_string_array(&readout.defeated_sides)
+    ));
+    out.push_str(&format!(
+        "{indent}  winningSides: {},\n",
+        ts_string_array(&readout.winning_sides)
     ));
     out.push_str(&format!(
         "{indent}  activeAllyCount: {},\n",
@@ -994,6 +1016,75 @@ pub(crate) fn render_combat_end_condition(
     out.push_str(&format!(
         "{indent}  defeatedEnemyCount: {},\n",
         readout.defeated_enemy_count
+    ));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&readout.reason)
+    ));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+pub(crate) fn render_combat_end_policy(policy: &CombatEndPolicy, indent: &str) -> String {
+    let objective_side_id = policy.objective_side_id().map(String::from);
+    format!(
+        "{{\n{indent}  kind: {},\n{indent}  objectiveSideId: {},\n{indent}}}",
+        ts_string(combat_end_policy_kind(policy)),
+        render_optional_string(&objective_side_id)
+    )
+}
+
+pub(crate) fn render_optional_combat_finalization(
+    finalization: Option<&CombatFinalizationReadout>,
+    indent: &str,
+) -> String {
+    finalization
+        .map(|readout| render_combat_finalization(readout, indent))
+        .unwrap_or_else(|| "null".to_string())
+}
+
+pub(crate) fn render_combat_finalization(
+    readout: &CombatFinalizationReadout,
+    indent: &str,
+) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!(
+        "{indent}  trigger: {},\n",
+        ts_string(lifecycle_transition_trigger(readout.trigger))
+    ));
+    out.push_str(&format!(
+        "{indent}  finalizedAtStep: {},\n",
+        readout.finalized_at_step
+    ));
+    out.push_str(&format!("{indent}  endCondition: "));
+    out.push_str(&render_combat_end_condition(
+        &readout.end_condition,
+        &format!("{indent}  "),
+    ));
+    out.push_str(",\n");
+    out.push_str(&format!(
+        "{indent}  outcomeKind: {},\n",
+        ts_string(combat_outcome_kind(readout.outcome_kind))
+    ));
+    out.push_str(&format!(
+        "{indent}  winningSides: {},\n",
+        ts_string_array(&readout.winning_sides)
+    ));
+    out.push_str(&format!(
+        "{indent}  remainingSides: {},\n",
+        ts_string_array(&readout.remaining_sides)
+    ));
+    out.push_str(&format!(
+        "{indent}  finalStateFingerprint: {},\n",
+        render_fingerprint(&readout.final_state_fingerprint, indent)
+    ));
+    out.push_str(&format!(
+        "{indent}  combatLogEntryCount: {},\n",
+        readout.combat_log_entry_count
+    ));
+    out.push_str(&format!(
+        "{indent}  commandAuditEntryCount: {},\n",
+        readout.command_audit_entry_count
     ));
     out.push_str(&format!(
         "{indent}  reason: {},\n",

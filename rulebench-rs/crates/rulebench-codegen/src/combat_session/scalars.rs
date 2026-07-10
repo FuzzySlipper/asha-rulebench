@@ -3,13 +3,13 @@ use crate::ts_emit::ts_string;
 use rulebench_fixtures::{
     ActionResourceKind, ActionResourceTransitionKind, CombatAutomationNoCandidateBehavior,
     CombatAutomationPolicyValidationCode, CombatControlCommandKind, CombatControlDecisionKind,
-    CombatEndConditionKind, CombatLifecyclePhase, CombatSessionAutomaticRunDecisionKind,
-    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepOperationKind,
-    CombatSessionCandidateSelectionDecisionKind, CombatSessionScriptCommandKind,
-    CombatSessionScriptDecisionKind, CommandDecisionKind, CommandOutcomeClass,
-    CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure, ReactionDecisionKind,
-    ReactionResponseKind, ReactionWindow, ReactionWindowLifecycleKind, ReactionWindowStatus,
-    StateFingerprint, TracePhase, TraceStatus,
+    CombatEndConditionKind, CombatEndPolicy, CombatLifecyclePhase, CombatOutcomeKind,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticStepDecisionKind,
+    CombatSessionAutomaticStepOperationKind, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CommandDecisionKind,
+    CommandOutcomeClass, CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure,
+    ReactionDecisionKind, ReactionResponseKind, ReactionWindow, ReactionWindowLifecycleKind,
+    ReactionWindowStatus, StateFingerprint, TracePhase, TraceStatus,
 };
 
 pub(crate) fn render_fingerprint(fingerprint: &StateFingerprint, _indent: &str) -> String {
@@ -254,7 +254,35 @@ pub(crate) fn trace_status(status: TraceStatus) -> &'static str {
 }
 
 pub(crate) fn combat_end_condition_kind(kind: CombatEndConditionKind) -> &'static str {
-    kind.code()
+    match kind {
+        CombatEndConditionKind::Ongoing => "ongoing",
+        CombatEndConditionKind::NoActiveEnemies => "noActiveEnemies",
+        CombatEndConditionKind::NoActiveAllies => "noActiveAllies",
+        CombatEndConditionKind::NoActiveCombatants => "noActiveCombatants",
+        CombatEndConditionKind::ExplicitOnly => "explicitOnly",
+        CombatEndConditionKind::ExplicitEnd => "explicitEnd",
+        CombatEndConditionKind::LastSideStanding => "lastSideStanding",
+        CombatEndConditionKind::ObjectiveSideVictory => "objectiveSideVictory",
+        CombatEndConditionKind::ObjectiveSideDefeated => "objectiveSideDefeated",
+    }
+}
+
+pub(crate) fn combat_end_policy_kind(policy: &CombatEndPolicy) -> &'static str {
+    match policy {
+        CombatEndPolicy::LastSideStanding => "lastSideStanding",
+        CombatEndPolicy::ObjectiveSideVictory { .. } => "objectiveSideVictory",
+        CombatEndPolicy::ExplicitOnly => "explicitOnly",
+    }
+}
+
+pub(crate) fn combat_outcome_kind(kind: CombatOutcomeKind) -> &'static str {
+    match kind {
+        CombatOutcomeKind::Ongoing => "ongoing",
+        CombatOutcomeKind::Victory => "victory",
+        CombatOutcomeKind::Defeat => "defeat",
+        CombatOutcomeKind::Draw => "draw",
+        CombatOutcomeKind::ExplicitEnd => "explicitEnd",
+    }
 }
 
 pub(crate) fn action_resource_kind(kind: ActionResourceKind) -> &'static str {

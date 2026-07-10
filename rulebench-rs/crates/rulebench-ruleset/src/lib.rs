@@ -316,12 +316,45 @@ impl ActionResolutionTargetingPolicy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TurnControlModuleConfiguration {
     pub turn_order_policy: TurnOrderPolicy,
+    pub combat_end_policy: CombatEndPolicy,
 }
 
 impl TurnControlModuleConfiguration {
     pub const fn explicit_turn_order() -> Self {
         Self {
             turn_order_policy: TurnOrderPolicy::Explicit,
+            combat_end_policy: CombatEndPolicy::LastSideStanding,
+        }
+    }
+
+    pub const fn explicit_turn_order_with_end_policy(combat_end_policy: CombatEndPolicy) -> Self {
+        Self {
+            turn_order_policy: TurnOrderPolicy::Explicit,
+            combat_end_policy,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CombatEndPolicy {
+    LastSideStanding,
+    ObjectiveSideVictory { side_id: String },
+    ExplicitOnly,
+}
+
+impl CombatEndPolicy {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            CombatEndPolicy::LastSideStanding => "lastSideStanding",
+            CombatEndPolicy::ObjectiveSideVictory { .. } => "objectiveSideVictory",
+            CombatEndPolicy::ExplicitOnly => "explicitOnly",
+        }
+    }
+
+    pub fn objective_side_id(&self) -> Option<&str> {
+        match self {
+            CombatEndPolicy::ObjectiveSideVictory { side_id } => Some(side_id),
+            CombatEndPolicy::LastSideStanding | CombatEndPolicy::ExplicitOnly => None,
         }
     }
 }
@@ -909,9 +942,10 @@ impl ModifierTenure {
 mod tests {
     use super::{
         validate_rule_modules, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
-        DamageEffectOperation, EffectOperationId, HealingEffectOperation, HitEffect,
-        HitEffectOperation, ModifierEffectOperation, ModifierTenure, RuleModuleConfiguration,
-        RuleModuleDeclaration, RuleModuleId, TurnControlModuleConfiguration,
+        CombatEndPolicy, DamageEffectOperation, EffectOperationId, HealingEffectOperation,
+        HitEffect, HitEffectOperation, ModifierEffectOperation, ModifierTenure,
+        RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
+        TurnControlModuleConfiguration,
     };
 
     #[test]
@@ -1091,6 +1125,19 @@ mod tests {
                 .unwrap_err()
                 .code(),
             "ruleModuleConfigurationMismatch"
+        );
+    }
+
+    #[test]
+    fn combat_end_policy_codes_are_stable() {
+        assert_eq!(CombatEndPolicy::LastSideStanding.code(), "lastSideStanding");
+        assert_eq!(CombatEndPolicy::ExplicitOnly.code(), "explicitOnly");
+        assert_eq!(
+            CombatEndPolicy::ObjectiveSideVictory {
+                side_id: "heroes".to_string(),
+            }
+            .code(),
+            "objectiveSideVictory"
         );
     }
 }

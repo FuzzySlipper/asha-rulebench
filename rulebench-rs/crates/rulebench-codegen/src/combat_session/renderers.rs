@@ -194,6 +194,12 @@ pub(crate) fn render_script_readout(readout: &CombatSessionScriptReadout) -> Str
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalization: ");
+    out.push_str(&render_optional_combat_finalization(
+        readout.final_snapshot.finalization.as_ref(),
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      lifecycleTransitionLog: [\n");
     for entry in &readout.final_snapshot.lifecycle_transition_log {
         out.push_str(&render_lifecycle_transition_entry(entry, "        "));
@@ -353,6 +359,12 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalization: ");
+    out.push_str(&render_optional_combat_finalization(
+        readout.final_snapshot.finalization.as_ref(),
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      combatLog: [\n");
     for entry in &readout.final_snapshot.combat_log {
         out.push_str(&render_log_entry(entry, "        "));
@@ -450,6 +462,10 @@ pub(crate) fn render_automatic_run_replay_readout(
     out.push_str(&format!(
         "      finalStateFingerprintMatches: {},\n",
         readout.final_state_fingerprint_matches
+    ));
+    out.push_str(&format!(
+        "      finalizationMatches: {},\n",
+        readout.finalization_matches
     ));
     out.push_str(&format!(
         "      expectedRunDecisionKind: {},\n",

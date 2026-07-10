@@ -6,7 +6,7 @@ use crate::{
 };
 use rulebench_ruleset::{
     ActionDefinition, ActionResourceRefreshPolicy, AttackCheckDeclaration, CheckDeclaration,
-    ContestedCheckDeclaration, ModifierTenure, RuleModuleValidationError,
+    CombatEndPolicy, ContestedCheckDeclaration, ModifierTenure, RuleModuleValidationError,
     SavingThrowCheckDeclaration, TargetKind, TargetSelection,
 };
 
@@ -111,6 +111,28 @@ fn validate_rulesets(scenario: &RulebenchScenario, diagnostics: &mut Vec<Content
                 scenario.selected_ruleset_id
             ),
         ));
+    }
+
+    if let Some(side_id) = scenario
+        .selected_ruleset()
+        .and_then(|ruleset| ruleset.validate_modules().ok())
+        .and_then(|registry| registry.turn_control().cloned())
+        .and_then(|configuration| match configuration.combat_end_policy {
+            CombatEndPolicy::ObjectiveSideVictory { side_id } => Some(side_id),
+            CombatEndPolicy::LastSideStanding | CombatEndPolicy::ExplicitOnly => None,
+        })
+    {
+        if scenario
+            .combatants
+            .iter()
+            .all(|combatant| combatant.side_id != side_id)
+        {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::MissingCombatEndObjectiveSide,
+                Some(side_id.clone()),
+                format!("Combat end policy references missing side {side_id}."),
+            ));
+        }
     }
 }
 
@@ -600,6 +622,13 @@ fn validate_combatant_class_and_stat_references(
                 ContentDiagnosticCode::DuplicateCombatantId,
                 Some(combatant.id.clone()),
                 format!("Combatant id {} appears more than once.", combatant.id),
+            ));
+        }
+        if combatant.side_id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyCombatantSide,
+                Some(combatant.id.clone()),
+                format!("Combatant {} has an empty side id.", combatant.id),
             ));
         }
         if scenario.entity_by_id(&combatant.entity_id).is_none() {

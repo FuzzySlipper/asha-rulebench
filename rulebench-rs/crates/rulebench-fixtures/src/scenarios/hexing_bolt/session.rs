@@ -40,6 +40,7 @@ fn hexing_bolt_bounded_automatic_run_replay_readout() -> CombatSessionAutomaticR
         hexing_bolt_fixture_scenario(),
         run_spec,
         run_readout.final_snapshot.current_state_fingerprint,
+        run_readout.final_snapshot.finalization,
         run_readout.decision_kind,
         run_readout.executed_step_count,
         run_readout.policy_decisions,

@@ -1,5 +1,23 @@
 use super::super::test_support::*;
 
+fn scenario_with_end_policy(policy: CombatEndPolicy) -> RulebenchScenario {
+    let mut scenario = turn_control_fixture_scenario();
+    scenario.rulesets[0].modules[1] = RuleModuleDeclaration::turn_control(
+        TurnControlModuleConfiguration::explicit_turn_order_with_end_policy(policy),
+    );
+    scenario
+}
+
+fn set_hit_points(scenario: &mut RulebenchScenario, combatant_id: &str, current: i32) {
+    scenario
+        .combatants
+        .iter_mut()
+        .find(|combatant| combatant.id == combatant_id)
+        .expect("combatant exists")
+        .hit_points
+        .current = current;
+}
+
 #[test]
 fn session_runtime_current_turn_action_usage_summarizes_accepted_hit() {
     let mut session =
@@ -128,7 +146,7 @@ fn session_runtime_combat_end_condition_reads_ongoing_combat() {
     assert_eq!(readout.defeated_enemy_count, 0);
     assert_eq!(
         readout.reason,
-        "Combat can continue because both sides have active combatants."
+        "Combat can continue because multiple configured sides have active combatants."
     );
     assert_eq!(session.snapshot().combat_end_condition, readout);
 }
@@ -613,4 +631,102 @@ fn session_runtime_accumulates_audit_entries_separately_from_combat_log() {
             .collect::<Vec<_>>(),
         vec![4, 2, 0]
     );
+}
+
+#[test]
+fn combat_end_policy_reports_stable_multi_side_winner_and_defeated_sides() {
+    let mut scenario = scenario_with_end_policy(CombatEndPolicy::LastSideStanding);
+    let mut mercenary = scenario.combatants[1].clone();
+    mercenary.id = "entity-mercenary".to_string();
+    mercenary.entity_id = "entity-mercenary".to_string();
+    mercenary.side_id = "mercenary".to_string();
+    mercenary.initiative = 1;
+    scenario.combatants.push(mercenary);
+    set_hit_points(&mut scenario, "entity-adept", 0);
+    set_hit_points(&mut scenario, "entity-raider", 0);
+
+    let session = CombatSessionState::new("multi-side-end", scenario);
+    let condition = session.combat_end_condition();
+
+    assert!(condition.combat_should_end);
+    assert_eq!(
+        condition.condition_kind,
+        CombatEndConditionKind::LastSideStanding
+    );
+    assert_eq!(condition.outcome_kind, CombatOutcomeKind::Victory);
+    assert_eq!(condition.active_sides, vec!["mercenary".to_string()]);
+    assert_eq!(
+        condition.defeated_sides,
+        vec!["ally".to_string(), "enemy".to_string()]
+    );
+    assert_eq!(condition.winning_sides, vec!["mercenary".to_string()]);
+}
+
+#[test]
+fn combat_end_policy_reports_draw_when_all_sides_fall_simultaneously() {
+    let mut scenario = scenario_with_end_policy(CombatEndPolicy::LastSideStanding);
+    set_hit_points(&mut scenario, "entity-adept", 0);
+    set_hit_points(&mut scenario, "entity-raider", 0);
+    let mut session = CombatSessionState::new("simultaneous-end", scenario);
+
+    let readout = session.submit_control_command(CombatControlCommandSpec::end_if_condition_met());
+    let finalization = session.finalization().expect("draw finalizes");
+
+    assert!(readout.accepted);
+    assert_eq!(finalization.outcome_kind, CombatOutcomeKind::Draw);
+    assert!(finalization.winning_sides.is_empty());
+    assert!(finalization.remaining_sides.is_empty());
+    assert_eq!(
+        finalization.end_condition.condition_kind,
+        CombatEndConditionKind::NoActiveCombatants
+    );
+}
+
+#[test]
+fn objective_side_policy_distinguishes_victory_and_defeat() {
+    let policy = CombatEndPolicy::ObjectiveSideVictory {
+        side_id: "ally".to_string(),
+    };
+    let mut victory_scenario = scenario_with_end_policy(policy.clone());
+    set_hit_points(&mut victory_scenario, "entity-raider", 0);
+    let victory =
+        CombatSessionState::new("objective-victory", victory_scenario).combat_end_condition();
+
+    let mut defeat_scenario = scenario_with_end_policy(policy);
+    set_hit_points(&mut defeat_scenario, "entity-adept", 0);
+    let defeat =
+        CombatSessionState::new("objective-defeat", defeat_scenario).combat_end_condition();
+
+    assert_eq!(victory.outcome_kind, CombatOutcomeKind::Victory);
+    assert_eq!(victory.winning_sides, vec!["ally".to_string()]);
+    assert_eq!(
+        victory.condition_kind,
+        CombatEndConditionKind::ObjectiveSideVictory
+    );
+    assert_eq!(defeat.outcome_kind, CombatOutcomeKind::Defeat);
+    assert_eq!(defeat.winning_sides, vec!["enemy".to_string()]);
+    assert_eq!(
+        defeat.condition_kind,
+        CombatEndConditionKind::ObjectiveSideDefeated
+    );
+}
+
+#[test]
+fn explicit_only_policy_requires_manual_finalization_and_is_idempotent() {
+    let mut scenario = scenario_with_end_policy(CombatEndPolicy::ExplicitOnly);
+    set_hit_points(&mut scenario, "entity-raider", 0);
+    let mut session = CombatSessionState::new("explicit-only-end", scenario);
+
+    assert!(!session.combat_end_condition().combat_should_end);
+    let first = session.submit_control_command(CombatControlCommandSpec::explicit_end());
+    let finalized = session.snapshot();
+    let repeated = session.submit_control_command(CombatControlCommandSpec::explicit_end());
+
+    assert!(first.accepted);
+    assert!(!repeated.accepted);
+    assert_eq!(session.snapshot(), finalized);
+    let finalization = finalized.finalization.expect("explicit end finalization");
+    assert_eq!(finalization.outcome_kind, CombatOutcomeKind::ExplicitEnd);
+    assert!(finalization.winning_sides.is_empty());
+    assert_eq!(finalization.remaining_sides, vec!["ally".to_string()]);
 }

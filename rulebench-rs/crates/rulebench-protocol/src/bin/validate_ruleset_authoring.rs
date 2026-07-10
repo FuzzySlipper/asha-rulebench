@@ -56,6 +56,8 @@ fn parse_module(value: &str) -> Result<RuleModuleDeclarationDto, String> {
         },
         "turnControl" => RuleModuleConfigurationDto::TurnControl {
             turn_order_policy: configuration.to_string(),
+            combat_end_policy: "lastSideStanding".to_string(),
+            objective_side: None,
         },
         _ => RuleModuleConfigurationDto::ActionResolution {
             targeting_policy: configuration.to_string(),

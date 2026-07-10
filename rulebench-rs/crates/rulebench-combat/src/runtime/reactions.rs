@@ -328,6 +328,9 @@ impl CombatSessionState {
             );
             true
         } else {
+            if self.reaction_window_stack.is_empty() {
+                self.finalize_if_condition_met();
+            }
             false
         }
     }
@@ -351,6 +354,7 @@ impl CombatSessionState {
             None,
             "Pending action effects and resource costs resumed after the root reaction window.",
         );
+        self.finalize_if_condition_met();
     }
 
     fn rejected_reaction_command(
@@ -367,17 +371,19 @@ impl CombatSessionState {
             "Reaction response rejected.",
             reason.clone(),
         )];
-        self.reaction_audit_log.push(ReactionAuditEntry {
-            sequence: self.reaction_audit_log.len() as u32,
-            window_id: command.window_id.clone(),
-            reactor_id: command.reactor_id.clone(),
-            response_kind: command.response_kind,
-            option_id: command.option_id.clone(),
-            accepted: false,
-            decision_kind,
-            trace: trace.clone(),
-            reason: reason.clone(),
-        });
+        if self.lifecycle.phase != CombatLifecyclePhase::Ended {
+            self.reaction_audit_log.push(ReactionAuditEntry {
+                sequence: self.reaction_audit_log.len() as u32,
+                window_id: command.window_id.clone(),
+                reactor_id: command.reactor_id.clone(),
+                response_kind: command.response_kind,
+                option_id: command.option_id.clone(),
+                accepted: false,
+                decision_kind,
+                trace: trace.clone(),
+                reason: reason.clone(),
+            });
+        }
         ReactionCommandReadout {
             command,
             accepted: false,

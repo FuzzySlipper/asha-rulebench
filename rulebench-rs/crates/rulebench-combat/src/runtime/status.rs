@@ -1,6 +1,7 @@
 //! Combat session status, audit, and snapshot readbacks.
 
 use super::*;
+use std::collections::BTreeMap;
 
 impl CombatSessionState {
     pub fn combat_log(&self) -> &[CombatLogEntry] {
@@ -140,6 +141,7 @@ impl CombatSessionState {
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
             combat_end_condition: combat_end_condition_readout(&current_scenario),
+            finalization: self.finalization.clone(),
             current_actor_options: current_actor_option_summary(
                 &self.lifecycle,
                 &self.turn_order,
@@ -224,9 +226,15 @@ fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndCondit
     let mut active_enemy_count = 0;
     let mut defeated_ally_count = 0;
     let mut defeated_enemy_count = 0;
+    let mut side_totals = BTreeMap::<String, u32>::new();
+    let mut side_active = BTreeMap::<String, u32>::new();
 
     for combatant in &scenario.combatants {
         let defeated = combatant.hit_points.current <= 0;
+        *side_totals.entry(combatant.side_id.clone()).or_default() += 1;
+        if !defeated {
+            *side_active.entry(combatant.side_id.clone()).or_default() += 1;
+        }
         match (combatant.team, defeated) {
             (Team::Ally, false) => active_ally_count += 1,
             (Team::Ally, true) => defeated_ally_count += 1,
@@ -235,31 +243,113 @@ fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndCondit
         }
     }
 
-    let condition_kind = if active_ally_count == 0 && active_enemy_count == 0 {
-        CombatEndConditionKind::NoActiveCombatants
-    } else if active_enemy_count == 0 {
-        CombatEndConditionKind::NoActiveEnemies
-    } else if active_ally_count == 0 {
-        CombatEndConditionKind::NoActiveAllies
-    } else {
-        CombatEndConditionKind::Ongoing
+    let policy = scenario
+        .selected_ruleset()
+        .and_then(|ruleset| ruleset.validate_modules().ok())
+        .and_then(|registry| registry.turn_control().cloned())
+        .map(|configuration| configuration.combat_end_policy)
+        .unwrap_or(rulebench_ruleset::CombatEndPolicy::LastSideStanding);
+    let active_sides = side_totals
+        .keys()
+        .filter(|side_id| side_active.get(*side_id).copied().unwrap_or_default() > 0)
+        .cloned()
+        .collect::<Vec<_>>();
+    let defeated_sides = side_totals
+        .keys()
+        .filter(|side_id| side_active.get(*side_id).copied().unwrap_or_default() == 0)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let (condition_kind, outcome_kind, winning_sides) = match &policy {
+        rulebench_ruleset::CombatEndPolicy::ExplicitOnly => (
+            CombatEndConditionKind::ExplicitOnly,
+            CombatOutcomeKind::Ongoing,
+            Vec::new(),
+        ),
+        rulebench_ruleset::CombatEndPolicy::LastSideStanding => {
+            let condition_kind = match active_sides.as_slice() {
+                [] => CombatEndConditionKind::NoActiveCombatants,
+                [side_id] if side_id == "ally" => CombatEndConditionKind::NoActiveEnemies,
+                [side_id] if side_id == "enemy" => CombatEndConditionKind::NoActiveAllies,
+                [_] => CombatEndConditionKind::LastSideStanding,
+                _ => CombatEndConditionKind::Ongoing,
+            };
+            let outcome_kind = match active_sides.len() {
+                0 => CombatOutcomeKind::Draw,
+                1 => CombatOutcomeKind::Victory,
+                _ => CombatOutcomeKind::Ongoing,
+            };
+            let winning_sides = if outcome_kind == CombatOutcomeKind::Victory {
+                active_sides.clone()
+            } else {
+                Vec::new()
+            };
+            (condition_kind, outcome_kind, winning_sides)
+        }
+        rulebench_ruleset::CombatEndPolicy::ObjectiveSideVictory { side_id } => {
+            let objective_active = side_active.get(side_id).copied().unwrap_or_default();
+            let opposing_active = active_sides
+                .iter()
+                .filter(|active_side_id| *active_side_id != side_id)
+                .count();
+            let outcome_kind = if objective_active == 0 && opposing_active == 0 {
+                CombatOutcomeKind::Draw
+            } else if objective_active > 0 && opposing_active == 0 {
+                CombatOutcomeKind::Victory
+            } else if objective_active == 0 && opposing_active > 0 {
+                CombatOutcomeKind::Defeat
+            } else {
+                CombatOutcomeKind::Ongoing
+            };
+            let condition_kind = match outcome_kind {
+                CombatOutcomeKind::Victory => CombatEndConditionKind::ObjectiveSideVictory,
+                CombatOutcomeKind::Defeat => CombatEndConditionKind::ObjectiveSideDefeated,
+                CombatOutcomeKind::Draw => CombatEndConditionKind::NoActiveCombatants,
+                CombatOutcomeKind::Ongoing | CombatOutcomeKind::ExplicitEnd => {
+                    CombatEndConditionKind::Ongoing
+                }
+            };
+            let winning_sides = match outcome_kind {
+                CombatOutcomeKind::Victory => vec![side_id.clone()],
+                CombatOutcomeKind::Defeat => active_sides.clone(),
+                CombatOutcomeKind::Ongoing
+                | CombatOutcomeKind::Draw
+                | CombatOutcomeKind::ExplicitEnd => Vec::new(),
+            };
+            (condition_kind, outcome_kind, winning_sides)
+        }
     };
+    let combat_should_end = outcome_kind != CombatOutcomeKind::Ongoing;
+    let reason = combat_end_condition_reason(&policy, condition_kind, outcome_kind);
 
     CombatEndConditionReadout {
-        combat_should_end: condition_kind != CombatEndConditionKind::Ongoing,
+        policy,
+        combat_should_end,
         condition_kind,
+        outcome_kind,
+        active_sides,
+        defeated_sides,
+        winning_sides,
         active_ally_count,
         active_enemy_count,
         defeated_ally_count,
         defeated_enemy_count,
-        reason: combat_end_condition_reason(condition_kind),
+        reason,
     }
 }
 
-fn combat_end_condition_reason(kind: CombatEndConditionKind) -> String {
-    match kind {
+fn combat_end_condition_reason(
+    policy: &rulebench_ruleset::CombatEndPolicy,
+    kind: CombatEndConditionKind,
+    outcome: CombatOutcomeKind,
+) -> String {
+    if policy == &rulebench_ruleset::CombatEndPolicy::ExplicitOnly {
+        return "Combat continues until an explicit end command under the configured policy."
+            .to_string();
+    }
+    let base = match kind {
         CombatEndConditionKind::Ongoing => {
-            "Combat can continue because both sides have active combatants."
+            "Combat can continue because multiple configured sides have active combatants."
         }
         CombatEndConditionKind::NoActiveEnemies => {
             "Combat should end because no active enemies remain."
@@ -270,8 +360,30 @@ fn combat_end_condition_reason(kind: CombatEndConditionKind) -> String {
         CombatEndConditionKind::NoActiveCombatants => {
             "Combat should end because no active combatants remain."
         }
+        CombatEndConditionKind::ExplicitOnly => {
+            "Combat continues until an explicit end command under the configured policy."
+        }
+        CombatEndConditionKind::ExplicitEnd => {
+            "Combat should end because authority received an explicit end command."
+        }
+        CombatEndConditionKind::LastSideStanding => {
+            "Combat should end because one configured side remains active."
+        }
+        CombatEndConditionKind::ObjectiveSideVictory => {
+            "Combat should end because the configured objective side is the only active side."
+        }
+        CombatEndConditionKind::ObjectiveSideDefeated => {
+            "Combat should end because the configured objective side has been defeated."
+        }
+    };
+    if matches!(
+        policy,
+        rulebench_ruleset::CombatEndPolicy::ObjectiveSideVictory { .. }
+    ) {
+        format!("{base} Configured objective outcome: {}.", outcome.code())
+    } else {
+        base.to_string()
     }
-    .to_string()
 }
 
 fn current_actor_option_summary(

@@ -1266,3 +1266,39 @@ fn generated_content_validation_readouts_include_clean_and_invalid_reports() {
         Some("item.missing-focus".to_string())
     );
 }
+
+#[test]
+fn content_diagnostics_reject_empty_combat_side_identity() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[0].side_id.clear();
+
+    let report = validate_scenario_content_report(&scenario);
+
+    assert!(!report.accepted);
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::EmptyCombatantSide));
+}
+
+#[test]
+fn content_diagnostics_reject_missing_objective_side() {
+    let mut scenario = turn_control_fixture_scenario();
+    scenario.rulesets[0].modules[1] = RuleModuleDeclaration::turn_control(
+        TurnControlModuleConfiguration::explicit_turn_order_with_end_policy(
+            CombatEndPolicy::ObjectiveSideVictory {
+                side_id: "missing-side".to_string(),
+            },
+        ),
+    );
+
+    let report = validate_scenario_content_report(&scenario);
+
+    assert!(!report.accepted);
+    let diagnostic = report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == ContentDiagnosticCode::MissingCombatEndObjectiveSide)
+        .expect("missing objective side diagnostic");
+    assert_eq!(diagnostic.content_id.as_deref(), Some("missing-side"));
+}

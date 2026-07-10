@@ -97,6 +97,8 @@ pub enum ContentDiagnosticCode {
     SelectedItemMissingFromCatalog,
     MissingCombatantEntity,
     EmptyCombatantId,
+    EmptyCombatantSide,
+    MissingCombatEndObjectiveSide,
     DuplicateCombatantId,
     MissingActionAbility,
     MissingActionAbilityGrant,
@@ -224,6 +226,8 @@ impl ContentDiagnosticCode {
             }
             ContentDiagnosticCode::MissingCombatantEntity => "missingCombatantEntity",
             ContentDiagnosticCode::EmptyCombatantId => "emptyCombatantId",
+            ContentDiagnosticCode::EmptyCombatantSide => "emptyCombatantSide",
+            ContentDiagnosticCode::MissingCombatEndObjectiveSide => "missingCombatEndObjectiveSide",
             ContentDiagnosticCode::DuplicateCombatantId => "duplicateCombatantId",
             ContentDiagnosticCode::MissingActionAbility => "missingActionAbility",
             ContentDiagnosticCode::MissingActionAbilityGrant => "missingActionAbilityGrant",

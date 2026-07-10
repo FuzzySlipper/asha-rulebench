@@ -2,6 +2,8 @@ import type {
   RulebenchActionResolutionModuleConfigurationDto,
   RulebenchActionResolutionTargetingPolicyDto,
   RulebenchCheckHandlerKindDto,
+  RulebenchCombatEndPolicyKindDto,
+  RulebenchCombatSideIdDto,
   RulebenchRuleModuleDeclarationDto,
   RulebenchRulesetDefinitionDto,
   RulebenchTurnControlModuleConfigurationDto,
@@ -25,6 +27,8 @@ export interface ActionResolutionModuleOptions {
 export interface TurnControlModuleOptions {
   readonly version?: string;
   readonly turnOrderPolicy?: RulebenchTurnOrderPolicyDto;
+  readonly combatEndPolicy?: RulebenchCombatEndPolicyKindDto;
+  readonly objectiveSide?: RulebenchCombatSideIdDto | null;
 }
 
 export function authorRulesetDefinition(options: RulesetDefinitionOptions): RulebenchRulesetDefinitionDto {
@@ -58,6 +62,8 @@ export function authorTurnControlModule(
   const configuration: RulebenchTurnControlModuleConfigurationDto = {
     module: 'turnControl',
     turnOrderPolicy: options.turnOrderPolicy ?? 'explicit',
+    combatEndPolicy: options.combatEndPolicy ?? 'lastSideStanding',
+    objectiveSide: options.objectiveSide ?? null,
   };
   return {
     module: 'turnControl',

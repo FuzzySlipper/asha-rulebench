@@ -48,6 +48,7 @@ pub use rulebench_replay::{
     verify_automatic_run_replay, CombatSessionAutomaticRunReplayDecisionKind,
     CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec,
 };
+pub use rulebench_ruleset::CombatEndPolicy;
 
 #[cfg(test)]
 mod tests {

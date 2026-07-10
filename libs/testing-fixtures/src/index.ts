@@ -30,6 +30,7 @@ export const twoCombatantScenarioReadout: RulebenchScenarioReadoutDto = {
       id: 'entity-adept',
       name: 'Adept',
       team: 'ally',
+      sideId: 'ally',
       position: { x: 1, y: 1 },
       hitPoints: { current: 24, max: 24 },
       defenses: [
@@ -43,6 +44,7 @@ export const twoCombatantScenarioReadout: RulebenchScenarioReadoutDto = {
       id: 'entity-raider',
       name: 'Raider',
       team: 'enemy',
+      sideId: 'enemy',
       position: { x: 4, y: 1 },
       hitPoints: { current: 9, max: 18 },
       defenses: [

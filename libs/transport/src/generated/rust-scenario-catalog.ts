@@ -134,6 +134,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-adept',
           name: 'Adept',
           team: 'ally',
+          sideId: 'ally',
           position: { x: 1, y: 1 },
           hitPoints: { current: 24, max: 24 },
           defenses: [
@@ -147,6 +148,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-raider',
           name: 'Raider',
           team: 'enemy',
+          sideId: 'enemy',
           position: { x: 4, y: 1 },
           hitPoints: { current: 9, max: 18 },
           defenses: [
@@ -285,6 +287,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-adept',
           name: 'Adept',
           team: 'ally',
+          sideId: 'ally',
           position: { x: 1, y: 1 },
           hitPoints: { current: 24, max: 24 },
           defenses: [
@@ -298,6 +301,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-raider',
           name: 'Raider',
           team: 'enemy',
+          sideId: 'enemy',
           position: { x: 4, y: 1 },
           hitPoints: { current: 18, max: 18 },
           defenses: [
@@ -417,6 +421,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-adept',
           name: 'Adept',
           team: 'ally',
+          sideId: 'ally',
           position: { x: 1, y: 1 },
           hitPoints: { current: 24, max: 24 },
           defenses: [
@@ -430,6 +435,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-raider',
           name: 'Raider',
           team: 'enemy',
+          sideId: 'enemy',
           position: { x: 4, y: 1 },
           hitPoints: { current: 18, max: 18 },
           defenses: [
@@ -523,6 +529,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-adept',
           name: 'Adept',
           team: 'ally',
+          sideId: 'ally',
           position: { x: 1, y: 1 },
           hitPoints: { current: 24, max: 24 },
           defenses: [
@@ -536,6 +543,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-raider',
           name: 'Raider',
           team: 'enemy',
+          sideId: 'enemy',
           position: { x: 4, y: 1 },
           hitPoints: { current: 9, max: 18 },
           defenses: [
@@ -674,6 +682,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-veteran-adept',
           name: 'Veteran Adept',
           team: 'ally',
+          sideId: 'ally',
           position: { x: 1, y: 2 },
           hitPoints: { current: 30, max: 30 },
           defenses: [
@@ -687,6 +696,7 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
           id: 'entity-raider',
           name: 'Raider',
           team: 'enemy',
+          sideId: 'enemy',
           position: { x: 4, y: 1 },
           hitPoints: { current: 9, max: 18 },
           defenses: [

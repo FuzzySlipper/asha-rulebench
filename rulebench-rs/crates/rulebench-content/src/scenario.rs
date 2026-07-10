@@ -23,6 +23,7 @@ pub struct Combatant {
     pub entity_id: String,
     pub name: String,
     pub team: Team,
+    pub side_id: String,
     pub initiative: i32,
     pub position: GridPosition,
     pub hit_points: BoundedValue,

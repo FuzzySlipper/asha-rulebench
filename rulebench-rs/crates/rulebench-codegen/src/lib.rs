@@ -77,4 +77,26 @@ mod tests {
     fn combat_session_renderer_matches_the_committed_artifact() {
         assert_eq!(render_combat_session_catalog(), GENERATED_COMBAT_SESSION);
     }
+
+    #[test]
+    fn combat_session_renderer_exposes_immutable_finalization_readbacks() {
+        let rendered = render_combat_session_catalog();
+
+        assert!(rendered.contains("finalization: {"));
+        assert!(rendered.contains("outcomeKind: 'victory'"));
+        assert!(rendered.contains("winningSides: ['ally']"));
+        assert!(rendered.contains("remainingSides: ['ally']"));
+        assert!(rendered.contains("finalStateFingerprint: { algorithm:"));
+    }
+
+    #[test]
+    fn catalog_renderers_expose_combat_side_ids() {
+        let scenario_catalog = render_scenario_catalog();
+        let combat_session_catalog = render_combat_session_catalog();
+
+        assert!(scenario_catalog.contains("sideId: 'ally'"));
+        assert!(scenario_catalog.contains("sideId: 'enemy'"));
+        assert!(combat_session_catalog.contains("sideId: 'ally'"));
+        assert!(combat_session_catalog.contains("sideId: 'enemy'"));
+    }
 }

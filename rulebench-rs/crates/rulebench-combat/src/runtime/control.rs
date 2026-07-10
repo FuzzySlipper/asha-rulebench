@@ -13,7 +13,7 @@ impl CombatSessionState {
 
     pub fn end_combat(&mut self) {
         if self.current_reaction_window().is_none() {
-            self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
+            self.finalize_explicitly();
         }
     }
 
@@ -21,15 +21,18 @@ impl CombatSessionState {
         &mut self,
         spec: CombatControlCommandSpec,
     ) -> CombatControlReadout {
+        let combat_was_ended = self.lifecycle.phase == CombatLifecyclePhase::Ended;
         let readout = match spec.kind {
             CombatControlCommandKind::ExplicitStart => self.submit_explicit_start_control(),
             CombatControlCommandKind::ExplicitEnd => self.submit_explicit_end_control(),
             CombatControlCommandKind::AdvanceTurn => self.submit_advance_turn_control(),
             CombatControlCommandKind::EndIfConditionMet => self.submit_conditional_end_control(),
         };
-        let history_entry =
-            combat_control_history_entry(self.control_history.len() as u32, &readout);
-        self.control_history.push(history_entry);
+        if !combat_was_ended {
+            let history_entry =
+                combat_control_history_entry(self.control_history.len() as u32, &readout);
+            self.control_history.push(history_entry);
+        }
         readout
     }
 
@@ -135,14 +138,6 @@ impl CombatSessionState {
         }
     }
 
-    fn end_lifecycle(&mut self, trigger: LifecycleTransitionTrigger) {
-        let previous_lifecycle = self.lifecycle.clone();
-        self.lifecycle.end_at_step(self.next_step_index);
-        self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
-        let expirations = self.state.expire_all_modifiers_for_event("combatEnd");
-        self.record_modifier_event_expiration_transitions("combatEnd", &expirations);
-    }
-
     fn submit_explicit_start_control(&mut self) -> CombatControlReadout {
         let previous_lifecycle = self.lifecycle.clone();
         let previous_turn_order = self.turn_order.clone();
@@ -207,7 +202,7 @@ impl CombatSessionState {
                 "Combat is already ended.",
             )
         } else {
-            self.end_lifecycle(LifecycleTransitionTrigger::ExplicitEnd);
+            self.finalize_explicitly();
             (
                 true,
                 CombatControlDecisionKind::Accepted,
@@ -252,7 +247,7 @@ impl CombatSessionState {
                 "Combat is already ended.".to_string(),
             )
         } else if end_condition.combat_should_end {
-            self.end_lifecycle(LifecycleTransitionTrigger::ConditionalEnd);
+            self.finalize_conditionally(end_condition.clone());
             (
                 true,
                 CombatControlDecisionKind::Accepted,

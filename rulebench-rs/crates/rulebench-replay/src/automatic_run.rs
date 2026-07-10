@@ -3,10 +3,10 @@
 use rulebench_combat::RulebenchScenario;
 use rulebench_combat::{
     ActionResourceTransitionEntry, ClassBuildLedgerReadout, CombatAutomationPolicyDecisionEvidence,
-    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunSpec, CombatSessionState, EquipmentLedgerReadout,
-    EquipmentTransitionEntry, ModifierDurationExpirationEntry, ReactionAuditEntry,
-    ReactionWindowLifecycleEntry,
+    CombatFinalizationReadout, CombatSessionAutomaticRunDecisionKind,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec, CombatSessionState,
+    EquipmentLedgerReadout, EquipmentTransitionEntry, ModifierDurationExpirationEntry,
+    ReactionAuditEntry, ReactionWindowLifecycleEntry,
 };
 use rulebench_core::StateFingerprint;
 
@@ -19,6 +19,7 @@ pub struct CombatSessionAutomaticRunReplaySpec {
     pub initial_scenario: RulebenchScenario,
     pub run: CombatSessionAutomaticRunSpec,
     pub expected_final_state_fingerprint: StateFingerprint,
+    pub expected_finalization: Option<CombatFinalizationReadout>,
     pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub expected_executed_step_count: u32,
     pub expected_policy_decisions: Vec<CombatAutomationPolicyDecisionEvidence>,
@@ -40,6 +41,7 @@ impl CombatSessionAutomaticRunReplaySpec {
         initial_scenario: RulebenchScenario,
         run: CombatSessionAutomaticRunSpec,
         expected_final_state_fingerprint: StateFingerprint,
+        expected_finalization: Option<CombatFinalizationReadout>,
         expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
         expected_executed_step_count: u32,
         expected_policy_decisions: Vec<CombatAutomationPolicyDecisionEvidence>,
@@ -59,6 +61,7 @@ impl CombatSessionAutomaticRunReplaySpec {
             initial_scenario,
             run,
             expected_final_state_fingerprint,
+            expected_finalization,
             expected_run_decision_kind,
             expected_executed_step_count,
             expected_policy_decisions,
@@ -98,6 +101,7 @@ pub struct CombatSessionAutomaticRunReplayReadout {
     pub expected_final_state_fingerprint: StateFingerprint,
     pub actual_final_state_fingerprint: StateFingerprint,
     pub final_state_fingerprint_matches: bool,
+    pub finalization_matches: bool,
     pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub actual_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub run_decision_kind_matches: bool,
@@ -131,6 +135,8 @@ pub fn verify_automatic_run_replay(
 
     let final_state_fingerprint_matches =
         actual_final_state_fingerprint == spec.expected_final_state_fingerprint;
+    let finalization_matches =
+        replayed_run.final_snapshot.finalization == spec.expected_finalization;
     let run_decision_kind_matches = actual_run_decision_kind == spec.expected_run_decision_kind;
     let executed_step_count_matches =
         actual_executed_step_count == spec.expected_executed_step_count;
@@ -153,6 +159,7 @@ pub fn verify_automatic_run_replay(
         replayed_run.final_snapshot.modifier_duration_expiration_log
             == spec.expected_modifier_duration_expiration_log;
     let accepted = final_state_fingerprint_matches
+        && finalization_matches
         && run_decision_kind_matches
         && executed_step_count_matches
         && policy_decisions_match
@@ -184,6 +191,7 @@ pub fn verify_automatic_run_replay(
         expected_final_state_fingerprint: spec.expected_final_state_fingerprint,
         actual_final_state_fingerprint,
         final_state_fingerprint_matches,
+        finalization_matches,
         expected_run_decision_kind: spec.expected_run_decision_kind,
         actual_run_decision_kind,
         run_decision_kind_matches,
@@ -227,6 +235,7 @@ mod tests {
             scenario,
             run,
             expected.final_snapshot.current_state_fingerprint.clone(),
+            expected.final_snapshot.finalization.clone(),
             expected.decision_kind,
             expected.executed_step_count,
             expected.policy_decisions.clone(),
@@ -254,6 +263,7 @@ mod tests {
             CombatSessionAutomaticRunReplayDecisionKind::Verified
         );
         assert!(readout.final_state_fingerprint_matches);
+        assert!(readout.finalization_matches);
         assert!(readout.run_decision_kind_matches);
         assert!(readout.executed_step_count_matches);
         assert!(readout.policy_decisions_match);
@@ -267,9 +277,9 @@ mod tests {
     }
 
     #[test]
-    fn automatic_run_replay_reports_mismatched_roll_evidence_count() {
+    fn automatic_run_replay_rejects_mismatched_finalization_evidence() {
         let scenario = minimal_replay_scenario();
-        let run = zero_step_run();
+        let run = one_step_run();
         let expected = expected_run(scenario.clone(), run.clone());
 
         let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
@@ -280,8 +290,9 @@ mod tests {
             scenario,
             run,
             expected.final_snapshot.current_state_fingerprint.clone(),
+            None,
             expected.decision_kind,
-            expected.executed_step_count + 1,
+            expected.executed_step_count,
             expected.policy_decisions.clone(),
             expected
                 .final_snapshot
@@ -307,8 +318,9 @@ mod tests {
             CombatSessionAutomaticRunReplayDecisionKind::MismatchedEvidence
         );
         assert!(readout.final_state_fingerprint_matches);
+        assert!(!readout.finalization_matches);
         assert!(readout.run_decision_kind_matches);
-        assert!(!readout.executed_step_count_matches);
+        assert!(readout.executed_step_count_matches);
         assert!(readout.policy_decisions_match);
     }
 
@@ -326,6 +338,16 @@ mod tests {
             "Zero step",
             "Replay evidence without mutation.",
             0,
+            Vec::new(),
+        )
+    }
+
+    fn one_step_run() -> CombatSessionAutomaticRunSpec {
+        CombatSessionAutomaticRunSpec::new(
+            "one-step",
+            "One step",
+            "Replay finalization evidence.",
+            1,
             Vec::new(),
         )
     }

@@ -859,7 +859,7 @@ fn session_runtime_automatic_step_advances_turn_when_no_candidate_is_accepted() 
 }
 
 #[test]
-fn session_runtime_automatic_step_prioritizes_conditional_end_when_met() {
+fn session_runtime_lethal_candidate_finalizes_without_a_follow_up_end_step() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
     session.submit_auto_candidate_command(CombatSessionAutoCandidateCommandSpec::new(
@@ -886,15 +886,12 @@ fn session_runtime_automatic_step_prioritizes_conditional_end_when_met() {
     ));
     let after_plan = session.snapshot();
 
-    assert!(plan.accepted);
+    assert!(!plan.accepted);
     assert_eq!(
         plan.decision_kind,
-        CombatSessionAutomaticStepDecisionKind::ConditionalEnd
+        CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle
     );
-    assert_eq!(
-        plan.operation_kind,
-        Some(CombatSessionAutomaticStepOperationKind::ConditionalEnd)
-    );
+    assert_eq!(plan.operation_kind, None);
     assert_eq!(
         plan.combat_end_condition.condition_kind,
         CombatEndConditionKind::NoActiveEnemies
@@ -902,29 +899,14 @@ fn session_runtime_automatic_step_prioritizes_conditional_end_when_met() {
     assert_eq!(plan.auto_candidate_plan, None);
     assert_eq!(after_plan, before_plan);
 
-    let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
-        "auto-step-end",
-        "Auto step end",
-        "Rust conditionally ends combat when the end condition is met.",
-        vec![17, 5],
-    ));
-
-    assert_eq!(
-        execution.plan.decision_kind,
-        CombatSessionAutomaticStepDecisionKind::ConditionalEnd
-    );
-    assert_eq!(execution.auto_candidate, None);
-    let control = execution
-        .control
-        .as_ref()
-        .expect("conditional end step has control readout");
-    assert!(control.accepted);
-    assert_eq!(
-        control.command_kind,
-        CombatControlCommandKind::EndIfConditionMet
-    );
     assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
     assert_eq!(session.lifecycle_transition_log().len(), 2);
+    let finalization = session.finalization().expect("lethal command finalizes");
+    assert_eq!(
+        finalization.trigger,
+        LifecycleTransitionTrigger::ConditionalEnd
+    );
+    assert_eq!(finalization.outcome_kind, CombatOutcomeKind::Victory);
 }
 
 #[test]
@@ -959,7 +941,7 @@ fn session_runtime_automatic_step_can_be_invoked_until_combat_ends() {
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
     let mut decisions = Vec::new();
 
-    for index in 0..5 {
+    for index in 0..4 {
         let execution = session.submit_automatic_step(CombatSessionAutomaticStepSpec::new(
             format!("auto-step-{index}"),
             format!("Auto step {index}"),
@@ -976,13 +958,12 @@ fn session_runtime_automatic_step_can_be_invoked_until_combat_ends() {
             CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
             CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
             CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
-            CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
         ]
     );
     assert_eq!(session.lifecycle().phase, CombatLifecyclePhase::Ended);
     assert_eq!(session.combat_log().len(), 2);
     assert_eq!(session.audit_log().len(), 2);
-    assert_eq!(session.control_history().len(), 3);
+    assert_eq!(session.control_history().len(), 2);
     assert_eq!(
         session.snapshot().combat_end_condition.condition_kind,
         CombatEndConditionKind::NoActiveEnemies
@@ -1150,8 +1131,8 @@ fn session_runtime_automatic_run_completes_fixture_combat_within_bound() {
         readout.policy,
         CombatAutomationPolicySpec::first_accepted_candidate()
     );
-    assert_eq!(readout.executed_step_count, 5);
-    assert_eq!(readout.policy_decisions.len(), 5);
+    assert_eq!(readout.executed_step_count, 4);
+    assert_eq!(readout.policy_decisions.len(), 4);
     assert_eq!(
         readout
             .steps
@@ -1163,7 +1144,6 @@ fn session_runtime_automatic_run_completes_fixture_combat_within_bound() {
             CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
             CombatSessionAutomaticStepDecisionKind::AdvanceTurn,
             CombatSessionAutomaticStepDecisionKind::SubmitCandidate,
-            CombatSessionAutomaticStepDecisionKind::ConditionalEnd,
         ]
     );
     assert_eq!(
@@ -1172,7 +1152,7 @@ fn session_runtime_automatic_run_completes_fixture_combat_within_bound() {
     );
     assert_eq!(readout.final_snapshot.combat_log.len(), 2);
     assert_eq!(readout.final_snapshot.audit_log.len(), 2);
-    assert_eq!(session.control_history().len(), 3);
+    assert_eq!(session.control_history().len(), 2);
     assert_eq!(
         readout.final_snapshot.current_state.combatants[1]
             .hit_points
@@ -1297,6 +1277,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
             .final_snapshot
             .current_state_fingerprint
             .clone(),
+        expected_run.final_snapshot.finalization.clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
         expected_run.policy_decisions.clone(),
@@ -1325,6 +1306,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     );
     assert_eq!(readout.decision_kind.code(), "verified");
     assert!(readout.final_state_fingerprint_matches);
+    assert!(readout.finalization_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
     assert!(readout.policy_decisions_match);
@@ -1372,6 +1354,7 @@ fn session_runtime_automatic_run_replay_rejects_policy_decision_drift_alone() {
             .final_snapshot
             .current_state_fingerprint
             .clone(),
+        expected_run.final_snapshot.finalization.clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
         drifted_policy_decisions,
@@ -1395,6 +1378,7 @@ fn session_runtime_automatic_run_replay_rejects_policy_decision_drift_alone() {
 
     assert!(!readout.accepted);
     assert!(readout.final_state_fingerprint_matches);
+    assert!(readout.finalization_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
     assert!(!readout.policy_decisions_match);
@@ -1442,6 +1426,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
             .final_snapshot
             .current_state_fingerprint
             .clone(),
+        expected_run.final_snapshot.finalization.clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
         Vec::new(),
@@ -1464,6 +1449,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     );
     assert_eq!(readout.decision_kind.code(), "mismatchedEvidence");
     assert!(readout.final_state_fingerprint_matches);
+    assert!(readout.finalization_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
     assert!(!readout.policy_decisions_match);

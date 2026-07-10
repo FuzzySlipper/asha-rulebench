@@ -24,6 +24,14 @@ export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
 
 export type RulebenchLifecycleTransitionTriggerDto = 'explicitStart' | 'commandStart' | 'explicitEnd' | 'conditionalEnd';
 
+export type RulebenchCombatSideIdDto = string;
+
+export type RulebenchCombatEndPolicyKindDto = 'lastSideStanding' | 'objectiveSideVictory' | 'explicitOnly';
+
+export type RulebenchCombatEndPolicyDto = { readonly kind: 'lastSideStanding' | 'explicitOnly'; readonly objectiveSideId: null } | { readonly kind: 'objectiveSideVictory'; readonly objectiveSideId: RulebenchCombatSideIdDto };
+
+export type RulebenchCombatOutcomeKindDto = 'ongoing' | 'victory' | 'defeat' | 'draw' | 'explicitEnd';
+
 export type RulebenchActionResourceKindDto = 'standardAction' | 'spellSlot' | 'charge' | 'cooldown';
 
 export type RulebenchActionResourceRefreshPolicyDto = { readonly kind: 'never' | 'combatStart' | 'turnStart'; readonly turns: null } | { readonly kind: 'turns'; readonly turns: number };
@@ -82,7 +90,7 @@ export type RulebenchReactionDecisionKindDto = 'accepted' | 'rejectedNoOpenWindo
 
 export type RulebenchReactionWindowLifecycleKindDto = 'opened' | 'nestedOpened' | 'responseAccepted' | 'resolved' | 'resolutionResumed';
 
-export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';
+export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants' | 'explicitOnly' | 'explicitEnd' | 'lastSideStanding' | 'objectiveSideVictory' | 'objectiveSideDefeated';
 
 export type RulebenchRuleModuleIdDto = 'actionResolution' | 'turnControl';
 
@@ -121,6 +129,8 @@ export interface RulebenchActionResolutionModuleConfigurationDto {
 export interface RulebenchTurnControlModuleConfigurationDto {
   readonly module: 'turnControl';
   readonly turnOrderPolicy: RulebenchTurnOrderPolicyDto;
+  readonly combatEndPolicy: RulebenchCombatEndPolicyKindDto;
+  readonly objectiveSide: RulebenchCombatSideIdDto | null;
 }
 
 export interface RulebenchRulesetCatalogDto {
@@ -201,6 +211,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
   readonly finalCombatEndCondition: RulebenchCombatEndConditionDto;
+  readonly finalization: RulebenchCombatFinalizationDto | null;
   readonly lifecycleTransitionLog: readonly RulebenchLifecycleTransitionEntryDto[];
   readonly turnTransitionLog: readonly RulebenchTurnTransitionEntryDto[];
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
@@ -360,6 +371,7 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
   readonly finalCombatEndCondition: RulebenchCombatEndConditionDto;
+  readonly finalization: RulebenchCombatFinalizationDto | null;
   readonly combatLog: readonly RulebenchCombatLogEntryDto[];
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly lifecycleTransitionLog: readonly RulebenchLifecycleTransitionEntryDto[];
@@ -385,6 +397,7 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly expectedFinalStateFingerprint: RulebenchStateFingerprintDto;
   readonly actualFinalStateFingerprint: RulebenchStateFingerprintDto;
   readonly finalStateFingerprintMatches: boolean;
+  readonly finalizationMatches: boolean;
   readonly expectedRunDecisionKind: RulebenchAutomaticRunDecisionKindDto;
   readonly actualRunDecisionKind: RulebenchAutomaticRunDecisionKindDto;
   readonly runDecisionKindMatches: boolean;
@@ -493,12 +506,30 @@ export interface RulebenchCombatantVitalityEntryDto {
 }
 
 export interface RulebenchCombatEndConditionDto {
+  readonly policy: RulebenchCombatEndPolicyDto;
   readonly combatShouldEnd: boolean;
   readonly conditionKind: RulebenchCombatEndConditionKindDto;
+  readonly outcomeKind: RulebenchCombatOutcomeKindDto;
+  readonly activeSides: readonly RulebenchCombatSideIdDto[];
+  readonly defeatedSides: readonly RulebenchCombatSideIdDto[];
+  readonly winningSides: readonly RulebenchCombatSideIdDto[];
   readonly activeAllyCount: number;
   readonly activeEnemyCount: number;
   readonly defeatedAllyCount: number;
   readonly defeatedEnemyCount: number;
+  readonly reason: string;
+}
+
+export interface RulebenchCombatFinalizationDto {
+  readonly trigger: RulebenchLifecycleTransitionTriggerDto;
+  readonly finalizedAtStep: number;
+  readonly endCondition: RulebenchCombatEndConditionDto;
+  readonly outcomeKind: RulebenchCombatOutcomeKindDto;
+  readonly winningSides: readonly RulebenchCombatSideIdDto[];
+  readonly remainingSides: readonly RulebenchCombatSideIdDto[];
+  readonly finalStateFingerprint: RulebenchStateFingerprintDto;
+  readonly combatLogEntryCount: number;
+  readonly commandAuditEntryCount: number;
   readonly reason: string;
 }
 
@@ -804,6 +835,7 @@ export interface RulebenchCombatantDto {
   readonly id: string;
   readonly name: string;
   readonly team: RulebenchTeamDto;
+  readonly sideId: RulebenchCombatSideIdDto;
   readonly position: RulebenchGridPositionDto;
   readonly hitPoints: RulebenchBoundedValueDto;
   readonly defenses: readonly RulebenchNamedNumberDto[];

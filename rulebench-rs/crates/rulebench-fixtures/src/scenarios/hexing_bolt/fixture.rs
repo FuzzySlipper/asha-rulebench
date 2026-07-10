@@ -475,6 +475,7 @@ fn adept_initial() -> Combatant {
         entity_id: "entity.adept".to_string(),
         name: "Adept".to_string(),
         team: Team::Ally,
+        side_id: "ally".to_string(),
         initiative: 15,
         position: GridPosition { x: 1, y: 1 },
         hit_points: BoundedValue {
@@ -530,6 +531,7 @@ fn raider_initial() -> Combatant {
         entity_id: "entity.raider".to_string(),
         name: "Raider".to_string(),
         team: Team::Enemy,
+        side_id: "enemy".to_string(),
         initiative: 10,
         position: GridPosition { x: 4, y: 1 },
         hit_points: BoundedValue {

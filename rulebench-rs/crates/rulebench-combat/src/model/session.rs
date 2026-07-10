@@ -3,12 +3,12 @@ use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase,
     CombatTurnOrder, CommandOutcomeClass, EquipmentLedgerReadout, EquipmentTransitionEntry,
-    LifecycleTransitionEntry, ModifierDurationExpirationEntry, ReactionAuditEntry,
-    ReactionWindowLifecycleEntry, ReactionWindowReadout, RollConsumptionEntry, RulebenchReceipt,
-    RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint, TargetLegality,
-    TurnTransitionEntry, UseActionIntent,
+    LifecycleTransitionEntry, LifecycleTransitionTrigger, ModifierDurationExpirationEntry,
+    ReactionAuditEntry, ReactionWindowLifecycleEntry, ReactionWindowReadout, RollConsumptionEntry,
+    RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint,
+    TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
-use rulebench_ruleset::ActionResourceCost;
+use rulebench_ruleset::{ActionResourceCost, CombatEndPolicy};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
@@ -175,6 +175,11 @@ pub enum CombatEndConditionKind {
     NoActiveEnemies,
     NoActiveAllies,
     NoActiveCombatants,
+    ExplicitOnly,
+    ExplicitEnd,
+    LastSideStanding,
+    ObjectiveSideVictory,
+    ObjectiveSideDefeated,
 }
 
 impl CombatEndConditionKind {
@@ -184,18 +189,63 @@ impl CombatEndConditionKind {
             CombatEndConditionKind::NoActiveEnemies => "noActiveEnemies",
             CombatEndConditionKind::NoActiveAllies => "noActiveAllies",
             CombatEndConditionKind::NoActiveCombatants => "noActiveCombatants",
+            CombatEndConditionKind::ExplicitOnly => "explicitOnly",
+            CombatEndConditionKind::ExplicitEnd => "explicitEnd",
+            CombatEndConditionKind::LastSideStanding => "lastSideStanding",
+            CombatEndConditionKind::ObjectiveSideVictory => "objectiveSideVictory",
+            CombatEndConditionKind::ObjectiveSideDefeated => "objectiveSideDefeated",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatOutcomeKind {
+    Ongoing,
+    Victory,
+    Defeat,
+    Draw,
+    ExplicitEnd,
+}
+
+impl CombatOutcomeKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CombatOutcomeKind::Ongoing => "ongoing",
+            CombatOutcomeKind::Victory => "victory",
+            CombatOutcomeKind::Defeat => "defeat",
+            CombatOutcomeKind::Draw => "draw",
+            CombatOutcomeKind::ExplicitEnd => "explicitEnd",
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatEndConditionReadout {
+    pub policy: CombatEndPolicy,
     pub combat_should_end: bool,
     pub condition_kind: CombatEndConditionKind,
+    pub outcome_kind: CombatOutcomeKind,
+    pub active_sides: Vec<String>,
+    pub defeated_sides: Vec<String>,
+    pub winning_sides: Vec<String>,
     pub active_ally_count: u32,
     pub active_enemy_count: u32,
     pub defeated_ally_count: u32,
     pub defeated_enemy_count: u32,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatFinalizationReadout {
+    pub trigger: LifecycleTransitionTrigger,
+    pub finalized_at_step: u32,
+    pub end_condition: CombatEndConditionReadout,
+    pub outcome_kind: CombatOutcomeKind,
+    pub winning_sides: Vec<String>,
+    pub remaining_sides: Vec<String>,
+    pub final_state_fingerprint: StateFingerprint,
+    pub combat_log_entry_count: u32,
+    pub command_audit_entry_count: u32,
     pub reason: String,
 }
 
@@ -348,6 +398,7 @@ pub struct CombatSessionSnapshot {
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
     pub combat_end_condition: CombatEndConditionReadout,
+    pub finalization: Option<CombatFinalizationReadout>,
     pub current_actor_options: CurrentActorOptionSummary,
     pub current_state: ScenarioProjection,
     pub current_state_fingerprint: StateFingerprint,

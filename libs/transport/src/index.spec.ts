@@ -255,17 +255,14 @@ describe("RulebenchTransport fixtures", () => {
         "explicitStart",
         "advanceTurn",
         "explicitEnd",
-        "advanceTurn",
       ]);
       expect(result.value.history.map((entry) => entry.decisionKind)).toEqual([
         "accepted",
         "accepted",
         "accepted",
-        "rejectedByLifecycle",
       ]);
       expect(result.value.history[0]?.lifecycleTransitionSequence).toBe(0);
       expect(result.value.history[1]?.turnTransitionSequence).toBe(0);
-      expect(result.value.history[3]?.reason).toBe("Combat is already ended.");
     }
   });
 
@@ -473,14 +470,22 @@ describe("RulebenchTransport fixtures", () => {
         defeatedCount: 0,
       });
       expect(result.value.finalCombatEndCondition).toEqual({
+        policy: {
+          kind: "lastSideStanding",
+          objectiveSideId: null,
+        },
         combatShouldEnd: false,
         conditionKind: "ongoing",
+        outcomeKind: "ongoing",
+        activeSides: ["ally", "enemy"],
+        defeatedSides: [],
+        winningSides: [],
         activeAllyCount: 1,
         activeEnemyCount: 1,
         defeatedAllyCount: 0,
         defeatedEnemyCount: 0,
         reason:
-          "Combat can continue because both sides have active combatants.",
+          "Combat can continue because multiple configured sides have active combatants.",
       });
       expect(result.value.lifecycleTransitionLog).toEqual([
         {
@@ -790,18 +795,18 @@ describe("RulebenchTransport fixtures", () => {
         version: 1,
         noCandidateBehavior: "advanceTurn",
       });
-      expect(result.value.executedStepCount).toBe(5);
+      expect(result.value.executedStepCount).toBe(4);
       expect(
         result.value.stepDecisions.map(
           (step) => step.policyValidation.code,
         ),
-      ).toEqual(["accepted", "accepted", "accepted", "accepted", "accepted"]);
-      expect(result.value.policyDecisions).toHaveLength(5);
+      ).toEqual(["accepted", "accepted", "accepted", "accepted"]);
+      expect(result.value.policyDecisions).toHaveLength(4);
       expect(
         result.value.policyDecisions.map(
           (decision) => decision.selectedCandidateIndex,
         ),
-      ).toEqual([0, null, null, 0, null]);
+      ).toEqual([0, null, null, 0]);
       expect(result.value.policyDecisions[0]?.candidates).toEqual([
         {
           index: 0,
@@ -818,7 +823,6 @@ describe("RulebenchTransport fixtures", () => {
         "advanceTurn",
         "advanceTurn",
         "submitCandidate",
-        "conditionalEnd",
       ]);
       expect(
         result.value.stepDecisions.map((step) => step.operationKind),
@@ -827,7 +831,6 @@ describe("RulebenchTransport fixtures", () => {
         "advanceTurn",
         "advanceTurn",
         "submitCandidate",
-        "conditionalEnd",
       ]);
       expect(result.value.finalLifecyclePhase).toBe("ended");
       expect(result.value.finalState.combatants[1]?.hitPoints.current).toBe(0);
@@ -863,13 +866,29 @@ describe("RulebenchTransport fixtures", () => {
         ),
       ).toEqual([false, true]);
       expect(result.value.finalCombatEndCondition).toEqual({
+        policy: {
+          kind: "lastSideStanding",
+          objectiveSideId: null,
+        },
         combatShouldEnd: true,
         conditionKind: "noActiveEnemies",
+        outcomeKind: "victory",
+        activeSides: ["ally"],
+        defeatedSides: ["enemy"],
+        winningSides: ["ally"],
         activeAllyCount: 1,
         activeEnemyCount: 0,
         defeatedAllyCount: 0,
         defeatedEnemyCount: 1,
         reason: "Combat should end because no active enemies remain.",
+      });
+      expect(result.value.finalization).toMatchObject({
+        trigger: "conditionalEnd",
+        outcomeKind: "victory",
+        winningSides: ["ally"],
+        remainingSides: ["ally"],
+        combatLogEntryCount: 2,
+        commandAuditEntryCount: 2,
       });
       expect(result.value.combatLogEntryCount).toBe(2);
       expect(result.value.auditEntryCount).toBe(2);
@@ -1023,13 +1042,14 @@ describe("RulebenchTransport fixtures", () => {
         value: "977a31e4f5dc71bc",
       });
       expect(result.value.finalStateFingerprintMatches).toBe(true);
+      expect(result.value.finalizationMatches).toBe(true);
       expect(result.value.expectedRunDecisionKind).toBe(
         "completedCombatEnded",
       );
       expect(result.value.actualRunDecisionKind).toBe("completedCombatEnded");
       expect(result.value.runDecisionKindMatches).toBe(true);
-      expect(result.value.expectedExecutedStepCount).toBe(5);
-      expect(result.value.actualExecutedStepCount).toBe(5);
+      expect(result.value.expectedExecutedStepCount).toBe(4);
+      expect(result.value.actualExecutedStepCount).toBe(4);
       expect(result.value.executedStepCountMatches).toBe(true);
       expect(result.value.policyDecisionsMatch).toBe(true);
       expect(result.value.actionResourceTransitionLogMatches).toBe(true);
@@ -1045,8 +1065,11 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.replayedRun.decisionKind).toBe(
         "completedCombatEnded",
       );
-      expect(result.value.replayedRun.executedStepCount).toBe(5);
+      expect(result.value.replayedRun.executedStepCount).toBe(4);
       expect(result.value.replayedRun.finalLifecyclePhase).toBe("ended");
+      expect(result.value.replayedRun.finalization?.outcomeKind).toBe(
+        "victory",
+      );
       expect(result.value.replayedRun.combatLogEntryCount).toBe(2);
       expect(result.value.replayedRun.auditEntryCount).toBe(2);
       expect(result.value.reason).toBe(

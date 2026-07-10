@@ -176,6 +176,10 @@ fn render_combatant(
         })
     ));
     out.push_str(&format!(
+        "{indent}      sideId: {},\n",
+        ts_string(&combatant.side_id)
+    ));
+    out.push_str(&format!(
         "{indent}      position: {{ x: {}, y: {} }},\n",
         combatant.position.x, combatant.position.y
     ));

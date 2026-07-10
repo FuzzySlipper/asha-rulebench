@@ -82,6 +82,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "turnOrderPolicy",
                     ty: "RulebenchTurnOrderPolicyDto",
                 },
+                Field {
+                    name: "combatEndPolicy",
+                    ty: "RulebenchCombatEndPolicyKindDto",
+                },
+                Field {
+                    name: "objectiveSide",
+                    ty: "RulebenchCombatSideIdDto | null",
+                },
             ],
         },
         Interface {
@@ -345,6 +353,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "finalCombatEndCondition",
                     ty: "RulebenchCombatEndConditionDto",
+                },
+                Field {
+                    name: "finalization",
+                    ty: "RulebenchCombatFinalizationDto | null",
                 },
                 Field {
                     name: "lifecycleTransitionLog",
@@ -878,6 +890,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "RulebenchCombatEndConditionDto",
                 },
                 Field {
+                    name: "finalization",
+                    ty: "RulebenchCombatFinalizationDto | null",
+                },
+                Field {
                     name: "combatLog",
                     ty: "readonly RulebenchCombatLogEntryDto[]",
                 },
@@ -968,6 +984,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "finalStateFingerprintMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "finalizationMatches",
                     ty: "boolean",
                 },
                 Field {
@@ -1326,12 +1346,32 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             name: "RulebenchCombatEndConditionDto",
             fields: &[
                 Field {
+                    name: "policy",
+                    ty: "RulebenchCombatEndPolicyDto",
+                },
+                Field {
                     name: "combatShouldEnd",
                     ty: "boolean",
                 },
                 Field {
                     name: "conditionKind",
                     ty: "RulebenchCombatEndConditionKindDto",
+                },
+                Field {
+                    name: "outcomeKind",
+                    ty: "RulebenchCombatOutcomeKindDto",
+                },
+                Field {
+                    name: "activeSides",
+                    ty: "readonly RulebenchCombatSideIdDto[]",
+                },
+                Field {
+                    name: "defeatedSides",
+                    ty: "readonly RulebenchCombatSideIdDto[]",
+                },
+                Field {
+                    name: "winningSides",
+                    ty: "readonly RulebenchCombatSideIdDto[]",
                 },
                 Field {
                     name: "activeAllyCount",
@@ -1347,6 +1387,51 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "defeatedEnemyCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatFinalizationDto",
+            fields: &[
+                Field {
+                    name: "trigger",
+                    ty: "RulebenchLifecycleTransitionTriggerDto",
+                },
+                Field {
+                    name: "finalizedAtStep",
+                    ty: "number",
+                },
+                Field {
+                    name: "endCondition",
+                    ty: "RulebenchCombatEndConditionDto",
+                },
+                Field {
+                    name: "outcomeKind",
+                    ty: "RulebenchCombatOutcomeKindDto",
+                },
+                Field {
+                    name: "winningSides",
+                    ty: "readonly RulebenchCombatSideIdDto[]",
+                },
+                Field {
+                    name: "remainingSides",
+                    ty: "readonly RulebenchCombatSideIdDto[]",
+                },
+                Field {
+                    name: "finalStateFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "combatLogEntryCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "commandAuditEntryCount",
                     ty: "number",
                 },
                 Field {
@@ -2322,6 +2407,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "team",
                     ty: "RulebenchTeamDto",
+                },
+                Field {
+                    name: "sideId",
+                    ty: "RulebenchCombatSideIdDto",
                 },
                 Field {
                     name: "position",

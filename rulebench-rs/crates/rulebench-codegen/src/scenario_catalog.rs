@@ -294,6 +294,10 @@ fn render_combatant(combatant: &Combatant, final_state: &FinalCombatantState) ->
         })
     ));
     out.push_str(&format!(
+        "          sideId: {},\n",
+        ts_string(&combatant.side_id)
+    ));
+    out.push_str(&format!(
         "          position: {{ x: {}, y: {} }},\n",
         combatant.position.x, combatant.position.y
     ));

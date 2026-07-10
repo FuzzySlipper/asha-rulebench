@@ -40,4 +40,16 @@ mod tests {
         assert_eq!(dto.id, "test-session");
         assert_eq!(dto.to_combat_session_handle(), handle);
     }
+
+    #[test]
+    fn typescript_contract_exposes_combat_sides_and_immutable_finalization() {
+        let contract = render_api_types();
+
+        assert!(contract.contains("export type RulebenchCombatSideIdDto = string;"));
+        assert!(contract.contains("readonly sideId: RulebenchCombatSideIdDto;"));
+        assert!(contract.contains("readonly policy: RulebenchCombatEndPolicyDto;"));
+        assert!(contract.contains("readonly outcomeKind: RulebenchCombatOutcomeKindDto;"));
+        assert!(contract.contains("readonly winningSides: readonly RulebenchCombatSideIdDto[];"));
+        assert!(contract.contains("readonly finalization: RulebenchCombatFinalizationDto | null;"));
+    }
 }

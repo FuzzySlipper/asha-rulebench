@@ -402,6 +402,11 @@ mod tests {
             entity_id: id.to_string(),
             name: id.to_string(),
             team,
+            side_id: match team {
+                Team::Ally => "ally",
+                Team::Enemy => "enemy",
+            }
+            .to_string(),
             initiative: 0,
             position: GridPosition { x: 0, y: 0 },
             hit_points: BoundedValue {
