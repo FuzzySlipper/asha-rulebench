@@ -67,6 +67,7 @@ pub struct ReplayVerificationReadout {
     pub verified_step_count: u32,
     pub mismatch: Option<ReplayMismatch>,
     pub final_state_fingerprint: Option<StateFingerprint>,
+    pub finalized: bool,
 }
 
 pub fn verify_replay_package(package: &ReplayPackage) -> ReplayVerificationReadout {
@@ -79,6 +80,7 @@ pub fn verify_replay_package(package: &ReplayPackage) -> ReplayVerificationReado
             verified_step_count: 0,
             mismatch: None,
             final_state_fingerprint: None,
+            finalized: false,
         };
     }
 
@@ -106,11 +108,13 @@ pub fn verify_replay_package(package: &ReplayPackage) -> ReplayVerificationReado
                     ),
                 }),
                 final_state_fingerprint: Some(actual.state_after_fingerprint),
+                finalized: false,
             };
         }
     }
 
     let final_state_fingerprint = session.snapshot().current_state_fingerprint;
+    let finalized = session.finalization().is_some();
     if final_state_fingerprint != package.final_state_fingerprint {
         return ReplayVerificationReadout {
             accepted: false,
@@ -124,6 +128,7 @@ pub fn verify_replay_package(package: &ReplayPackage) -> ReplayVerificationReado
                 reason: "Replay final state fingerprint differed after all commands.".to_string(),
             }),
             final_state_fingerprint: Some(final_state_fingerprint),
+            finalized,
         };
     }
 
@@ -134,6 +139,7 @@ pub fn verify_replay_package(package: &ReplayPackage) -> ReplayVerificationReado
         verified_step_count: package.commands.len() as u32,
         mismatch: None,
         final_state_fingerprint: Some(final_state_fingerprint),
+        finalized,
     }
 }
 
@@ -290,7 +296,7 @@ fn first_step_mismatch(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::package_validation::tests::valid_package;
     use crate::{ReplayCommand, ReplayCommandRecord};
@@ -303,7 +309,8 @@ mod tests {
         let readout = verify_replay_package(&package);
 
         assert!(readout.accepted);
-        assert_eq!(readout.verified_step_count, 2);
+        assert_eq!(readout.verified_step_count, 3);
+        assert!(readout.finalized);
         assert_eq!(readout.mismatch, None);
     }
 
@@ -349,7 +356,7 @@ mod tests {
         );
     }
 
-    fn recorded_control_package() -> ReplayPackage {
+    pub(crate) fn recorded_control_package() -> ReplayPackage {
         let mut package = valid_package();
         package.commands = vec![
             ReplayCommandRecord {
@@ -362,6 +369,12 @@ mod tests {
                 sequence: 1,
                 id: "start-again".to_string(),
                 command: ReplayCommand::Control(CombatControlCommandSpec::explicit_start()),
+                expected: package.commands[0].expected.clone(),
+            },
+            ReplayCommandRecord {
+                sequence: 2,
+                id: "end".to_string(),
+                command: ReplayCommand::Control(CombatControlCommandSpec::explicit_end()),
                 expected: package.commands[0].expected.clone(),
             },
         ];

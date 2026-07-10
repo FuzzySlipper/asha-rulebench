@@ -27,3 +27,10 @@ pub use verification::{
     verify_replay_package, ReplayMismatch, ReplayMismatchDimension, ReplayVerificationDecisionKind,
     ReplayVerificationReadout,
 };
+mod archive;
+mod archive_storage;
+pub use archive::{ReplayArchive, ReplayArchiveError, ReplayArchiveQuery};
+pub use archive_storage::{
+    InMemoryReplayArchiveStorage, ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage,
+    ReplayArchiveStorageError,
+};
