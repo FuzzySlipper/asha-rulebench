@@ -1,3 +1,5 @@
+//! Automatic command selection and execution.
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

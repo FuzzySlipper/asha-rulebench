@@ -1,3 +1,4 @@
+/// Explicit combat-control commands and readbacks.
 use super::{
     CombatLifecycle, CombatLifecyclePhase, CombatTurnOrder, LifecycleTransitionEntry,
     StateFingerprint, TurnAdvanceReadout,

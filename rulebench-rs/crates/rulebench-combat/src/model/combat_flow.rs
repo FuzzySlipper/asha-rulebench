@@ -1,3 +1,4 @@
+/// Combat lifecycle, turn order, and session-flow readbacks.
 use super::StateFingerprint;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

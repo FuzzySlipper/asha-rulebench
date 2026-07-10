@@ -1,3 +1,4 @@
+/// Authoritative action receipts and projected combat state.
 use super::{
     AttackRollResult, BoundedValue, DamageOutcome, DomainEvent, ModifierOutcome,
     RulebenchRejection, TargetLegality, TraceEntry, UseActionIntent,

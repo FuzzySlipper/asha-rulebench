@@ -1,3 +1,4 @@
+/// Combat action-resource state and readbacks.
 use super::ActiveModifier;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,3 +1,4 @@
+/// Resolution outcomes, events, and trace records.
 use super::BoundedValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,3 +1,5 @@
+//! Deterministic combat-session scripts.
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

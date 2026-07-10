@@ -1,3 +1,4 @@
+/// Session command, audit, and snapshot readbacks.
 use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase, CombatTurnOrder,

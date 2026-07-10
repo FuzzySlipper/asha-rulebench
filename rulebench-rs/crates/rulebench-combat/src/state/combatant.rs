@@ -1,3 +1,5 @@
+//! Internal mutable combatant state.
+
 use crate::model::{
     ActionResourceKind, ActionResourceRefreshDecisionKind, ActionResourceRefreshReadout,
     ActionResourceSpendDecisionKind, ActionResourceSpendReadout, ActionResourceState,

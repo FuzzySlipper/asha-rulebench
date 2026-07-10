@@ -1,4 +1,35 @@
 //! Authoritative combat state, resolution, and control runtime.
-//!
-//! This reserved boundary will own session lifecycle, command intake, state
-//! application, manual and automatic control, and combat readbacks.
+
+#![forbid(unsafe_code)]
+
+pub mod model;
+
+mod audit;
+mod modifiers;
+mod resolver;
+mod runtime;
+mod state;
+
+pub use audit::{
+    fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
+    STATE_FINGERPRINT_ALGORITHM,
+};
+pub use modifiers::{
+    active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
+};
+pub use resolver::{resolve_use_action, validate_intent_shape};
+pub use runtime::{
+    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
+    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
+    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
+    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
+    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
+    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
+    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
+    CombatSessionState,
+};
+pub use state::CombatState;

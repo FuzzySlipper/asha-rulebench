@@ -1,3 +1,5 @@
+//! Combat session status, audit, and snapshot readbacks.
+
 use super::*;
 
 impl CombatSessionState {

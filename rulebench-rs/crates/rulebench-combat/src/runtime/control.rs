@@ -1,3 +1,5 @@
+//! Manual lifecycle and turn-control handling.
+
 use super::*;
 
 impl CombatSessionState {
