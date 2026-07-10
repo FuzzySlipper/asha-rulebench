@@ -12,6 +12,8 @@ export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';
 
 export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';
 
+export type RulebenchRulesetCompatibilityErrorCodeDto = 'unknownRulesetId' | 'newerRulesetVersion' | 'incompatibleRulesetVersion' | 'incompatibleRulesetModules';
+
 export type RulebenchScenarioOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality';
 
 export type RulebenchContentDiagnosticSeverityDto = 'error' | 'warning';

@@ -20,6 +20,145 @@ impl RulesetMetadata {
     ) -> Result<ValidatedRuleModuleRegistry, RuleModuleValidationError> {
         validate_rule_modules(&self.modules)
     }
+
+    pub fn artifact_provenance(&self) -> RulesetArtifactProvenance {
+        let mut module_versions = self
+            .modules
+            .iter()
+            .map(|module| RulesetModuleProvenance {
+                module: module.module,
+                version: module.version.clone(),
+            })
+            .collect::<Vec<_>>();
+        module_versions.sort_by_key(|module| module.module.code());
+
+        RulesetArtifactProvenance {
+            ruleset_id: self.id.clone(),
+            ruleset_version: self.version.clone(),
+            module_versions,
+            effect_operation_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+        }
+    }
+
+    pub fn validate_artifact_provenance(
+        &self,
+        provenance: &RulesetArtifactProvenance,
+    ) -> Result<(), RulesetCompatibilityError> {
+        if provenance.ruleset_id != self.id {
+            return Err(RulesetCompatibilityError::UnknownRulesetId {
+                expected_id: self.id.clone(),
+                actual_id: provenance.ruleset_id.clone(),
+            });
+        }
+        validate_version("ruleset", &self.version, &provenance.ruleset_version)?;
+        validate_version(
+            "effect-operation vocabulary",
+            EffectOperationId::VOCABULARY_VERSION,
+            &provenance.effect_operation_vocabulary_version,
+        )?;
+
+        if provenance.module_versions != self.artifact_provenance().module_versions {
+            return Err(RulesetCompatibilityError::IncompatibleModuleRequirements);
+        }
+
+        Ok(())
+    }
+}
+
+/// Immutable compatibility identity carried by generated golden and replay artifacts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetArtifactProvenance {
+    pub ruleset_id: String,
+    pub ruleset_version: String,
+    pub module_versions: Vec<RulesetModuleProvenance>,
+    pub effect_operation_vocabulary_version: String,
+}
+
+/// The version requirement for one statically selected behavior module.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetModuleProvenance {
+    pub module: RuleModuleId,
+    pub version: String,
+}
+
+/// Stable compatibility failures for loading previously authored artifacts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RulesetCompatibilityError {
+    UnknownRulesetId {
+        expected_id: String,
+        actual_id: String,
+    },
+    NewerVersion {
+        surface: &'static str,
+        expected: String,
+        actual: String,
+    },
+    IncompatibleVersion {
+        surface: &'static str,
+        expected: String,
+        actual: String,
+    },
+    IncompatibleModuleRequirements,
+}
+
+impl RulesetCompatibilityError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            RulesetCompatibilityError::UnknownRulesetId { .. } => "unknownRulesetId",
+            RulesetCompatibilityError::NewerVersion { .. } => "newerRulesetVersion",
+            RulesetCompatibilityError::IncompatibleVersion { .. } => "incompatibleRulesetVersion",
+            RulesetCompatibilityError::IncompatibleModuleRequirements => {
+                "incompatibleRulesetModules"
+            }
+        }
+    }
+}
+
+fn validate_version(
+    surface: &'static str,
+    expected: &str,
+    actual: &str,
+) -> Result<(), RulesetCompatibilityError> {
+    if actual == expected {
+        return Ok(());
+    }
+
+    let error = if version_is_newer(actual, expected) {
+        RulesetCompatibilityError::NewerVersion {
+            surface,
+            expected: expected.to_string(),
+            actual: actual.to_string(),
+        }
+    } else {
+        RulesetCompatibilityError::IncompatibleVersion {
+            surface,
+            expected: expected.to_string(),
+            actual: actual.to_string(),
+        }
+    };
+    Err(error)
+}
+
+fn version_is_newer(actual: &str, expected: &str) -> bool {
+    let actual_segments = actual.split('.').collect::<Vec<_>>();
+    let expected_segments = expected.split('.').collect::<Vec<_>>();
+    let segment_count = actual_segments.len().max(expected_segments.len());
+
+    for index in 0..segment_count {
+        let actual_segment = actual_segments
+            .get(index)
+            .and_then(|segment| segment.parse::<u32>().ok())
+            .unwrap_or_default();
+        let expected_segment = expected_segments
+            .get(index)
+            .and_then(|segment| segment.parse::<u32>().ok())
+            .unwrap_or_default();
+        if actual_segment != expected_segment {
+            return actual_segment > expected_segment;
+        }
+    }
+
+    false
 }
 
 /// A closed identifier for a Rust behavior module selected by a ruleset.
@@ -666,6 +805,52 @@ mod tests {
         assert!(damage.is_currently_supported());
         assert_eq!(healing.id(), EffectOperationId::Heal);
         assert!(!healing.is_currently_supported());
+    }
+
+    #[test]
+    fn artifact_provenance_fails_closed_for_unknown_newer_and_incompatible_versions() {
+        let ruleset = super::RulesetMetadata {
+            id: "test.ruleset".to_string(),
+            name: "Test Ruleset".to_string(),
+            version: "1.2.0".to_string(),
+            summary: "Compatibility fixture.".to_string(),
+            modules: vec![RuleModuleDeclaration::action_resolution(
+                ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight(),
+            )],
+        };
+        let provenance = ruleset.artifact_provenance();
+
+        assert_eq!(ruleset.validate_artifact_provenance(&provenance), Ok(()));
+
+        let mut unknown = provenance.clone();
+        unknown.ruleset_id = "other.ruleset".to_string();
+        assert_eq!(
+            ruleset
+                .validate_artifact_provenance(&unknown)
+                .unwrap_err()
+                .code(),
+            "unknownRulesetId"
+        );
+
+        let mut newer = provenance.clone();
+        newer.ruleset_version = "2.0.0".to_string();
+        assert_eq!(
+            ruleset
+                .validate_artifact_provenance(&newer)
+                .unwrap_err()
+                .code(),
+            "newerRulesetVersion"
+        );
+
+        let mut incompatible = provenance.clone();
+        incompatible.effect_operation_vocabulary_version = "0".to_string();
+        assert_eq!(
+            ruleset
+                .validate_artifact_provenance(&incompatible)
+                .unwrap_err()
+                .code(),
+            "incompatibleRulesetVersion"
+        );
     }
 
     #[test]

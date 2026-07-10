@@ -27,8 +27,9 @@ pub use rulebench_ruleset::{
     ModifierEffectOperation, ModifierTenure, MovementEffectOperation, MovementKind,
     ReactionHookEffectOperation, ReactionWindow, ResourceChangeEffectOperation,
     RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
-    RulesetMetadata, SavingThrowCheckDeclaration, TargetKind, TargetSelection,
-    TargetTeamConstraint, TargetingDeclaration, TurnControlModuleConfiguration, TurnOrderPolicy,
+    RulesetArtifactProvenance, RulesetCompatibilityError, RulesetMetadata, RulesetModuleProvenance,
+    SavingThrowCheckDeclaration, TargetKind, TargetSelection, TargetTeamConstraint,
+    TargetingDeclaration, TurnControlModuleConfiguration, TurnOrderPolicy,
     ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry, VisibilityRequirement,
 };
 pub use scenario::*;
