@@ -18,16 +18,16 @@ pub use audit::{
     fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
     STATE_FINGERPRINT_ALGORITHM,
 };
-pub use rulebench_combat::{
-    CombatSessionApi, CombatSessionApiError, CombatSessionArchive, CombatSessionCreateReadout,
-    CombatSessionCreateRequest, CombatSessionHandle,
-};
 pub use content::{validate_scenario_content, validate_scenario_content_report};
 pub use model::*;
 pub use modifiers::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
+pub use rulebench_combat::{
+    CombatSessionApi, CombatSessionApiError, CombatSessionArchive, CombatSessionCreateReadout,
+    CombatSessionCreateRequest, CombatSessionHandle,
+};
 pub use runtime::{
     verify_automatic_run_replay, CombatSessionAutoCandidateCommandSpec,
     CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
