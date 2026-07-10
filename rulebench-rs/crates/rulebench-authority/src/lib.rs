@@ -70,7 +70,7 @@ pub use catalog::{
 pub use catalog_types::*;
 pub use fixtures::{
     accepted_hexing_bolt_fixture_receipt, hexing_bolt_fixture_scenario,
-    rejected_target_fixture_receipt, turn_control_fixture_scenario,
+    hexing_bolt_scenario_package, rejected_target_fixture_receipt, turn_control_fixture_scenario,
 };
 pub use rulebench_rules::*;
 pub use rulebench_rules::{

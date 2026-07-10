@@ -140,16 +140,17 @@ fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {
 
 fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
     let session_id = "hexing-bolt-mixed-control-script";
-    let script_id = "hexing-bolt-mixed-control-script";
-    let title = "Hexing Bolt Mixed Control Script";
-    let summary = "A generated Rust script readout that mixes lifecycle control, selected-candidate execution, and rejected selected-candidate planning.";
 
     let mut session_state = CombatSessionState::new(session_id, hexing_bolt_fixture_scenario());
 
-    session_state.run_script(CombatSessionScriptSpec::new(
-        script_id,
-        title,
-        summary,
+    session_state.run_script(hexing_bolt_mixed_script_spec())
+}
+
+pub(super) fn hexing_bolt_mixed_script_spec() -> CombatSessionScriptSpec {
+    CombatSessionScriptSpec::new(
+        "hexing-bolt-mixed-control-script",
+        "Hexing Bolt Mixed Control Script",
+        "A generated Rust script readout that mixes lifecycle control, selected-candidate execution, and rejected selected-candidate planning.",
         vec![
             CombatSessionScriptStepSpec::control(
                 "script-start",
@@ -232,7 +233,7 @@ fn hexing_bolt_mixed_script_readout() -> CombatSessionScriptReadout {
                 CombatControlCommandSpec::explicit_end(),
             ),
         ],
-    ))
+    )
 }
 
 fn hexing_bolt_control_history_readout() -> CombatControlHistoryReadout {

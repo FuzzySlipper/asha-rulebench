@@ -1,5 +1,10 @@
 use crate::model::*;
 use crate::resolver::resolve_use_action;
+use rulebench_fixtures::{
+    ScenarioPackage, ScenarioPackageContentReference, ScenarioPackageDisplayMetadata,
+    ScenarioPackageEvidenceExpectation, ScenarioPackageEvidenceKind, ScenarioPackageIdentity,
+    ScenarioPackageInitialState, ScenarioPackageRulesetReference, ScenarioPackageScript,
+};
 
 pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
     let selected_action = hexing_bolt_action();
@@ -66,6 +71,90 @@ pub fn turn_control_fixture_scenario() -> RulebenchScenario {
     scenario.actions[0].ruleset_id = ruleset_id.clone();
     scenario.selected_action.ruleset_id = ruleset_id;
     scenario
+}
+
+pub fn hexing_bolt_scenario_package() -> ScenarioPackage {
+    let scenario = hexing_bolt_fixture_scenario();
+    ScenarioPackage {
+        identity: ScenarioPackageIdentity {
+            id: "asha-rulebench.hexing-bolt".to_string(),
+            version: "0.1.0".to_string(),
+        },
+        display: ScenarioPackageDisplayMetadata {
+            title: "Hexing Bolt Package".to_string(),
+            summary:
+                "Rulebench-local scenario package for deterministic Hexing Bolt authority evidence."
+                    .to_string(),
+            tags: vec!["combat".to_string(), "hexing-bolt".to_string()],
+        },
+        ruleset: ScenarioPackageRulesetReference {
+            id: scenario.selected_ruleset_id.clone(),
+            version: scenario
+                .selected_ruleset()
+                .expect("Hexing Bolt scenario selects a declared ruleset")
+                .version
+                .clone(),
+        },
+        content_references: vec![ScenarioPackageContentReference {
+            id: "asha-rulebench.hexing-bolt.content".to_string(),
+            version: "0.1.0".to_string(),
+        }],
+        initial_state: ScenarioPackageInitialState {
+            participant_ids: scenario
+                .combatants
+                .iter()
+                .map(|combatant| combatant.id.clone())
+                .collect(),
+            scenario,
+        },
+        scripts: vec![ScenarioPackageScript {
+            session_id: "hexing-bolt-mixed-control-script".to_string(),
+            script: super::session::hexing_bolt_mixed_script_spec(),
+        }],
+        expected_evidence: vec![
+            evidence("hexing-bolt-hit", ScenarioPackageEvidenceKind::CatalogCase),
+            evidence("hexing-bolt-miss", ScenarioPackageEvidenceKind::CatalogCase),
+            evidence(
+                "hexing-bolt-self-target-rejected",
+                ScenarioPackageEvidenceKind::CatalogCase,
+            ),
+            evidence(
+                "hexing-bolt-opening-exchange",
+                ScenarioPackageEvidenceKind::SessionTranscript,
+            ),
+            evidence(
+                "hexing-bolt-control-sequence",
+                ScenarioPackageEvidenceKind::ControlHistory,
+            ),
+            evidence(
+                "hexing-bolt-mixed-control-script",
+                ScenarioPackageEvidenceKind::Script,
+            ),
+            evidence(
+                "hexing-bolt-bounded-automatic-run",
+                ScenarioPackageEvidenceKind::AutomaticRun,
+            ),
+            evidence(
+                "hexing-bolt-bounded-automatic-run-replay",
+                ScenarioPackageEvidenceKind::ReplayVerification,
+            ),
+            evidence(
+                "hexing-bolt-accepted-receipt",
+                ScenarioPackageEvidenceKind::Receipt,
+            ),
+            evidence(
+                "hexing-bolt-rejected-target-receipt",
+                ScenarioPackageEvidenceKind::Receipt,
+            ),
+        ],
+    }
+}
+
+fn evidence(id: &str, kind: ScenarioPackageEvidenceKind) -> ScenarioPackageEvidenceExpectation {
+    ScenarioPackageEvidenceExpectation {
+        id: id.to_string(),
+        kind,
+    }
 }
 
 fn hexing_bolt_ruleset() -> RulesetMetadata {
