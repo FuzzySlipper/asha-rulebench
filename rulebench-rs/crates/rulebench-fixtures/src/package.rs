@@ -2,6 +2,8 @@ use std::collections::HashSet;
 
 use rulebench_rules::{validate_scenario_content, CombatSessionScriptSpec, RulebenchScenario};
 
+use crate::FixtureGoldenManifest;
+
 /// Data-only Rulebench scenario package.
 ///
 /// A package selects and configures Rust-owned behavior. It never carries
@@ -15,6 +17,7 @@ pub struct ScenarioPackage {
     pub initial_state: ScenarioPackageInitialState,
     pub scripts: Vec<ScenarioPackageScript>,
     pub expected_evidence: Vec<ScenarioPackageEvidenceExpectation>,
+    pub golden_manifest: FixtureGoldenManifest,
 }
 
 impl ScenarioPackage {
@@ -28,6 +31,7 @@ impl ScenarioPackage {
         validate_initial_state(&self.initial_state, &mut errors);
         validate_scripts(&self.scripts, &mut errors);
         validate_expected_evidence(&self.expected_evidence, &mut errors);
+        validate_golden_manifest(self, &mut errors);
 
         if !validate_scenario_content(&self.initial_state.scenario).is_empty() {
             errors.push(ScenarioPackageValidationError::InvalidInitialScenarioContent);
@@ -118,6 +122,10 @@ pub enum ScenarioPackageValidationError {
     DuplicateScriptId { script_id: String },
     EmptyEvidenceId,
     DuplicateEvidenceId { evidence_id: String },
+    GoldenManifestPackageMismatch { package_id: String },
+    GoldenArtifactMissingExpectedEvidence { artifact_id: String },
+    ExpectedEvidenceMissingGoldenArtifact { evidence_id: String },
+    DuplicateGoldenArtifactId { artifact_id: String },
     InvalidInitialScenarioContent,
 }
 
@@ -161,6 +169,18 @@ impl ScenarioPackageValidationError {
             ScenarioPackageValidationError::DuplicateScriptId { .. } => "duplicateScriptId",
             ScenarioPackageValidationError::EmptyEvidenceId => "emptyEvidenceId",
             ScenarioPackageValidationError::DuplicateEvidenceId { .. } => "duplicateEvidenceId",
+            ScenarioPackageValidationError::GoldenManifestPackageMismatch { .. } => {
+                "goldenManifestPackageMismatch"
+            }
+            ScenarioPackageValidationError::GoldenArtifactMissingExpectedEvidence { .. } => {
+                "goldenArtifactMissingExpectedEvidence"
+            }
+            ScenarioPackageValidationError::ExpectedEvidenceMissingGoldenArtifact { .. } => {
+                "expectedEvidenceMissingGoldenArtifact"
+            }
+            ScenarioPackageValidationError::DuplicateGoldenArtifactId { .. } => {
+                "duplicateGoldenArtifactId"
+            }
             ScenarioPackageValidationError::InvalidInitialScenarioContent => {
                 "invalidInitialScenarioContent"
             }
@@ -333,6 +353,50 @@ fn validate_expected_evidence(
             errors.push(ScenarioPackageValidationError::DuplicateEvidenceId {
                 evidence_id: expectation.id.clone(),
             });
+        }
+    }
+}
+
+fn validate_golden_manifest(
+    package: &ScenarioPackage,
+    errors: &mut Vec<ScenarioPackageValidationError>,
+) {
+    if package.golden_manifest.package_id != package.identity.id {
+        errors.push(
+            ScenarioPackageValidationError::GoldenManifestPackageMismatch {
+                package_id: package.golden_manifest.package_id.clone(),
+            },
+        );
+    }
+
+    let expected_ids = package
+        .expected_evidence
+        .iter()
+        .map(|expectation| expectation.id.as_str())
+        .collect::<HashSet<_>>();
+    let mut golden_ids = HashSet::new();
+    for artifact in &package.golden_manifest.artifacts {
+        if !golden_ids.insert(artifact.id.as_str()) {
+            errors.push(ScenarioPackageValidationError::DuplicateGoldenArtifactId {
+                artifact_id: artifact.id.clone(),
+            });
+        }
+        if !expected_ids.contains(artifact.id.as_str()) {
+            errors.push(
+                ScenarioPackageValidationError::GoldenArtifactMissingExpectedEvidence {
+                    artifact_id: artifact.id.clone(),
+                },
+            );
+        }
+    }
+
+    for evidence_id in expected_ids {
+        if !golden_ids.contains(evidence_id) {
+            errors.push(
+                ScenarioPackageValidationError::ExpectedEvidenceMissingGoldenArtifact {
+                    evidence_id: evidence_id.to_string(),
+                },
+            );
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::{
-    ScenarioPackage, ScenarioPackageContentReference, ScenarioPackageDisplayMetadata,
+    FixtureGoldenArtifact, FixtureGoldenArtifactKind, FixtureGoldenManifest, ScenarioPackage,
+    ScenarioPackageContentReference, ScenarioPackageDisplayMetadata,
     ScenarioPackageEvidenceExpectation, ScenarioPackageEvidenceKind, ScenarioPackageIdentity,
     ScenarioPackageInitialState, ScenarioPackageRulesetReference, ScenarioPackageScript,
 };
@@ -146,6 +147,73 @@ pub fn hexing_bolt_scenario_package() -> ScenarioPackage {
                 ScenarioPackageEvidenceKind::Receipt,
             ),
         ],
+        golden_manifest: FixtureGoldenManifest {
+            package_id: "asha-rulebench.hexing-bolt".to_string(),
+            artifacts: hexing_bolt_golden_artifacts(),
+        },
+    }
+}
+
+fn hexing_bolt_golden_artifacts() -> Vec<FixtureGoldenArtifact> {
+    vec![
+        golden(
+            "hexing-bolt-hit",
+            FixtureGoldenArtifactKind::ScenarioCatalog,
+            "pnpm run catalog:check",
+        ),
+        golden(
+            "hexing-bolt-miss",
+            FixtureGoldenArtifactKind::ScenarioCatalog,
+            "pnpm run catalog:check",
+        ),
+        golden(
+            "hexing-bolt-self-target-rejected",
+            FixtureGoldenArtifactKind::ScenarioCatalog,
+            "pnpm run catalog:check",
+        ),
+        golden(
+            "hexing-bolt-opening-exchange",
+            FixtureGoldenArtifactKind::SessionTranscript,
+            "pnpm run session:check",
+        ),
+        golden(
+            "hexing-bolt-control-sequence",
+            FixtureGoldenArtifactKind::ControlHistory,
+            "pnpm run session:check",
+        ),
+        golden(
+            "hexing-bolt-mixed-control-script",
+            FixtureGoldenArtifactKind::ScriptReadout,
+            "pnpm run session:check",
+        ),
+        golden(
+            "hexing-bolt-bounded-automatic-run",
+            FixtureGoldenArtifactKind::AutomaticRun,
+            "pnpm run session:check",
+        ),
+        golden(
+            "hexing-bolt-bounded-automatic-run-replay",
+            FixtureGoldenArtifactKind::ReplayVerification,
+            "pnpm run session:check",
+        ),
+        golden(
+            "hexing-bolt-accepted-receipt",
+            FixtureGoldenArtifactKind::Receipt,
+            "cargo test --manifest-path rulebench-rs/Cargo.toml -p rulebench-fixtures",
+        ),
+        golden(
+            "hexing-bolt-rejected-target-receipt",
+            FixtureGoldenArtifactKind::Receipt,
+            "cargo test --manifest-path rulebench-rs/Cargo.toml -p rulebench-fixtures",
+        ),
+    ]
+}
+
+fn golden(id: &str, kind: FixtureGoldenArtifactKind, check_command: &str) -> FixtureGoldenArtifact {
+    FixtureGoldenArtifact {
+        id: id.to_string(),
+        kind,
+        check_command: check_command.to_string(),
     }
 }
 

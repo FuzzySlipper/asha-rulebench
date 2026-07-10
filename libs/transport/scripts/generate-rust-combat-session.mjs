@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 const generatedPath = join(process.cwd(), 'libs/transport/src/generated/rust-combat-session.ts');
 const rustManifestPath = join(process.cwd(), 'rulebench-rs/Cargo.toml');
+const owningPackage = 'asha-rulebench.hexing-bolt';
 
 export function renderCombatSessionCatalog() {
   const result = spawnSync(
@@ -25,10 +26,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--check')) {
     const currentContent = readFileSync(generatedPath, 'utf8');
     if (currentContent !== nextContent) {
-      console.error(`${generatedPath} is out of date. Run node libs/transport/scripts/generate-rust-combat-session.mjs.`);
+      console.error(`Fixture package ${owningPackage} combat-session artifact ${generatedPath} is out of date. Run pnpm run session:write.`);
       process.exit(1);
     }
-  } else {
+  } else if (process.argv.includes('--write')) {
     writeFileSync(generatedPath, nextContent);
+  } else {
+    console.error('Pass --check to verify or --write to regenerate the combat session artifact.');
+    process.exit(1);
   }
 }

@@ -25,6 +25,7 @@ mod tests {
         assert_eq!(package.identity.id, "asha-rulebench.hexing-bolt");
         assert_eq!(package.scripts.len(), 1);
         assert_eq!(package.expected_evidence.len(), 10);
+        assert_eq!(package.golden_manifest.artifacts.len(), 10);
     }
 
     #[test]
@@ -36,5 +37,18 @@ mod tests {
         assert!(!rejected_receipt.accepted);
         assert_eq!(scenario_catalog_cases().len(), 4);
         assert_eq!(combat_session_transcripts().len(), 1);
+    }
+
+    #[test]
+    fn golden_manifest_rejects_an_expected_evidence_gap() {
+        let mut package = hexing_bolt_scenario_package();
+        package.golden_manifest.artifacts.pop();
+
+        let errors = package
+            .validate()
+            .expect_err("package should reject incomplete golden coverage");
+        let codes = errors.iter().map(|error| error.code()).collect::<Vec<_>>();
+
+        assert_eq!(codes, vec!["expectedEvidenceMissingGoldenArtifact"]);
     }
 }

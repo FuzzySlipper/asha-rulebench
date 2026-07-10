@@ -6,10 +6,12 @@
 #![forbid(unsafe_code)]
 
 mod catalog;
+mod goldens;
 mod package;
 pub mod scenarios;
 
 pub use catalog::*;
+pub use goldens::{FixtureGoldenArtifact, FixtureGoldenArtifactKind, FixtureGoldenManifest};
 pub use package::{
     ScenarioPackage, ScenarioPackageContentReference, ScenarioPackageDisplayMetadata,
     ScenarioPackageEvidenceExpectation, ScenarioPackageEvidenceKind, ScenarioPackageIdentity,
