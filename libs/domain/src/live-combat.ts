@@ -1,0 +1,265 @@
+import type {
+  RulebenchLiveCandidateSummaryDto,
+  RulebenchLiveCommandExecutionDto,
+  RulebenchLiveCurrentActorOptionsDto,
+  RulebenchLivePreflightDto,
+  RulebenchLiveSessionSnapshotDto,
+} from "@asha-rulebench/protocol";
+
+export interface RulebenchLiveSessionView {
+  readonly sessionId: string;
+  readonly lifecycleLabel: string;
+  readonly roundLabel: string;
+  readonly turnLabel: string;
+  readonly currentActorId: string | null;
+  readonly fingerprintLabel: string;
+  readonly participants: readonly RulebenchLiveParticipantView[];
+  readonly options: RulebenchLiveOptionsView;
+  readonly combatEndLabel: string;
+  readonly finalizationLabel: string | null;
+  readonly combatLog: readonly RulebenchLiveLogEntryView[];
+  readonly auditLog: readonly RulebenchLiveAuditEntryView[];
+}
+
+export interface RulebenchLiveParticipantView {
+  readonly id: string;
+  readonly name: string;
+  readonly hitPointLabel: string;
+  readonly temporaryVitalityLabel: string | null;
+  readonly statusLabel: string;
+  readonly conditionLabels: readonly string[];
+}
+
+export interface RulebenchLiveOptionsView {
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly currentActorId: string | null;
+  readonly actions: readonly RulebenchLiveActionOptionView[];
+}
+
+export interface RulebenchLiveActionOptionView {
+  readonly actionId: string;
+  readonly abilityId: string;
+  readonly name: string;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly resourceLabels: readonly string[];
+  readonly targets: readonly RulebenchLiveTargetOptionView[];
+}
+
+export interface RulebenchLiveTargetOptionView {
+  readonly id: string;
+  readonly name: string;
+  readonly hitPointLabel: string;
+}
+
+export interface RulebenchLiveLogEntryView {
+  readonly id: string;
+  readonly stepId: string;
+  readonly sequenceLabel: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeLabel: string;
+  readonly eventTypeLabels: readonly string[];
+}
+
+export interface RulebenchLiveAuditEntryView {
+  readonly id: string;
+  readonly stepId: string;
+  readonly sequenceLabel: string;
+  readonly accepted: boolean;
+  readonly decisionLabel: string;
+  readonly rejectionLabel: string | null;
+  readonly eventCount: number;
+  readonly traceCount: number;
+  readonly stateChanged: boolean;
+}
+
+export interface RulebenchLiveCandidateView {
+  readonly actorId: string;
+  readonly actionId: string;
+  readonly targetId: string;
+  readonly targetName: string;
+  readonly targetHitPointLabel: string;
+  readonly accepted: boolean;
+  readonly decisionLabel: string;
+  readonly rejectionLabel: string | null;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveCandidateSummaryView {
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly currentActorId: string | null;
+  readonly candidates: readonly RulebenchLiveCandidateView[];
+}
+
+export interface RulebenchLivePreflightView {
+  readonly accepted: boolean;
+  readonly actorId: string;
+  readonly actionId: string;
+  readonly targetId: string;
+  readonly decisionLabel: string;
+  readonly rejectionLabel: string | null;
+  readonly targetAccepted: boolean | null;
+  readonly targetReason: string | null;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveCommandExecutionView {
+  readonly accepted: boolean;
+  readonly stepId: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly decisionLabel: string;
+  readonly rejectionLabel: string | null;
+  readonly eventLabels: readonly string[];
+  readonly traceLabels: readonly string[];
+  readonly stateChanged: boolean;
+}
+
+export function projectLiveSessionSnapshot(
+  snapshot: RulebenchLiveSessionSnapshotDto,
+): RulebenchLiveSessionView {
+  return {
+    sessionId: snapshot.sessionId,
+    lifecycleLabel: labelCode(snapshot.lifecyclePhase),
+    roundLabel: String(snapshot.roundNumber),
+    turnLabel: String(snapshot.turnIndex + 1),
+    currentActorId: snapshot.currentActorId,
+    fingerprintLabel: `${snapshot.stateFingerprint.algorithm}:${snapshot.stateFingerprint.value}`,
+    participants: snapshot.participants.map((participant) => ({
+      id: participant.id,
+      name: participant.name,
+      hitPointLabel: `${participant.currentHitPoints}/${participant.maxHitPoints} HP`,
+      temporaryVitalityLabel:
+        participant.temporaryVitality === 0
+          ? null
+          : `${participant.temporaryVitality} temporary vitality`,
+      statusLabel: participant.defeated ? "Defeated" : "Active",
+      conditionLabels: participant.conditions,
+    })),
+    options: projectLiveOptions(snapshot.options),
+    combatEndLabel: snapshot.combatEnd.reason,
+    finalizationLabel: snapshot.finalization?.reason ?? null,
+    combatLog: snapshot.combatLog.map((entry) => ({
+      id: entry.id,
+      stepId: entry.stepId,
+      sequenceLabel: String(entry.logIndex),
+      title: entry.title,
+      summary: entry.summary,
+      outcomeLabel: labelCode(entry.outcomeClass),
+      eventTypeLabels: entry.eventTypes.map(labelCode),
+    })),
+    auditLog: snapshot.auditLog.map((entry) => ({
+      id: entry.id,
+      stepId: entry.stepId,
+      sequenceLabel: String(entry.sequence),
+      accepted: entry.accepted,
+      decisionLabel: labelCode(entry.decisionKind),
+      rejectionLabel:
+        entry.rejectionCode === null ? null : labelCode(entry.rejectionCode),
+      eventCount: entry.eventCount,
+      traceCount: entry.traceCount,
+      stateChanged:
+        entry.stateBeforeFingerprint.value !==
+        entry.stateAfterFingerprint.value,
+    })),
+  };
+}
+
+export function projectLiveOptions(
+  options: RulebenchLiveCurrentActorOptionsDto,
+): RulebenchLiveOptionsView {
+  return {
+    available: options.available,
+    unavailableReason: options.unavailableReason,
+    currentActorId: options.currentActorId,
+    actions: options.actions.map((action) => ({
+      actionId: action.actionId,
+      abilityId: action.abilityId,
+      name: action.actionName,
+      available: action.available,
+      unavailableReason: action.unavailableReason,
+      resourceLabels: action.resourceStates.map(
+        (resource) =>
+          `${resource.resourceId} ${resource.current}/${resource.max}`,
+      ),
+      targets: action.targets.map((target) => ({
+        id: target.targetId,
+        name: target.targetName,
+        hitPointLabel: `${target.currentHitPoints}/${target.maxHitPoints} HP`,
+      })),
+    })),
+  };
+}
+
+export function projectLiveCandidates(
+  summary: RulebenchLiveCandidateSummaryDto,
+): RulebenchLiveCandidateSummaryView {
+  return {
+    available: summary.available,
+    unavailableReason: summary.unavailableReason,
+    currentActorId: summary.currentActorId,
+    candidates: summary.candidates.map((candidate) => ({
+      actorId: candidate.intent.actorId,
+      actionId: candidate.intent.actionId,
+      targetId: candidate.intent.targetId,
+      targetName: candidate.targetName,
+      targetHitPointLabel: `${candidate.targetCurrentHitPoints}/${candidate.targetMaxHitPoints} HP`,
+      accepted: candidate.accepted,
+      decisionLabel: labelCode(candidate.decisionKind),
+      rejectionLabel:
+        candidate.rejectionCode === null
+          ? null
+          : labelCode(candidate.rejectionCode),
+      reason: candidate.reason,
+    })),
+  };
+}
+
+export function projectLivePreflight(
+  preflight: RulebenchLivePreflightDto,
+): RulebenchLivePreflightView {
+  return {
+    accepted: preflight.accepted,
+    actorId: preflight.intent.actorId,
+    actionId: preflight.intent.actionId,
+    targetId: preflight.intent.targetId,
+    decisionLabel: labelCode(preflight.decisionKind),
+    rejectionLabel:
+      preflight.rejectionCode === null
+        ? null
+        : labelCode(preflight.rejectionCode),
+    targetAccepted: preflight.targetAccepted,
+    targetReason: preflight.targetReason,
+    reason: preflight.reason,
+  };
+}
+
+export function projectLiveCommandExecution(
+  execution: RulebenchLiveCommandExecutionDto,
+): RulebenchLiveCommandExecutionView {
+  return {
+    accepted: execution.step.accepted,
+    stepId: execution.step.stepId,
+    title: execution.step.title,
+    summary: execution.step.summary,
+    decisionLabel: labelCode(execution.step.decisionKind),
+    rejectionLabel:
+      execution.step.rejectionCode === null
+        ? null
+        : labelCode(execution.step.rejectionCode),
+    eventLabels: execution.step.events.map((event) => labelCode(event.kind)),
+    traceLabels: execution.step.trace.map((entry) => entry.message),
+    stateChanged:
+      execution.step.stateBeforeFingerprint.value !==
+      execution.step.stateAfterFingerprint.value,
+  };
+}
+
+function labelCode(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
