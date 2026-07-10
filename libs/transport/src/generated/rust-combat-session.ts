@@ -1294,6 +1294,34 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
       },
+      finalClassBuildLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            classInputs: [
+              {
+                classId: 'class.hex-adept',
+                version: '1.0.0',
+                level: 1,
+                appliedGrantLevels: [1],
+                sourceIds: ['class:class.hex-adept@1.0.0:1'],
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            classInputs: [
+              {
+                classId: 'class.raider',
+                version: '1.0.0',
+                level: 1,
+                appliedGrantLevels: [],
+                sourceIds: [],
+              },
+            ],
+          },
+        ],
+      },
       currentTurnActionUsage: {
         roundNumber: 2,
         turnIndex: 0,
@@ -1662,6 +1690,34 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
       },
+      finalClassBuildLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            classInputs: [
+              {
+                classId: 'class.hex-adept',
+                version: '1.0.0',
+                level: 1,
+                appliedGrantLevels: [1],
+                sourceIds: ['class:class.hex-adept@1.0.0:1'],
+              },
+            ],
+          },
+          {
+            combatantId: 'entity-raider',
+            classInputs: [
+              {
+                classId: 'class.raider',
+                version: '1.0.0',
+                level: 1,
+                appliedGrantLevels: [],
+                sourceIds: [],
+              },
+            ],
+          },
+        ],
+      },
       finalCurrentActorOptions: {
         roundNumber: 2,
         turnIndex: 0,
@@ -1962,6 +2018,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       executedStepCountMatches: true,
       actionResourceTransitionLogMatches: true,
       equipmentLedgerMatches: true,
+      classBuildLedgerMatches: true,
       equipmentTransitionLogMatches: true,
       modifierDurationExpirationLogMatches: true,
       replayedRun: {
@@ -2074,6 +2131,34 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
               inventoryItemIds: ['item.raider-mail'],
               equippedItemIds: ['item.raider-mail'],
               availableAbilityIds: [],
+            },
+          ],
+        },
+        finalClassBuildLedger: {
+          combatants: [
+            {
+              combatantId: 'entity-adept',
+              classInputs: [
+                {
+                  classId: 'class.hex-adept',
+                  version: '1.0.0',
+                  level: 1,
+                  appliedGrantLevels: [1],
+                  sourceIds: ['class:class.hex-adept@1.0.0:1'],
+                },
+              ],
+            },
+            {
+              combatantId: 'entity-raider',
+              classInputs: [
+                {
+                  classId: 'class.raider',
+                  version: '1.0.0',
+                  level: 1,
+                  appliedGrantLevels: [],
+                  sourceIds: [],
+                },
+              ],
             },
           ],
         },

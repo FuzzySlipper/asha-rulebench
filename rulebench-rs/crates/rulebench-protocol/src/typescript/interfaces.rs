@@ -327,6 +327,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "RulebenchEquipmentLedgerDto",
                 },
                 Field {
+                    name: "finalClassBuildLedger",
+                    ty: "RulebenchClassBuildLedgerDto",
+                },
+                Field {
                     name: "currentTurnActionUsage",
                     ty: "RulebenchActionUsageSummaryDto",
                 },
@@ -443,6 +447,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "finalEquipmentLedger",
                     ty: "RulebenchEquipmentLedgerDto",
+                },
+                Field {
+                    name: "finalClassBuildLedger",
+                    ty: "RulebenchClassBuildLedgerDto",
                 },
                 Field {
                     name: "finalCurrentActorOptions",
@@ -567,6 +575,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "equipmentLedgerMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "classBuildLedgerMatches",
                     ty: "boolean",
                 },
                 Field {
@@ -1349,6 +1361,51 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 name: "combatants",
                 ty: "readonly RulebenchCombatantEquipmentReadoutDto[]",
             }],
+        },
+        Interface {
+            name: "RulebenchClassBuildLedgerDto",
+            fields: &[Field {
+                name: "combatants",
+                ty: "readonly RulebenchCombatantClassBuildReadoutDto[]",
+            }],
+        },
+        Interface {
+            name: "RulebenchCombatantClassBuildReadoutDto",
+            fields: &[
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "classInputs",
+                    ty: "readonly RulebenchClassBuildInputReadoutDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchClassBuildInputReadoutDto",
+            fields: &[
+                Field {
+                    name: "classId",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "level",
+                    ty: "number",
+                },
+                Field {
+                    name: "appliedGrantLevels",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "sourceIds",
+                    ty: "readonly string[]",
+                },
+            ],
         },
         Interface {
             name: "RulebenchEquipmentCommandSpecDto",

@@ -1162,6 +1162,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
             .action_resource_transition_log
             .clone(),
         expected_run.final_snapshot.equipment_ledger.clone(),
+        expected_run.final_snapshot.class_build_ledger.clone(),
         expected_run.final_snapshot.equipment_transition_log.clone(),
         expected_run
             .final_snapshot
@@ -1180,6 +1181,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     assert!(readout.executed_step_count_matches);
     assert!(readout.action_resource_transition_log_matches);
     assert!(readout.equipment_ledger_matches);
+    assert!(readout.class_build_ledger_matches);
     assert!(readout.equipment_transition_log_matches);
     assert!(readout.modifier_duration_expiration_log_matches);
     assert_eq!(
@@ -1231,6 +1233,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
         expected_run.executed_step_count,
         expected_action_resource_transition_log,
         expected_run.final_snapshot.equipment_ledger.clone(),
+        expected_run.final_snapshot.class_build_ledger.clone(),
         expected_run.final_snapshot.equipment_transition_log.clone(),
         expected_modifier_duration_expiration_log,
     ));
@@ -1246,6 +1249,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     assert!(readout.executed_step_count_matches);
     assert!(!readout.action_resource_transition_log_matches);
     assert!(readout.equipment_ledger_matches);
+    assert!(readout.class_build_ledger_matches);
     assert!(readout.equipment_transition_log_matches);
     assert!(!readout.modifier_duration_expiration_log_matches);
     assert_eq!(

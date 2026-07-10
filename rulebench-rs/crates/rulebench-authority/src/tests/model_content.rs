@@ -247,8 +247,12 @@ fn scenario_carries_class_catalog_and_stat_definitions() {
         Some("class.hex-adept")
     );
     assert_eq!(
-        scenario.combatants[0].class_ids,
-        vec!["class.hex-adept".to_string()]
+        scenario.combatants[0].class_inputs,
+        vec![ClassLevelInput {
+            class_id: "class.hex-adept".to_string(),
+            version: "1.0.0".to_string(),
+            level: 1,
+        }]
     );
     assert_eq!(
         scenario.stat_definition_by_id("mind").map(|stat| stat.kind),

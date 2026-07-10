@@ -27,6 +27,10 @@ impl CombatSessionState {
         self.state.equipment_ledger()
     }
 
+    pub fn class_build_ledger(&self) -> ClassBuildLedgerReadout {
+        self.state.class_build_ledger()
+    }
+
     pub fn modifier_duration_expiration_log(&self) -> &[ModifierDurationExpirationEntry] {
         &self.modifier_duration_expiration_log
     }
@@ -126,6 +130,7 @@ impl CombatSessionState {
             turn_transition_log: self.turn_transition_log.clone(),
             action_resource_ledger: self.state.action_resource_ledger(),
             equipment_ledger: self.state.equipment_ledger(),
+            class_build_ledger: self.state.class_build_ledger(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
             combat_end_condition: combat_end_condition_readout(&current_scenario),

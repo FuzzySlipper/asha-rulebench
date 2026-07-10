@@ -416,6 +416,32 @@ describe("RulebenchTransport fixtures", () => {
           availableAbilityIds: [],
         },
       ]);
+      expect(result.value.finalClassBuildLedger.combatants).toEqual([
+        {
+          combatantId: "entity-adept",
+          classInputs: [
+            {
+              classId: "class.hex-adept",
+              version: "1.0.0",
+              level: 1,
+              appliedGrantLevels: [1],
+              sourceIds: ["class:class.hex-adept@1.0.0:1"],
+            },
+          ],
+        },
+        {
+          combatantId: "entity-raider",
+          classInputs: [
+            {
+              classId: "class.raider",
+              version: "1.0.0",
+              level: 1,
+              appliedGrantLevels: [],
+              sourceIds: [],
+            },
+          ],
+        },
+      ]);
       expect(result.value.finalCurrentActorOptions).toEqual({
         roundNumber: 2,
         turnIndex: 0,
@@ -982,6 +1008,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.executedStepCountMatches).toBe(true);
       expect(result.value.actionResourceTransitionLogMatches).toBe(true);
       expect(result.value.equipmentLedgerMatches).toBe(true);
+      expect(result.value.classBuildLedgerMatches).toBe(true);
       expect(result.value.equipmentTransitionLogMatches).toBe(true);
       expect(result.value.modifierDurationExpirationLogMatches).toBe(true);
       expect(result.value.replayedRun.id).toBe(

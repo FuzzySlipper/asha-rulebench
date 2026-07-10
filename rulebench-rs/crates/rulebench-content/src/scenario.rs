@@ -27,7 +27,7 @@ pub struct Combatant {
     pub position: GridPosition,
     pub hit_points: BoundedValue,
     pub temporary_vitality: i32,
-    pub class_ids: Vec<String>,
+    pub class_inputs: Vec<ClassLevelInput>,
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
     pub resource_pools: Vec<ActionResourcePool>,
@@ -172,14 +172,14 @@ pub struct ItemDefinition {
     pub summary: String,
     pub tags: Vec<String>,
     pub equipment_slot: String,
-    pub requirements: Vec<EquipmentRequirement>,
+    pub requirements: Vec<StatRequirement>,
     pub granted_modifier_ids: Vec<String>,
     pub granted_ability_ids: Vec<String>,
     pub granted_resource_pools: Vec<ActionResourcePool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EquipmentRequirement {
+pub struct StatRequirement {
     pub stat_id: String,
     pub minimum: i32,
 }
@@ -188,8 +188,26 @@ pub struct EquipmentRequirement {
 pub struct ClassDefinition {
     pub id: String,
     pub name: String,
+    pub version: String,
     pub summary: String,
     pub tags: Vec<String>,
+    pub prerequisites: Vec<StatRequirement>,
+    pub level_grants: Vec<ClassLevelGrant>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassLevelGrant {
+    pub level: u32,
+    pub granted_modifier_ids: Vec<String>,
+    pub granted_ability_ids: Vec<String>,
+    pub granted_resource_pools: Vec<ActionResourcePool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassLevelInput {
+    pub class_id: String,
+    pub version: String,
+    pub level: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

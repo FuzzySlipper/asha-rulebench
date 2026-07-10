@@ -7,10 +7,10 @@ use combatant::CombatantState;
 use crate::model::{
     ActionResourceKind, ActionResourceLedgerReadout, ActionResourceRefreshDecisionKind,
     ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
-    ActiveModifier, CombatantActionResourceReadout, CombatantEquipmentReadout, DamageOutcome,
-    EquipmentLedgerReadout, HealingOutcome, ItemDefinition, ModifierDefinition,
-    ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario, ScenarioProjection,
-    TemporaryVitalityOutcome,
+    ActiveModifier, ClassBuildLedgerReadout, CombatantActionResourceReadout,
+    CombatantClassBuildReadout, CombatantEquipmentReadout, DamageOutcome, EquipmentLedgerReadout,
+    HealingOutcome, ItemDefinition, ModifierDefinition, ModifierDurationExpirationReadout,
+    ModifierOutcome, RulebenchScenario, ScenarioProjection, TemporaryVitalityOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,7 +25,12 @@ impl CombatState {
                 .combatants
                 .iter()
                 .map(|combatant| {
-                    CombatantState::from_combatant(combatant, &scenario.items, &scenario.modifiers)
+                    CombatantState::from_combatant(
+                        combatant,
+                        &scenario.items,
+                        &scenario.classes,
+                        &scenario.modifiers,
+                    )
                 })
                 .collect(),
         }
@@ -122,6 +127,23 @@ impl CombatState {
                 .map(CombatantState::equipment_readout)
                 .collect(),
         }
+    }
+
+    pub fn class_build_ledger(&self) -> ClassBuildLedgerReadout {
+        ClassBuildLedgerReadout {
+            combatants: self
+                .combatants
+                .iter()
+                .map(CombatantState::class_build_readout)
+                .collect(),
+        }
+    }
+
+    pub fn class_build_for(&self, combatant_id: &str) -> Option<CombatantClassBuildReadout> {
+        self.combatants
+            .iter()
+            .find(|combatant| combatant.id == combatant_id)
+            .map(CombatantState::class_build_readout)
     }
 
     pub fn equipment_for(&self, combatant_id: &str) -> Option<CombatantEquipmentReadout> {
@@ -387,7 +409,7 @@ mod tests {
                 max: 12,
             },
             temporary_vitality: 0,
-            class_ids: Vec::new(),
+            class_inputs: Vec::new(),
             stats: StatBlock {
                 base_stats: Vec::new(),
                 derived_stats: Vec::new(),

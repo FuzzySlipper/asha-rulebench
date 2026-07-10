@@ -164,6 +164,12 @@ pub(crate) fn render_script_readout(readout: &CombatSessionScriptReadout) -> Str
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalClassBuildLedger: ");
+    out.push_str(&render_class_build_ledger(
+        &readout.final_snapshot.class_build_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      currentTurnActionUsage: ");
     out.push_str(&render_action_usage_summary(
         &readout.final_snapshot.current_turn_action_usage,
@@ -286,6 +292,12 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
     out.push_str("      finalEquipmentLedger: ");
     out.push_str(&render_equipment_ledger(
         &readout.final_snapshot.equipment_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
+    out.push_str("      finalClassBuildLedger: ");
+    out.push_str(&render_class_build_ledger(
+        &readout.final_snapshot.class_build_ledger,
         "      ",
     ));
     out.push_str(",\n");
@@ -420,6 +432,10 @@ pub(crate) fn render_automatic_run_replay_readout(
     out.push_str(&format!(
         "      equipmentLedgerMatches: {},\n",
         readout.equipment_ledger_matches
+    ));
+    out.push_str(&format!(
+        "      classBuildLedgerMatches: {},\n",
+        readout.class_build_ledger_matches
     ));
     out.push_str(&format!(
         "      equipmentTransitionLogMatches: {},\n",

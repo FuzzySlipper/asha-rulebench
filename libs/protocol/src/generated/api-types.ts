@@ -182,6 +182,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalTurnOrder: RulebenchCombatTurnOrderDto;
   readonly finalActionResourceLedger: RulebenchActionResourceLedgerDto;
   readonly finalEquipmentLedger: RulebenchEquipmentLedgerDto;
+  readonly finalClassBuildLedger: RulebenchClassBuildLedgerDto;
   readonly currentTurnActionUsage: RulebenchActionUsageSummaryDto;
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
@@ -215,6 +216,7 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly finalState: RulebenchFinalStateDto;
   readonly finalActionResourceLedger: RulebenchActionResourceLedgerDto;
   readonly finalEquipmentLedger: RulebenchEquipmentLedgerDto;
+  readonly finalClassBuildLedger: RulebenchClassBuildLedgerDto;
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
   readonly finalCombatEndCondition: RulebenchCombatEndConditionDto;
@@ -248,6 +250,7 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly executedStepCountMatches: boolean;
   readonly actionResourceTransitionLogMatches: boolean;
   readonly equipmentLedgerMatches: boolean;
+  readonly classBuildLedgerMatches: boolean;
   readonly equipmentTransitionLogMatches: boolean;
   readonly modifierDurationExpirationLogMatches: boolean;
   readonly replayedRun: RulebenchAutomaticRunReadoutDto;
@@ -484,6 +487,23 @@ export interface RulebenchActionResourceLedgerDto {
 
 export interface RulebenchEquipmentLedgerDto {
   readonly combatants: readonly RulebenchCombatantEquipmentReadoutDto[];
+}
+
+export interface RulebenchClassBuildLedgerDto {
+  readonly combatants: readonly RulebenchCombatantClassBuildReadoutDto[];
+}
+
+export interface RulebenchCombatantClassBuildReadoutDto {
+  readonly combatantId: string;
+  readonly classInputs: readonly RulebenchClassBuildInputReadoutDto[];
+}
+
+export interface RulebenchClassBuildInputReadoutDto {
+  readonly classId: string;
+  readonly version: string;
+  readonly level: number;
+  readonly appliedGrantLevels: readonly number[];
+  readonly sourceIds: readonly string[];
 }
 
 export interface RulebenchEquipmentCommandSpecDto {

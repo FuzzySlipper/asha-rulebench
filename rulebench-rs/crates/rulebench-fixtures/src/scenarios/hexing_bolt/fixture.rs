@@ -326,12 +326,12 @@ fn hexing_bolt_items() -> Vec<ItemDefinition> {
             summary: "A small focus that supports the Adept's hexing magic.".to_string(),
             tags: vec!["focus".to_string(), "implement".to_string()],
             equipment_slot: "implement".to_string(),
-            requirements: vec![EquipmentRequirement {
+            requirements: vec![StatRequirement {
                 stat_id: "mind".to_string(),
                 minimum: 3,
             }],
             granted_modifier_ids: Vec::new(),
-            granted_ability_ids: vec!["ability.hexing-bolt".to_string()],
+            granted_ability_ids: Vec::new(),
             granted_resource_pools: Vec::new(),
         },
         ItemDefinition {
@@ -340,7 +340,7 @@ fn hexing_bolt_items() -> Vec<ItemDefinition> {
             summary: "Rough armor worn by the Raider.".to_string(),
             tags: vec!["armor".to_string()],
             equipment_slot: "armor".to_string(),
-            requirements: vec![EquipmentRequirement {
+            requirements: vec![StatRequirement {
                 stat_id: "body".to_string(),
                 minimum: 2,
             }],
@@ -356,14 +356,28 @@ fn hexing_bolt_classes() -> Vec<ClassDefinition> {
         ClassDefinition {
             id: "class.hex-adept".to_string(),
             name: "Hex Adept".to_string(),
-            summary: "A focused caster class marker; structural content only.".to_string(),
+            version: "1.0.0".to_string(),
+            summary: "A focused caster class that grants Hexing Bolt.".to_string(),
             tags: vec!["caster".to_string()],
+            prerequisites: vec![StatRequirement {
+                stat_id: "mind".to_string(),
+                minimum: 3,
+            }],
+            level_grants: vec![ClassLevelGrant {
+                level: 1,
+                granted_modifier_ids: Vec::new(),
+                granted_ability_ids: vec!["ability.hexing-bolt".to_string()],
+                granted_resource_pools: Vec::new(),
+            }],
         },
         ClassDefinition {
             id: "class.raider".to_string(),
             name: "Raider".to_string(),
-            summary: "A hostile skirmisher class marker; structural content only.".to_string(),
+            version: "1.0.0".to_string(),
+            summary: "A hostile skirmisher class input.".to_string(),
             tags: vec!["martial".to_string()],
+            prerequisites: Vec::new(),
+            level_grants: Vec::new(),
         },
     ]
 }
@@ -468,7 +482,11 @@ fn adept_initial() -> Combatant {
             max: 24,
         },
         temporary_vitality: 0,
-        class_ids: vec!["class.hex-adept".to_string()],
+        class_inputs: vec![ClassLevelInput {
+            class_id: "class.hex-adept".to_string(),
+            version: "1.0.0".to_string(),
+            level: 1,
+        }],
         stats: StatBlock {
             base_stats: vec![
                 NamedNumber {
@@ -519,7 +537,11 @@ fn raider_initial() -> Combatant {
             max: 18,
         },
         temporary_vitality: 0,
-        class_ids: vec!["class.raider".to_string()],
+        class_inputs: vec![ClassLevelInput {
+            class_id: "class.raider".to_string(),
+            version: "1.0.0".to_string(),
+            level: 1,
+        }],
         stats: StatBlock {
             base_stats: vec![
                 NamedNumber {

@@ -1,8 +1,8 @@
 /// Session command, audit, and snapshot readbacks.
 use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
-    CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase, CombatTurnOrder,
-    CommandOutcomeClass, EquipmentLedgerReadout, EquipmentTransitionEntry,
+    ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase,
+    CombatTurnOrder, CommandOutcomeClass, EquipmentLedgerReadout, EquipmentTransitionEntry,
     LifecycleTransitionEntry, ModifierDurationExpirationEntry, RollConsumptionEntry,
     RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint,
     TargetLegality, TurnTransitionEntry, UseActionIntent,
@@ -336,6 +336,7 @@ pub struct CombatSessionSnapshot {
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub action_resource_ledger: ActionResourceLedgerReadout,
     pub equipment_ledger: EquipmentLedgerReadout,
+    pub class_build_ledger: ClassBuildLedgerReadout,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
     pub combat_end_condition: CombatEndConditionReadout,

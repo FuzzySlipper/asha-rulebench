@@ -672,7 +672,7 @@ mod tests {
             summary: "Equipment integration fixture.".to_string(),
             tags: vec!["focus".to_string()],
             equipment_slot: "implement".to_string(),
-            requirements: vec![EquipmentRequirement {
+            requirements: vec![StatRequirement {
                 stat_id: "mind".to_string(),
                 minimum: 1,
             }],
@@ -778,6 +778,110 @@ mod tests {
         assert_eq!(
             after_end.decision_kind,
             EquipmentDecisionKind::RejectedByLifecycle
+        );
+    }
+
+    #[test]
+    fn api_applies_versioned_cumulative_class_grants() {
+        let mut scenario = valid_scenario();
+        scenario.combatants[0].base_ability_ids.clear();
+        scenario.combatants[0].class_inputs = vec![ClassLevelInput {
+            class_id: "class.api-adept".to_string(),
+            version: "1.2.0".to_string(),
+            level: 2,
+        }];
+        scenario.classes.push(ClassDefinition {
+            id: "class.api-adept".to_string(),
+            name: "API Adept".to_string(),
+            version: "1.2.0".to_string(),
+            summary: "Class grant integration fixture.".to_string(),
+            tags: vec!["caster".to_string()],
+            prerequisites: vec![StatRequirement {
+                stat_id: "mind".to_string(),
+                minimum: 1,
+            }],
+            level_grants: vec![
+                ClassLevelGrant {
+                    level: 1,
+                    granted_modifier_ids: Vec::new(),
+                    granted_ability_ids: vec!["ability.api".to_string()],
+                    granted_resource_pools: Vec::new(),
+                },
+                ClassLevelGrant {
+                    level: 2,
+                    granted_modifier_ids: vec!["marked".to_string()],
+                    granted_ability_ids: Vec::new(),
+                    granted_resource_pools: vec![ActionResourcePool {
+                        id: "class-charge".to_string(),
+                        kind: ActionResourceKind::Charge,
+                        maximum: 2,
+                        refresh_policy: ActionResourceRefreshPolicy::Never,
+                    }],
+                },
+            ],
+        });
+        let class_cost = ActionResourceCost {
+            resource_id: "class-charge".to_string(),
+            amount: 1,
+        };
+        scenario.actions[0].resource_costs.push(class_cost.clone());
+        scenario.selected_action.resource_costs.push(class_cost);
+        scenario.modifiers[0]
+            .stat_adjustments
+            .push(ModifierStatAdjustment {
+                stat_id: "mind".to_string(),
+                stat_label: "Mind".to_string(),
+                delta: 1,
+            });
+
+        let granted_scenario =
+            crate::CombatState::from_scenario(&scenario).apply_to_scenario(scenario.clone());
+        let granted_stats = crate::effective_stats_for_combatant(&granted_scenario, "adept")
+            .expect("class modifier feeds effective stat evaluation");
+        assert_eq!(
+            granted_stats
+                .stats
+                .iter()
+                .find(|stat| stat.stat_id == "mind")
+                .map(|stat| stat.effective_value),
+            Some(2)
+        );
+
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new("class-grants", scenario))
+            .expect("versioned class build is valid");
+        let snapshot = api
+            .snapshot(&created.session)
+            .expect("class build snapshot");
+        let build = &snapshot.class_build_ledger.combatants[0].class_inputs[0];
+        assert_eq!(build.class_id, "class.api-adept");
+        assert_eq!(build.version, "1.2.0");
+        assert_eq!(build.level, 2);
+        assert_eq!(build.applied_grant_levels, vec![1, 2]);
+        assert_eq!(
+            build.source_ids,
+            vec![
+                "class:class.api-adept@1.2.0:1".to_string(),
+                "class:class.api-adept@1.2.0:2".to_string(),
+            ]
+        );
+        let class_resource = snapshot.action_resource_ledger.combatants[0]
+            .resources
+            .iter()
+            .find(|resource| resource.resource_id == "class-charge")
+            .expect("class resource exists");
+        assert_eq!(class_resource.source_id, "class:class.api-adept@1.2.0:2");
+        assert!(snapshot.current_state.combatants[0]
+            .conditions
+            .contains(&"marked".to_string()));
+        assert!(
+            api.preflight_command(
+                &created.session,
+                UseActionIntent::new("adept", "api_bolt", "raider"),
+            )
+            .expect("class-granted action preflight")
+            .accepted
         );
     }
 
@@ -899,7 +1003,7 @@ mod tests {
                 max: hit_points,
             },
             temporary_vitality: 0,
-            class_ids: Vec::new(),
+            class_inputs: Vec::new(),
             stats: StatBlock {
                 base_stats: vec![NamedNumber {
                     id: "mind".to_string(),

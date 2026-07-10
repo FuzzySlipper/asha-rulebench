@@ -238,6 +238,113 @@ fn validate_classes(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentD
                 format!("Class id {} appears more than once.", class.id),
             ));
         }
+        if class.version.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyClassVersion,
+                Some(class.id.clone()),
+                format!("Class {} has an empty version.", class.id),
+            ));
+        }
+        for requirement in &class.prerequisites {
+            if scenario
+                .stat_definition_by_id(&requirement.stat_id)
+                .is_none()
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingClassPrerequisiteStat,
+                    Some(class.id.clone()),
+                    format!(
+                        "Class {} requires missing stat {}.",
+                        class.id, requirement.stat_id
+                    ),
+                ));
+            }
+        }
+        let mut grant_levels = HashSet::new();
+        let mut granted_resource_ids = HashSet::new();
+        for grant in &class.level_grants {
+            if grant.level == 0 {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidClassGrantLevel,
+                    Some(class.id.clone()),
+                    format!("Class {} declares a level-zero grant.", class.id),
+                ));
+            }
+            if !grant_levels.insert(grant.level) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::DuplicateClassGrantLevel,
+                    Some(class.id.clone()),
+                    format!(
+                        "Class {} declares level {} grants more than once.",
+                        class.id, grant.level
+                    ),
+                ));
+            }
+            for modifier_id in &grant.granted_modifier_ids {
+                if scenario.modifier_by_id(modifier_id).is_none() {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::MissingClassGrantedModifier,
+                        Some(class.id.clone()),
+                        format!(
+                            "Class {} grants missing modifier {}.",
+                            class.id, modifier_id
+                        ),
+                    ));
+                }
+            }
+            for ability_id in &grant.granted_ability_ids {
+                if scenario.ability_by_id(ability_id).is_none() {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::MissingClassGrantedAbility,
+                        Some(class.id.clone()),
+                        format!("Class {} grants missing ability {}.", class.id, ability_id),
+                    ));
+                }
+            }
+            for pool in &grant.granted_resource_pools {
+                if pool.id.is_empty() {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::EmptyActionResourcePoolId,
+                        Some(class.id.clone()),
+                        format!(
+                            "Class {} grants a resource pool with an empty id.",
+                            class.id
+                        ),
+                    ));
+                    continue;
+                }
+                if !granted_resource_ids.insert(pool.id.clone()) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::DuplicateActionResourcePoolId,
+                        Some(pool.id.clone()),
+                        format!(
+                            "Class {} grants resource pool {} more than once.",
+                            class.id, pool.id
+                        ),
+                    ));
+                }
+                if pool.maximum == 0 || i32::try_from(pool.maximum).is_err() {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::InvalidActionResourcePoolMaximum,
+                        Some(pool.id.clone()),
+                        format!(
+                            "Class {} resource pool {} has unsupported maximum {}.",
+                            class.id, pool.id, pool.maximum
+                        ),
+                    ));
+                }
+                if pool.refresh_policy == ActionResourceRefreshPolicy::Turns(0) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::InvalidActionResourceRefreshPolicy,
+                        Some(pool.id.clone()),
+                        format!(
+                            "Class {} resource pool {} declares a zero-turn refresh clock.",
+                            class.id, pool.id
+                        ),
+                    ));
+                }
+            }
+        }
     }
 
     if let Some(selected_class_id) = &scenario.selected_class_id {
@@ -506,16 +613,85 @@ fn validate_combatant_class_and_stat_references(
             ));
         }
 
-        for class_id in &combatant.class_ids {
-            if scenario.class_by_id(class_id).is_none() {
+        let mut seen_combatant_classes = HashSet::new();
+        let mut class_resource_ids = combatant
+            .resource_pools
+            .iter()
+            .map(|pool| pool.id.clone())
+            .collect::<HashSet<_>>();
+        for input in &combatant.class_inputs {
+            if !seen_combatant_classes.insert(input.class_id.clone()) {
                 diagnostics.push(ContentDiagnostic::error(
-                    ContentDiagnosticCode::MissingCombatantClass,
-                    Some(class_id.clone()),
+                    ContentDiagnosticCode::DuplicateCombatantClass,
+                    Some(input.class_id.clone()),
                     format!(
-                        "Combatant {} references class {} that is not present in the scenario class catalog.",
-                        combatant.id, class_id
+                        "Combatant {} declares class {} more than once.",
+                        combatant.id, input.class_id
                     ),
                 ));
+            }
+            if input.level == 0 {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidClassInputLevel,
+                    Some(input.class_id.clone()),
+                    format!(
+                        "Combatant {} declares a level-zero class input.",
+                        combatant.id
+                    ),
+                ));
+            }
+            let Some(class) = scenario.class_by_id(&input.class_id) else {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingCombatantClass,
+                    Some(input.class_id.clone()),
+                    format!(
+                        "Combatant {} references class {} that is not present in the scenario class catalog.",
+                        combatant.id, input.class_id
+                    ),
+                ));
+                continue;
+            };
+            if input.version != class.version {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::ClassVersionMismatch,
+                    Some(input.class_id.clone()),
+                    format!(
+                        "Combatant {} requests class {} version {}, but catalog version is {}.",
+                        combatant.id, input.class_id, input.version, class.version
+                    ),
+                ));
+            }
+            for requirement in &class.prerequisites {
+                if !combatant
+                    .stat_by_id(&requirement.stat_id)
+                    .is_some_and(|stat| stat.value >= requirement.minimum)
+                {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::ClassPrerequisiteNotMet,
+                        Some(input.class_id.clone()),
+                        format!(
+                            "Combatant {} does not meet class {} prerequisite {} >= {}.",
+                            combatant.id, input.class_id, requirement.stat_id, requirement.minimum
+                        ),
+                    ));
+                }
+            }
+            for pool in class
+                .level_grants
+                .iter()
+                .filter(|grant| grant.level <= input.level)
+                .flat_map(|grant| &grant.granted_resource_pools)
+            {
+                if !class_resource_ids.insert(pool.id.clone()) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::ClassResourcePoolConflict,
+                        Some(input.class_id.clone()),
+                        format!(
+                            "Combatant {} receives duplicate resource pool {} from class {}.",
+                            combatant.id, pool.id, input.class_id
+                        ),
+                    ));
+                }
             }
         }
 
@@ -730,6 +906,18 @@ fn validate_items(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDia
             .iter()
             .map(|pool| pool.id.clone())
             .collect::<HashSet<_>>();
+        for input in &combatant.class_inputs {
+            if let Some(class) = scenario.class_by_id(&input.class_id) {
+                resource_pool_ids.extend(
+                    class
+                        .level_grants
+                        .iter()
+                        .filter(|grant| grant.level <= input.level)
+                        .flat_map(|grant| &grant.granted_resource_pools)
+                        .map(|pool| pool.id.clone()),
+                );
+            }
+        }
         for item_id in &combatant.equipped_item_ids {
             if !equipped_ids.insert(item_id.clone()) {
                 diagnostics.push(ContentDiagnostic::error(
@@ -935,7 +1123,20 @@ fn validate_action_references(
                 .item_by_id(item_id)
                 .is_some_and(|item| item.granted_ability_ids.contains(&action.ability_id))
         });
-        if scenario.ability_by_id(&action.ability_id).is_some() && !base_ability && !item_ability {
+        let class_ability = actor.class_inputs.iter().any(|input| {
+            scenario.class_by_id(&input.class_id).is_some_and(|class| {
+                class
+                    .level_grants
+                    .iter()
+                    .filter(|grant| grant.level <= input.level)
+                    .any(|grant| grant.granted_ability_ids.contains(&action.ability_id))
+            })
+        });
+        if scenario.ability_by_id(&action.ability_id).is_some()
+            && !base_ability
+            && !item_ability
+            && !class_ability
+        {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::MissingActionAbilityGrant,
                 Some(action.id.clone()),
@@ -1028,7 +1229,17 @@ fn validate_action_resource_costs(
                     .any(|pool| pool.id == cost.resource_id)
             })
         });
-        if !base_pool_exists && !inventory_pool_exists {
+        let class_pool_exists = actor.class_inputs.iter().any(|input| {
+            scenario.class_by_id(&input.class_id).is_some_and(|class| {
+                class
+                    .level_grants
+                    .iter()
+                    .filter(|grant| grant.level <= input.level)
+                    .flat_map(|grant| &grant.granted_resource_pools)
+                    .any(|pool| pool.id == cost.resource_id)
+            })
+        });
+        if !base_pool_exists && !inventory_pool_exists && !class_pool_exists {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::MissingActionResourcePool,
                 Some(cost.resource_id.clone()),

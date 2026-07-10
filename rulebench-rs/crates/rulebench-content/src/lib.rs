@@ -17,11 +17,11 @@ pub use diagnostics::{
     ScenarioMetadata,
 };
 pub use scenario::{
-    ClassDefinition, Combatant, CombatantEffectiveStatReadout,
+    ClassDefinition, ClassLevelGrant, ClassLevelInput, Combatant, CombatantEffectiveStatReadout,
     CombatantModifierStatAdjustmentReadout, DamageAdjustment, DamageAdjustmentPolicy,
-    EffectiveStatReadout, EntityDefinition, EquipmentRequirement, Grid, GridCell, ItemDefinition,
-    ModifierDefinition, ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
-    ModifierStatAdjustmentContribution, RulebenchScenario, UseActionIntent,
+    EffectiveStatReadout, EntityDefinition, Grid, GridCell, ItemDefinition, ModifierDefinition,
+    ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
+    ModifierStatAdjustmentContribution, RulebenchScenario, StatRequirement, UseActionIntent,
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
 pub use validation::{validate_scenario_content, validate_scenario_content_report};

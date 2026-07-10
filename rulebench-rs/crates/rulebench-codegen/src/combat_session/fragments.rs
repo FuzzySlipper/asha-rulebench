@@ -4,7 +4,7 @@ use crate::ts_emit::{ts_string, ts_string_array};
 use rulebench_fixtures::{
     ActionResourceLedgerReadout, ActionResourceRefreshPolicy, ActionResourceState,
     ActionResourceTransitionEntry, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
-    CombatControlHistoryEntry, CombatEndConditionReadout, CombatLogEntry,
+    ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatEndConditionReadout, CombatLogEntry,
     CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
     CombatantEquipmentReadout, CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt,
     CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
@@ -13,6 +13,45 @@ use rulebench_fixtures::{
     ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, RulebenchRejection,
     ScenarioProjection, TurnTransitionEntry,
 };
+
+pub(crate) fn render_class_build_ledger(ledger: &ClassBuildLedgerReadout, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  combatants: [\n"));
+    for combatant in &ledger.combatants {
+        out.push_str(&format!("{indent}    {{\n"));
+        out.push_str(&format!(
+            "{indent}      combatantId: {},\n",
+            ts_string(&combatant.combatant_id)
+        ));
+        out.push_str(&format!("{indent}      classInputs: [\n"));
+        for input in &combatant.class_inputs {
+            out.push_str(&format!("{indent}        {{\n"));
+            out.push_str(&format!(
+                "{indent}          classId: {},\n",
+                ts_string(&input.class_id)
+            ));
+            out.push_str(&format!(
+                "{indent}          version: {},\n",
+                ts_string(&input.version)
+            ));
+            out.push_str(&format!("{indent}          level: {},\n", input.level));
+            out.push_str(&format!(
+                "{indent}          appliedGrantLevels: {:?},\n",
+                input.applied_grant_levels
+            ));
+            out.push_str(&format!(
+                "{indent}          sourceIds: {},\n",
+                ts_string_array(&input.source_ids)
+            ));
+            out.push_str(&format!("{indent}        }},\n"));
+        }
+        out.push_str(&format!("{indent}      ],\n"));
+        out.push_str(&format!("{indent}    }},\n"));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
 
 pub(crate) fn render_equipment_ledger(ledger: &EquipmentLedgerReadout, indent: &str) -> String {
     let mut out = String::from("{\n");

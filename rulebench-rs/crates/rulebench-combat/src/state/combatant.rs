@@ -3,10 +3,10 @@
 use crate::model::{
     ActionResourceKind, ActionResourceRefreshDecisionKind, ActionResourceRefreshReadout,
     ActionResourceSpendDecisionKind, ActionResourceSpendReadout, ActionResourceState,
-    ActiveModifier, BoundedValue, Combatant, CombatantActionResourceReadout, FinalCombatantState,
-    ItemDefinition, ModifierDefinition, ModifierDurationExpirationDecisionKind,
-    ModifierDurationExpirationReadout, ModifierDurationPolicy, ModifierOutcome,
-    ModifierStackingPolicy, ModifierTenure,
+    ActiveModifier, BoundedValue, ClassBuildInputReadout, ClassDefinition, ClassLevelInput,
+    Combatant, CombatantActionResourceReadout, FinalCombatantState, ItemDefinition,
+    ModifierDefinition, ModifierDurationExpirationDecisionKind, ModifierDurationExpirationReadout,
+    ModifierDurationPolicy, ModifierOutcome, ModifierStackingPolicy, ModifierTenure,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,12 +22,14 @@ pub(super) struct CombatantState {
     pub(super) equipped_item_ids: Vec<String>,
     pub(super) base_ability_ids: Vec<String>,
     pub(super) available_ability_ids: Vec<String>,
+    pub(super) class_inputs: Vec<ClassBuildInputReadout>,
 }
 
 impl CombatantState {
     pub(super) fn from_combatant(
         combatant: &Combatant,
         items: &[ItemDefinition],
+        classes: &[ClassDefinition],
         modifiers: &[ModifierDefinition],
     ) -> Self {
         let mut state = Self {
@@ -42,7 +44,14 @@ impl CombatantState {
             equipped_item_ids: Vec::new(),
             base_ability_ids: combatant.base_ability_ids.clone(),
             available_ability_ids: combatant.base_ability_ids.clone(),
+            class_inputs: Vec::new(),
         };
+        for input in &combatant.class_inputs {
+            if let Some(class) = classes.iter().find(|class| class.id == input.class_id) {
+                state.apply_class_grants(class, input, modifiers);
+            }
+        }
+        state.base_ability_ids = state.available_ability_ids.clone();
         for item_id in &combatant.equipped_item_ids {
             if let Some(item) = items.iter().find(|item| item.id == *item_id) {
                 state.apply_item_grants(item, modifiers);
@@ -75,7 +84,63 @@ impl CombatantState {
             equipped_item_ids: Vec::new(),
             base_ability_ids: Vec::new(),
             available_ability_ids: Vec::new(),
+            class_inputs: Vec::new(),
         }
+    }
+
+    pub(super) fn apply_class_grants(
+        &mut self,
+        class: &ClassDefinition,
+        input: &ClassLevelInput,
+        modifiers: &[ModifierDefinition],
+    ) {
+        let grants = class
+            .level_grants
+            .iter()
+            .filter(|grant| grant.level <= input.level)
+            .collect::<Vec<_>>();
+        let source_ids = grants
+            .iter()
+            .map(|grant| class_grant_source_id(class, grant.level))
+            .collect::<Vec<_>>();
+        for (grant, source_id) in grants.iter().zip(&source_ids) {
+            for modifier_id in &grant.granted_modifier_ids {
+                if let Some(definition) = modifiers
+                    .iter()
+                    .find(|modifier| modifier.id == *modifier_id)
+                {
+                    self.apply_active_modifier(ActiveModifier {
+                        modifier_id: definition.id.clone(),
+                        source_id: source_id.clone(),
+                        label: definition.label.clone(),
+                        duration: "class grant".to_string(),
+                        tenure: ModifierTenure::Permanent,
+                        stacking_group: definition.stacking_group.clone(),
+                        stacking_policy: definition.stacking_policy,
+                        duration_policy: ModifierDurationPolicy::Permanent,
+                        remaining_turns: None,
+                        remaining_rounds: None,
+                    });
+                }
+            }
+            for ability_id in &grant.granted_ability_ids {
+                if !self.available_ability_ids.contains(ability_id) {
+                    self.available_ability_ids.push(ability_id.clone());
+                }
+            }
+            self.action_resources.extend(
+                grant.granted_resource_pools.iter().map(|pool| {
+                    ActionResourceState::from_pool_with_source(pool, source_id.clone())
+                }),
+            );
+        }
+        self.class_inputs.push(ClassBuildInputReadout {
+            class_id: input.class_id.clone(),
+            version: input.version.clone(),
+            level: input.level,
+            applied_grant_levels: grants.iter().map(|grant| grant.level).collect(),
+            source_ids,
+        });
     }
 
     pub(super) fn apply_item_grants(
@@ -200,6 +265,13 @@ impl CombatantState {
             inventory_item_ids: self.inventory_item_ids.clone(),
             equipped_item_ids: self.equipped_item_ids.clone(),
             available_ability_ids: self.available_ability_ids.clone(),
+        }
+    }
+
+    pub(super) fn class_build_readout(&self) -> crate::model::CombatantClassBuildReadout {
+        crate::model::CombatantClassBuildReadout {
+            combatant_id: self.id.clone(),
+            class_inputs: self.class_inputs.clone(),
         }
     }
 
@@ -588,4 +660,8 @@ fn action_resources_from_combatant(combatant: &Combatant) -> Vec<ActionResourceS
         .iter()
         .map(ActionResourceState::from_pool)
         .collect()
+}
+
+fn class_grant_source_id(class: &ClassDefinition, level: u32) -> String {
+    format!("class:{}@{}:{}", class.id, class.version, level)
 }

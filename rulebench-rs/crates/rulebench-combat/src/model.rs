@@ -1,6 +1,7 @@
 pub const AUTHORITY_SURFACE: &str = "asha-rulebench.local-authority.v0";
 
 mod action_resources;
+mod class_build;
 mod combat_flow;
 mod control;
 mod effects;
@@ -9,6 +10,7 @@ mod projection;
 mod session;
 
 pub use action_resources::*;
+pub use class_build::*;
 pub use combat_flow::*;
 pub use control::*;
 pub use effects::*;

@@ -416,8 +416,11 @@ fn content_diagnostics_report_empty_class_id() {
     scenario.classes.push(ClassDefinition {
         id: String::new(),
         name: "Nameless".to_string(),
+        version: "1.0.0".to_string(),
         summary: "Invalid class fixture.".to_string(),
         tags: Vec::new(),
+        prerequisites: Vec::new(),
+        level_grants: Vec::new(),
     });
 
     let diagnostics = validate_scenario_content(&scenario);
@@ -461,7 +464,12 @@ fn content_diagnostics_report_selected_class_missing_from_catalog() {
 #[test]
 fn content_diagnostics_report_missing_combatant_class() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.combatants[0].class_ids = vec!["class.missing".to_string()];
+    scenario.combatants[0].class_inputs = vec![ClassLevelInput {
+        class_id: "class.missing".to_string(),
+        version: "1.0.0".to_string(),
+        level: 1,
+    }];
+    scenario.combatants[0].base_ability_ids = vec!["ability.hexing-bolt".to_string()];
 
     let diagnostics = validate_scenario_content(&scenario);
 
@@ -471,6 +479,41 @@ fn content_diagnostics_report_missing_combatant_class() {
         ContentDiagnosticCode::MissingCombatantClass
     );
     assert_eq!(diagnostics[0].content_id, Some("class.missing".to_string()));
+}
+
+#[test]
+fn content_diagnostics_reject_invalid_class_builds_and_grants() {
+    let mut version = hexing_bolt_fixture_scenario();
+    version.combatants[0].class_inputs[0].version = "2.0.0".to_string();
+    assert!(validate_scenario_content(&version)
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::ClassVersionMismatch));
+
+    let mut prerequisite = hexing_bolt_fixture_scenario();
+    prerequisite.classes[0].prerequisites[0].minimum = 99;
+    assert!(validate_scenario_content(&prerequisite)
+        .iter()
+        .any(|diagnostic| { diagnostic.code == ContentDiagnosticCode::ClassPrerequisiteNotMet }));
+
+    let mut grants = hexing_bolt_fixture_scenario();
+    let duplicate_grant = grants.classes[0].level_grants[0].clone();
+    grants.classes[0].level_grants.push(duplicate_grant);
+    grants.classes[0].level_grants[0]
+        .granted_ability_ids
+        .push("ability.missing".to_string());
+    grants.classes[0].level_grants[0]
+        .granted_modifier_ids
+        .push("modifier.missing".to_string());
+    let diagnostics = validate_scenario_content(&grants);
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::DuplicateClassGrantLevel));
+    assert!(diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::MissingClassGrantedAbility));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentDiagnosticCode::MissingClassGrantedModifier
+    }));
 }
 
 #[test]
