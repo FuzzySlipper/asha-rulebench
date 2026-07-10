@@ -6,7 +6,7 @@ use crate::{
 };
 use rulebench_ruleset::{RulesetCompatibilityError, RulesetMetadata};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContentPackDiagnosticCode {
     EmptyPackId,
     EmptyPackVersion,

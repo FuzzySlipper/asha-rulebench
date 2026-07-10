@@ -8,6 +8,7 @@
 mod active_modifier;
 mod canonical;
 mod diagnostics;
+mod import;
 mod pack;
 mod pack_validation;
 mod scenario;
@@ -19,6 +20,10 @@ pub use canonical::{canonicalize_content_pack, fingerprint_content_pack_set};
 pub use diagnostics::{
     ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity, ContentValidationReport,
     ScenarioMetadata,
+};
+pub use import::{
+    import_content_pack, AuthoredContentPack, ContentImportContext, ContentImportDiagnostic,
+    ContentImportDiagnosticCode, ContentImportLimits, ContentImportReport, ImportedContentPack,
 };
 pub use pack::{
     CanonicalContentPack, ContentDefinitionKind, ContentFingerprint, ContentPackCatalogs,
