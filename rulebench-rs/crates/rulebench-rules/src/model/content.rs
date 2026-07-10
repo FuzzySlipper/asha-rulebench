@@ -51,6 +51,7 @@ pub enum ContentDiagnosticCode {
     SelectedItemMissingFromCatalog,
     MissingCombatantEntity,
     MissingActionAbility,
+    CrossRulesetActionReference,
     MissingActionActor,
     MissingActionTarget,
     UnsupportedTargetingDeclaration,
@@ -112,6 +113,7 @@ impl ContentDiagnosticCode {
             }
             ContentDiagnosticCode::MissingCombatantEntity => "missingCombatantEntity",
             ContentDiagnosticCode::MissingActionAbility => "missingActionAbility",
+            ContentDiagnosticCode::CrossRulesetActionReference => "crossRulesetActionReference",
             ContentDiagnosticCode::MissingActionActor => "missingActionActor",
             ContentDiagnosticCode::MissingActionTarget => "missingActionTarget",
             ContentDiagnosticCode::UnsupportedTargetingDeclaration => {

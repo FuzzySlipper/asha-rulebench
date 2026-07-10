@@ -240,6 +240,7 @@ mod tests {
     fn test_action() -> ActionDefinition {
         ActionDefinition {
             id: "test-action".to_string(),
+            ruleset_id: "test-ruleset".to_string(),
             ability_id: "test-ability".to_string(),
             name: "Test Action".to_string(),
             actor_id: "entity-adept".to_string(),

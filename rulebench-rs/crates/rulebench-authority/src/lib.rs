@@ -47,7 +47,7 @@ pub use catalog::{
 };
 pub use fixtures::{
     accepted_hexing_bolt_fixture_receipt, hexing_bolt_fixture_scenario,
-    rejected_target_fixture_receipt,
+    rejected_target_fixture_receipt, turn_control_fixture_scenario,
 };
 pub use rulebench_rules::*;
 pub use rulebench_rules::{

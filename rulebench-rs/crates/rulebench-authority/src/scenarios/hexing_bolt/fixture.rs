@@ -45,6 +45,29 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
     }
 }
 
+pub fn turn_control_fixture_scenario() -> RulebenchScenario {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    let ruleset_id = "asha-rulebench.turn-control.v0".to_string();
+    scenario.rulesets[0] = RulesetMetadata {
+        id: ruleset_id.clone(),
+        name: "Turn Control Fixture Rules".to_string(),
+        version: "0.0.0".to_string(),
+        summary: "Minimal second ruleset proving static turn-control module selection.".to_string(),
+        modules: vec![
+            RuleModuleDeclaration::action_resolution(
+                ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight(),
+            ),
+            RuleModuleDeclaration::turn_control(
+                TurnControlModuleConfiguration::explicit_turn_order(),
+            ),
+        ],
+    };
+    scenario.selected_ruleset_id = ruleset_id.clone();
+    scenario.actions[0].ruleset_id = ruleset_id.clone();
+    scenario.selected_action.ruleset_id = ruleset_id;
+    scenario
+}
+
 fn hexing_bolt_ruleset() -> RulesetMetadata {
     RulesetMetadata {
         id: "asha-rulebench.hexing-bolt.v0".to_string(),
@@ -60,6 +83,7 @@ fn hexing_bolt_ruleset() -> RulesetMetadata {
 fn hexing_bolt_action() -> ActionDefinition {
     ActionDefinition {
         id: "hexing_bolt".to_string(),
+        ruleset_id: "asha-rulebench.hexing-bolt.v0".to_string(),
         ability_id: "ability.hexing-bolt".to_string(),
         name: "Hexing Bolt".to_string(),
         actor_id: "entity-adept".to_string(),

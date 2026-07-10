@@ -413,6 +413,22 @@ fn validate_action_references(
         ));
     }
 
+    if !scenario.selected_ruleset_id.is_empty()
+        && scenario
+            .selected_ruleset()
+            .is_some_and(|ruleset| !ruleset.id.is_empty())
+        && action.ruleset_id != scenario.selected_ruleset_id
+    {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::CrossRulesetActionReference,
+            Some(action.id.clone()),
+            format!(
+                "Action {} belongs to ruleset {} but scenario selected ruleset is {}.",
+                action.id, action.ruleset_id, scenario.selected_ruleset_id
+            ),
+        ));
+    }
+
     let actor = scenario
         .combatants
         .iter()

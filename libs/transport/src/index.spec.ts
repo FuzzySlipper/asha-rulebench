@@ -41,6 +41,13 @@ describe("RulebenchTransport fixtures", () => {
           summary:
             "Local single-action fixture ruleset for authority incubation.",
         },
+        {
+          id: "asha-rulebench.turn-control.v0",
+          name: "Turn Control Fixture Rules",
+          version: "0.0.0",
+          summary:
+            "Minimal second ruleset proving static turn-control module selection.",
+        },
       ]);
     }
   });
@@ -113,6 +120,7 @@ describe("RulebenchTransport fixtures", () => {
         "hexing-bolt-hit",
         "hexing-bolt-miss",
         "hexing-bolt-self-target-rejected",
+        "turn-control-hit",
       ]);
     }
     expect(result.ok).toBe(true);

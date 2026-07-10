@@ -107,6 +107,53 @@ fn resolver_accepts_hexing_bolt_hit_from_deterministic_roll_stream() {
 }
 
 #[test]
+fn second_ruleset_selects_turn_control_without_forking_resolution() {
+    let scenario = turn_control_fixture_scenario();
+    let ruleset = scenario
+        .selected_ruleset()
+        .expect("second ruleset is selected");
+
+    assert_eq!(ruleset.id, "asha-rulebench.turn-control.v0");
+    assert_eq!(ruleset.modules.len(), 2);
+    assert!(ruleset
+        .validate_modules()
+        .expect("valid modules")
+        .turn_control()
+        .is_some());
+    assert_eq!(
+        ruleset.validate_artifact_provenance(&ruleset.artifact_provenance()),
+        Ok(())
+    );
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[17, 5],
+    );
+
+    assert!(receipt.accepted);
+    assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+}
+
+#[test]
+fn ruleset_catalog_exposes_both_minimal_rulesets_by_identity() {
+    let catalog = ruleset_catalog_readout();
+
+    assert_eq!(catalog.selected_ruleset_id, "asha-rulebench.hexing-bolt.v0");
+    assert_eq!(
+        catalog
+            .rulesets
+            .iter()
+            .map(|ruleset| ruleset.id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "asha-rulebench.hexing-bolt.v0",
+            "asha-rulebench.turn-control.v0",
+        ]
+    );
+}
+
+#[test]
 fn resolver_rejects_rulesets_with_invalid_module_declarations() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.rulesets[0].modules.clear();
@@ -583,7 +630,8 @@ fn catalog_enumerates_stable_scenario_summaries() {
         vec![
             "hexing-bolt-hit",
             "hexing-bolt-miss",
-            "hexing-bolt-self-target-rejected"
+            "hexing-bolt-self-target-rejected",
+            "turn-control-hit"
         ]
     );
     assert_eq!(
@@ -591,7 +639,12 @@ fn catalog_enumerates_stable_scenario_summaries() {
             .iter()
             .map(|summary| summary.outcome_class.code())
             .collect::<Vec<_>>(),
-        vec!["acceptedHit", "acceptedMiss", "rejectedTargetLegality"]
+        vec![
+            "acceptedHit",
+            "acceptedMiss",
+            "rejectedTargetLegality",
+            "acceptedHit"
+        ]
     );
 }
 

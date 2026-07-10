@@ -1,4 +1,4 @@
-use super::fixture::hexing_bolt_fixture_scenario;
+use super::fixture::{hexing_bolt_fixture_scenario, turn_control_fixture_scenario};
 use crate::content::validate_scenario_content_report;
 use crate::model::*;
 
@@ -7,14 +7,42 @@ pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
         accepted_hit_catalog_case(),
         accepted_miss_catalog_case(),
         rejected_target_legality_catalog_case(),
+        turn_control_catalog_case(),
     ]
 }
 
+fn turn_control_catalog_case() -> ScenarioCatalogCase {
+    let mut scenario = turn_control_fixture_scenario();
+    scenario.metadata = ScenarioMetadata {
+        id: "turn-control-hit".to_string(),
+        title: "Turn Control Ruleset Hit".to_string(),
+        summary: "The second ruleset resolves the same minimal action with turn control selected."
+            .to_string(),
+        seed_label: "roll-stream:17,5".to_string(),
+    };
+    ScenarioCatalogCase {
+        summary: ScenarioCatalogSummary {
+            id: scenario.metadata.id.clone(),
+            title: scenario.metadata.title.clone(),
+            summary: scenario.metadata.summary.clone(),
+            seed_label: scenario.metadata.seed_label.clone(),
+            outcome_class: ScenarioOutcomeClass::AcceptedHit,
+        },
+        scenario,
+        intent: UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        roll_stream: vec![17, 5],
+    }
+}
+
 pub fn ruleset_catalog_readout() -> RulesetCatalogReadout {
-    let scenario = hexing_bolt_fixture_scenario();
+    let hexing_bolt_scenario = hexing_bolt_fixture_scenario();
+    let turn_control_scenario = turn_control_fixture_scenario();
     RulesetCatalogReadout {
-        selected_ruleset_id: scenario.selected_ruleset_id,
-        rulesets: scenario.rulesets,
+        selected_ruleset_id: hexing_bolt_scenario.selected_ruleset_id,
+        rulesets: vec![
+            hexing_bolt_scenario.rulesets[0].clone(),
+            turn_control_scenario.rulesets[0].clone(),
+        ],
     }
 }
 

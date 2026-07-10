@@ -656,6 +656,20 @@ fn content_diagnostics_report_missing_action_target() {
 }
 
 #[test]
+fn content_diagnostics_reject_cross_ruleset_action_references() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0].ruleset_id = "asha-rulebench.other.v0".to_string();
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::CrossRulesetActionReference
+    );
+}
+
+#[test]
 fn content_diagnostics_report_visible_target_outside_target_ids() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0]

@@ -5,6 +5,10 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
     fixture::hexing_bolt_fixture_scenario()
 }
 
+pub fn turn_control_fixture_scenario() -> RulebenchScenario {
+    fixture::turn_control_fixture_scenario()
+}
+
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
     fixture::accepted_hexing_bolt_fixture_receipt()
 }

@@ -464,6 +464,7 @@ pub struct AbilityDefinition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDefinition {
     pub id: String,
+    pub ruleset_id: String,
     pub ability_id: String,
     pub name: String,
     pub actor_id: String,

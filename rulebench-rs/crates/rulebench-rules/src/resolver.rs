@@ -117,6 +117,15 @@ pub fn resolve_use_action(
             trace,
         );
     };
+    if action.ruleset_id != scenario.selected_ruleset_id {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    }
     if action.actor_id != intent.actor_id {
         return rejected_with_projection(
             scenario,
