@@ -36,6 +36,20 @@ pub struct ScenarioOptionDto {
     pub id: String,
     pub title: String,
     pub summary: String,
+    pub ruleset_id: String,
+    pub ruleset_version: String,
+    pub content_pack_id: Option<String>,
+    pub content_pack_version: Option<String>,
+    pub participants: Vec<ScenarioParticipantOptionDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScenarioParticipantOptionDto {
+    pub id: String,
+    pub name: String,
+    pub side_id: String,
+    pub initiative: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,6 +57,8 @@ pub struct ScenarioOptionDto {
 pub struct CombatSessionCreateRequestDto {
     pub session_id: String,
     pub scenario_id: String,
+    #[serde(default)]
+    pub participant_order: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

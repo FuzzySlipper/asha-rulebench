@@ -44,6 +44,47 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "summary",
                     ty: "string",
                 },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "contentPackId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "contentPackVersion",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "participants",
+                    ty: "readonly RulebenchScenarioParticipantOptionDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchScenarioParticipantOptionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "sideId",
+                    ty: "string",
+                },
+                Field {
+                    name: "initiative",
+                    ty: "number",
+                },
             ],
         },
         Interface {
@@ -56,6 +97,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "scenarioId",
                     ty: "string",
+                },
+                Field {
+                    name: "participantOrder",
+                    ty: "readonly string[]",
                 },
             ],
         },

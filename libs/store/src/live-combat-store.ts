@@ -165,13 +165,18 @@ export class LiveCombatStore {
     this.clock.now();
   }
 
-  async createSession(sessionId: string, scenarioId: string): Promise<void> {
+  async createSession(
+    sessionId: string,
+    scenarioId: string,
+    participantOrder: readonly string[],
+  ): Promise<void> {
     this.selectSessionIdentity(sessionId);
     const generation = this.sessionGeneration;
     this._snapshot.set({ kind: "loading" });
     const result = await this.transport.createSession({
       sessionId,
       scenarioId,
+      participantOrder,
     });
     if (!this.isCurrent(sessionId, generation)) return;
     this._snapshot.set(

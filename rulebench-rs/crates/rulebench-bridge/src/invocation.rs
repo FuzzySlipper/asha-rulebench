@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
-    ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioOptionDto, UseActionIntentDto,
-    PROTOCOL_ID, PROTOCOL_VERSION,
+    ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioOptionDto,
+    ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 use rulebench_rules::{
     CombatControlReadout, CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
@@ -28,11 +28,38 @@ impl BridgeScenario {
         summary: impl Into<String>,
         scenario: RulebenchScenario,
     ) -> Self {
+        let ruleset_version = scenario
+            .selected_ruleset()
+            .map(|ruleset| ruleset.version.clone())
+            .unwrap_or_default();
+        let content_pack_id = scenario
+            .content_pack_set
+            .as_ref()
+            .map(|set| set.root.id.clone());
+        let content_pack_version = scenario
+            .content_pack_set
+            .as_ref()
+            .map(|set| set.root.version.clone());
+        let participants = scenario
+            .combatants
+            .iter()
+            .map(|combatant| ScenarioParticipantOptionDto {
+                id: combatant.id.clone(),
+                name: combatant.name.clone(),
+                side_id: combatant.side_id.clone(),
+                initiative: combatant.initiative,
+            })
+            .collect();
         Self {
             option: ScenarioOptionDto {
                 id: id.into(),
                 title: title.into(),
                 summary: summary.into(),
+                ruleset_id: scenario.selected_ruleset_id.clone(),
+                ruleset_version,
+                content_pack_id,
+                content_pack_version,
+                participants,
             },
             scenario,
         }
@@ -113,10 +140,12 @@ impl RulebenchBridge {
                 format!("Scenario does not exist: {}", request.scenario_id),
             )
         })?;
+        let configured_scenario =
+            configure_participant_order(scenario.scenario.clone(), &request.participant_order)?;
         self.sessions
             .create_session(rulebench_rules::CombatSessionCreateRequest::new(
                 &request.session_id,
-                scenario.scenario.clone(),
+                configured_scenario,
             ))
             .map_err(BridgeError::from_session_error)
     }
@@ -254,6 +283,56 @@ impl RulebenchBridge {
             ),
         ))
     }
+}
+
+fn configure_participant_order(
+    mut scenario: RulebenchScenario,
+    participant_order: &[String],
+) -> Result<RulebenchScenario, BridgeError> {
+    if participant_order.is_empty() {
+        return Ok(scenario);
+    }
+    if participant_order.len() != scenario.combatants.len() {
+        return Err(BridgeError::new(
+            BridgeErrorKind::InvalidRequest,
+            format!(
+                "Participant setup must include all {} scenario participants exactly once.",
+                scenario.combatants.len()
+            ),
+        ));
+    }
+    let mut combatants = scenario
+        .combatants
+        .into_iter()
+        .map(|combatant| (combatant.id.clone(), combatant))
+        .collect::<BTreeMap<_, _>>();
+    let mut ordered = Vec::with_capacity(participant_order.len());
+    for (index, participant_id) in participant_order.iter().enumerate() {
+        let Some(mut combatant) = combatants.remove(participant_id) else {
+            return Err(BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                format!(
+                    "Participant setup contains an unknown or duplicate participant id: {participant_id}."
+                ),
+            ));
+        };
+        combatant.initiative = i32::MAX
+            - i32::try_from(index).map_err(|_| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    "Participant setup contains too many participants.",
+                )
+            })?;
+        ordered.push(combatant);
+    }
+    if !combatants.is_empty() {
+        return Err(BridgeError::new(
+            BridgeErrorKind::InvalidRequest,
+            "Participant setup omitted a scenario participant.",
+        ));
+    }
+    scenario.combatants = ordered;
+    Ok(scenario)
 }
 
 fn require_command_id(command_id: &str) -> Result<(), BridgeError> {

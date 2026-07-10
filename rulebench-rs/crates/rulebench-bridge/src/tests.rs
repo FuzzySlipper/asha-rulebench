@@ -201,6 +201,7 @@ fn create(bridge: &mut RulebenchBridge, session_id: &str) -> CombatSessionHandle
             &CombatSessionCreateRequestDto {
                 session_id: session_id.to_string(),
                 scenario_id: "hexing-bolt".to_string(),
+                participant_order: Vec::new(),
             },
         )
         .expect("fixture session is valid");
@@ -365,6 +366,7 @@ fn bridge_rejects_duplicate_and_unknown_scenario_requests() {
             &CombatSessionCreateRequestDto {
                 session_id: "duplicate".to_string(),
                 scenario_id: "hexing-bolt".to_string(),
+                participant_order: Vec::new(),
             },
         )
         .expect_err("duplicate session must fail");
@@ -376,8 +378,50 @@ fn bridge_rejects_duplicate_and_unknown_scenario_requests() {
             &CombatSessionCreateRequestDto {
                 session_id: "unknown".to_string(),
                 scenario_id: "missing".to_string(),
+                participant_order: Vec::new(),
             },
         )
         .expect_err("unknown scenario must fail");
     assert_eq!(unknown.kind, BridgeErrorKind::UnknownScenario);
+}
+
+#[test]
+fn bridge_exposes_setup_metadata_and_validates_participant_order() {
+    let mut bridge = bridge();
+    let options = bridge
+        .list_scenarios(&context())
+        .expect("scenario options load");
+    let option = &options[0];
+    assert_eq!(option.ruleset_id, "bridge.v0");
+    assert_eq!(option.participants.len(), 2);
+
+    let created = bridge
+        .create_session(
+            &context(),
+            &CombatSessionCreateRequestDto {
+                session_id: "reordered".to_string(),
+                scenario_id: "hexing-bolt".to_string(),
+                participant_order: vec!["raider".to_string(), "adept".to_string()],
+            },
+        )
+        .expect("complete participant order is valid");
+    assert_eq!(
+        created.snapshot.turn_order.participant_order,
+        vec!["raider".to_string(), "adept".to_string()]
+    );
+
+    let invalid = bridge
+        .create_session(
+            &context(),
+            &CombatSessionCreateRequestDto {
+                session_id: "invalid-setup".to_string(),
+                scenario_id: "hexing-bolt".to_string(),
+                participant_order: vec!["adept".to_string()],
+            },
+        )
+        .expect_err("incomplete participant order is rejected");
+    assert_eq!(invalid.kind, BridgeErrorKind::InvalidRequest);
+    assert!(invalid
+        .message
+        .contains("include all 2 scenario participants"));
 }

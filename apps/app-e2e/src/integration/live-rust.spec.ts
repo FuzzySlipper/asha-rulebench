@@ -29,10 +29,39 @@ test("invokes live Rust authority through the Angular origin", async ({
     expect(scenarios.value.map((scenario) => scenario.id)).toContain(
       "hexing-bolt-hit",
     );
+    expect(
+      scenarios.value.find((scenario) => scenario.id === "hexing-bolt-hit"),
+    ).toEqual(
+      expect.objectContaining({
+        rulesetId: "asha-rulebench.hexing-bolt.v0",
+        participants: [
+          expect.objectContaining({ id: "entity-adept", sideId: "ally" }),
+          expect.objectContaining({ id: "entity-raider", sideId: "enemy" }),
+        ],
+      }),
+    );
+
+    await expect(
+      transport.createSession({
+        sessionId: "e2e-invalid-setup",
+        scenarioId: "hexing-bolt-hit",
+        participantOrder: ["entity-adept"],
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        kind: "bridge",
+        code: "invalidRequest",
+        message:
+          "Participant setup must include all 2 scenario participants exactly once.",
+        retryable: false,
+      },
+    });
 
     const created = await transport.createSession({
       sessionId,
       scenarioId: "hexing-bolt-hit",
+      participantOrder: ["entity-adept", "entity-raider"],
     });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
@@ -203,4 +232,51 @@ test("shows Rust automatic step and bounded-run decisions", async ({ page }) => 
   await workspace.getByRole("button", { name: "End", exact: true }).click();
   await workspace.getByRole("button", { name: "Close", exact: true }).click();
   await expect(workspace.getByRole("region", { name: "Live session state" })).toHaveCount(0);
+});
+
+test("configures participants from Rust scenario readbacks", async ({ page }) => {
+  await page.goto("/");
+  const workspace = page.getByRole("region", { name: "Live combat controls" });
+  await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
+  await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
+
+  const setup = workspace.getByRole("region", { name: "Scenario setup" });
+  await expect(setup).toContainText("asha-rulebench.hexing-bolt.v0");
+  await expect(setup).toContainText("Adept · ally · initiative 15");
+  await expect(setup).toContainText("Raider · enemy · initiative 10");
+
+  await setup.getByRole("button", { name: "Later" }).first().click();
+  await workspace.getByLabel("Session").fill("e2e-reordered-setup-session");
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  const sessionState = workspace.getByRole("region", { name: "Live session state" });
+  await expect(sessionState).toContainText("actor entity-raider");
+  await workspace.getByRole("button", { name: "End", exact: true }).click();
+  await workspace.getByRole("button", { name: "Close", exact: true }).click();
+
+  await page.route("**/api/rulebench/v1/sessions", async (route) => {
+    const body: unknown = route.request().postDataJSON();
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      !("participantOrder" in body) ||
+      !Array.isArray(body.participantOrder)
+    ) {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch({
+      postData: JSON.stringify({
+        ...body,
+        participantOrder: body.participantOrder.slice(0, 1),
+      }),
+    });
+    await route.fulfill({ response });
+  });
+  await workspace
+    .getByRole("textbox", { name: "Session" })
+    .fill("e2e-visible-invalid-setup");
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  await expect(workspace.getByRole("alert")).toContainText(
+    "invalidRequest · Participant setup must include all 2 scenario participants exactly once.",
+  );
 });

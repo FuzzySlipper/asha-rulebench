@@ -42,7 +42,11 @@ describe("LiveCombatStore", () => {
       listScenarios: async () => ({
         ok: true,
         value: [
-          { id: "scenario", title: "Scenario", summary: "Test scenario." },
+          {
+            id: "scenario", title: "Scenario", summary: "Test scenario.",
+            rulesetId: "rules", rulesetVersion: "1.0.0", contentPackId: null, contentPackVersion: null,
+            participants: [],
+          },
         ],
       }),
       getSession: async () => ({ ok: true, value: snapshot }),

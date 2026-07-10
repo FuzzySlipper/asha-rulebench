@@ -52,6 +52,7 @@ fn router_serializes_lifecycle_and_isolates_multiple_sessions() {
             &CombatSessionCreateRequestDto {
                 session_id: session_id.to_string(),
                 scenario_id: scenario_id.clone(),
+                participant_order: Vec::new(),
             },
         ));
         assert_eq!(created.status, 200);
@@ -113,6 +114,7 @@ fn router_classifies_version_serialization_handle_and_lifecycle_errors() {
         &CombatSessionCreateRequestDto {
             session_id: "ready".to_string(),
             scenario_id: scenarios[0].id.clone(),
+            participant_order: Vec::new(),
         },
     ));
     assert_eq!(created.status, 200);

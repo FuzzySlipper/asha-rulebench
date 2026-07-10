@@ -384,11 +384,24 @@ export interface RulebenchScenarioOptionDto {
   readonly id: string;
   readonly title: string;
   readonly summary: string;
+  readonly rulesetId: string;
+  readonly rulesetVersion: string;
+  readonly contentPackId: string | null;
+  readonly contentPackVersion: string | null;
+  readonly participants: readonly RulebenchScenarioParticipantOptionDto[];
+}
+
+export interface RulebenchScenarioParticipantOptionDto {
+  readonly id: string;
+  readonly name: string;
+  readonly sideId: string;
+  readonly initiative: number;
 }
 
 export interface RulebenchCombatSessionCreateRequestDto {
   readonly sessionId: string;
   readonly scenarioId: string;
+  readonly participantOrder: readonly string[];
 }
 
 export interface RulebenchCombatSessionIntentCommandDto {

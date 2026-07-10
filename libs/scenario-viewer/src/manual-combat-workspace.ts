@@ -64,6 +64,19 @@ import { LiveCombatStore } from '@asha-rulebench/store';
               <label>Session <input #sessionId [value]="sessionIdInput()" (input)="setSessionId(sessionId.value)" /></label>
               <button type="button" [disabled]="!canCreateSession()" (click)="createSession()">Create session</button>
             </div>
+            @if (selectedScenario(); as scenario) {
+              <section class="evidence-grid" aria-label="Scenario setup">
+                <section class="evidence"><h4>Ruleset</h4><p>{{ scenario.rulesetId }} · {{ scenario.rulesetVersion }}</p></section>
+                <section class="evidence"><h4>Content</h4><p>{{ scenario.contentPackId === null ? 'Built-in fixture content' : scenario.contentPackId + ' · ' + scenario.contentPackVersion }}</p></section>
+                <section class="evidence"><h4>Participant order</h4>
+                  @for (participantId of participantOrder(); track participantId; let index = $index) {
+                    @if (participantById(participantId); as participant) {
+                      <div class="choice-row"><span>{{ index + 1 }} · {{ participant.name }} · {{ participant.sideId }} · initiative {{ participant.initiative }}</span><button type="button" [disabled]="index === 0" (click)="moveParticipant(index, -1)">Earlier</button><button type="button" [disabled]="index === participantOrder().length - 1" (click)="moveParticipant(index, 1)">Later</button></div>
+                    }
+                  }
+                </section>
+              </section>
+            }
             @if (sessions().kind === 'data' && sessions().value.length > 0) {
               <div class="choice-row" aria-label="Live sessions">
                 @for (session of sessions().value; track session.sessionId) {
@@ -185,6 +198,10 @@ export class ManualCombatWorkspaceComponent implements OnInit {
   protected readonly automaticStep = computed(() => this.store.automaticStep());
   protected readonly automaticRun = computed(() => this.store.automaticRun());
   protected readonly selectedScenarioId = computed(() => this.store.selectedScenarioId());
+  protected readonly selectedScenario = computed(() => {
+    const scenarios = this.scenarios();
+    return scenarios.kind === 'data' ? scenarios.value.find((scenario) => scenario.id === this.selectedScenarioId()) ?? null : null;
+  });
   protected readonly selectedSessionId = computed(() => this.store.selectedSessionId());
   protected readonly intent = computed(() => this.store.intent());
   protected readonly sessionIdInput = signal('manual-session');
@@ -193,6 +210,7 @@ export class ManualCombatWorkspaceComponent implements OnInit {
   protected readonly automaticRollInput = signal('17,5,2,5,17,5');
   protected readonly maxStepsInput = signal('8');
   protected readonly noCandidateBehavior = signal<'advanceTurn' | 'stopRun'>('advanceTurn');
+  protected readonly participantOrder = signal<readonly string[]>([]);
   private commandSequence = 0;
   protected readonly busy = computed(() =>
     [this.snapshot(), this.options(), this.candidates(), this.preflight(), this.submission(), this.store.control()].some((state) => state.kind === 'loading'),
@@ -213,7 +231,7 @@ export class ManualCombatWorkspaceComponent implements OnInit {
   protected connect(): void { void this.initialize(); }
   protected disconnect(): void { this.store.disconnect(); }
   protected refreshSessions(): void { void this.store.loadSessions(); }
-  protected selectScenario(id: string): void { this.store.selectScenario(id); }
+  protected selectScenario(id: string): void { this.store.selectScenario(id); this.syncParticipantOrder(); }
   protected setSessionId(value: string): void { this.sessionIdInput.set(value); }
   protected setAttackRoll(value: string): void { this.attackRollInput.set(value); }
   protected setDamageRoll(value: string): void { this.damageRollInput.set(value); }
@@ -221,10 +239,21 @@ export class ManualCombatWorkspaceComponent implements OnInit {
     this.store.setIntent({ actorId: actorId ?? '', actionId, targetId: this.intent().targetId });
   }
   protected selectTarget(targetId: string): void { this.store.setIntent({ ...this.intent(), targetId }); }
+  protected participantById(participantId: string) { return this.selectedScenario()?.participants.find((participant) => participant.id === participantId) ?? null; }
+  protected moveParticipant(index: number, offset: -1 | 1): void {
+    const next = [...this.participantOrder()];
+    const targetIndex = index + offset;
+    const current = next[index];
+    const target = next[targetIndex];
+    if (current === undefined || target === undefined) return;
+    next[index] = target;
+    next[targetIndex] = current;
+    this.participantOrder.set(next);
+  }
   protected createSession(): void {
     const scenarioId = this.selectedScenarioId();
     if (scenarioId === null) return;
-    void this.store.createSession(this.sessionIdInput().trim(), scenarioId).then(() => this.refreshEvidence());
+    void this.store.createSession(this.sessionIdInput().trim(), scenarioId, this.participantOrder()).then(() => this.refreshEvidence());
   }
   protected selectSession(sessionId: string): void { void this.store.selectSession(sessionId).then(() => this.refreshEvidence()); }
   protected controlCombat(kind: 'explicitStart' | 'explicitEnd' | 'advanceTurn'): void {
@@ -270,6 +299,7 @@ export class ManualCombatWorkspaceComponent implements OnInit {
     await this.store.connect();
     if (this.store.connection().kind !== 'data') return;
     await Promise.all([this.store.loadScenarios(), this.store.loadSessions()]);
+    this.syncParticipantOrder();
   }
   private rollStream(): readonly number[] | null {
     const attack = Number(this.attackRollInput());
@@ -286,5 +316,8 @@ export class ManualCombatWorkspaceComponent implements OnInit {
   }
   private automationPolicy(): { readonly id: string; readonly version: number; readonly noCandidateBehavior: 'advanceTurn' | 'stopRun' } {
     return { id: 'firstAcceptedCandidate', version: 1, noCandidateBehavior: this.noCandidateBehavior() };
+  }
+  private syncParticipantOrder(): void {
+    this.participantOrder.set(this.selectedScenario()?.participants.map((participant) => participant.id) ?? []);
   }
 }

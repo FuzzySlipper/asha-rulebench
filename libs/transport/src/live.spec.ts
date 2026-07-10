@@ -56,6 +56,7 @@ describe("live Rulebench transport", () => {
     const createRequest = {
       sessionId: "session/one",
       scenarioId: "hexing-bolt-hit",
+      participantOrder: ["entity-adept", "entity-raider"],
     };
     const intent = {
       actorId: "adept",
@@ -235,7 +236,11 @@ describe("live Rulebench transport", () => {
 describe("fake live Rulebench transport", () => {
   it("has interface parity and returns configured authority evidence by identity", async () => {
     const scenarios: readonly RulebenchScenarioOptionDto[] = [
-      { id: "scenario", title: "Scenario", summary: "Authority fixture." },
+      {
+        id: "scenario", title: "Scenario", summary: "Authority fixture.",
+        rulesetId: "rules", rulesetVersion: "1.0.0", contentPackId: null, contentPackVersion: null,
+        participants: [],
+      },
     ];
     const transport = createFakeRulebenchLiveTransport({
       connect: async () => ({ ok: true, value: handshake }),

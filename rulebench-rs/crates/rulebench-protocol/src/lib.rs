@@ -22,8 +22,8 @@ pub use bridge::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatAutomationNoCandidateBehaviorDto,
     CombatAutomationPolicyDto, CombatControlCommandDto, CombatControlCommandKindDto,
     CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, ProtocolHandshakeDto,
-    ProtocolRequestContextDto, ScenarioOptionDto, UseActionIntentDto, PROTOCOL_ID,
-    PROTOCOL_VERSION,
+    ProtocolRequestContextDto, ScenarioOptionDto, ScenarioParticipantOptionDto, UseActionIntentDto,
+    PROTOCOL_ID, PROTOCOL_VERSION,
 };
 pub use content::{
     ContentFingerprintDto, ContentImportDiagnosticDto, ContentImportReadoutDto,
