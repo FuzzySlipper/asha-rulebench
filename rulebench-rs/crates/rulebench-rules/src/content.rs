@@ -492,6 +492,7 @@ fn validate_action_references(
         validate_actor_attack_stat(action, attack, actor, diagnostics);
     }
     validate_hit_modifier(scenario, action, diagnostics);
+    validate_effect_operations(action, diagnostics);
 
     for target_id in &action.targeting.target_ids {
         if let Some(target) = scenario
@@ -502,6 +503,22 @@ fn validate_action_references(
             if let Some(attack) = action.attack_check() {
                 validate_target_defense(action, attack, target, diagnostics);
             }
+        }
+    }
+}
+
+fn validate_effect_operations(action: &ActionDefinition, diagnostics: &mut Vec<ContentDiagnostic>) {
+    for operation in &action.hit.operations {
+        if !operation.is_currently_supported() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::UnsupportedEffectOperation,
+                Some(action.id.clone()),
+                format!(
+                    "Action {} declares effect operation {} without a Rust runtime handler.",
+                    action.id,
+                    operation.id().code()
+                ),
+            ));
         }
     }
 }

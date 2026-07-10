@@ -112,6 +112,31 @@ fn content_diagnostics_reject_unimplemented_targeting_and_check_declarations() {
 }
 
 #[test]
+fn content_diagnostics_reject_unimplemented_effect_operations() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0]
+        .hit
+        .operations
+        .push(HitEffectOperation::Heal(HealingEffectOperation {
+            healing_bonus: 3,
+            healing_type: "vitality".to_string(),
+        }));
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::UnsupportedEffectOperation
+    );
+    assert_eq!(
+        ContentDiagnosticCode::UnsupportedEffectOperation.code(),
+        "unsupportedEffectOperation"
+    );
+    assert!(diagnostics[0].message.contains("heal"));
+}
+
+#[test]
 fn content_diagnostics_report_empty_action_id() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0].id.clear();

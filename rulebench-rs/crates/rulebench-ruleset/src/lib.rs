@@ -446,7 +446,11 @@ impl HitEffect {
             .iter()
             .find_map(|operation| match operation {
                 HitEffectOperation::Damage(damage) => Some(damage),
-                HitEffectOperation::ApplyModifier(_) => None,
+                HitEffectOperation::Heal(_)
+                | HitEffectOperation::ApplyModifier(_)
+                | HitEffectOperation::Move(_)
+                | HitEffectOperation::ChangeResource(_)
+                | HitEffectOperation::OpenReactionWindow(_) => None,
             })
     }
 
@@ -454,7 +458,11 @@ impl HitEffect {
         self.operations
             .iter()
             .find_map(|operation| match operation {
-                HitEffectOperation::Damage(_) => None,
+                HitEffectOperation::Damage(_)
+                | HitEffectOperation::Heal(_)
+                | HitEffectOperation::Move(_)
+                | HitEffectOperation::ChangeResource(_)
+                | HitEffectOperation::OpenReactionWindow(_) => None,
                 HitEffectOperation::ApplyModifier(modifier) => Some(modifier),
             })
     }
@@ -464,7 +472,57 @@ impl HitEffect {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HitEffectOperation {
     Damage(DamageEffectOperation),
+    Heal(HealingEffectOperation),
     ApplyModifier(ModifierEffectOperation),
+    Move(MovementEffectOperation),
+    ChangeResource(ResourceChangeEffectOperation),
+    OpenReactionWindow(ReactionHookEffectOperation),
+}
+
+impl HitEffectOperation {
+    pub const fn id(&self) -> EffectOperationId {
+        match self {
+            HitEffectOperation::Damage(_) => EffectOperationId::Damage,
+            HitEffectOperation::Heal(_) => EffectOperationId::Heal,
+            HitEffectOperation::ApplyModifier(_) => EffectOperationId::ApplyModifier,
+            HitEffectOperation::Move(_) => EffectOperationId::Move,
+            HitEffectOperation::ChangeResource(_) => EffectOperationId::ChangeResource,
+            HitEffectOperation::OpenReactionWindow(_) => EffectOperationId::OpenReactionWindow,
+        }
+    }
+
+    pub const fn is_currently_supported(&self) -> bool {
+        matches!(
+            self,
+            HitEffectOperation::Damage(_) | HitEffectOperation::ApplyModifier(_)
+        )
+    }
+}
+
+/// Stable identifiers for effect-operation declarations and future trace entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffectOperationId {
+    Damage,
+    Heal,
+    ApplyModifier,
+    Move,
+    ChangeResource,
+    OpenReactionWindow,
+}
+
+impl EffectOperationId {
+    pub const VOCABULARY_VERSION: &'static str = "1";
+
+    pub const fn code(self) -> &'static str {
+        match self {
+            EffectOperationId::Damage => "damage",
+            EffectOperationId::Heal => "heal",
+            EffectOperationId::ApplyModifier => "applyModifier",
+            EffectOperationId::Move => "move",
+            EffectOperationId::ChangeResource => "changeResource",
+            EffectOperationId::OpenReactionWindow => "openReactionWindow",
+        }
+    }
 }
 
 /// A damage operation declaration.
@@ -474,12 +532,53 @@ pub struct DamageEffectOperation {
     pub damage_type: String,
 }
 
+/// A healing operation declaration. Runtime application is not implemented yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealingEffectOperation {
+    pub healing_bonus: i32,
+    pub healing_type: String,
+}
+
 /// A modifier application operation declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModifierEffectOperation {
     pub modifier_id: String,
     pub modifier_label: String,
     pub modifier_duration: String,
+}
+
+/// A movement operation declaration. Runtime application is not implemented yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MovementEffectOperation {
+    pub maximum_distance: u32,
+    pub movement_kind: MovementKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovementKind {
+    Push,
+    Pull,
+    Shift,
+}
+
+/// A resource mutation declaration. Runtime application is not implemented yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceChangeEffectOperation {
+    pub resource_id: String,
+    pub delta: i32,
+}
+
+/// A reaction-window declaration. Runtime window handling is not implemented yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReactionHookEffectOperation {
+    pub hook_id: String,
+    pub window: ReactionWindow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReactionWindow {
+    BeforeEffect,
+    AfterEffect,
 }
 
 /// Whether a modifier declaration survives beyond a temporary combat window.
@@ -502,9 +601,9 @@ impl ModifierTenure {
 mod tests {
     use super::{
         validate_rule_modules, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
-        DamageEffectOperation, HitEffect, HitEffectOperation, ModifierEffectOperation,
-        ModifierTenure, RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
-        TurnControlModuleConfiguration,
+        DamageEffectOperation, EffectOperationId, HealingEffectOperation, HitEffect,
+        HitEffectOperation, ModifierEffectOperation, ModifierTenure, RuleModuleConfiguration,
+        RuleModuleDeclaration, RuleModuleId, TurnControlModuleConfiguration,
     };
 
     #[test]
@@ -545,6 +644,28 @@ mod tests {
         assert_eq!(AbilityDefinitionKind::Spell.code(), "spell");
         assert_eq!(ModifierTenure::Permanent.code(), "permanent");
         assert_eq!(RuleModuleId::ActionResolution.code(), "actionResolution");
+        assert_eq!(EffectOperationId::VOCABULARY_VERSION, "1");
+        assert_eq!(
+            EffectOperationId::OpenReactionWindow.code(),
+            "openReactionWindow"
+        );
+    }
+
+    #[test]
+    fn effect_operations_expose_stable_identity_and_handler_status() {
+        let damage = HitEffectOperation::Damage(DamageEffectOperation {
+            damage_bonus: 1,
+            damage_type: "fire".to_string(),
+        });
+        let healing = HitEffectOperation::Heal(HealingEffectOperation {
+            healing_bonus: 1,
+            healing_type: "vitality".to_string(),
+        });
+
+        assert_eq!(damage.id(), EffectOperationId::Damage);
+        assert!(damage.is_currently_supported());
+        assert_eq!(healing.id(), EffectOperationId::Heal);
+        assert!(!healing.is_currently_supported());
     }
 
     #[test]
