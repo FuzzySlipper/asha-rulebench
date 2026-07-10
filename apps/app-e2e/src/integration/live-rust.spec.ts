@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { createLiveRulebenchTransport } from "@asha-rulebench/transport";
 
+test.describe.configure({ mode: "serial" });
+
 test("invokes live Rust authority through the Angular origin", async ({
   page,
 }) => {
@@ -146,4 +148,34 @@ test("invokes live Rust authority through the Angular origin", async ({
     }
     transport.disconnect();
   }
+});
+
+test("completes a supported scenario through the visible manual workspace", async ({ page }) => {
+  await page.goto("/");
+  const workspace = page.getByRole("region", { name: "Live combat controls" });
+
+  await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
+  await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
+  await workspace.getByLabel("Session").fill("e2e-visible-manual-session");
+  await workspace.getByRole("button", { name: "Create session" }).click();
+
+  const sessionState = workspace.getByRole("region", { name: "Live session state" });
+  await expect(sessionState).toContainText("e2e-visible-manual-session · Ready");
+  await workspace.getByRole("button", { name: "Start", exact: true }).click();
+  await expect(sessionState).toContainText("In Progress");
+
+  await workspace.getByRole("button", { name: "Hexing Bolt", exact: true }).click();
+  await workspace.getByRole("button", { name: /Raider · 18\/18 HP/ }).click();
+  await workspace.getByRole("button", { name: "Preflight", exact: true }).click();
+  await expect(workspace.getByRole("region", { name: "Live preflight evidence" })).toContainText("Accepted");
+
+  await workspace.getByRole("button", { name: "Submit", exact: true }).click();
+  await expect(sessionState).toContainText("Raider9/18 HP · Active");
+  await expect(workspace.getByRole("region", { name: "Live combat log" })).toContainText("Damage Applied");
+  await expect(workspace.getByRole("region", { name: "Live command audit" })).toContainText("state changed");
+
+  await workspace.getByRole("button", { name: "End", exact: true }).click();
+  await expect(sessionState).toContainText("Ended");
+  await workspace.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(workspace.getByText("e2e-visible-manual-session · Ended")).toHaveCount(0);
 });

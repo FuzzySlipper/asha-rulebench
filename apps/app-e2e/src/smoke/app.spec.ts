@@ -47,18 +47,19 @@ test('boots the rulebench shell', async ({ page }) => {
 
   await expect(page.getByLabel('Combat session step')).toContainText('2 · Adept misses Raider');
 
-  await expect(page.getByRole('button', { name: 'Hexing Bolt Hit Accepted hit · roll-stream:17,5', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Hexing Bolt Miss/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Hexing Bolt Self Target Rejected/ })).toBeVisible();
+  const scenarioCatalog = page.getByRole('region', { name: 'Scenario catalog' });
+  await expect(scenarioCatalog.getByRole('button', { name: 'Hexing Bolt Hit Accepted hit · roll-stream:17,5', exact: true })).toBeVisible();
+  await expect(scenarioCatalog.getByRole('button', { name: /Hexing Bolt Miss/ })).toBeVisible();
+  await expect(scenarioCatalog.getByRole('button', { name: /Hexing Bolt Self Target Rejected/ })).toBeVisible();
 
-  await page.getByRole('button', { name: /Hexing Bolt Miss/ }).click();
+  await scenarioCatalog.getByRole('button', { name: /Hexing Bolt Miss/ }).click();
 
   await expect(page.getByText('Hexing Bolt Miss · roll-stream:2,5')).toBeVisible();
   await expect(page.getByLabel('DomainEvents timeline')).toContainText('AttackRolled');
   await expect(page.getByLabel('Rule trace')).toContainText('Miss branch selected');
   await expect(page.getByLabel('Final state')).toContainText('Attack missed; no authority state changed.');
 
-  await page.getByRole('button', { name: /Hexing Bolt Self Target Rejected/ }).click();
+  await scenarioCatalog.getByRole('button', { name: /Hexing Bolt Self Target Rejected/ }).click();
 
   await expect(page.getByText('Hexing Bolt Self Target Rejected · roll-stream:17,5')).toBeVisible();
   await expect(page.getByLabel('Selected action')).toContainText('Rejected: Target is not hostile.');

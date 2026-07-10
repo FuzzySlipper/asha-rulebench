@@ -4,9 +4,10 @@ import { RulebenchScenarioRendererComponent } from '@asha-rulebench/renderer';
 import { SessionStore } from '@asha-rulebench/store';
 import type { RulebenchCommandOutcomeClassDto, RulebenchScenarioOutcomeClassDto } from '@asha-rulebench/protocol';
 import { ContentWorkspaceComponent } from './content-workspace';
+import { ManualCombatWorkspaceComponent } from './manual-combat-workspace';
 
 @Component({
-  imports: [RulebenchScenarioRendererComponent, ContentWorkspaceComponent],
+  imports: [RulebenchScenarioRendererComponent, ContentWorkspaceComponent, ManualCombatWorkspaceComponent],
   selector: 'arb-scenario-viewer-feature',
   standalone: true,
   styles: [
@@ -165,6 +166,7 @@ import { ContentWorkspaceComponent } from './content-workspace';
   template: `
     <div class="viewer">
       <arb-content-workspace />
+      <arb-manual-combat-workspace />
       <section class="session" aria-label="Combat session">
         <h2>Combat Session</h2>
         @switch (sessionCatalog().kind) {
