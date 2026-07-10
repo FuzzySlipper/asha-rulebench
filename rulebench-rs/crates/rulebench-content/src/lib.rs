@@ -19,8 +19,8 @@ pub use diagnostics::{
 pub use scenario::{
     ClassDefinition, Combatant, CombatantEffectiveStatReadout,
     CombatantModifierStatAdjustmentReadout, DamageAdjustment, DamageAdjustmentPolicy,
-    EffectiveStatReadout, EntityDefinition, Grid, GridCell, ItemDefinition, ModifierDefinition,
-    ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
+    EffectiveStatReadout, EntityDefinition, EquipmentRequirement, Grid, GridCell, ItemDefinition,
+    ModifierDefinition, ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
     ModifierStatAdjustmentContribution, RulebenchScenario, UseActionIntent,
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};

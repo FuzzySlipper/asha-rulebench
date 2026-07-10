@@ -7,6 +7,7 @@ pub use rulebench_ruleset::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResourceState {
     pub resource_id: String,
+    pub source_id: String,
     pub kind: ActionResourceKind,
     pub current: i32,
     pub max: i32,
@@ -25,6 +26,7 @@ impl ActionResourceState {
         };
         Self {
             resource_id: resource_id.to_string(),
+            source_id: "base".to_string(),
             kind,
             current,
             max,
@@ -40,9 +42,14 @@ impl ActionResourceState {
     }
 
     pub fn from_pool(pool: &ActionResourcePool) -> Self {
+        Self::from_pool_with_source(pool, "base")
+    }
+
+    pub fn from_pool_with_source(pool: &ActionResourcePool, source_id: impl Into<String>) -> Self {
         let max = i32::try_from(pool.maximum).unwrap_or_default();
         Self {
             resource_id: pool.id.clone(),
+            source_id: source_id.into(),
             kind: pool.kind,
             current: max,
             max,

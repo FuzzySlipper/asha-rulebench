@@ -158,6 +158,12 @@ pub(crate) fn render_script_readout(readout: &CombatSessionScriptReadout) -> Str
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalEquipmentLedger: ");
+    out.push_str(&render_equipment_ledger(
+        &readout.final_snapshot.equipment_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      currentTurnActionUsage: ");
     out.push_str(&render_action_usage_summary(
         &readout.final_snapshot.current_turn_action_usage,
@@ -205,6 +211,11 @@ pub(crate) fn render_script_readout(readout: &CombatSessionScriptReadout) -> Str
     out.push_str("      actionResourceTransitionLog: [\n");
     for entry in &readout.final_snapshot.action_resource_transition_log {
         out.push_str(&render_action_resource_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      equipmentTransitionLog: [\n");
+    for entry in &readout.final_snapshot.equipment_transition_log {
+        out.push_str(&render_equipment_transition_entry(entry, "        "));
     }
     out.push_str("      ],\n");
     out.push_str("      modifierDurationExpirationLog: [\n");
@@ -272,6 +283,12 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
         "      ",
     ));
     out.push_str(",\n");
+    out.push_str("      finalEquipmentLedger: ");
+    out.push_str(&render_equipment_ledger(
+        &readout.final_snapshot.equipment_ledger,
+        "      ",
+    ));
+    out.push_str(",\n");
     out.push_str("      finalCurrentActorOptions: ");
     out.push_str(&render_current_actor_options(
         &readout.final_snapshot.current_actor_options,
@@ -318,6 +335,11 @@ pub(crate) fn render_automatic_run_readout(readout: &CombatSessionAutomaticRunRe
     out.push_str("      actionResourceTransitionLog: [\n");
     for entry in &readout.final_snapshot.action_resource_transition_log {
         out.push_str(&render_action_resource_transition_entry(entry, "        "));
+    }
+    out.push_str("      ],\n");
+    out.push_str("      equipmentTransitionLog: [\n");
+    for entry in &readout.final_snapshot.equipment_transition_log {
+        out.push_str(&render_equipment_transition_entry(entry, "        "));
     }
     out.push_str("      ],\n");
     out.push_str("      modifierDurationExpirationLog: [\n");
@@ -394,6 +416,14 @@ pub(crate) fn render_automatic_run_replay_readout(
     out.push_str(&format!(
         "      actionResourceTransitionLogMatches: {},\n",
         readout.action_resource_transition_log_matches
+    ));
+    out.push_str(&format!(
+        "      equipmentLedgerMatches: {},\n",
+        readout.equipment_ledger_matches
+    ));
+    out.push_str(&format!(
+        "      equipmentTransitionLogMatches: {},\n",
+        readout.equipment_transition_log_matches
     ));
     out.push_str(&format!(
         "      modifierDurationExpirationLogMatches: {},\n",

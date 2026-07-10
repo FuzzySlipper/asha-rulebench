@@ -4,7 +4,7 @@ use rulebench_combat::RulebenchScenario;
 use rulebench_combat::{
     ActionResourceTransitionEntry, CombatSessionAutomaticRunDecisionKind,
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec, CombatSessionState,
-    ModifierDurationExpirationEntry,
+    EquipmentLedgerReadout, EquipmentTransitionEntry, ModifierDurationExpirationEntry,
 };
 use rulebench_core::StateFingerprint;
 
@@ -20,6 +20,8 @@ pub struct CombatSessionAutomaticRunReplaySpec {
     pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub expected_executed_step_count: u32,
     pub expected_action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
+    pub expected_equipment_ledger: EquipmentLedgerReadout,
+    pub expected_equipment_transition_log: Vec<EquipmentTransitionEntry>,
     pub expected_modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
 }
 
@@ -35,6 +37,8 @@ impl CombatSessionAutomaticRunReplaySpec {
         expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
         expected_executed_step_count: u32,
         expected_action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
+        expected_equipment_ledger: EquipmentLedgerReadout,
+        expected_equipment_transition_log: Vec<EquipmentTransitionEntry>,
         expected_modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     ) -> Self {
         Self {
@@ -48,6 +52,8 @@ impl CombatSessionAutomaticRunReplaySpec {
             expected_run_decision_kind,
             expected_executed_step_count,
             expected_action_resource_transition_log,
+            expected_equipment_ledger,
+            expected_equipment_transition_log,
             expected_modifier_duration_expiration_log,
         }
     }
@@ -85,6 +91,8 @@ pub struct CombatSessionAutomaticRunReplayReadout {
     pub actual_executed_step_count: u32,
     pub executed_step_count_matches: bool,
     pub action_resource_transition_log_matches: bool,
+    pub equipment_ledger_matches: bool,
+    pub equipment_transition_log_matches: bool,
     pub modifier_duration_expiration_log_matches: bool,
     pub replayed_run: CombatSessionAutomaticRunReadout,
     pub reason: String,
@@ -111,6 +119,10 @@ pub fn verify_automatic_run_replay(
     let action_resource_transition_log_matches =
         replayed_run.final_snapshot.action_resource_transition_log
             == spec.expected_action_resource_transition_log;
+    let equipment_ledger_matches =
+        replayed_run.final_snapshot.equipment_ledger == spec.expected_equipment_ledger;
+    let equipment_transition_log_matches = replayed_run.final_snapshot.equipment_transition_log
+        == spec.expected_equipment_transition_log;
     let modifier_duration_expiration_log_matches =
         replayed_run.final_snapshot.modifier_duration_expiration_log
             == spec.expected_modifier_duration_expiration_log;
@@ -118,6 +130,8 @@ pub fn verify_automatic_run_replay(
         && run_decision_kind_matches
         && executed_step_count_matches
         && action_resource_transition_log_matches
+        && equipment_ledger_matches
+        && equipment_transition_log_matches
         && modifier_duration_expiration_log_matches;
     let decision_kind = if accepted {
         CombatSessionAutomaticRunReplayDecisionKind::Verified
@@ -147,6 +161,8 @@ pub fn verify_automatic_run_replay(
         actual_executed_step_count,
         executed_step_count_matches,
         action_resource_transition_log_matches,
+        equipment_ledger_matches,
+        equipment_transition_log_matches,
         modifier_duration_expiration_log_matches,
         replayed_run,
         reason,
@@ -183,6 +199,8 @@ mod tests {
                 .final_snapshot
                 .action_resource_transition_log
                 .clone(),
+            expected.final_snapshot.equipment_ledger.clone(),
+            expected.final_snapshot.equipment_transition_log.clone(),
             expected
                 .final_snapshot
                 .modifier_duration_expiration_log
@@ -198,6 +216,8 @@ mod tests {
         assert!(readout.run_decision_kind_matches);
         assert!(readout.executed_step_count_matches);
         assert!(readout.action_resource_transition_log_matches);
+        assert!(readout.equipment_ledger_matches);
+        assert!(readout.equipment_transition_log_matches);
         assert!(readout.modifier_duration_expiration_log_matches);
     }
 
@@ -221,6 +241,8 @@ mod tests {
                 .final_snapshot
                 .action_resource_transition_log
                 .clone(),
+            expected.final_snapshot.equipment_ledger.clone(),
+            expected.final_snapshot.equipment_transition_log.clone(),
             expected
                 .final_snapshot
                 .modifier_duration_expiration_log

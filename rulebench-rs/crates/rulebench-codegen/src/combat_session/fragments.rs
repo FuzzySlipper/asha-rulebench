@@ -6,12 +6,96 @@ use rulebench_fixtures::{
     ActionResourceTransitionEntry, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
     CombatControlHistoryEntry, CombatEndConditionReadout, CombatLogEntry,
     CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
-    CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt, CommandAuditEntry,
-    CommandPreflightDecisionKind, CurrentActorActionOption, CurrentActorOptionSummary,
-    CurrentActorOptionsUnavailableReason, CurrentActorTargetOption, LifecycleTransitionEntry,
+    CombatantEquipmentReadout, CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt,
+    CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
+    CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
+    EquipmentLedgerReadout, EquipmentTransitionEntry, LifecycleTransitionEntry,
     ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, RulebenchRejection,
     ScenarioProjection, TurnTransitionEntry,
 };
+
+pub(crate) fn render_equipment_ledger(ledger: &EquipmentLedgerReadout, indent: &str) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  combatants: [\n"));
+    for combatant in &ledger.combatants {
+        out.push_str(&format!("{indent}    {{\n"));
+        out.push_str(&render_combatant_equipment_fields(
+            combatant,
+            &format!("{indent}      "),
+        ));
+        out.push_str(&format!("{indent}    }},\n"));
+    }
+    out.push_str(&format!("{indent}  ],\n"));
+    out.push_str(&format!("{indent}}}"));
+    out
+}
+
+pub(crate) fn render_equipment_transition_entry(
+    entry: &EquipmentTransitionEntry,
+    indent: &str,
+) -> String {
+    let mut out = String::from("{\n");
+    out.push_str(&format!("{indent}  sequence: {},\n", entry.sequence));
+    out.push_str(&format!(
+        "{indent}  transitionKind: {},\n",
+        ts_string(entry.transition_kind.code())
+    ));
+    out.push_str(&format!(
+        "{indent}  combatantId: {},\n",
+        ts_string(&entry.combatant_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  itemId: {},\n",
+        ts_string(&entry.item_id)
+    ));
+    out.push_str(&format!(
+        "{indent}  equipmentSlot: {},\n",
+        ts_string(&entry.equipment_slot)
+    ));
+    out.push_str(&format!(
+        "{indent}  grantedModifierIds: {},\n",
+        ts_string_array(&entry.granted_modifier_ids)
+    ));
+    out.push_str(&format!(
+        "{indent}  grantedAbilityIds: {},\n",
+        ts_string_array(&entry.granted_ability_ids)
+    ));
+    out.push_str(&format!(
+        "{indent}  grantedResourceIds: {},\n",
+        ts_string_array(&entry.granted_resource_ids)
+    ));
+    out.push_str(&format!("{indent}  previousEquipment: {{\n"));
+    out.push_str(&render_combatant_equipment_fields(
+        &entry.previous_equipment,
+        &format!("{indent}    "),
+    ));
+    out.push_str(&format!("{indent}  }},\n"));
+    out.push_str(&format!("{indent}  nextEquipment: {{\n"));
+    out.push_str(&render_combatant_equipment_fields(
+        &entry.next_equipment,
+        &format!("{indent}    "),
+    ));
+    out.push_str(&format!("{indent}  }},\n"));
+    out.push_str(&format!(
+        "{indent}  reason: {},\n",
+        ts_string(&entry.reason)
+    ));
+    out.push_str(&format!("{indent}}},\n"));
+    out
+}
+
+fn render_combatant_equipment_fields(
+    combatant: &CombatantEquipmentReadout,
+    indent: &str,
+) -> String {
+    format!(
+        "{indent}combatantId: {},\n{indent}inventoryItemIds: {},\n{indent}equippedItemIds: {},\n{indent}availableAbilityIds: {},\n",
+        ts_string(&combatant.combatant_id),
+        ts_string_array(&combatant.inventory_item_ids),
+        ts_string_array(&combatant.equipped_item_ids),
+        ts_string_array(&combatant.available_ability_ids)
+    )
+}
 
 pub(crate) fn render_action_resource_ledger(
     ledger: &ActionResourceLedgerReadout,
@@ -43,6 +127,10 @@ pub(crate) fn render_action_resource_state(resource: &ActionResourceState, inden
     out.push_str(&format!(
         "{indent}          resourceId: {},\n",
         ts_string(&resource.resource_id)
+    ));
+    out.push_str(&format!(
+        "{indent}          sourceId: {},\n",
+        ts_string(&resource.source_id)
     ));
     out.push_str(&format!(
         "{indent}          kind: {},\n",
@@ -713,8 +801,9 @@ pub(crate) fn render_action_resource_transition_entry(
 
 pub(crate) fn render_action_resource_state_inline(resource: &ActionResourceState) -> String {
     format!(
-        "{{ resourceId: {}, kind: {}, current: {}, max: {}, available: {}, refreshPolicy: {}, remainingRefreshTurns: {} }}",
+        "{{ resourceId: {}, sourceId: {}, kind: {}, current: {}, max: {}, available: {}, refreshPolicy: {}, remainingRefreshTurns: {} }}",
         ts_string(&resource.resource_id),
+        ts_string(&resource.source_id),
         ts_string(action_resource_kind(resource.kind)),
         resource.current,
         resource.max,

@@ -2,9 +2,10 @@
 use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase, CombatTurnOrder,
-    CommandOutcomeClass, LifecycleTransitionEntry, ModifierDurationExpirationEntry,
-    RollConsumptionEntry, RulebenchReceipt, RulebenchRejection, RulebenchScenario,
-    ScenarioProjection, StateFingerprint, TargetLegality, TurnTransitionEntry, UseActionIntent,
+    CommandOutcomeClass, EquipmentLedgerReadout, EquipmentTransitionEntry,
+    LifecycleTransitionEntry, ModifierDurationExpirationEntry, RollConsumptionEntry,
+    RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint,
+    TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
 use rulebench_ruleset::ActionResourceCost;
 
@@ -68,6 +69,7 @@ pub enum CommandPreflightDecisionKind {
     RejectedByActorLookup,
     RejectedByActionLookup,
     RejectedByActionOwnership,
+    RejectedByAbilityAvailability,
     RejectedByTargetLookup,
     RejectedByTargetLegality,
     RejectedByActionResource,
@@ -83,6 +85,9 @@ impl CommandPreflightDecisionKind {
             CommandPreflightDecisionKind::RejectedByActorLookup => "rejectedByActorLookup",
             CommandPreflightDecisionKind::RejectedByActionLookup => "rejectedByActionLookup",
             CommandPreflightDecisionKind::RejectedByActionOwnership => "rejectedByActionOwnership",
+            CommandPreflightDecisionKind::RejectedByAbilityAvailability => {
+                "rejectedByAbilityAvailability"
+            }
             CommandPreflightDecisionKind::RejectedByTargetLookup => "rejectedByTargetLookup",
             CommandPreflightDecisionKind::RejectedByTargetLegality => "rejectedByTargetLegality",
             CommandPreflightDecisionKind::RejectedByActionResource => "rejectedByActionResource",
@@ -326,9 +331,11 @@ pub struct CombatSessionSnapshot {
     pub audit_log: Vec<CommandAuditEntry>,
     pub action_usage_log: Vec<ActionUsageEntry>,
     pub action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
+    pub equipment_transition_log: Vec<EquipmentTransitionEntry>,
     pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub action_resource_ledger: ActionResourceLedgerReadout,
+    pub equipment_ledger: EquipmentLedgerReadout,
     pub current_turn_action_usage: ActionUsageSummary,
     pub combatant_vitality: CombatantVitalitySummary,
     pub combat_end_condition: CombatEndConditionReadout,

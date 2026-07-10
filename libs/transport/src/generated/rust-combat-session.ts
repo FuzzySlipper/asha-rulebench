@@ -242,6 +242,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 0,
                 max: 1,
@@ -256,6 +257,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -471,6 +473,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 0,
                 max: 1,
@@ -485,6 +488,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -674,6 +678,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 0,
                 max: 1,
@@ -688,6 +693,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -922,6 +928,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 0,
                 max: 1,
@@ -936,6 +943,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -1243,6 +1251,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -1257,6 +1266,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -1265,6 +1275,22 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
                 remainingRefreshTurns: null,
               },
             ],
+          },
+        ],
+      },
+      finalEquipmentLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            inventoryItemIds: ['item.hex-focus'],
+            equippedItemIds: ['item.hex-focus'],
+            availableAbilityIds: ['ability.hexing-bolt'],
+          },
+          {
+            combatantId: 'entity-raider',
+            inventoryItemIds: ['item.raider-mail'],
+            equippedItemIds: ['item.raider-mail'],
+            availableAbilityIds: [],
           },
         ],
       },
@@ -1458,8 +1484,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 1,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: 'script-selected-runtime-hit',
           commandStepIndex: 1,
           turnTransitionSequence: null,
@@ -1475,8 +1501,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 0,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: null,
           commandStepIndex: null,
           turnTransitionSequence: 0,
@@ -1492,8 +1518,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 1,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: null,
           commandStepIndex: null,
           turnTransitionSequence: 1,
@@ -1502,6 +1528,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           currentActorId: 'entity-adept',
           reason: 'Action resource refreshed at turn start.',
         },
+      ],
+      equipmentTransitionLog: [
       ],
       modifierDurationExpirationLog: [
 {
@@ -1591,6 +1619,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 0,
                 max: 1,
@@ -1605,6 +1634,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resources: [
               {
                 resourceId: 'standard-action',
+                sourceId: 'base',
                 kind: 'standardAction',
                 current: 1,
                 max: 1,
@@ -1613,6 +1643,22 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
                 remainingRefreshTurns: null,
               },
             ],
+          },
+        ],
+      },
+      finalEquipmentLedger: {
+        combatants: [
+          {
+            combatantId: 'entity-adept',
+            inventoryItemIds: ['item.hex-focus'],
+            equippedItemIds: ['item.hex-focus'],
+            availableAbilityIds: ['ability.hexing-bolt'],
+          },
+          {
+            combatantId: 'entity-raider',
+            inventoryItemIds: ['item.raider-mail'],
+            equippedItemIds: ['item.raider-mail'],
+            availableAbilityIds: [],
           },
         ],
       },
@@ -1814,8 +1860,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 1,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: 'hexing-bolt-bounded-automatic-run-step-0',
           commandStepIndex: 0,
           turnTransitionSequence: null,
@@ -1831,8 +1877,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 0,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: null,
           commandStepIndex: null,
           turnTransitionSequence: 0,
@@ -1848,8 +1894,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 1,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: null,
           commandStepIndex: null,
           turnTransitionSequence: 1,
@@ -1865,8 +1911,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           resourceId: 'standard-action',
           resourceKind: 'standardAction',
           amount: 1,
-          previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-          nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+          nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
           commandStepId: 'hexing-bolt-bounded-automatic-run-step-3',
           commandStepIndex: 1,
           turnTransitionSequence: null,
@@ -1875,6 +1921,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           currentActorId: 'entity-adept',
           reason: 'Action resource spent.',
         },
+      ],
+      equipmentTransitionLog: [
       ],
       modifierDurationExpirationLog: [
 {
@@ -1913,6 +1961,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       actualExecutedStepCount: 5,
       executedStepCountMatches: true,
       actionResourceTransitionLogMatches: true,
+      equipmentLedgerMatches: true,
+      equipmentTransitionLogMatches: true,
       modifierDurationExpirationLogMatches: true,
       replayedRun: {
         id: 'hexing-bolt-bounded-automatic-run',
@@ -1984,6 +2034,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
               resources: [
                 {
                   resourceId: 'standard-action',
+                  sourceId: 'base',
                   kind: 'standardAction',
                   current: 0,
                   max: 1,
@@ -1998,6 +2049,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
               resources: [
                 {
                   resourceId: 'standard-action',
+                  sourceId: 'base',
                   kind: 'standardAction',
                   current: 1,
                   max: 1,
@@ -2006,6 +2058,22 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
                   remainingRefreshTurns: null,
                 },
               ],
+            },
+          ],
+        },
+        finalEquipmentLedger: {
+          combatants: [
+            {
+              combatantId: 'entity-adept',
+              inventoryItemIds: ['item.hex-focus'],
+              equippedItemIds: ['item.hex-focus'],
+              availableAbilityIds: ['ability.hexing-bolt'],
+            },
+            {
+              combatantId: 'entity-raider',
+              inventoryItemIds: ['item.raider-mail'],
+              equippedItemIds: ['item.raider-mail'],
+              availableAbilityIds: [],
             },
           ],
         },
@@ -2207,8 +2275,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resourceId: 'standard-action',
             resourceKind: 'standardAction',
             amount: 1,
-            previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-            nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
             commandStepId: 'hexing-bolt-bounded-automatic-run-step-0',
             commandStepIndex: 0,
             turnTransitionSequence: null,
@@ -2224,8 +2292,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resourceId: 'standard-action',
             resourceKind: 'standardAction',
             amount: 0,
-            previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-            nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
             commandStepId: null,
             commandStepIndex: null,
             turnTransitionSequence: 0,
@@ -2241,8 +2309,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resourceId: 'standard-action',
             resourceKind: 'standardAction',
             amount: 1,
-            previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-            nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
             commandStepId: null,
             commandStepIndex: null,
             turnTransitionSequence: 1,
@@ -2258,8 +2326,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             resourceId: 'standard-action',
             resourceKind: 'standardAction',
             amount: 1,
-            previousResource: { resourceId: 'standard-action', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
-            nextResource: { resourceId: 'standard-action', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            previousResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 1, max: 1, available: true, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
+            nextResource: { resourceId: 'standard-action', sourceId: 'base', kind: 'standardAction', current: 0, max: 1, available: false, refreshPolicy: { kind: 'turnStart', turns: null }, remainingRefreshTurns: null },
             commandStepId: 'hexing-bolt-bounded-automatic-run-step-3',
             commandStepIndex: 1,
             turnTransitionSequence: null,
@@ -2268,6 +2336,8 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
             currentActorId: 'entity-adept',
             reason: 'Action resource spent.',
           },
+        ],
+        equipmentTransitionLog: [
         ],
         modifierDurationExpirationLog: [
       {

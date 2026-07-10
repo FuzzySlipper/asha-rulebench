@@ -19,6 +19,14 @@ impl CombatSessionState {
         &self.action_resource_transition_log
     }
 
+    pub fn equipment_transition_log(&self) -> &[EquipmentTransitionEntry] {
+        &self.equipment_transition_log
+    }
+
+    pub fn equipment_ledger(&self) -> EquipmentLedgerReadout {
+        self.state.equipment_ledger()
+    }
+
     pub fn modifier_duration_expiration_log(&self) -> &[ModifierDurationExpirationEntry] {
         &self.modifier_duration_expiration_log
     }
@@ -61,6 +69,7 @@ impl CombatSessionState {
             &self.scenario,
             &current_state,
             &self.state.action_resource_ledger(),
+            &self.state.equipment_ledger(),
         )
     }
 
@@ -73,12 +82,14 @@ impl CombatSessionState {
             &current_scenario,
             &current_state,
             &self.state.action_resource_ledger(),
+            &self.state.equipment_ledger(),
         );
 
         current_actor_command_candidates(
             &self.lifecycle,
             &current_scenario,
             &self.state.action_resource_ledger(),
+            &self.state.equipment_ledger(),
             current_actor_options,
         )
     }
@@ -90,6 +101,7 @@ impl CombatSessionState {
             self.turn_order.current_actor_id.clone(),
             &current_scenario,
             &self.state.action_resource_ledger(),
+            &self.state.equipment_ledger(),
             intent,
         )
     }
@@ -109,9 +121,11 @@ impl CombatSessionState {
             audit_log: self.audit_log.clone(),
             action_usage_log: self.action_usage_log.clone(),
             action_resource_transition_log: self.action_resource_transition_log.clone(),
+            equipment_transition_log: self.equipment_transition_log.clone(),
             modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
             action_resource_ledger: self.state.action_resource_ledger(),
+            equipment_ledger: self.state.equipment_ledger(),
             current_turn_action_usage: self.current_turn_action_usage(),
             combatant_vitality: combatant_vitality_summary(&current_state),
             combat_end_condition: combat_end_condition_readout(&current_scenario),
@@ -121,6 +135,7 @@ impl CombatSessionState {
                 &current_scenario,
                 &current_state,
                 &self.state.action_resource_ledger(),
+                &self.state.equipment_ledger(),
             ),
             current_state,
             current_state_fingerprint,
@@ -253,6 +268,7 @@ fn current_actor_option_summary(
     scenario: &RulebenchScenario,
     projection: &ScenarioProjection,
     action_resources: &ActionResourceLedgerReadout,
+    equipment: &EquipmentLedgerReadout,
 ) -> CurrentActorOptionSummary {
     let current_actor_id = turn_order.current_actor_id.clone();
     let current_actor_defeated = current_actor_id
@@ -297,7 +313,9 @@ fn current_actor_option_summary(
         .actions
         .iter()
         .filter(|action| action.actor_id == actor_id)
-        .map(|action| current_actor_action_option(action, projection, action_resources, actor_id))
+        .map(|action| {
+            current_actor_action_option(action, projection, action_resources, equipment, actor_id)
+        })
         .collect::<Vec<_>>();
 
     if actions.is_empty() {
@@ -338,10 +356,17 @@ fn current_actor_command_candidates(
     lifecycle: &CombatLifecycle,
     scenario: &RulebenchScenario,
     action_resources: &ActionResourceLedgerReadout,
+    equipment: &EquipmentLedgerReadout,
     options: CurrentActorOptionSummary,
 ) -> CommandCandidateSummary {
     let candidates = if options.available {
-        current_actor_id_command_candidates(lifecycle, scenario, action_resources, &options)
+        current_actor_id_command_candidates(
+            lifecycle,
+            scenario,
+            action_resources,
+            equipment,
+            &options,
+        )
     } else {
         Vec::new()
     };
@@ -362,6 +387,7 @@ fn current_actor_id_command_candidates(
     lifecycle: &CombatLifecycle,
     scenario: &RulebenchScenario,
     action_resources: &ActionResourceLedgerReadout,
+    equipment: &EquipmentLedgerReadout,
     options: &CurrentActorOptionSummary,
 ) -> Vec<CommandCandidateEntry> {
     let Some(actor_id) = options.current_actor_id.as_deref() else {
@@ -384,6 +410,7 @@ fn current_actor_id_command_candidates(
                     options.current_actor_id.clone(),
                     scenario,
                     action_resources,
+                    equipment,
                     intent.clone(),
                 );
 
@@ -430,10 +457,22 @@ fn current_actor_action_option(
     action: &ActionDefinition,
     projection: &ScenarioProjection,
     action_resources: &ActionResourceLedgerReadout,
+    equipment: &EquipmentLedgerReadout,
     actor_id: &str,
 ) -> CurrentActorActionOption {
-    let availability =
-        action_resource_costs_available(action_resources, actor_id, &action.resource_costs);
+    let ability_available = equipment
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == actor_id)
+        .is_some_and(|combatant| combatant.available_ability_ids.contains(&action.ability_id));
+    let availability = if ability_available {
+        action_resource_costs_available(action_resources, actor_id, &action.resource_costs)
+    } else {
+        Err((
+            None,
+            "Actor does not currently have the action ability.".to_string(),
+        ))
+    };
     let (available, unavailable_reason) = match availability {
         Ok(_) => (true, None),
         Err((_, reason)) => (false, Some(reason)),

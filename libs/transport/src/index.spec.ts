@@ -211,6 +211,7 @@ describe("RulebenchTransport fixtures", () => {
           resources: [
             {
               resourceId: "standard-action",
+              sourceId: "base",
               kind: "standardAction",
               current: 0,
               max: 1,
@@ -225,6 +226,7 @@ describe("RulebenchTransport fixtures", () => {
           resources: [
             {
               resourceId: "standard-action",
+              sourceId: "base",
               kind: "standardAction",
               current: 1,
               max: 1,
@@ -365,6 +367,7 @@ describe("RulebenchTransport fixtures", () => {
             resources: [
               {
                 resourceId: "standard-action",
+                sourceId: "base",
                 kind: "standardAction",
                 current: 1,
                 max: 1,
@@ -379,6 +382,7 @@ describe("RulebenchTransport fixtures", () => {
             resources: [
               {
                 resourceId: "standard-action",
+                sourceId: "base",
                 kind: "standardAction",
                 current: 1,
                 max: 1,
@@ -398,6 +402,20 @@ describe("RulebenchTransport fixtures", () => {
         usedActionIds: [],
         usedAbilityIds: [],
       });
+      expect(result.value.finalEquipmentLedger.combatants).toEqual([
+        {
+          combatantId: "entity-adept",
+          inventoryItemIds: ["item.hex-focus"],
+          equippedItemIds: ["item.hex-focus"],
+          availableAbilityIds: ["ability.hexing-bolt"],
+        },
+        {
+          combatantId: "entity-raider",
+          inventoryItemIds: ["item.raider-mail"],
+          equippedItemIds: ["item.raider-mail"],
+          availableAbilityIds: [],
+        },
+      ]);
       expect(result.value.finalCurrentActorOptions).toEqual({
         roundNumber: 2,
         turnIndex: 0,
@@ -600,6 +618,7 @@ describe("RulebenchTransport fixtures", () => {
           amount: 1,
           previousResource: {
             resourceId: "standard-action",
+            sourceId: "base",
             kind: "standardAction",
             current: 1,
             max: 1,
@@ -609,6 +628,7 @@ describe("RulebenchTransport fixtures", () => {
           },
           nextResource: {
             resourceId: "standard-action",
+            sourceId: "base",
             kind: "standardAction",
             current: 0,
             max: 1,
@@ -633,6 +653,7 @@ describe("RulebenchTransport fixtures", () => {
           amount: 0,
           previousResource: {
             resourceId: "standard-action",
+            sourceId: "base",
             kind: "standardAction",
             current: 1,
             max: 1,
@@ -642,6 +663,7 @@ describe("RulebenchTransport fixtures", () => {
           },
           nextResource: {
             resourceId: "standard-action",
+            sourceId: "base",
             kind: "standardAction",
             current: 1,
             max: 1,
@@ -666,6 +688,7 @@ describe("RulebenchTransport fixtures", () => {
           amount: 1,
           previousResource: {
             resourceId: "standard-action",
+            sourceId: "base",
             kind: "standardAction",
             current: 0,
             max: 1,
@@ -675,6 +698,7 @@ describe("RulebenchTransport fixtures", () => {
           },
           nextResource: {
             resourceId: "standard-action",
+            sourceId: "base",
             kind: "standardAction",
             current: 1,
             max: 1,
@@ -957,6 +981,8 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.actualExecutedStepCount).toBe(5);
       expect(result.value.executedStepCountMatches).toBe(true);
       expect(result.value.actionResourceTransitionLogMatches).toBe(true);
+      expect(result.value.equipmentLedgerMatches).toBe(true);
+      expect(result.value.equipmentTransitionLogMatches).toBe(true);
       expect(result.value.modifierDurationExpirationLogMatches).toBe(true);
       expect(result.value.replayedRun.id).toBe(
         "hexing-bolt-bounded-automatic-run",

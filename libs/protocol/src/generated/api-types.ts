@@ -28,7 +28,7 @@ export type RulebenchActionResourceKindDto = 'standardAction' | 'spellSlot' | 'c
 
 export type RulebenchActionResourceRefreshPolicyDto = { readonly kind: 'never' | 'combatStart' | 'turnStart'; readonly turns: null } | { readonly kind: 'turns'; readonly turns: number };
 
-export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
+export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByAbilityAvailability' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
 
 export type RulebenchCommandDecisionKindDto = 'acceptedByResolver' | 'rejectedByResolver' | 'rejectedByPreflight' | 'rejectedByLifecycle' | 'rejectedByTurnOrder';
 
@@ -59,6 +59,12 @@ export type RulebenchModifierDurationPolicyDto = { readonly kind: 'permanent'; r
 export type RulebenchModifierDurationTransitionTriggerDto = { readonly kind: 'turnBoundary' | 'roundBoundary'; readonly event: null } | { readonly kind: 'event'; readonly event: string };
 
 export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed' | 'cooldownAdvanced';
+
+export type RulebenchEquipmentTransitionKindDto = 'equip' | 'unequip';
+
+export type RulebenchEquipmentCommandKindDto = 'equip' | 'unequip';
+
+export type RulebenchEquipmentDecisionKindDto = 'accepted' | 'rejectedByLifecycle' | 'rejectedByCombatant' | 'rejectedByItem' | 'rejectedByOwnership' | 'rejectedByEquippedState' | 'rejectedBySlotConflict' | 'rejectedByRequirement' | 'rejectedByResourceConflict';
 
 export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noAvailableResources' | 'noVisibleActiveTargets';
 
@@ -175,6 +181,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly finalState: RulebenchFinalStateDto;
   readonly finalTurnOrder: RulebenchCombatTurnOrderDto;
   readonly finalActionResourceLedger: RulebenchActionResourceLedgerDto;
+  readonly finalEquipmentLedger: RulebenchEquipmentLedgerDto;
   readonly currentTurnActionUsage: RulebenchActionUsageSummaryDto;
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
@@ -184,6 +191,7 @@ export interface RulebenchCombatScriptReadoutDto {
   readonly commandAuditLog: readonly RulebenchCommandAuditEntryDto[];
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
+  readonly equipmentTransitionLog: readonly RulebenchEquipmentTransitionEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
 }
 
@@ -206,6 +214,7 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly finalLifecyclePhase: RulebenchCombatLifecyclePhaseDto;
   readonly finalState: RulebenchFinalStateDto;
   readonly finalActionResourceLedger: RulebenchActionResourceLedgerDto;
+  readonly finalEquipmentLedger: RulebenchEquipmentLedgerDto;
   readonly finalCurrentActorOptions: RulebenchCurrentActorOptionSummaryDto;
   readonly finalCombatantVitality: RulebenchCombatantVitalitySummaryDto;
   readonly finalCombatEndCondition: RulebenchCombatEndConditionDto;
@@ -215,6 +224,7 @@ export interface RulebenchAutomaticRunReadoutDto {
   readonly turnTransitionLog: readonly RulebenchTurnTransitionEntryDto[];
   readonly actionUsageLog: readonly RulebenchActionUsageEntryDto[];
   readonly actionResourceTransitionLog: readonly RulebenchActionResourceTransitionEntryDto[];
+  readonly equipmentTransitionLog: readonly RulebenchEquipmentTransitionEntryDto[];
   readonly modifierDurationExpirationLog: readonly RulebenchModifierDurationExpirationEntryDto[];
   readonly combatLogEntryCount: number;
   readonly auditEntryCount: number;
@@ -237,6 +247,8 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly actualExecutedStepCount: number;
   readonly executedStepCountMatches: boolean;
   readonly actionResourceTransitionLogMatches: boolean;
+  readonly equipmentLedgerMatches: boolean;
+  readonly equipmentTransitionLogMatches: boolean;
   readonly modifierDurationExpirationLogMatches: boolean;
   readonly replayedRun: RulebenchAutomaticRunReadoutDto;
   readonly reason: string;
@@ -470,6 +482,46 @@ export interface RulebenchActionResourceLedgerDto {
   readonly combatants: readonly RulebenchCombatantActionResourceReadoutDto[];
 }
 
+export interface RulebenchEquipmentLedgerDto {
+  readonly combatants: readonly RulebenchCombatantEquipmentReadoutDto[];
+}
+
+export interface RulebenchEquipmentCommandSpecDto {
+  readonly kind: RulebenchEquipmentCommandKindDto;
+  readonly combatantId: string;
+  readonly itemId: string;
+}
+
+export interface RulebenchEquipmentCommandReadoutDto {
+  readonly command: RulebenchEquipmentCommandSpecDto;
+  readonly accepted: boolean;
+  readonly decisionKind: RulebenchEquipmentDecisionKindDto;
+  readonly previousEquipment: RulebenchCombatantEquipmentReadoutDto | null;
+  readonly nextEquipment: RulebenchCombatantEquipmentReadoutDto | null;
+  readonly reason: string;
+}
+
+export interface RulebenchCombatantEquipmentReadoutDto {
+  readonly combatantId: string;
+  readonly inventoryItemIds: readonly string[];
+  readonly equippedItemIds: readonly string[];
+  readonly availableAbilityIds: readonly string[];
+}
+
+export interface RulebenchEquipmentTransitionEntryDto {
+  readonly sequence: number;
+  readonly transitionKind: RulebenchEquipmentTransitionKindDto;
+  readonly combatantId: string;
+  readonly itemId: string;
+  readonly equipmentSlot: string;
+  readonly grantedModifierIds: readonly string[];
+  readonly grantedAbilityIds: readonly string[];
+  readonly grantedResourceIds: readonly string[];
+  readonly previousEquipment: RulebenchCombatantEquipmentReadoutDto;
+  readonly nextEquipment: RulebenchCombatantEquipmentReadoutDto;
+  readonly reason: string;
+}
+
 export interface RulebenchCombatantActionResourceReadoutDto {
   readonly combatantId: string;
   readonly resources: readonly RulebenchActionResourceStateDto[];
@@ -477,6 +529,7 @@ export interface RulebenchCombatantActionResourceReadoutDto {
 
 export interface RulebenchActionResourceStateDto {
   readonly resourceId: string;
+  readonly sourceId: string;
   readonly kind: RulebenchActionResourceKindDto;
   readonly current: number;
   readonly max: number;

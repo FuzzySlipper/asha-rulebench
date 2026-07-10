@@ -7,7 +7,8 @@ use combatant::CombatantState;
 use crate::model::{
     ActionResourceKind, ActionResourceLedgerReadout, ActionResourceRefreshDecisionKind,
     ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
-    ActiveModifier, CombatantActionResourceReadout, DamageOutcome, HealingOutcome,
+    ActiveModifier, CombatantActionResourceReadout, CombatantEquipmentReadout, DamageOutcome,
+    EquipmentLedgerReadout, HealingOutcome, ItemDefinition, ModifierDefinition,
     ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario, ScenarioProjection,
     TemporaryVitalityOutcome,
 };
@@ -23,7 +24,9 @@ impl CombatState {
             combatants: scenario
                 .combatants
                 .iter()
-                .map(CombatantState::from_combatant)
+                .map(|combatant| {
+                    CombatantState::from_combatant(combatant, &scenario.items, &scenario.modifiers)
+                })
                 .collect(),
         }
     }
@@ -109,6 +112,66 @@ impl CombatState {
                 .map(CombatantState::action_resource_readout)
                 .collect(),
         }
+    }
+
+    pub fn equipment_ledger(&self) -> EquipmentLedgerReadout {
+        EquipmentLedgerReadout {
+            combatants: self
+                .combatants
+                .iter()
+                .map(CombatantState::equipment_readout)
+                .collect(),
+        }
+    }
+
+    pub fn equipment_for(&self, combatant_id: &str) -> Option<CombatantEquipmentReadout> {
+        self.combatants
+            .iter()
+            .find(|combatant| combatant.id == combatant_id)
+            .map(CombatantState::equipment_readout)
+    }
+
+    pub fn equip_item(
+        &mut self,
+        combatant_id: &str,
+        item: &ItemDefinition,
+        modifiers: &[ModifierDefinition],
+    ) -> bool {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == combatant_id)
+        else {
+            return false;
+        };
+        combatant.apply_item_grants(item, modifiers);
+        combatant.equipped_item_ids.push(item.id.clone());
+        true
+    }
+
+    pub fn unequip_item(
+        &mut self,
+        combatant_id: &str,
+        item: &ItemDefinition,
+        items: &[ItemDefinition],
+    ) -> bool {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == combatant_id)
+        else {
+            return false;
+        };
+        combatant
+            .equipped_item_ids
+            .retain(|equipped_item_id| equipped_item_id != &item.id);
+        let remaining_items = combatant
+            .equipped_item_ids
+            .iter()
+            .filter_map(|item_id| items.iter().find(|candidate| candidate.id == *item_id))
+            .collect::<Vec<_>>();
+        combatant.remove_item_grants(item, &remaining_items);
+        true
     }
 
     pub fn action_resources_for(
@@ -265,6 +328,7 @@ impl CombatState {
                 combatant.temporary_vitality = state.temporary_vitality;
                 combatant.active_modifiers = state.active_modifiers.clone();
                 combatant.conditions = state.condition_labels();
+                combatant.equipped_item_ids = state.equipped_item_ids.clone();
             }
         }
         scenario
@@ -330,7 +394,9 @@ mod tests {
             },
             defenses: Vec::new(),
             resource_pools: vec![ActionResourcePool::standard_action()],
+            inventory_item_ids: Vec::new(),
             equipped_item_ids: Vec::new(),
+            base_ability_ids: Vec::new(),
             active_modifiers: Vec::new(),
             conditions: Vec::new(),
             is_actor: true,

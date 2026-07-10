@@ -31,7 +31,9 @@ pub struct Combatant {
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
     pub resource_pools: Vec<ActionResourcePool>,
+    pub inventory_item_ids: Vec<String>,
     pub equipped_item_ids: Vec<String>,
+    pub base_ability_ids: Vec<String>,
     pub active_modifiers: Vec<ActiveModifier>,
     pub conditions: Vec<String>,
     pub is_actor: bool,
@@ -169,6 +171,17 @@ pub struct ItemDefinition {
     pub name: String,
     pub summary: String,
     pub tags: Vec<String>,
+    pub equipment_slot: String,
+    pub requirements: Vec<EquipmentRequirement>,
+    pub granted_modifier_ids: Vec<String>,
+    pub granted_ability_ids: Vec<String>,
+    pub granted_resource_pools: Vec<ActionResourcePool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EquipmentRequirement {
+    pub stat_id: String,
+    pub minimum: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

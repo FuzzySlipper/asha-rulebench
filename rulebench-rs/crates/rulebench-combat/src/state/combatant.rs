@@ -4,8 +4,9 @@ use crate::model::{
     ActionResourceKind, ActionResourceRefreshDecisionKind, ActionResourceRefreshReadout,
     ActionResourceSpendDecisionKind, ActionResourceSpendReadout, ActionResourceState,
     ActiveModifier, BoundedValue, Combatant, CombatantActionResourceReadout, FinalCombatantState,
-    ModifierDurationExpirationDecisionKind, ModifierDurationExpirationReadout,
-    ModifierDurationPolicy, ModifierOutcome, ModifierStackingPolicy, ModifierTenure,
+    ItemDefinition, ModifierDefinition, ModifierDurationExpirationDecisionKind,
+    ModifierDurationExpirationReadout, ModifierDurationPolicy, ModifierOutcome,
+    ModifierStackingPolicy, ModifierTenure,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,11 +18,19 @@ pub(super) struct CombatantState {
     pub(super) active_modifiers: Vec<ActiveModifier>,
     pub(super) conditions: Vec<String>,
     pub(super) action_resources: Vec<ActionResourceState>,
+    pub(super) inventory_item_ids: Vec<String>,
+    pub(super) equipped_item_ids: Vec<String>,
+    pub(super) base_ability_ids: Vec<String>,
+    pub(super) available_ability_ids: Vec<String>,
 }
 
 impl CombatantState {
-    pub(super) fn from_combatant(combatant: &Combatant) -> Self {
-        Self {
+    pub(super) fn from_combatant(
+        combatant: &Combatant,
+        items: &[ItemDefinition],
+        modifiers: &[ModifierDefinition],
+    ) -> Self {
+        let mut state = Self {
             id: combatant.id.clone(),
             name: combatant.name.clone(),
             hit_points: combatant.hit_points,
@@ -29,7 +38,18 @@ impl CombatantState {
             active_modifiers: combatant.active_modifiers.clone(),
             conditions: combatant.conditions.clone(),
             action_resources: action_resources_from_combatant(combatant),
+            inventory_item_ids: combatant.inventory_item_ids.clone(),
+            equipped_item_ids: Vec::new(),
+            base_ability_ids: combatant.base_ability_ids.clone(),
+            available_ability_ids: combatant.base_ability_ids.clone(),
+        };
+        for item_id in &combatant.equipped_item_ids {
+            if let Some(item) = items.iter().find(|item| item.id == *item_id) {
+                state.apply_item_grants(item, modifiers);
+                state.equipped_item_ids.push(item.id.clone());
+            }
         }
+        state
     }
 
     pub(super) fn to_final_state(&self) -> FinalCombatantState {
@@ -51,6 +71,65 @@ impl CombatantState {
             active_modifiers: Vec::new(),
             conditions: combatant.conditions.clone(),
             action_resources: vec![ActionResourceState::standard_action_available()],
+            inventory_item_ids: Vec::new(),
+            equipped_item_ids: Vec::new(),
+            base_ability_ids: Vec::new(),
+            available_ability_ids: Vec::new(),
+        }
+    }
+
+    pub(super) fn apply_item_grants(
+        &mut self,
+        item: &ItemDefinition,
+        modifiers: &[ModifierDefinition],
+    ) {
+        for modifier_id in &item.granted_modifier_ids {
+            if let Some(definition) = modifiers
+                .iter()
+                .find(|modifier| modifier.id == *modifier_id)
+            {
+                self.apply_active_modifier(ActiveModifier {
+                    modifier_id: definition.id.clone(),
+                    source_id: item.id.clone(),
+                    label: definition.label.clone(),
+                    duration: "while equipped".to_string(),
+                    tenure: ModifierTenure::Permanent,
+                    stacking_group: definition.stacking_group.clone(),
+                    stacking_policy: definition.stacking_policy,
+                    duration_policy: ModifierDurationPolicy::Permanent,
+                    remaining_turns: None,
+                    remaining_rounds: None,
+                });
+            }
+        }
+        for ability_id in &item.granted_ability_ids {
+            if !self.available_ability_ids.contains(ability_id) {
+                self.available_ability_ids.push(ability_id.clone());
+            }
+        }
+        self.action_resources.extend(
+            item.granted_resource_pools
+                .iter()
+                .map(|pool| ActionResourceState::from_pool_with_source(pool, item.id.clone())),
+        );
+    }
+
+    pub(super) fn remove_item_grants(
+        &mut self,
+        item: &ItemDefinition,
+        remaining_items: &[&ItemDefinition],
+    ) {
+        self.active_modifiers
+            .retain(|modifier| modifier.source_id != item.id);
+        self.action_resources
+            .retain(|resource| resource.source_id != item.id);
+        self.available_ability_ids = self.base_ability_ids.clone();
+        for remaining_item in remaining_items {
+            for ability_id in &remaining_item.granted_ability_ids {
+                if !self.available_ability_ids.contains(ability_id) {
+                    self.available_ability_ids.push(ability_id.clone());
+                }
+            }
         }
     }
 
@@ -72,18 +151,22 @@ impl CombatantState {
             remaining_turns: modifier.remaining_turns,
             remaining_rounds: modifier.remaining_rounds,
         };
-        match modifier.stacking_policy {
+        self.apply_active_modifier(active_modifier);
+    }
+
+    fn apply_active_modifier(&mut self, active_modifier: ActiveModifier) {
+        match active_modifier.stacking_policy {
             ModifierStackingPolicy::Stack => self.active_modifiers.push(active_modifier),
             ModifierStackingPolicy::Replace => {
                 self.active_modifiers
-                    .retain(|active| active.stacking_group != modifier.stacking_group);
+                    .retain(|active| active.stacking_group != active_modifier.stacking_group);
                 self.active_modifiers.push(active_modifier);
             }
             ModifierStackingPolicy::Refresh => {
                 if let Some(existing) = self
                     .active_modifiers
                     .iter_mut()
-                    .find(|active| active.stacking_group == modifier.stacking_group)
+                    .find(|active| active.stacking_group == active_modifier.stacking_group)
                 {
                     *existing = active_modifier;
                 } else {
@@ -109,6 +192,15 @@ impl CombatantState {
             }
         }
         labels
+    }
+
+    pub(super) fn equipment_readout(&self) -> crate::model::CombatantEquipmentReadout {
+        crate::model::CombatantEquipmentReadout {
+            combatant_id: self.id.clone(),
+            inventory_item_ids: self.inventory_item_ids.clone(),
+            equipped_item_ids: self.equipped_item_ids.clone(),
+            available_ability_ids: self.available_ability_ids.clone(),
+        }
     }
 
     pub(super) fn action_resource_readout(&self) -> CombatantActionResourceReadout {

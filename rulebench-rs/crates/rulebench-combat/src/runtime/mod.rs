@@ -8,6 +8,7 @@ use rulebench_ruleset::ActionResourceCost;
 
 mod automation;
 mod control;
+mod equipment;
 mod script;
 mod status;
 
@@ -97,6 +98,7 @@ pub struct CombatSessionState {
     audit_log: Vec<CommandAuditEntry>,
     action_usage_log: Vec<ActionUsageEntry>,
     action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
+    equipment_transition_log: Vec<EquipmentTransitionEntry>,
     modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
@@ -118,6 +120,7 @@ impl CombatSessionState {
             audit_log: Vec::new(),
             action_usage_log: Vec::new(),
             action_resource_transition_log: Vec::new(),
+            equipment_transition_log: Vec::new(),
             modifier_duration_expiration_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
@@ -175,6 +178,7 @@ impl CombatSessionState {
                 self.turn_order.current_actor_id.clone(),
                 &self.scenario,
                 &self.state.action_resource_ledger(),
+                &self.state.equipment_ledger(),
                 intent.clone(),
             ))
         } else {
@@ -733,6 +737,7 @@ fn command_preflight_readout(
     current_actor_id: Option<String>,
     scenario: &RulebenchScenario,
     action_resources: &ActionResourceLedgerReadout,
+    equipment: &EquipmentLedgerReadout,
     intent: UseActionIntent,
 ) -> CommandPreflightReadout {
     if intent.actor_id.is_empty() {
@@ -833,6 +838,23 @@ fn command_preflight_readout(
             None,
             None,
             "Action does not belong to the proposed actor.",
+        );
+    }
+
+    let ability_available = equipment
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == intent.actor_id)
+        .is_some_and(|combatant| combatant.available_ability_ids.contains(&action.ability_id));
+    if !ability_available {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByAbilityAvailability,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            None,
+            "Actor does not currently have the action ability.",
         );
     }
 

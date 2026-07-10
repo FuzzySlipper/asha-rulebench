@@ -603,6 +603,87 @@ fn validate_items(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDia
                 format!("Item id {} appears more than once.", item.id),
             ));
         }
+        if item.equipment_slot.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyItemEquipmentSlot,
+                Some(item.id.clone()),
+                format!("Item {} has an empty equipment slot.", item.id),
+            ));
+        }
+        for requirement in &item.requirements {
+            if scenario
+                .stat_definition_by_id(&requirement.stat_id)
+                .is_none()
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingItemRequirementStat,
+                    Some(item.id.clone()),
+                    format!(
+                        "Item {} requires stat {} that is not present in the stat catalog.",
+                        item.id, requirement.stat_id
+                    ),
+                ));
+            }
+        }
+        for modifier_id in &item.granted_modifier_ids {
+            if scenario.modifier_by_id(modifier_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingItemGrantedModifier,
+                    Some(item.id.clone()),
+                    format!("Item {} grants missing modifier {}.", item.id, modifier_id),
+                ));
+            }
+        }
+        for ability_id in &item.granted_ability_ids {
+            if scenario.ability_by_id(ability_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingItemGrantedAbility,
+                    Some(item.id.clone()),
+                    format!("Item {} grants missing ability {}.", item.id, ability_id),
+                ));
+            }
+        }
+        let mut granted_resource_ids = HashSet::new();
+        for pool in &item.granted_resource_pools {
+            if pool.id.is_empty() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::EmptyActionResourcePoolId,
+                    Some(item.id.clone()),
+                    format!("Item {} grants a resource pool with an empty id.", item.id),
+                ));
+                continue;
+            }
+            if !granted_resource_ids.insert(pool.id.clone()) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::DuplicateActionResourcePoolId,
+                    Some(pool.id.clone()),
+                    format!(
+                        "Item {} grants resource pool {} more than once.",
+                        item.id, pool.id
+                    ),
+                ));
+            }
+            if pool.maximum == 0 || i32::try_from(pool.maximum).is_err() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidActionResourcePoolMaximum,
+                    Some(pool.id.clone()),
+                    format!(
+                        "Item {} resource pool {} has unsupported maximum {}.",
+                        item.id, pool.id, pool.maximum
+                    ),
+                ));
+            }
+            if pool.refresh_policy == ActionResourceRefreshPolicy::Turns(0) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidActionResourceRefreshPolicy,
+                    Some(pool.id.clone()),
+                    format!(
+                        "Item {} resource pool {} declares a zero-turn refresh clock.",
+                        item.id, pool.id
+                    ),
+                ));
+            }
+        }
     }
 
     if let Some(selected_item_id) = &scenario.selected_item_id {
@@ -619,14 +700,116 @@ fn validate_items(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDia
     }
 
     for combatant in &scenario.combatants {
-        for item_id in &combatant.equipped_item_ids {
+        let mut inventory_ids = HashSet::new();
+        for item_id in &combatant.inventory_item_ids {
+            if !inventory_ids.insert(item_id.clone()) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::DuplicateInventoryItem,
+                    Some(item_id.clone()),
+                    format!(
+                        "Combatant {} owns item {} more than once.",
+                        combatant.id, item_id
+                    ),
+                ));
+            }
             if scenario.item_by_id(item_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingInventoryItem,
+                    Some(item_id.clone()),
+                    format!(
+                        "Combatant {} owns item {} that is not present in the item catalog.",
+                        combatant.id, item_id
+                    ),
+                ));
+            }
+        }
+        let mut equipped_ids = HashSet::new();
+        let mut equipped_slots = HashMap::new();
+        let mut resource_pool_ids = combatant
+            .resource_pools
+            .iter()
+            .map(|pool| pool.id.clone())
+            .collect::<HashSet<_>>();
+        for item_id in &combatant.equipped_item_ids {
+            if !equipped_ids.insert(item_id.clone()) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::DuplicateEquippedItem,
+                    Some(item_id.clone()),
+                    format!(
+                        "Combatant {} equips item {} more than once.",
+                        combatant.id, item_id
+                    ),
+                ));
+            }
+            let Some(item) = scenario.item_by_id(item_id) else {
                 diagnostics.push(ContentDiagnostic::error(
                     ContentDiagnosticCode::MissingEquippedItem,
                     Some(item_id.clone()),
                     format!(
                         "Combatant {} equips item {} that is not present in the scenario item catalog.",
                         combatant.id, item_id
+                    ),
+                ));
+                continue;
+            };
+            if !inventory_ids.contains(item_id) {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::EquippedItemNotOwned,
+                    Some(item_id.clone()),
+                    format!(
+                        "Combatant {} equips unowned item {}.",
+                        combatant.id, item_id
+                    ),
+                ));
+            }
+            if let Some(other_item_id) =
+                equipped_slots.insert(item.equipment_slot.clone(), item.id.clone())
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::EquipmentSlotConflict,
+                    Some(item.id.clone()),
+                    format!(
+                        "Combatant {} equips items {} and {} in slot {}.",
+                        combatant.id, other_item_id, item.id, item.equipment_slot
+                    ),
+                ));
+            }
+            for requirement in &item.requirements {
+                let meets_requirement = combatant
+                    .stat_by_id(&requirement.stat_id)
+                    .is_some_and(|stat| stat.value >= requirement.minimum);
+                if !meets_requirement {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::EquipmentRequirementNotMet,
+                        Some(item.id.clone()),
+                        format!(
+                            "Combatant {} does not meet item {} requirement {} >= {}.",
+                            combatant.id, item.id, requirement.stat_id, requirement.minimum
+                        ),
+                    ));
+                }
+            }
+            for pool in &item.granted_resource_pools {
+                if !resource_pool_ids.insert(pool.id.clone()) {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::EquipmentResourcePoolConflict,
+                        Some(item.id.clone()),
+                        format!(
+                            "Combatant {} receives duplicate resource pool {} from item {}.",
+                            combatant.id, pool.id, item.id
+                        ),
+                    ));
+                }
+            }
+        }
+        for ability_id in &combatant.base_ability_ids {
+            if scenario.ability_by_id(ability_id).is_none() {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::MissingBaseAbility,
+                    Some(ability_id.clone()),
+                    format!(
+                        "Combatant {} has missing base ability {}.",
+                        combatant.id, ability_id
                     ),
                 ));
             }
@@ -746,6 +929,22 @@ fn validate_action_references(
     }
 
     if let Some(actor) = actor {
+        let base_ability = actor.base_ability_ids.contains(&action.ability_id);
+        let item_ability = actor.inventory_item_ids.iter().any(|item_id| {
+            scenario
+                .item_by_id(item_id)
+                .is_some_and(|item| item.granted_ability_ids.contains(&action.ability_id))
+        });
+        if scenario.ability_by_id(&action.ability_id).is_some() && !base_ability && !item_ability {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::MissingActionAbilityGrant,
+                Some(action.id.clone()),
+                format!(
+                    "Action {} ability {} is not granted to actor {} by base content or inventory.",
+                    action.id, action.ability_id, actor.id
+                ),
+            ));
+        }
         match &action.check {
             CheckDeclaration::Attack(attack) => {
                 validate_actor_attack_stat(scenario, action, attack, actor, diagnostics);
@@ -757,7 +956,7 @@ fn validate_action_references(
                 validate_contested_actor_stat(scenario, action, contested, actor, diagnostics);
             }
         }
-        validate_action_resource_costs(action, actor, diagnostics);
+        validate_action_resource_costs(scenario, action, actor, diagnostics);
     }
     validate_hit_modifier(scenario, action, diagnostics);
     validate_effect_operations(action, diagnostics);
@@ -800,6 +999,7 @@ fn validate_action_references(
 }
 
 fn validate_action_resource_costs(
+    scenario: &RulebenchScenario,
     action: &ActionDefinition,
     actor: &Combatant,
     diagnostics: &mut Vec<ContentDiagnostic>,
@@ -817,11 +1017,18 @@ fn validate_action_resource_costs(
             ));
         }
 
-        if !actor
+        let base_pool_exists = actor
             .resource_pools
             .iter()
-            .any(|pool| pool.id == cost.resource_id)
-        {
+            .any(|pool| pool.id == cost.resource_id);
+        let inventory_pool_exists = actor.inventory_item_ids.iter().any(|item_id| {
+            scenario.item_by_id(item_id).is_some_and(|item| {
+                item.granted_resource_pools
+                    .iter()
+                    .any(|pool| pool.id == cost.resource_id)
+            })
+        });
+        if !base_pool_exists && !inventory_pool_exists {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::MissingActionResourcePool,
                 Some(cost.resource_id.clone()),

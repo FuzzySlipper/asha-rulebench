@@ -323,6 +323,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "RulebenchActionResourceLedgerDto",
                 },
                 Field {
+                    name: "finalEquipmentLedger",
+                    ty: "RulebenchEquipmentLedgerDto",
+                },
+                Field {
                     name: "currentTurnActionUsage",
                     ty: "RulebenchActionUsageSummaryDto",
                 },
@@ -357,6 +361,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "actionResourceTransitionLog",
                     ty: "readonly RulebenchActionResourceTransitionEntryDto[]",
+                },
+                Field {
+                    name: "equipmentTransitionLog",
+                    ty: "readonly RulebenchEquipmentTransitionEntryDto[]",
                 },
                 Field {
                     name: "modifierDurationExpirationLog",
@@ -433,6 +441,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "RulebenchActionResourceLedgerDto",
                 },
                 Field {
+                    name: "finalEquipmentLedger",
+                    ty: "RulebenchEquipmentLedgerDto",
+                },
+                Field {
                     name: "finalCurrentActorOptions",
                     ty: "RulebenchCurrentActorOptionSummaryDto",
                 },
@@ -467,6 +479,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "actionResourceTransitionLog",
                     ty: "readonly RulebenchActionResourceTransitionEntryDto[]",
+                },
+                Field {
+                    name: "equipmentTransitionLog",
+                    ty: "readonly RulebenchEquipmentTransitionEntryDto[]",
                 },
                 Field {
                     name: "modifierDurationExpirationLog",
@@ -547,6 +563,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "actionResourceTransitionLogMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "equipmentLedgerMatches",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "equipmentTransitionLogMatches",
                     ty: "boolean",
                 },
                 Field {
@@ -1320,6 +1344,129 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             }],
         },
         Interface {
+            name: "RulebenchEquipmentLedgerDto",
+            fields: &[Field {
+                name: "combatants",
+                ty: "readonly RulebenchCombatantEquipmentReadoutDto[]",
+            }],
+        },
+        Interface {
+            name: "RulebenchEquipmentCommandSpecDto",
+            fields: &[
+                Field {
+                    name: "kind",
+                    ty: "RulebenchEquipmentCommandKindDto",
+                },
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "itemId",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchEquipmentCommandReadoutDto",
+            fields: &[
+                Field {
+                    name: "command",
+                    ty: "RulebenchEquipmentCommandSpecDto",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionKind",
+                    ty: "RulebenchEquipmentDecisionKindDto",
+                },
+                Field {
+                    name: "previousEquipment",
+                    ty: "RulebenchCombatantEquipmentReadoutDto | null",
+                },
+                Field {
+                    name: "nextEquipment",
+                    ty: "RulebenchCombatantEquipmentReadoutDto | null",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCombatantEquipmentReadoutDto",
+            fields: &[
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "inventoryItemIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "equippedItemIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "availableAbilityIds",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchEquipmentTransitionEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "transitionKind",
+                    ty: "RulebenchEquipmentTransitionKindDto",
+                },
+                Field {
+                    name: "combatantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "itemId",
+                    ty: "string",
+                },
+                Field {
+                    name: "equipmentSlot",
+                    ty: "string",
+                },
+                Field {
+                    name: "grantedModifierIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "grantedAbilityIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "grantedResourceIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "previousEquipment",
+                    ty: "RulebenchCombatantEquipmentReadoutDto",
+                },
+                Field {
+                    name: "nextEquipment",
+                    ty: "RulebenchCombatantEquipmentReadoutDto",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchCombatantActionResourceReadoutDto",
             fields: &[
                 Field {
@@ -1337,6 +1484,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             fields: &[
                 Field {
                     name: "resourceId",
+                    ty: "string",
+                },
+                Field {
+                    name: "sourceId",
                     ty: "string",
                 },
                 Field {

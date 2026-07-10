@@ -5,7 +5,8 @@ use rulebench_content::{validate_scenario_content_report, ContentValidationRepor
 use crate::model::{
     CombatControlCommandSpec, CombatControlReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    CurrentActorOptionSummary, RulebenchScenario, UseActionIntent,
+    CurrentActorOptionSummary, EquipmentCommandReadout, EquipmentCommandSpec, RulebenchScenario,
+    UseActionIntent,
 };
 use crate::{
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
@@ -158,6 +159,16 @@ impl CombatSessionApi {
         Ok(self
             .active_session_mut(session)?
             .submit_control_command(command))
+    }
+
+    pub fn submit_equipment(
+        &mut self,
+        handle: &CombatSessionHandle,
+        command: EquipmentCommandSpec,
+    ) -> Result<EquipmentCommandReadout, CombatSessionApiError> {
+        Ok(self
+            .active_session_mut(handle)?
+            .submit_equipment_command(command))
     }
 
     pub fn current_actor_options(
@@ -638,7 +649,7 @@ mod tests {
             .action_resource_transition_log
             .iter()
             .any(|entry| entry.transition_kind == ActionResourceTransitionKind::CooldownAdvanced));
-        assert!(refreshed.current_actor_options.available);
+        assert!(refreshed.current_actor_options.actions[0].available);
         assert!(refreshed.current_actor_options.actions[0].available);
         assert!(
             api.preflight_command(
@@ -647,6 +658,126 @@ mod tests {
             )
             .expect("cooldown-refreshed preflight")
             .accepted
+        );
+    }
+
+    #[test]
+    fn api_equipment_commands_apply_and_remove_shared_item_grants() {
+        let mut scenario = valid_scenario();
+        scenario.combatants[0].base_ability_ids.clear();
+        scenario.combatants[0].inventory_item_ids = vec!["item.api-focus".to_string()];
+        scenario.items.push(ItemDefinition {
+            id: "item.api-focus".to_string(),
+            name: "API Focus".to_string(),
+            summary: "Equipment integration fixture.".to_string(),
+            tags: vec!["focus".to_string()],
+            equipment_slot: "implement".to_string(),
+            requirements: vec![EquipmentRequirement {
+                stat_id: "mind".to_string(),
+                minimum: 1,
+            }],
+            granted_modifier_ids: vec!["marked".to_string()],
+            granted_ability_ids: vec!["ability.api".to_string()],
+            granted_resource_pools: vec![ActionResourcePool {
+                id: "focus-charge".to_string(),
+                kind: ActionResourceKind::Charge,
+                maximum: 2,
+                refresh_policy: ActionResourceRefreshPolicy::Never,
+            }],
+        });
+        let focus_cost = ActionResourceCost {
+            resource_id: "focus-charge".to_string(),
+            amount: 1,
+        };
+        scenario.actions[0].resource_costs.push(focus_cost.clone());
+        scenario.selected_action.resource_costs.push(focus_cost);
+
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new("equipment", scenario))
+            .expect("unequipped owned item scenario is valid");
+        let session = created.session;
+        let unavailable = api
+            .preflight_command(
+                &session,
+                UseActionIntent::new("adept", "api_bolt", "raider"),
+            )
+            .expect("preflight before equipment");
+        assert_eq!(
+            unavailable.decision_kind,
+            CommandPreflightDecisionKind::RejectedByAbilityAvailability
+        );
+
+        let equipped = api
+            .submit_equipment(
+                &session,
+                EquipmentCommandSpec::equip("adept", "item.api-focus"),
+            )
+            .expect("equipment command readout");
+        assert!(equipped.accepted);
+        let equipped_snapshot = api.snapshot(&session).expect("equipped snapshot");
+        assert!(equipped_snapshot.current_actor_options.actions[0].available);
+        let focus_resource = equipped_snapshot.action_resource_ledger.combatants[0]
+            .resources
+            .iter()
+            .find(|resource| resource.resource_id == "focus-charge")
+            .expect("item resource is present");
+        assert_eq!(focus_resource.source_id, "item.api-focus");
+        assert!(equipped_snapshot.current_state.combatants[0]
+            .conditions
+            .contains(&"marked".to_string()));
+        assert_eq!(equipped_snapshot.equipment_transition_log.len(), 1);
+        assert_eq!(
+            equipped_snapshot.equipment_transition_log[0].item_id,
+            "item.api-focus"
+        );
+        let duplicate = api
+            .submit_equipment(
+                &session,
+                EquipmentCommandSpec::equip("adept", "item.api-focus"),
+            )
+            .expect("duplicate equipment readout");
+        assert!(!duplicate.accepted);
+        assert_eq!(
+            duplicate.decision_kind,
+            EquipmentDecisionKind::RejectedByEquippedState
+        );
+        assert_eq!(
+            api.snapshot(&session)
+                .expect("duplicate rejection snapshot")
+                .equipment_transition_log
+                .len(),
+            1
+        );
+
+        let unequipped = api
+            .submit_equipment(
+                &session,
+                EquipmentCommandSpec::unequip("adept", "item.api-focus"),
+            )
+            .expect("unequipment command readout");
+        assert!(unequipped.accepted);
+        let unequipped_snapshot = api.snapshot(&session).expect("unequipped snapshot");
+        assert!(!unequipped_snapshot.current_actor_options.actions[0].available);
+        assert!(!unequipped_snapshot.action_resource_ledger.combatants[0]
+            .resources
+            .iter()
+            .any(|resource| resource.resource_id == "focus-charge"));
+        assert!(!unequipped_snapshot.current_state.combatants[0]
+            .conditions
+            .contains(&"marked".to_string()));
+        assert_eq!(unequipped_snapshot.equipment_transition_log.len(), 2);
+
+        api.end_session(&session).expect("session ends");
+        let after_end = api
+            .submit_equipment(
+                &session,
+                EquipmentCommandSpec::equip("adept", "item.api-focus"),
+            )
+            .expect("post-end equipment readout");
+        assert_eq!(
+            after_end.decision_kind,
+            EquipmentDecisionKind::RejectedByLifecycle
         );
     }
 
@@ -783,7 +914,9 @@ mod tests {
                 value: 10,
             }],
             resource_pools: vec![ActionResourcePool::standard_action()],
+            inventory_item_ids: Vec::new(),
             equipped_item_ids: Vec::new(),
+            base_ability_ids: vec!["ability.api".to_string()],
             active_modifiers: Vec::new(),
             conditions: Vec::new(),
             is_actor: id == "adept",

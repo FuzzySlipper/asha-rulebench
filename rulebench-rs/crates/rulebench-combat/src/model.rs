@@ -4,6 +4,7 @@ mod action_resources;
 mod combat_flow;
 mod control;
 mod effects;
+mod equipment;
 mod projection;
 mod session;
 
@@ -11,6 +12,7 @@ pub use action_resources::*;
 pub use combat_flow::*;
 pub use control::*;
 pub use effects::*;
+pub use equipment::*;
 pub use projection::*;
 pub use rulebench_content::*;
 pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};

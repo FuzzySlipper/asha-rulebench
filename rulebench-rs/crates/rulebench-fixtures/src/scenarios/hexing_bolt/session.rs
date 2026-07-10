@@ -43,6 +43,8 @@ fn hexing_bolt_bounded_automatic_run_replay_readout() -> CombatSessionAutomaticR
         run_readout.decision_kind,
         run_readout.executed_step_count,
         run_readout.final_snapshot.action_resource_transition_log,
+        run_readout.final_snapshot.equipment_ledger,
+        run_readout.final_snapshot.equipment_transition_log,
         run_readout.final_snapshot.modifier_duration_expiration_log,
     ))
 }

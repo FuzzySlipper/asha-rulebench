@@ -399,6 +399,7 @@ fn content_diagnostics_report_missing_action_ability() {
 fn content_diagnostics_report_empty_item_id() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.items[1].id.clear();
+    scenario.combatants[1].inventory_item_ids.clear();
     scenario.combatants[1].equipped_item_ids.clear();
 
     let diagnostics = validate_scenario_content(&scenario);
@@ -857,6 +858,53 @@ fn content_diagnostics_report_missing_equipped_item() {
         diagnostics[0].content_id,
         Some("item.missing-focus".to_string())
     );
+}
+
+#[test]
+fn content_diagnostics_reject_invalid_equipment_loadouts_and_grants() {
+    let mut unowned = hexing_bolt_fixture_scenario();
+    unowned.combatants[0].inventory_item_ids.clear();
+    let unowned_diagnostics = validate_scenario_content(&unowned);
+    assert!(unowned_diagnostics
+        .iter()
+        .any(|diagnostic| { diagnostic.code == ContentDiagnosticCode::EquippedItemNotOwned }));
+
+    let mut slot_conflict = hexing_bolt_fixture_scenario();
+    let mut second_focus = slot_conflict.items[0].clone();
+    second_focus.id = "item.second-focus".to_string();
+    slot_conflict.items.push(second_focus);
+    slot_conflict.combatants[0]
+        .inventory_item_ids
+        .push("item.second-focus".to_string());
+    slot_conflict.combatants[0]
+        .equipped_item_ids
+        .push("item.second-focus".to_string());
+    let slot_diagnostics = validate_scenario_content(&slot_conflict);
+    assert!(slot_diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == ContentDiagnosticCode::EquipmentSlotConflict));
+
+    let mut requirement = hexing_bolt_fixture_scenario();
+    requirement.items[0].requirements[0].minimum = 99;
+    let requirement_diagnostics = validate_scenario_content(&requirement);
+    assert!(requirement_diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentDiagnosticCode::EquipmentRequirementNotMet
+    }));
+
+    let mut grants = hexing_bolt_fixture_scenario();
+    grants.items[0]
+        .granted_modifier_ids
+        .push("modifier.missing".to_string());
+    grants.items[0]
+        .granted_ability_ids
+        .push("ability.missing".to_string());
+    let grant_diagnostics = validate_scenario_content(&grants);
+    assert!(grant_diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentDiagnosticCode::MissingItemGrantedModifier
+    }));
+    assert!(grant_diagnostics
+        .iter()
+        .any(|diagnostic| { diagnostic.code == ContentDiagnosticCode::MissingItemGrantedAbility }));
 }
 
 #[test]
