@@ -4,12 +4,19 @@
 
 pub mod model;
 
+pub use model::*;
+
+mod api;
 mod audit;
 mod modifiers;
 mod resolver;
 mod runtime;
 mod state;
 
+pub use api::{
+    CombatSessionApi, CombatSessionApiError, CombatSessionArchive, CombatSessionCreateReadout,
+    CombatSessionCreateRequest, CombatSessionHandle,
+};
 pub use audit::{
     fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
     STATE_FINGERPRINT_ALGORITHM,
