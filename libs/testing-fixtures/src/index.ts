@@ -1,5 +1,16 @@
 import type { RulebenchScenarioReadoutDto } from '@asha-rulebench/protocol';
 
+export {
+  authorActionResolutionModule,
+  authorRulesetDefinition,
+  authorTurnControlModule,
+} from './ruleset-authoring';
+export type {
+  ActionResolutionModuleOptions,
+  RulesetDefinitionOptions,
+  TurnControlModuleOptions,
+} from './ruleset-authoring';
+
 export const twoCombatantScenarioReadout: RulebenchScenarioReadoutDto = {
   id: 'two-combatant-hexing-bolt',
   title: 'Hexing Bolt Opening',

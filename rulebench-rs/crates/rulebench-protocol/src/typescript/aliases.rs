@@ -28,5 +28,9 @@ pub fn aliases() -> &'static [super::ProtocolAlias] {
         "export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';",
         "export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';",
         "export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';",
+        "export type RulebenchRuleModuleIdDto = 'actionResolution' | 'turnControl';",
+        "export type RulebenchActionResolutionTargetingPolicyDto = 'declaredTargetsAndLineOfSight';",
+        "export type RulebenchTurnOrderPolicyDto = 'explicit';",
+        "export type RulebenchRuleModuleConfigurationDto = RulebenchActionResolutionModuleConfigurationDto | RulebenchTurnControlModuleConfigurationDto;",
     ]
 }

@@ -56,8 +56,40 @@ export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | '
 
 export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';
 
+export type RulebenchRuleModuleIdDto = 'actionResolution' | 'turnControl';
+
+export type RulebenchActionResolutionTargetingPolicyDto = 'declaredTargetsAndLineOfSight';
+
+export type RulebenchTurnOrderPolicyDto = 'explicit';
+
+export type RulebenchRuleModuleConfigurationDto = RulebenchActionResolutionModuleConfigurationDto | RulebenchTurnControlModuleConfigurationDto;
+
 export interface RulebenchCombatSessionHandleDto {
   readonly id: string;
+}
+
+export interface RulebenchRulesetDefinitionDto {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly summary: string;
+  readonly modules: readonly RulebenchRuleModuleDeclarationDto[];
+}
+
+export interface RulebenchRuleModuleDeclarationDto {
+  readonly module: RulebenchRuleModuleIdDto;
+  readonly version: string;
+  readonly configuration: RulebenchRuleModuleConfigurationDto;
+}
+
+export interface RulebenchActionResolutionModuleConfigurationDto {
+  readonly module: 'actionResolution';
+  readonly targetingPolicy: RulebenchActionResolutionTargetingPolicyDto;
+}
+
+export interface RulebenchTurnControlModuleConfigurationDto {
+  readonly module: 'turnControl';
+  readonly turnOrderPolicy: RulebenchTurnOrderPolicyDto;
 }
 
 export interface RulebenchRulesetCatalogDto {

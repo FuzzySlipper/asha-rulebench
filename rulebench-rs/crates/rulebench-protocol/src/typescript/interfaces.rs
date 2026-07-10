@@ -13,6 +13,74 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             }],
         },
         Interface {
+            name: "RulebenchRulesetDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "modules",
+                    ty: "readonly RulebenchRuleModuleDeclarationDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchRuleModuleDeclarationDto",
+            fields: &[
+                Field {
+                    name: "module",
+                    ty: "RulebenchRuleModuleIdDto",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "configuration",
+                    ty: "RulebenchRuleModuleConfigurationDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActionResolutionModuleConfigurationDto",
+            fields: &[
+                Field {
+                    name: "module",
+                    ty: "'actionResolution'",
+                },
+                Field {
+                    name: "targetingPolicy",
+                    ty: "RulebenchActionResolutionTargetingPolicyDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchTurnControlModuleConfigurationDto",
+            fields: &[
+                Field {
+                    name: "module",
+                    ty: "'turnControl'",
+                },
+                Field {
+                    name: "turnOrderPolicy",
+                    ty: "RulebenchTurnOrderPolicyDto",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchRulesetCatalogDto",
             fields: &[
                 Field {

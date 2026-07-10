@@ -6,9 +6,14 @@
 
 #![forbid(unsafe_code)]
 
+mod authoring;
 mod session;
 mod typescript;
 
+pub use authoring::{
+    validate_ruleset_definition, RuleModuleConfigurationDto, RuleModuleDeclarationDto,
+    RulesetAuthoringError, RulesetDefinitionDto,
+};
 pub use session::CombatSessionHandleDto;
 pub use typescript::{render_api_types, ProtocolAlias, ProtocolField, ProtocolInterface};
 
