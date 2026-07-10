@@ -1,3 +1,4 @@
+/// Static identity for one authored scenario or content validation report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioMetadata {
     pub id: String,

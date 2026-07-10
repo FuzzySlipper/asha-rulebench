@@ -1,4 +1,4 @@
-use super::NamedNumber;
+use rulebench_core::NamedNumber;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatDefinitionKind {

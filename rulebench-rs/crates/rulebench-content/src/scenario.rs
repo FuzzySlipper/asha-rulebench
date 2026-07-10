@@ -1,8 +1,6 @@
-use super::{
-    AbilityDefinition, ActionDefinition, ActiveModifier, BoundedValue, GridPosition,
-    ModifierTenure, NamedNumber, RulesetMetadata, ScenarioMetadata, StatBlock, StatDefinition,
-    Team,
-};
+use crate::{ActiveModifier, ScenarioMetadata, StatBlock, StatDefinition};
+use rulebench_core::{BoundedValue, GridPosition, NamedNumber, Team};
+use rulebench_ruleset::{AbilityDefinition, ActionDefinition, ModifierTenure, RulesetMetadata};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grid {
