@@ -7,9 +7,10 @@ It is intentionally local to this repo. Crates here may use ASHA/ECRP vocabulary
 ## Crate Structure
 
 The destination crate boundaries are present now so new work has an explicit
-home. Only `rulebench-rules` and `rulebench-authority` currently own substantial
-behavior; the other crates are documented, compiling reservation boundaries.
-Code moves into them through focused tasks with behavior-preserving tests.
+home. The portable core, ruleset, content, combat, and replay crates now own
+their extracted concerns; Rulebench-local fixtures, codegen, bridge adapters,
+and the authority harness remain separate. Further changes move through focused
+tasks with behavior-preserving tests.
 
 Portable authority layers:
 
@@ -34,6 +35,21 @@ Rulebench-local layers:
 The boundaries add useful friction. A game repo should be able to share portable
 rule behavior without inheriting Rulebench fixtures, generators, or UI machinery.
 Rulebench can exercise every portable layer through its harness.
+
+## Supported Portable Facade
+
+`rulebench-rules` is the supported local `v0` convenience facade for a consumer
+that wants the complete portable contract from one crate. It exposes:
+
+- authored content and validation values;
+- ruleset declarations, module validation, and compatibility identity;
+- combat session creation, commands, readbacks, state, resolver, and audit;
+- replay specifications and verification.
+
+Consumers that need a smaller dependency surface may use the focused owner
+crates directly. The facade does not expose Rulebench fixture catalogs, checked
+artifact generation, protocol/bridge adapters, or UI concerns. It is not a
+generic rules-engine or host-runtime compatibility promise.
 
 ## Dependency Direction
 

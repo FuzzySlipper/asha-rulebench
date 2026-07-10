@@ -1,4 +1,4 @@
-use super::{
+use rulebench_rules::{
     ContentValidationReport, RulebenchReceipt, RulebenchScenario, RulesetMetadata, UseActionIntent,
 };
 
