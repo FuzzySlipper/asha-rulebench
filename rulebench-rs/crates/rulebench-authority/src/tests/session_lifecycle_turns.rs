@@ -1462,7 +1462,7 @@ fn session_runtime_turn_wrap_refreshes_spent_current_actor_action_resource() {
     );
     assert_eq!(
         raider_refresh_transition.reason,
-        "Action resource refreshed."
+        "Action resource refreshed at turn start."
     );
 
     let adept_refresh_transition = &session.action_resource_transition_log()[2];
@@ -1495,7 +1495,7 @@ fn session_runtime_turn_wrap_refreshes_spent_current_actor_action_resource() {
     );
     assert_eq!(
         adept_refresh_transition.reason,
-        "Action resource refreshed."
+        "Action resource refreshed at turn start."
     );
 }
 

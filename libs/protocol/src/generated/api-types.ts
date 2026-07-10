@@ -24,7 +24,9 @@ export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
 
 export type RulebenchLifecycleTransitionTriggerDto = 'explicitStart' | 'commandStart' | 'explicitEnd' | 'conditionalEnd';
 
-export type RulebenchActionResourceKindDto = 'standardAction';
+export type RulebenchActionResourceKindDto = 'standardAction' | 'spellSlot' | 'charge' | 'cooldown';
+
+export type RulebenchActionResourceRefreshPolicyDto = { readonly kind: 'never' | 'combatStart' | 'turnStart'; readonly turns: null } | { readonly kind: 'turns'; readonly turns: number };
 
 export type RulebenchCommandPreflightDecisionKindDto = 'accepted' | 'rejectedByShape' | 'rejectedByLifecycle' | 'rejectedByTurnOrder' | 'rejectedByActorLookup' | 'rejectedByActionLookup' | 'rejectedByActionOwnership' | 'rejectedByTargetLookup' | 'rejectedByTargetLegality' | 'rejectedByActionResource';
 
@@ -56,9 +58,9 @@ export type RulebenchModifierDurationPolicyDto = { readonly kind: 'permanent'; r
 
 export type RulebenchModifierDurationTransitionTriggerDto = { readonly kind: 'turnBoundary' | 'roundBoundary'; readonly event: null } | { readonly kind: 'event'; readonly event: string };
 
-export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed';
+export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed' | 'cooldownAdvanced';
 
-export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noVisibleActiveTargets';
+export type RulebenchCurrentActorOptionsUnavailableReasonDto = 'combatEnded' | 'noCurrentActor' | 'currentActorDefeated' | 'noMatchingActions' | 'noAvailableResources' | 'noVisibleActiveTargets';
 
 export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';
 
@@ -234,6 +236,7 @@ export interface RulebenchAutomaticRunReplayReadoutDto {
   readonly expectedExecutedStepCount: number;
   readonly actualExecutedStepCount: number;
   readonly executedStepCountMatches: boolean;
+  readonly actionResourceTransitionLogMatches: boolean;
   readonly modifierDurationExpirationLogMatches: boolean;
   readonly replayedRun: RulebenchAutomaticRunReadoutDto;
   readonly reason: string;
@@ -292,7 +295,16 @@ export interface RulebenchCurrentActorActionOptionDto {
   readonly actionId: string;
   readonly abilityId: string;
   readonly actionName: string;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly resourceCosts: readonly RulebenchActionResourceCostDto[];
+  readonly resourceStates: readonly RulebenchActionResourceStateDto[];
   readonly targetOptions: readonly RulebenchCurrentActorTargetOptionDto[];
+}
+
+export interface RulebenchActionResourceCostDto {
+  readonly resourceId: string;
+  readonly amount: number;
 }
 
 export interface RulebenchCurrentActorTargetOptionDto {
@@ -395,6 +407,7 @@ export interface RulebenchActionResourceTransitionEntryDto {
   readonly sequence: number;
   readonly transitionKind: RulebenchActionResourceTransitionKindDto;
   readonly combatantId: string;
+  readonly resourceId: string;
   readonly resourceKind: RulebenchActionResourceKindDto;
   readonly amount: number;
   readonly previousResource: RulebenchActionResourceStateDto;
@@ -463,10 +476,13 @@ export interface RulebenchCombatantActionResourceReadoutDto {
 }
 
 export interface RulebenchActionResourceStateDto {
+  readonly resourceId: string;
   readonly kind: RulebenchActionResourceKindDto;
   readonly current: number;
   readonly max: number;
   readonly available: boolean;
+  readonly refreshPolicy: RulebenchActionResourceRefreshPolicyDto;
+  readonly remainingRefreshTurns: number | null;
 }
 
 export interface RulebenchCombatSessionStepReadoutDto {

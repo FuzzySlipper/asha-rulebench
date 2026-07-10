@@ -2,8 +2,9 @@
 
 use rulebench_combat::RulebenchScenario;
 use rulebench_combat::{
-    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunSpec, CombatSessionState, ModifierDurationExpirationEntry,
+    ActionResourceTransitionEntry, CombatSessionAutomaticRunDecisionKind,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec, CombatSessionState,
+    ModifierDurationExpirationEntry,
 };
 use rulebench_core::StateFingerprint;
 
@@ -18,6 +19,7 @@ pub struct CombatSessionAutomaticRunReplaySpec {
     pub expected_final_state_fingerprint: StateFingerprint,
     pub expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
     pub expected_executed_step_count: u32,
+    pub expected_action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
     pub expected_modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
 }
 
@@ -32,6 +34,7 @@ impl CombatSessionAutomaticRunReplaySpec {
         expected_final_state_fingerprint: StateFingerprint,
         expected_run_decision_kind: CombatSessionAutomaticRunDecisionKind,
         expected_executed_step_count: u32,
+        expected_action_resource_transition_log: Vec<ActionResourceTransitionEntry>,
         expected_modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     ) -> Self {
         Self {
@@ -44,6 +47,7 @@ impl CombatSessionAutomaticRunReplaySpec {
             expected_final_state_fingerprint,
             expected_run_decision_kind,
             expected_executed_step_count,
+            expected_action_resource_transition_log,
             expected_modifier_duration_expiration_log,
         }
     }
@@ -80,6 +84,7 @@ pub struct CombatSessionAutomaticRunReplayReadout {
     pub expected_executed_step_count: u32,
     pub actual_executed_step_count: u32,
     pub executed_step_count_matches: bool,
+    pub action_resource_transition_log_matches: bool,
     pub modifier_duration_expiration_log_matches: bool,
     pub replayed_run: CombatSessionAutomaticRunReadout,
     pub reason: String,
@@ -103,12 +108,16 @@ pub fn verify_automatic_run_replay(
     let run_decision_kind_matches = actual_run_decision_kind == spec.expected_run_decision_kind;
     let executed_step_count_matches =
         actual_executed_step_count == spec.expected_executed_step_count;
+    let action_resource_transition_log_matches =
+        replayed_run.final_snapshot.action_resource_transition_log
+            == spec.expected_action_resource_transition_log;
     let modifier_duration_expiration_log_matches =
         replayed_run.final_snapshot.modifier_duration_expiration_log
             == spec.expected_modifier_duration_expiration_log;
     let accepted = final_state_fingerprint_matches
         && run_decision_kind_matches
         && executed_step_count_matches
+        && action_resource_transition_log_matches
         && modifier_duration_expiration_log_matches;
     let decision_kind = if accepted {
         CombatSessionAutomaticRunReplayDecisionKind::Verified
@@ -137,6 +146,7 @@ pub fn verify_automatic_run_replay(
         expected_executed_step_count: spec.expected_executed_step_count,
         actual_executed_step_count,
         executed_step_count_matches,
+        action_resource_transition_log_matches,
         modifier_duration_expiration_log_matches,
         replayed_run,
         reason,
@@ -171,6 +181,10 @@ mod tests {
             expected.executed_step_count,
             expected
                 .final_snapshot
+                .action_resource_transition_log
+                .clone(),
+            expected
+                .final_snapshot
                 .modifier_duration_expiration_log
                 .clone(),
         ));
@@ -183,6 +197,7 @@ mod tests {
         assert!(readout.final_state_fingerprint_matches);
         assert!(readout.run_decision_kind_matches);
         assert!(readout.executed_step_count_matches);
+        assert!(readout.action_resource_transition_log_matches);
         assert!(readout.modifier_duration_expiration_log_matches);
     }
 
@@ -202,6 +217,10 @@ mod tests {
             expected.final_snapshot.current_state_fingerprint.clone(),
             expected.decision_kind,
             expected.executed_step_count + 1,
+            expected
+                .final_snapshot
+                .action_resource_transition_log
+                .clone(),
             expected
                 .final_snapshot
                 .modifier_duration_expiration_log

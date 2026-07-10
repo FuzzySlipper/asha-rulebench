@@ -1,6 +1,8 @@
 use crate::{ActiveModifier, ScenarioMetadata, StatBlock, StatDefinition};
 use rulebench_core::{BoundedValue, GridPosition, NamedNumber, Team};
-use rulebench_ruleset::{AbilityDefinition, ActionDefinition, ModifierTenure, RulesetMetadata};
+use rulebench_ruleset::{
+    AbilityDefinition, ActionDefinition, ActionResourcePool, ModifierTenure, RulesetMetadata,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grid {
@@ -28,6 +30,7 @@ pub struct Combatant {
     pub class_ids: Vec<String>,
     pub stats: StatBlock,
     pub defenses: Vec<NamedNumber>,
+    pub resource_pools: Vec<ActionResourcePool>,
     pub equipped_item_ids: Vec<String>,
     pub active_modifiers: Vec<ActiveModifier>,
     pub conditions: Vec<String>,

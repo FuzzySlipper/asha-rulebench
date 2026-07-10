@@ -5,9 +5,9 @@ use crate::{
     ContentValidationReport, ModifierDurationPolicy, RulebenchScenario, StatDefinitionKind,
 };
 use rulebench_ruleset::{
-    ActionDefinition, AttackCheckDeclaration, CheckDeclaration, ContestedCheckDeclaration,
-    ModifierTenure, RuleModuleValidationError, SavingThrowCheckDeclaration, TargetKind,
-    TargetSelection,
+    ActionDefinition, ActionResourceRefreshPolicy, AttackCheckDeclaration, CheckDeclaration,
+    ContestedCheckDeclaration, ModifierTenure, RuleModuleValidationError,
+    SavingThrowCheckDeclaration, TargetKind, TargetSelection,
 };
 
 pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> ContentValidationReport {
@@ -481,6 +481,7 @@ fn validate_combatant_class_and_stat_references(
 ) {
     let mut seen_combatant_ids = HashSet::new();
     for combatant in &scenario.combatants {
+        validate_combatant_resource_pools(combatant, diagnostics);
         if combatant.id.is_empty() {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::EmptyCombatantId,
@@ -756,10 +757,10 @@ fn validate_action_references(
                 validate_contested_actor_stat(scenario, action, contested, actor, diagnostics);
             }
         }
+        validate_action_resource_costs(action, actor, diagnostics);
     }
     validate_hit_modifier(scenario, action, diagnostics);
     validate_effect_operations(action, diagnostics);
-    validate_action_resource_costs(action, diagnostics);
 
     for target_id in &action.targeting.target_ids {
         if let Some(target) = scenario
@@ -800,30 +801,94 @@ fn validate_action_references(
 
 fn validate_action_resource_costs(
     action: &ActionDefinition,
+    actor: &Combatant,
     diagnostics: &mut Vec<ContentDiagnostic>,
 ) {
-    let mut seen_resource_kinds = HashSet::new();
+    let mut seen_resource_ids = HashSet::new();
     for cost in &action.resource_costs {
-        if cost.amount == 0 {
+        if cost.resource_id.is_empty() || cost.amount == 0 {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::InvalidActionResourceCost,
                 Some(action.id.clone()),
                 format!(
                     "Action {} declares a zero {} resource cost.",
-                    action.id,
-                    cost.kind.code()
+                    action.id, cost.resource_id
                 ),
             ));
         }
 
-        if !seen_resource_kinds.insert(cost.kind.code()) {
+        if !actor
+            .resource_pools
+            .iter()
+            .any(|pool| pool.id == cost.resource_id)
+        {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::MissingActionResourcePool,
+                Some(cost.resource_id.clone()),
+                format!(
+                    "Action {} references resource pool {} that actor {} does not own.",
+                    action.id, cost.resource_id, actor.id
+                ),
+            ));
+        }
+
+        if !seen_resource_ids.insert(cost.resource_id.as_str()) {
             diagnostics.push(ContentDiagnostic::error(
                 ContentDiagnosticCode::DuplicateActionResourceCost,
                 Some(action.id.clone()),
                 format!(
                     "Action {} declares {} more than once in its resource costs.",
-                    action.id,
-                    cost.kind.code()
+                    action.id, cost.resource_id
+                ),
+            ));
+        }
+    }
+}
+
+fn validate_combatant_resource_pools(
+    combatant: &Combatant,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let mut seen_resource_ids = HashSet::new();
+    for pool in &combatant.resource_pools {
+        if pool.id.is_empty() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::EmptyActionResourcePoolId,
+                Some(combatant.id.clone()),
+                format!(
+                    "Combatant {} declares a resource pool with an empty id.",
+                    combatant.id
+                ),
+            ));
+            continue;
+        }
+        if !seen_resource_ids.insert(pool.id.as_str()) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateActionResourcePoolId,
+                Some(pool.id.clone()),
+                format!(
+                    "Combatant {} declares resource pool {} more than once.",
+                    combatant.id, pool.id
+                ),
+            ));
+        }
+        if pool.maximum == 0 || i32::try_from(pool.maximum).is_err() {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidActionResourcePoolMaximum,
+                Some(pool.id.clone()),
+                format!(
+                    "Combatant {} resource pool {} has unsupported maximum {}.",
+                    combatant.id, pool.id, pool.maximum
+                ),
+            ));
+        }
+        if matches!(pool.refresh_policy, ActionResourceRefreshPolicy::Turns(0)) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidActionResourceRefreshPolicy,
+                Some(pool.id.clone()),
+                format!(
+                    "Combatant {} resource pool {} declares a zero-turn refresh clock.",
+                    combatant.id, pool.id
                 ),
             ));
         }

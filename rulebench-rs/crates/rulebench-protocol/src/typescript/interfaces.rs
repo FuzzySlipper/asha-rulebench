@@ -546,6 +546,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "boolean",
                 },
                 Field {
+                    name: "actionResourceTransitionLogMatches",
+                    ty: "boolean",
+                },
+                Field {
                     name: "modifierDurationExpirationLogMatches",
                     ty: "boolean",
                 },
@@ -736,8 +740,37 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "string",
                 },
                 Field {
+                    name: "available",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "unavailableReason",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "resourceCosts",
+                    ty: "readonly RulebenchActionResourceCostDto[]",
+                },
+                Field {
+                    name: "resourceStates",
+                    ty: "readonly RulebenchActionResourceStateDto[]",
+                },
+                Field {
                     name: "targetOptions",
                     ty: "readonly RulebenchCurrentActorTargetOptionDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchActionResourceCostDto",
+            fields: &[
+                Field {
+                    name: "resourceId",
+                    ty: "string",
+                },
+                Field {
+                    name: "amount",
+                    ty: "number",
                 },
             ],
         },
@@ -1078,6 +1111,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "string",
                 },
                 Field {
+                    name: "resourceId",
+                    ty: "string",
+                },
+                Field {
                     name: "resourceKind",
                     ty: "RulebenchActionResourceKindDto",
                 },
@@ -1299,6 +1336,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             name: "RulebenchActionResourceStateDto",
             fields: &[
                 Field {
+                    name: "resourceId",
+                    ty: "string",
+                },
+                Field {
                     name: "kind",
                     ty: "RulebenchActionResourceKindDto",
                 },
@@ -1313,6 +1354,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "available",
                     ty: "boolean",
+                },
+                Field {
+                    name: "refreshPolicy",
+                    ty: "RulebenchActionResourceRefreshPolicyDto",
+                },
+                Field {
+                    name: "remainingRefreshTurns",
+                    ty: "number | null",
                 },
             ],
         },

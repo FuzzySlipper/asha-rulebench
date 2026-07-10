@@ -197,6 +197,7 @@ pub enum CurrentActorOptionsUnavailableReason {
     NoCurrentActor,
     CurrentActorDefeated,
     NoMatchingActions,
+    NoAvailableResources,
     NoVisibleActiveTargets,
 }
 
@@ -207,6 +208,7 @@ impl CurrentActorOptionsUnavailableReason {
             CurrentActorOptionsUnavailableReason::NoCurrentActor => "noCurrentActor",
             CurrentActorOptionsUnavailableReason::CurrentActorDefeated => "currentActorDefeated",
             CurrentActorOptionsUnavailableReason::NoMatchingActions => "noMatchingActions",
+            CurrentActorOptionsUnavailableReason::NoAvailableResources => "noAvailableResources",
             CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets => {
                 "noVisibleActiveTargets"
             }
@@ -227,6 +229,10 @@ pub struct CurrentActorActionOption {
     pub action_id: String,
     pub ability_id: String,
     pub action_name: String,
+    pub available: bool,
+    pub unavailable_reason: Option<String>,
+    pub resource_costs: Vec<ActionResourceCost>,
+    pub resource_states: Vec<ActionResourceState>,
     pub target_options: Vec<CurrentActorTargetOption>,
 }
 

@@ -209,13 +209,29 @@ describe("RulebenchTransport fixtures", () => {
         {
           combatantId: "entity-adept",
           resources: [
-            { kind: "standardAction", current: 0, max: 1, available: false },
+            {
+              resourceId: "standard-action",
+              kind: "standardAction",
+              current: 0,
+              max: 1,
+              available: false,
+              refreshPolicy: { kind: "turnStart", turns: null },
+              remainingRefreshTurns: null,
+            },
           ],
         },
         {
           combatantId: "entity-raider",
           resources: [
-            { kind: "standardAction", current: 1, max: 1, available: true },
+            {
+              resourceId: "standard-action",
+              kind: "standardAction",
+              current: 1,
+              max: 1,
+              available: true,
+              refreshPolicy: { kind: "turnStart", turns: null },
+              remainingRefreshTurns: null,
+            },
           ],
         },
       ]);
@@ -348,10 +364,13 @@ describe("RulebenchTransport fixtures", () => {
             combatantId: "entity-adept",
             resources: [
               {
+                resourceId: "standard-action",
                 kind: "standardAction",
                 current: 1,
                 max: 1,
                 available: true,
+                refreshPolicy: { kind: "turnStart", turns: null },
+                remainingRefreshTurns: null,
               },
             ],
           },
@@ -359,10 +378,13 @@ describe("RulebenchTransport fixtures", () => {
             combatantId: "entity-raider",
             resources: [
               {
+                resourceId: "standard-action",
                 kind: "standardAction",
                 current: 1,
                 max: 1,
                 available: true,
+                refreshPolicy: { kind: "turnStart", turns: null },
+                remainingRefreshTurns: null,
               },
             ],
           },
@@ -573,19 +595,26 @@ describe("RulebenchTransport fixtures", () => {
           sequence: 0,
           transitionKind: "spent",
           combatantId: "entity-adept",
+          resourceId: "standard-action",
           resourceKind: "standardAction",
           amount: 1,
           previousResource: {
+            resourceId: "standard-action",
             kind: "standardAction",
             current: 1,
             max: 1,
             available: true,
+            refreshPolicy: { kind: "turnStart", turns: null },
+            remainingRefreshTurns: null,
           },
           nextResource: {
+            resourceId: "standard-action",
             kind: "standardAction",
             current: 0,
             max: 1,
             available: false,
+            refreshPolicy: { kind: "turnStart", turns: null },
+            remainingRefreshTurns: null,
           },
           commandStepId: "script-selected-runtime-hit",
           commandStepIndex: 1,
@@ -599,19 +628,26 @@ describe("RulebenchTransport fixtures", () => {
           sequence: 1,
           transitionKind: "refreshed",
           combatantId: "entity-raider",
+          resourceId: "standard-action",
           resourceKind: "standardAction",
           amount: 0,
           previousResource: {
+            resourceId: "standard-action",
             kind: "standardAction",
             current: 1,
             max: 1,
             available: true,
+            refreshPolicy: { kind: "turnStart", turns: null },
+            remainingRefreshTurns: null,
           },
           nextResource: {
+            resourceId: "standard-action",
             kind: "standardAction",
             current: 1,
             max: 1,
             available: true,
+            refreshPolicy: { kind: "turnStart", turns: null },
+            remainingRefreshTurns: null,
           },
           commandStepId: null,
           commandStepIndex: null,
@@ -619,25 +655,32 @@ describe("RulebenchTransport fixtures", () => {
           roundNumber: 1,
           turnIndex: 1,
           currentActorId: "entity-raider",
-          reason: "Action resource refreshed.",
+          reason: "Action resource refreshed at turn start.",
         },
         {
           sequence: 2,
           transitionKind: "refreshed",
           combatantId: "entity-adept",
+          resourceId: "standard-action",
           resourceKind: "standardAction",
           amount: 1,
           previousResource: {
+            resourceId: "standard-action",
             kind: "standardAction",
             current: 0,
             max: 1,
             available: false,
+            refreshPolicy: { kind: "turnStart", turns: null },
+            remainingRefreshTurns: null,
           },
           nextResource: {
+            resourceId: "standard-action",
             kind: "standardAction",
             current: 1,
             max: 1,
             available: true,
+            refreshPolicy: { kind: "turnStart", turns: null },
+            remainingRefreshTurns: null,
           },
           commandStepId: null,
           commandStepIndex: null,
@@ -645,7 +688,7 @@ describe("RulebenchTransport fixtures", () => {
           roundNumber: 2,
           turnIndex: 0,
           currentActorId: "entity-adept",
-          reason: "Action resource refreshed.",
+          reason: "Action resource refreshed at turn start.",
         },
       ]);
       expect(result.value.modifierDurationExpirationLog).toEqual([
@@ -913,6 +956,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.expectedExecutedStepCount).toBe(5);
       expect(result.value.actualExecutedStepCount).toBe(5);
       expect(result.value.executedStepCountMatches).toBe(true);
+      expect(result.value.actionResourceTransitionLogMatches).toBe(true);
       expect(result.value.modifierDurationExpirationLogMatches).toBe(true);
       expect(result.value.replayedRun.id).toBe(
         "hexing-bolt-bounded-automatic-run",

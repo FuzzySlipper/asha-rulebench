@@ -141,7 +141,7 @@ fn content_diagnostics_reject_invalid_and_duplicate_action_resource_costs() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0].resource_costs = vec![
         ActionResourceCost {
-            kind: ActionResourceKind::StandardAction,
+            resource_id: "standard-action".to_string(),
             amount: 0,
         },
         ActionResourceCost::standard_action(),
@@ -165,6 +165,48 @@ fn content_diagnostics_reject_invalid_and_duplicate_action_resource_costs() {
     assert_eq!(
         ContentDiagnosticCode::DuplicateActionResourceCost.code(),
         "duplicateActionResourceCost"
+    );
+}
+
+#[test]
+fn content_diagnostics_reject_malformed_resource_pools_and_missing_cost_targets() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.combatants[0]
+        .resource_pools
+        .push(ActionResourcePool {
+            id: String::new(),
+            kind: ActionResourceKind::Charge,
+            maximum: 1,
+            refresh_policy: ActionResourceRefreshPolicy::Never,
+        });
+    scenario.combatants[0]
+        .resource_pools
+        .push(ActionResourcePool {
+            id: "standard-action".to_string(),
+            kind: ActionResourceKind::Cooldown,
+            maximum: 0,
+            refresh_policy: ActionResourceRefreshPolicy::Turns(0),
+        });
+    scenario.actions[0].resource_costs.push(ActionResourceCost {
+        resource_id: "missing-pool".to_string(),
+        amount: 1,
+    });
+
+    let diagnostics = validate_scenario_content(&scenario);
+    let codes = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.code)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        codes,
+        vec![
+            ContentDiagnosticCode::EmptyActionResourcePoolId,
+            ContentDiagnosticCode::DuplicateActionResourcePoolId,
+            ContentDiagnosticCode::InvalidActionResourcePoolMaximum,
+            ContentDiagnosticCode::InvalidActionResourceRefreshPolicy,
+            ContentDiagnosticCode::MissingActionResourcePool,
+        ]
     );
 }
 

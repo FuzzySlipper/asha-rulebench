@@ -104,7 +104,11 @@ fn session_runtime_snapshot_reads_command_updates() {
         snapshot.combatant_vitality.active_combatant_ids,
         vec!["entity-adept".to_string(), "entity-raider".to_string()]
     );
-    assert!(snapshot.current_actor_options.available);
+    assert!(!snapshot.current_actor_options.available);
+    assert_eq!(
+        snapshot.current_actor_options.unavailable_reason,
+        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
+    );
     assert_eq!(
         snapshot.current_actor_options.actions[0].target_options[0].current_hit_points,
         9

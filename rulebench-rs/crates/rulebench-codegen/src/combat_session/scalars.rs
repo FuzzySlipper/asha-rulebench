@@ -140,6 +140,9 @@ pub(crate) fn combat_end_condition_kind(kind: CombatEndConditionKind) -> &'stati
 pub(crate) fn action_resource_kind(kind: ActionResourceKind) -> &'static str {
     match kind {
         ActionResourceKind::StandardAction => "standardAction",
+        ActionResourceKind::SpellSlot => "spellSlot",
+        ActionResourceKind::Charge => "charge",
+        ActionResourceKind::Cooldown => "cooldown",
     }
 }
 

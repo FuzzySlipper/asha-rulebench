@@ -28,7 +28,7 @@ impl CombatantState {
             temporary_vitality: combatant.temporary_vitality,
             active_modifiers: combatant.active_modifiers.clone(),
             conditions: combatant.conditions.clone(),
-            action_resources: default_action_resources(),
+            action_resources: action_resources_from_combatant(combatant),
         }
     }
 
@@ -50,7 +50,7 @@ impl CombatantState {
             temporary_vitality: combatant.temporary_vitality,
             active_modifiers: Vec::new(),
             conditions: combatant.conditions.clone(),
-            action_resources: default_action_resources(),
+            action_resources: vec![ActionResourceState::standard_action_available()],
         }
     }
 
@@ -120,17 +120,18 @@ impl CombatantState {
 
     pub(super) fn spend_action_resource(
         &mut self,
-        resource_kind: ActionResourceKind,
+        resource_id: &str,
         amount: u32,
     ) -> ActionResourceSpendReadout {
         let Some(resource) = self
             .action_resources
             .iter_mut()
-            .find(|resource| resource.kind == resource_kind)
+            .find(|resource| resource.resource_id == resource_id)
         else {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
-                resource_kind,
+                resource_id: resource_id.to_string(),
+                resource_kind: ActionResourceKind::StandardAction,
                 amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByMissingResource,
@@ -145,7 +146,8 @@ impl CombatantState {
         let Ok(amount) = i32::try_from(requested_amount) else {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
-                resource_kind,
+                resource_id: resource_id.to_string(),
+                resource_kind: resource.kind,
                 amount: requested_amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByInvalidAmount,
@@ -157,7 +159,8 @@ impl CombatantState {
         if amount <= 0 {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
-                resource_kind,
+                resource_id: resource_id.to_string(),
+                resource_kind: resource.kind,
                 amount: requested_amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByInvalidAmount,
@@ -169,7 +172,8 @@ impl CombatantState {
         if !resource.available {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
-                resource_kind,
+                resource_id: resource_id.to_string(),
+                resource_kind: resource.kind,
                 amount: requested_amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByUnavailableResource,
@@ -181,7 +185,8 @@ impl CombatantState {
         if resource.current < amount {
             return ActionResourceSpendReadout {
                 combatant_id: self.id.clone(),
-                resource_kind,
+                resource_id: resource_id.to_string(),
+                resource_kind: resource.kind,
                 amount: requested_amount,
                 accepted: false,
                 decision_kind: ActionResourceSpendDecisionKind::RejectedByInsufficientResource,
@@ -193,11 +198,16 @@ impl CombatantState {
 
         resource.current -= amount;
         resource.available = resource.current > 0;
+        resource.remaining_refresh_turns = match &resource.refresh_policy {
+            crate::model::ActionResourceRefreshPolicy::Turns(turns) => Some(*turns),
+            _ => None,
+        };
         let next_resource = resource.clone();
 
         ActionResourceSpendReadout {
             combatant_id: self.id.clone(),
-            resource_kind,
+            resource_id: resource_id.to_string(),
+            resource_kind: resource.kind,
             amount: requested_amount,
             accepted: true,
             decision_kind: ActionResourceSpendDecisionKind::Spent,
@@ -209,16 +219,17 @@ impl CombatantState {
 
     pub(super) fn refresh_action_resource(
         &mut self,
-        resource_kind: ActionResourceKind,
+        resource_id: &str,
     ) -> ActionResourceRefreshReadout {
         let Some(resource) = self
             .action_resources
             .iter_mut()
-            .find(|resource| resource.kind == resource_kind)
+            .find(|resource| resource.resource_id == resource_id)
         else {
             return ActionResourceRefreshReadout {
                 combatant_id: self.id.clone(),
-                resource_kind,
+                resource_id: resource_id.to_string(),
+                resource_kind: ActionResourceKind::StandardAction,
                 accepted: false,
                 decision_kind: ActionResourceRefreshDecisionKind::RejectedByMissingResource,
                 previous_resource: None,
@@ -230,16 +241,115 @@ impl CombatantState {
         let previous_resource = resource.clone();
         resource.current = resource.max;
         resource.available = resource.current > 0;
+        resource.remaining_refresh_turns = None;
         let next_resource = resource.clone();
 
         ActionResourceRefreshReadout {
             combatant_id: self.id.clone(),
-            resource_kind,
+            resource_id: resource_id.to_string(),
+            resource_kind: resource.kind,
             accepted: true,
             decision_kind: ActionResourceRefreshDecisionKind::Refreshed,
             previous_resource: Some(previous_resource),
             next_resource: Some(next_resource),
             reason: "Action resource refreshed.".to_string(),
+        }
+    }
+
+    pub(super) fn advance_action_resources_for_turn_start(
+        &mut self,
+    ) -> Vec<ActionResourceRefreshReadout> {
+        let resource_ids = self
+            .action_resources
+            .iter()
+            .map(|resource| resource.resource_id.clone())
+            .collect::<Vec<_>>();
+
+        resource_ids
+            .into_iter()
+            .filter_map(|resource_id| self.advance_action_resource_for_turn_start(&resource_id))
+            .collect()
+    }
+
+    pub(super) fn refresh_action_resources_for_combat_start(
+        &mut self,
+    ) -> Vec<ActionResourceRefreshReadout> {
+        let resource_ids = self
+            .action_resources
+            .iter()
+            .filter(|resource| {
+                resource.refresh_policy == crate::model::ActionResourceRefreshPolicy::CombatStart
+            })
+            .map(|resource| resource.resource_id.clone())
+            .collect::<Vec<_>>();
+
+        resource_ids
+            .into_iter()
+            .map(|resource_id| self.refresh_action_resource(&resource_id))
+            .collect()
+    }
+
+    fn advance_action_resource_for_turn_start(
+        &mut self,
+        resource_id: &str,
+    ) -> Option<ActionResourceRefreshReadout> {
+        let resource = self
+            .action_resources
+            .iter_mut()
+            .find(|resource| resource.resource_id == resource_id)?;
+        let previous_resource = resource.clone();
+
+        match &resource.refresh_policy {
+            crate::model::ActionResourceRefreshPolicy::TurnStart => {
+                resource.current = resource.max;
+                resource.available = resource.current > 0;
+                resource.remaining_refresh_turns = None;
+                Some(ActionResourceRefreshReadout {
+                    combatant_id: self.id.clone(),
+                    resource_id: resource.resource_id.clone(),
+                    resource_kind: resource.kind,
+                    accepted: true,
+                    decision_kind: ActionResourceRefreshDecisionKind::Refreshed,
+                    previous_resource: Some(previous_resource),
+                    next_resource: Some(resource.clone()),
+                    reason: "Action resource refreshed at turn start.".to_string(),
+                })
+            }
+            crate::model::ActionResourceRefreshPolicy::Turns(turns)
+                if resource.current < resource.max =>
+            {
+                let remaining = resource.remaining_refresh_turns.unwrap_or(*turns);
+                if remaining <= 1 {
+                    resource.current = resource.max;
+                    resource.available = resource.current > 0;
+                    resource.remaining_refresh_turns = None;
+                    Some(ActionResourceRefreshReadout {
+                        combatant_id: self.id.clone(),
+                        resource_id: resource.resource_id.clone(),
+                        resource_kind: resource.kind,
+                        accepted: true,
+                        decision_kind: ActionResourceRefreshDecisionKind::Refreshed,
+                        previous_resource: Some(previous_resource),
+                        next_resource: Some(resource.clone()),
+                        reason: "Cooldown resource refreshed at turn start.".to_string(),
+                    })
+                } else {
+                    resource.remaining_refresh_turns = Some(remaining - 1);
+                    Some(ActionResourceRefreshReadout {
+                        combatant_id: self.id.clone(),
+                        resource_id: resource.resource_id.clone(),
+                        resource_kind: resource.kind,
+                        accepted: true,
+                        decision_kind: ActionResourceRefreshDecisionKind::CooldownAdvanced,
+                        previous_resource: Some(previous_resource),
+                        next_resource: Some(resource.clone()),
+                        reason: "Cooldown resource advanced at turn start.".to_string(),
+                    })
+                }
+            }
+            crate::model::ActionResourceRefreshPolicy::Never
+            | crate::model::ActionResourceRefreshPolicy::CombatStart
+            | crate::model::ActionResourceRefreshPolicy::Turns(_) => None,
         }
     }
 
@@ -376,6 +486,14 @@ impl ModifierDurationBoundary {
     }
 }
 
-fn default_action_resources() -> Vec<ActionResourceState> {
-    vec![ActionResourceState::standard_action_available()]
+fn action_resources_from_combatant(combatant: &Combatant) -> Vec<ActionResourceState> {
+    if combatant.resource_pools.is_empty() {
+        return vec![ActionResourceState::standard_action_available()];
+    }
+
+    combatant
+        .resource_pools
+        .iter()
+        .map(ActionResourceState::from_pool)
+        .collect()
 }

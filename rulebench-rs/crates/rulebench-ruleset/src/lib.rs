@@ -508,12 +508,58 @@ pub struct AbilityDefinition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionResourceKind {
     StandardAction,
+    SpellSlot,
+    Charge,
+    Cooldown,
 }
 
 impl ActionResourceKind {
     pub const fn code(self) -> &'static str {
         match self {
             ActionResourceKind::StandardAction => "standardAction",
+            ActionResourceKind::SpellSlot => "spellSlot",
+            ActionResourceKind::Charge => "charge",
+            ActionResourceKind::Cooldown => "cooldown",
+        }
+    }
+}
+
+/// The deterministic point at which a depleted resource pool may refresh.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionResourceRefreshPolicy {
+    Never,
+    CombatStart,
+    TurnStart,
+    Turns(u32),
+}
+
+impl ActionResourceRefreshPolicy {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            ActionResourceRefreshPolicy::Never => "never",
+            ActionResourceRefreshPolicy::CombatStart => "combatStart",
+            ActionResourceRefreshPolicy::TurnStart => "turnStart",
+            ActionResourceRefreshPolicy::Turns(_) => "turns",
+        }
+    }
+}
+
+/// An authored resource pool owned by one combatant at combat creation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionResourcePool {
+    pub id: String,
+    pub kind: ActionResourceKind,
+    pub maximum: u32,
+    pub refresh_policy: ActionResourceRefreshPolicy,
+}
+
+impl ActionResourcePool {
+    pub fn standard_action() -> Self {
+        Self {
+            id: "standard-action".to_string(),
+            kind: ActionResourceKind::StandardAction,
+            maximum: 1,
+            refresh_policy: ActionResourceRefreshPolicy::TurnStart,
         }
     }
 }
@@ -521,14 +567,14 @@ impl ActionResourceKind {
 /// One authoritative resource cost required to admit an action.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResourceCost {
-    pub kind: ActionResourceKind,
+    pub resource_id: String,
     pub amount: u32,
 }
 
 impl ActionResourceCost {
-    pub const fn standard_action() -> Self {
+    pub fn standard_action() -> Self {
         Self {
-            kind: ActionResourceKind::StandardAction,
+            resource_id: "standard-action".to_string(),
             amount: 1,
         }
     }

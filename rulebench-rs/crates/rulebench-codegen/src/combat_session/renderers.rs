@@ -392,6 +392,10 @@ pub(crate) fn render_automatic_run_replay_readout(
         readout.executed_step_count_matches
     ));
     out.push_str(&format!(
+        "      actionResourceTransitionLogMatches: {},\n",
+        readout.action_resource_transition_log_matches
+    ));
+    out.push_str(&format!(
         "      modifierDurationExpirationLogMatches: {},\n",
         readout.modifier_duration_expiration_log_matches
     ));

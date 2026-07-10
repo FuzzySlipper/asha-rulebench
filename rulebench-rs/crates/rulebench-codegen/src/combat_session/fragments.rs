@@ -2,14 +2,15 @@ use crate::combat_session::scalars::*;
 use crate::ts_emit::{ts_string, ts_string_array};
 
 use rulebench_fixtures::{
-    ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
-    ActionUsageEntry, ActionUsageSummary, ActiveModifier, CombatControlHistoryEntry,
-    CombatEndConditionReadout, CombatLogEntry, CombatSessionScriptStepReadout,
-    CombatSessionStepSummary, CombatTurnOrder, CombatantVitalityEntry, CombatantVitalitySummary,
-    CommandAttempt, CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
-    CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
-    LifecycleTransitionEntry, ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger,
-    RulebenchRejection, ScenarioProjection, TurnTransitionEntry,
+    ActionResourceLedgerReadout, ActionResourceRefreshPolicy, ActionResourceState,
+    ActionResourceTransitionEntry, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
+    CombatControlHistoryEntry, CombatEndConditionReadout, CombatLogEntry,
+    CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
+    CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt, CommandAuditEntry,
+    CommandPreflightDecisionKind, CurrentActorActionOption, CurrentActorOptionSummary,
+    CurrentActorOptionsUnavailableReason, CurrentActorTargetOption, LifecycleTransitionEntry,
+    ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, RulebenchRejection,
+    ScenarioProjection, TurnTransitionEntry,
 };
 
 pub(crate) fn render_action_resource_ledger(
@@ -40,6 +41,10 @@ pub(crate) fn render_action_resource_state(resource: &ActionResourceState, inden
     let mut out = String::from("");
     out.push_str(&format!("{indent}        {{\n"));
     out.push_str(&format!(
+        "{indent}          resourceId: {},\n",
+        ts_string(&resource.resource_id)
+    ));
+    out.push_str(&format!(
         "{indent}          kind: {},\n",
         ts_string(action_resource_kind(resource.kind))
     ));
@@ -51,6 +56,14 @@ pub(crate) fn render_action_resource_state(resource: &ActionResourceState, inden
     out.push_str(&format!(
         "{indent}          available: {},\n",
         resource.available
+    ));
+    out.push_str(&format!(
+        "{indent}          refreshPolicy: {},\n",
+        render_action_resource_refresh_policy(&resource.refresh_policy)
+    ));
+    out.push_str(&format!(
+        "{indent}          remainingRefreshTurns: {},\n",
+        render_optional_u32(resource.remaining_refresh_turns)
     ));
     out.push_str(&format!("{indent}        }},\n"));
     out
@@ -465,6 +478,29 @@ pub(crate) fn render_current_actor_action_option(
         "{indent}      actionName: {},\n",
         ts_string(&action.action_name)
     ));
+    out.push_str(&format!("{indent}      available: {},\n", action.available));
+    out.push_str(&format!(
+        "{indent}      unavailableReason: {},\n",
+        action
+            .unavailable_reason
+            .as_deref()
+            .map(ts_string)
+            .unwrap_or_else(|| "null".to_string())
+    ));
+    out.push_str(&format!("{indent}      resourceCosts: [\n"));
+    for cost in &action.resource_costs {
+        out.push_str(&format!(
+            "{indent}        {{ resourceId: {}, amount: {} }},\n",
+            ts_string(&cost.resource_id),
+            cost.amount
+        ));
+    }
+    out.push_str(&format!("{indent}      ],\n"));
+    out.push_str(&format!("{indent}      resourceStates: [\n"));
+    for resource in &action.resource_states {
+        out.push_str(&render_action_resource_state(resource, indent));
+    }
+    out.push_str(&format!("{indent}      ],\n"));
     out.push_str(&format!("{indent}      targetOptions: [\n"));
     for target in &action.target_options {
         out.push_str(&render_current_actor_target_option(target, indent));
@@ -627,6 +663,10 @@ pub(crate) fn render_action_resource_transition_entry(
         ts_string(&entry.combatant_id)
     ));
     out.push_str(&format!(
+        "{indent}  resourceId: {},\n",
+        ts_string(&entry.resource_id)
+    ));
+    out.push_str(&format!(
         "{indent}  resourceKind: {},\n",
         ts_string(action_resource_kind(entry.resource_kind))
     ));
@@ -673,12 +713,28 @@ pub(crate) fn render_action_resource_transition_entry(
 
 pub(crate) fn render_action_resource_state_inline(resource: &ActionResourceState) -> String {
     format!(
-        "{{ kind: {}, current: {}, max: {}, available: {} }}",
+        "{{ resourceId: {}, kind: {}, current: {}, max: {}, available: {}, refreshPolicy: {}, remainingRefreshTurns: {} }}",
+        ts_string(&resource.resource_id),
         ts_string(action_resource_kind(resource.kind)),
         resource.current,
         resource.max,
-        resource.available
+        resource.available,
+        render_action_resource_refresh_policy(&resource.refresh_policy),
+        render_optional_u32(resource.remaining_refresh_turns)
     )
+}
+
+fn render_action_resource_refresh_policy(policy: &ActionResourceRefreshPolicy) -> String {
+    match policy {
+        ActionResourceRefreshPolicy::Never => "{ kind: 'never', turns: null }".to_string(),
+        ActionResourceRefreshPolicy::CombatStart => {
+            "{ kind: 'combatStart', turns: null }".to_string()
+        }
+        ActionResourceRefreshPolicy::TurnStart => "{ kind: 'turnStart', turns: null }".to_string(),
+        ActionResourceRefreshPolicy::Turns(turns) => {
+            format!("{{ kind: 'turns', turns: {turns} }}")
+        }
+    }
 }
 
 pub(crate) fn render_modifier_duration_expiration_entry(

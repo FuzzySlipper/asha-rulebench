@@ -80,10 +80,12 @@ impl CombatSessionState {
         );
         self.turn_transition_log.push(transition.clone());
         if let Some(current_actor_id) = self.turn_order.current_actor_id.clone() {
-            let refresh = self
+            let refreshes = self
                 .state
-                .refresh_action_resource(&current_actor_id, ActionResourceKind::StandardAction);
-            self.record_action_resource_refresh_transition(&transition, &refresh);
+                .advance_action_resources_for_turn_start(&current_actor_id);
+            for refresh in &refreshes {
+                self.record_action_resource_refresh_transition(&transition, refresh);
+            }
         }
         if let Some(previous_actor_id) = transition.previous_actor_id.as_deref() {
             let expirations = self
@@ -112,8 +114,13 @@ impl CombatSessionState {
 
     pub(super) fn start_lifecycle(&mut self, trigger: LifecycleTransitionTrigger) {
         let previous_lifecycle = self.lifecycle.clone();
+        let should_refresh_combat_start_resources =
+            previous_lifecycle.phase == CombatLifecyclePhase::Ready;
         self.lifecycle.start_at_step(self.next_step_index);
         self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
+        if should_refresh_combat_start_resources {
+            self.state.refresh_action_resources_for_combat_start();
+        }
     }
 
     fn end_lifecycle(&mut self, trigger: LifecycleTransitionTrigger) {

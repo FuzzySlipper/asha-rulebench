@@ -57,7 +57,11 @@ fn session_runtime_current_actor_options_snapshot_readback_uses_current_state() 
 
     let snapshot = session.snapshot();
 
-    assert!(snapshot.current_actor_options.available);
+    assert!(!snapshot.current_actor_options.available);
+    assert_eq!(
+        snapshot.current_actor_options.unavailable_reason,
+        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
+    );
     assert_eq!(
         snapshot.current_actor_options.current_actor_id,
         Some("entity-adept".to_string())
@@ -225,22 +229,11 @@ fn session_runtime_command_candidates_read_current_state_after_hit() {
 
     let candidates = session.current_actor_command_candidates();
 
-    assert!(candidates.available);
-    assert_eq!(candidates.candidates.len(), 1);
+    assert!(!candidates.available);
+    assert!(candidates.candidates.is_empty());
     assert_eq!(
-        candidates.candidates[0].intent,
-        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider")
-    );
-    assert_eq!(candidates.candidates[0].target_current_hit_points, 9);
-    assert_eq!(candidates.candidates[0].target_max_hit_points, 18);
-    assert!(!candidates.candidates[0].accepted);
-    assert_eq!(
-        candidates.candidates[0].decision_kind,
-        CommandPreflightDecisionKind::RejectedByActionResource
-    );
-    assert_eq!(
-        candidates.candidates[0].reason,
-        "Actor has no available standard action resource."
+        candidates.unavailable_reason,
+        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
     );
 }
 
@@ -298,8 +291,8 @@ fn session_runtime_command_candidates_are_read_only() {
     let candidates = session.current_actor_command_candidates();
     let after_candidates = session.snapshot();
 
-    assert!(candidates.available);
-    assert_eq!(candidates.candidates.len(), 1);
+    assert!(!candidates.available);
+    assert!(candidates.candidates.is_empty());
     assert_eq!(after_candidates, before_candidates);
     assert_eq!(session.next_step_index(), 1);
     assert_eq!(session.combat_log().len(), 1);
@@ -655,18 +648,22 @@ fn session_runtime_auto_candidate_rejects_when_no_candidate_is_accepted() {
     assert!(!plan.accepted);
     assert_eq!(
         plan.decision_kind,
-        CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate
+        CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates
     );
-    assert_eq!(plan.decision_kind.code(), "rejectedByNoAcceptedCandidate");
+    assert_eq!(plan.decision_kind.code(), "rejectedByUnavailableCandidates");
     assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
-    assert_eq!(plan.candidate_count, 1);
+    assert_eq!(plan.candidate_count, 0);
     assert_eq!(plan.accepted_candidate_count, 0);
     assert_eq!(plan.selected_action_id, None);
     assert_eq!(plan.selected_target_id, None);
     assert_eq!(plan.selection, None);
     assert_eq!(
+        plan.unavailable_reason,
+        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
+    );
+    assert_eq!(
         plan.reason,
-        "No accepted command candidates are available for deterministic auto submission."
+        "No command candidates are available because the current actor cannot cover any action resource costs."
     );
     assert_eq!(after_plan, before_plan);
     assert_eq!(session.combat_log().len(), 1);
@@ -830,7 +827,7 @@ fn session_runtime_automatic_step_advances_turn_when_no_candidate_is_accepted() 
         plan.auto_candidate_plan
             .as_ref()
             .map(|candidate| candidate.decision_kind),
-        Some(CombatSessionAutoCandidateDecisionKind::RejectedByNoAcceptedCandidate)
+        Some(CombatSessionAutoCandidateDecisionKind::RejectedByUnavailableCandidates)
     );
     assert_eq!(after_plan, before_plan);
 
@@ -1162,6 +1159,10 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
         expected_run.executed_step_count,
         expected_run
             .final_snapshot
+            .action_resource_transition_log
+            .clone(),
+        expected_run
+            .final_snapshot
             .modifier_duration_expiration_log
             .clone(),
     ));
@@ -1175,6 +1176,7 @@ fn session_runtime_automatic_run_replay_verifies_expected_final_evidence() {
     assert!(readout.final_state_fingerprint_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
+    assert!(readout.action_resource_transition_log_matches);
     assert!(readout.modifier_duration_expiration_log_matches);
     assert_eq!(
         readout.actual_final_state_fingerprint,
@@ -1204,6 +1206,11 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
         .modifier_duration_expiration_log
         .clone();
     expected_modifier_duration_expiration_log.clear();
+    let mut expected_action_resource_transition_log = expected_run
+        .final_snapshot
+        .action_resource_transition_log
+        .clone();
+    expected_action_resource_transition_log.clear();
 
     let readout = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
         "auto-run-replay-mismatch-verification",
@@ -1218,6 +1225,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
             .clone(),
         expected_run.decision_kind,
         expected_run.executed_step_count,
+        expected_action_resource_transition_log,
         expected_modifier_duration_expiration_log,
     ));
 
@@ -1230,6 +1238,7 @@ fn session_runtime_automatic_run_replay_reports_mismatched_expected_evidence() {
     assert!(readout.final_state_fingerprint_matches);
     assert!(readout.run_decision_kind_matches);
     assert!(readout.executed_step_count_matches);
+    assert!(!readout.action_resource_transition_log_matches);
     assert!(!readout.modifier_duration_expiration_log_matches);
     assert_eq!(
         readout.actual_executed_step_count,

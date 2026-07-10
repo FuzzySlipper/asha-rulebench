@@ -288,9 +288,11 @@ impl CombatSessionState {
                 .map(|action| action.resource_costs.clone())
                 .unwrap_or_default();
             for cost in &resource_costs {
-                let spend =
-                    self.state
-                        .spend_action_resource(&command.actor_id, cost.kind, cost.amount);
+                let spend = self.state.spend_action_resource(
+                    &command.actor_id,
+                    &cost.resource_id,
+                    cost.amount,
+                );
                 self.record_action_resource_spend_transition(&step, &spend);
             }
         }
@@ -552,6 +554,7 @@ impl CombatSessionState {
                 sequence: self.action_resource_transition_log.len() as u32,
                 transition_kind: ActionResourceTransitionKind::Spent,
                 combatant_id: spend.combatant_id.clone(),
+                resource_id: spend.resource_id.clone(),
                 resource_kind: spend.resource_kind,
                 amount: spend.amount,
                 previous_resource,
@@ -587,11 +590,23 @@ impl CombatSessionState {
         )
         .unwrap_or_default();
 
+        let transition_kind = match refresh.decision_kind {
+            ActionResourceRefreshDecisionKind::CooldownAdvanced => {
+                ActionResourceTransitionKind::CooldownAdvanced
+            }
+            ActionResourceRefreshDecisionKind::Refreshed
+            | ActionResourceRefreshDecisionKind::RejectedByMissingCombatant
+            | ActionResourceRefreshDecisionKind::RejectedByMissingResource => {
+                ActionResourceTransitionKind::Refreshed
+            }
+        };
+
         self.action_resource_transition_log
             .push(ActionResourceTransitionEntry {
                 sequence: self.action_resource_transition_log.len() as u32,
-                transition_kind: ActionResourceTransitionKind::Refreshed,
+                transition_kind,
                 combatant_id: refresh.combatant_id.clone(),
+                resource_id: refresh.resource_id.clone(),
                 resource_kind: refresh.resource_kind,
                 amount,
                 previous_resource,
@@ -910,7 +925,7 @@ fn action_resource_costs_available(
                 None,
                 format!(
                     "Action declares an invalid zero {} resource cost.",
-                    cost.kind.code()
+                    cost.resource_id
                 ),
             ));
         }
@@ -919,30 +934,27 @@ fn action_resource_costs_available(
                 None,
                 format!(
                     "Action {} resource cost exceeds the supported resource range.",
-                    cost.kind.code()
+                    cost.resource_id
                 ),
             ));
         };
         let Some(resource) = combatant
             .resources
             .iter()
-            .find(|resource| resource.kind == cost.kind)
+            .find(|resource| resource.resource_id == cost.resource_id)
             .cloned()
         else {
             return Err((
                 None,
-                format!(
-                    "Actor has no {} resource in the ledger.",
-                    action_resource_label(cost.kind)
-                ),
+                format!("Actor has no {} resource in the ledger.", cost.resource_id),
             ));
         };
         if !resource.available {
             return Err((
-                Some(resource),
+                Some(resource.clone()),
                 format!(
                     "Actor has no available {} resource.",
-                    action_resource_label(cost.kind)
+                    action_resource_label(resource.kind)
                 ),
             ));
         }
@@ -951,8 +963,7 @@ fn action_resource_costs_available(
                 Some(resource),
                 format!(
                     "Actor cannot cover the declared {} {} resource cost.",
-                    cost.amount,
-                    cost.kind.code()
+                    cost.amount, cost.resource_id
                 ),
             ));
         }
@@ -965,6 +976,9 @@ fn action_resource_costs_available(
 fn action_resource_label(kind: ActionResourceKind) -> &'static str {
     match kind {
         ActionResourceKind::StandardAction => "standard action",
+        ActionResourceKind::SpellSlot => "spell slot",
+        ActionResourceKind::Charge => "charge",
+        ActionResourceKind::Cooldown => "cooldown",
     }
 }
 

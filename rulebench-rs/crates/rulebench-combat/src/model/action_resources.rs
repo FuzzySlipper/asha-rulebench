@@ -1,27 +1,59 @@
 /// Combat action-resource state and readbacks.
 use super::ActiveModifier;
-pub use rulebench_ruleset::{ActionResourceCost, ActionResourceKind};
+pub use rulebench_ruleset::{
+    ActionResourceCost, ActionResourceKind, ActionResourcePool, ActionResourceRefreshPolicy,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResourceState {
+    pub resource_id: String,
     pub kind: ActionResourceKind,
     pub current: i32,
     pub max: i32,
     pub available: bool,
+    pub refresh_policy: ActionResourceRefreshPolicy,
+    pub remaining_refresh_turns: Option<u32>,
 }
 
 impl ActionResourceState {
-    pub const fn new(kind: ActionResourceKind, current: i32, max: i32) -> Self {
+    pub fn new(kind: ActionResourceKind, current: i32, max: i32) -> Self {
+        let resource_id = match kind {
+            ActionResourceKind::StandardAction => "standard-action",
+            ActionResourceKind::SpellSlot => "spell-slot",
+            ActionResourceKind::Charge => "charge",
+            ActionResourceKind::Cooldown => "cooldown",
+        };
         Self {
+            resource_id: resource_id.to_string(),
             kind,
             current,
             max,
             available: current > 0,
+            refresh_policy: match kind {
+                ActionResourceKind::StandardAction => ActionResourceRefreshPolicy::TurnStart,
+                ActionResourceKind::SpellSlot
+                | ActionResourceKind::Charge
+                | ActionResourceKind::Cooldown => ActionResourceRefreshPolicy::Never,
+            },
+            remaining_refresh_turns: None,
         }
     }
 
-    pub const fn standard_action_available() -> Self {
-        Self::new(ActionResourceKind::StandardAction, 1, 1)
+    pub fn from_pool(pool: &ActionResourcePool) -> Self {
+        let max = i32::try_from(pool.maximum).unwrap_or_default();
+        Self {
+            resource_id: pool.id.clone(),
+            kind: pool.kind,
+            current: max,
+            max,
+            available: max > 0,
+            refresh_policy: pool.refresh_policy.clone(),
+            remaining_refresh_turns: None,
+        }
+    }
+
+    pub fn standard_action_available() -> Self {
+        Self::from_pool(&ActionResourcePool::standard_action())
     }
 }
 
@@ -70,6 +102,7 @@ impl ActionResourceSpendDecisionKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResourceSpendReadout {
     pub combatant_id: String,
+    pub resource_id: String,
     pub resource_kind: ActionResourceKind,
     pub amount: u32,
     pub accepted: bool,
@@ -82,6 +115,7 @@ pub struct ActionResourceSpendReadout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionResourceRefreshDecisionKind {
     Refreshed,
+    CooldownAdvanced,
     RejectedByMissingCombatant,
     RejectedByMissingResource,
 }
@@ -90,6 +124,7 @@ impl ActionResourceRefreshDecisionKind {
     pub const fn code(self) -> &'static str {
         match self {
             ActionResourceRefreshDecisionKind::Refreshed => "refreshed",
+            ActionResourceRefreshDecisionKind::CooldownAdvanced => "cooldownAdvanced",
             ActionResourceRefreshDecisionKind::RejectedByMissingCombatant => {
                 "rejectedByMissingCombatant"
             }
@@ -103,6 +138,7 @@ impl ActionResourceRefreshDecisionKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResourceRefreshReadout {
     pub combatant_id: String,
+    pub resource_id: String,
     pub resource_kind: ActionResourceKind,
     pub accepted: bool,
     pub decision_kind: ActionResourceRefreshDecisionKind,
@@ -115,6 +151,7 @@ pub struct ActionResourceRefreshReadout {
 pub enum ActionResourceTransitionKind {
     Spent,
     Refreshed,
+    CooldownAdvanced,
 }
 
 impl ActionResourceTransitionKind {
@@ -122,6 +159,7 @@ impl ActionResourceTransitionKind {
         match self {
             ActionResourceTransitionKind::Spent => "spent",
             ActionResourceTransitionKind::Refreshed => "refreshed",
+            ActionResourceTransitionKind::CooldownAdvanced => "cooldownAdvanced",
         }
     }
 }
@@ -131,6 +169,7 @@ pub struct ActionResourceTransitionEntry {
     pub sequence: u32,
     pub transition_kind: ActionResourceTransitionKind,
     pub combatant_id: String,
+    pub resource_id: String,
     pub resource_kind: ActionResourceKind,
     pub amount: u32,
     pub previous_resource: ActionResourceState,

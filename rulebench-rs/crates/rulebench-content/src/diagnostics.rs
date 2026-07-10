@@ -42,6 +42,11 @@ pub enum ContentDiagnosticCode {
     DuplicateActionId,
     InvalidActionResourceCost,
     DuplicateActionResourceCost,
+    EmptyActionResourcePoolId,
+    DuplicateActionResourcePoolId,
+    InvalidActionResourcePoolMaximum,
+    InvalidActionResourceRefreshPolicy,
+    MissingActionResourcePool,
     EmptyClassId,
     DuplicateClassId,
     EmptyStatDefinitionId,
@@ -119,6 +124,15 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::DuplicateActionId => "duplicateActionId",
             ContentDiagnosticCode::InvalidActionResourceCost => "invalidActionResourceCost",
             ContentDiagnosticCode::DuplicateActionResourceCost => "duplicateActionResourceCost",
+            ContentDiagnosticCode::EmptyActionResourcePoolId => "emptyActionResourcePoolId",
+            ContentDiagnosticCode::DuplicateActionResourcePoolId => "duplicateActionResourcePoolId",
+            ContentDiagnosticCode::InvalidActionResourcePoolMaximum => {
+                "invalidActionResourcePoolMaximum"
+            }
+            ContentDiagnosticCode::InvalidActionResourceRefreshPolicy => {
+                "invalidActionResourceRefreshPolicy"
+            }
+            ContentDiagnosticCode::MissingActionResourcePool => "missingActionResourcePool",
             ContentDiagnosticCode::EmptyClassId => "emptyClassId",
             ContentDiagnosticCode::DuplicateClassId => "duplicateClassId",
             ContentDiagnosticCode::EmptyStatDefinitionId => "emptyStatDefinitionId",

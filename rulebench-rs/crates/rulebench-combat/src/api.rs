@@ -397,7 +397,7 @@ mod tests {
     fn api_rejects_unaffordable_declared_cost_without_resource_mutation() {
         let mut scenario = valid_scenario();
         let costly_resource = ActionResourceCost {
-            kind: ActionResourceKind::StandardAction,
+            resource_id: "standard-action".to_string(),
             amount: 2,
         };
         scenario.actions[0].resource_costs = vec![costly_resource.clone()];
@@ -515,6 +515,158 @@ mod tests {
         );
     }
 
+    #[test]
+    fn api_enforces_typed_pools_and_reopens_a_timed_cooldown() {
+        let mut scenario = valid_scenario();
+        scenario.combatants[0].resource_pools = vec![
+            ActionResourcePool::standard_action(),
+            ActionResourcePool {
+                id: "spell-slot-1".to_string(),
+                kind: ActionResourceKind::SpellSlot,
+                maximum: 2,
+                refresh_policy: ActionResourceRefreshPolicy::CombatStart,
+            },
+            ActionResourcePool {
+                id: "arcane-charge".to_string(),
+                kind: ActionResourceKind::Charge,
+                maximum: 2,
+                refresh_policy: ActionResourceRefreshPolicy::Never,
+            },
+            ActionResourcePool {
+                id: "api-bolt-cooldown".to_string(),
+                kind: ActionResourceKind::Cooldown,
+                maximum: 1,
+                refresh_policy: ActionResourceRefreshPolicy::Turns(2),
+            },
+        ];
+        let costs = vec![
+            ActionResourceCost::standard_action(),
+            ActionResourceCost {
+                resource_id: "spell-slot-1".to_string(),
+                amount: 1,
+            },
+            ActionResourceCost {
+                resource_id: "arcane-charge".to_string(),
+                amount: 1,
+            },
+            ActionResourceCost {
+                resource_id: "api-bolt-cooldown".to_string(),
+                amount: 1,
+            },
+        ];
+        scenario.actions[0].resource_costs = costs.clone();
+        scenario.selected_action.resource_costs = costs;
+
+        let mut api = CombatSessionApi::new();
+        let created = api
+            .create_session(CombatSessionCreateRequest::new("typed-pools", scenario))
+            .expect("typed resource scenario is valid");
+        let session = created.session;
+        api.start_session(&session).expect("session starts");
+
+        let intent = UseActionIntent::new("adept", "api_bolt", "raider");
+        let accepted = api
+            .submit_intent(
+                &session,
+                CombatSessionIntentCommandSpec::new(
+                    "typed-pool-command",
+                    "Typed resource command",
+                    "Spend one action, slot, charge, and cooldown resource.",
+                    intent.clone(),
+                    vec![20, 1],
+                ),
+            )
+            .expect("first typed resource command is accepted");
+        assert!(accepted.receipt.accepted);
+        let after_spend = api.snapshot(&session).expect("spent resource snapshot");
+        let adept_resources = &after_spend.action_resource_ledger.combatants[0].resources;
+        assert_eq!(resource_current(adept_resources, "spell-slot-1"), Some(1));
+        assert_eq!(resource_current(adept_resources, "arcane-charge"), Some(1));
+        assert_eq!(
+            resource_current(adept_resources, "api-bolt-cooldown"),
+            Some(0)
+        );
+        assert_eq!(
+            resource_remaining_turns(adept_resources, "api-bolt-cooldown"),
+            Some(Some(2))
+        );
+        assert!(!after_spend.current_actor_options.available);
+        assert_eq!(
+            after_spend.current_actor_options.unavailable_reason,
+            Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
+        );
+        let spent_action_option = &after_spend.current_actor_options.actions[0];
+        assert!(!spent_action_option.available);
+        assert_eq!(spent_action_option.resource_costs.len(), 4);
+        assert_eq!(spent_action_option.resource_states.len(), 4);
+        assert_eq!(
+            resource_current(&spent_action_option.resource_states, "api-bolt-cooldown"),
+            Some(0)
+        );
+
+        let rejected = api
+            .submit_intent(
+                &session,
+                CombatSessionIntentCommandSpec::new(
+                    "typed-pool-retry",
+                    "Rejected typed resource retry",
+                    "The same action cannot reuse its spent cooldown or action resource.",
+                    intent,
+                    vec![20, 1],
+                ),
+            )
+            .expect("rejected command returns readback");
+        let after_rejection = api.snapshot(&session).expect("rejected resource snapshot");
+        assert!(!rejected.receipt.accepted);
+        assert_eq!(
+            after_spend.action_resource_ledger,
+            after_rejection.action_resource_ledger
+        );
+
+        for _ in 0..4 {
+            api.submit_control(&session, CombatControlCommandSpec::advance_turn())
+                .expect("turn advances for cooldown timing");
+        }
+        let refreshed = api.snapshot(&session).expect("cooldown refresh snapshot");
+        let resources = &refreshed.action_resource_ledger.combatants[0].resources;
+        assert_eq!(resource_current(resources, "api-bolt-cooldown"), Some(1));
+        assert_eq!(
+            resource_remaining_turns(resources, "api-bolt-cooldown"),
+            Some(None)
+        );
+        assert!(refreshed
+            .action_resource_transition_log
+            .iter()
+            .any(|entry| entry.transition_kind == ActionResourceTransitionKind::CooldownAdvanced));
+        assert!(refreshed.current_actor_options.available);
+        assert!(refreshed.current_actor_options.actions[0].available);
+        assert!(
+            api.preflight_command(
+                &session,
+                UseActionIntent::new("adept", "api_bolt", "raider")
+            )
+            .expect("cooldown-refreshed preflight")
+            .accepted
+        );
+    }
+
+    fn resource_current(resources: &[ActionResourceState], resource_id: &str) -> Option<i32> {
+        resources
+            .iter()
+            .find(|resource| resource.resource_id == resource_id)
+            .map(|resource| resource.current)
+    }
+
+    fn resource_remaining_turns(
+        resources: &[ActionResourceState],
+        resource_id: &str,
+    ) -> Option<Option<u32>> {
+        resources
+            .iter()
+            .find(|resource| resource.resource_id == resource_id)
+            .map(|resource| resource.remaining_refresh_turns)
+    }
+
     fn invalid_scenario() -> RulebenchScenario {
         let mut scenario = valid_scenario();
         scenario.selected_ruleset_id = "missing-ruleset".to_string();
@@ -630,6 +782,7 @@ mod tests {
                 label: "Nerve".to_string(),
                 value: 10,
             }],
+            resource_pools: vec![ActionResourcePool::standard_action()],
             equipped_item_ids: Vec::new(),
             active_modifiers: Vec::new(),
             conditions: Vec::new(),

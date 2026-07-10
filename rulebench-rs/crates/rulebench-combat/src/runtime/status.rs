@@ -60,6 +60,7 @@ impl CombatSessionState {
             &self.turn_order,
             &self.scenario,
             &current_state,
+            &self.state.action_resource_ledger(),
         )
     }
 
@@ -71,6 +72,7 @@ impl CombatSessionState {
             &self.turn_order,
             &current_scenario,
             &current_state,
+            &self.state.action_resource_ledger(),
         );
 
         current_actor_command_candidates(
@@ -118,6 +120,7 @@ impl CombatSessionState {
                 &self.turn_order,
                 &current_scenario,
                 &current_state,
+                &self.state.action_resource_ledger(),
             ),
             current_state,
             current_state_fingerprint,
@@ -249,6 +252,7 @@ fn current_actor_option_summary(
     turn_order: &CombatTurnOrder,
     scenario: &RulebenchScenario,
     projection: &ScenarioProjection,
+    action_resources: &ActionResourceLedgerReadout,
 ) -> CurrentActorOptionSummary {
     let current_actor_id = turn_order.current_actor_id.clone();
     let current_actor_defeated = current_actor_id
@@ -293,7 +297,7 @@ fn current_actor_option_summary(
         .actions
         .iter()
         .filter(|action| action.actor_id == actor_id)
-        .map(|action| current_actor_action_option(action, projection))
+        .map(|action| current_actor_action_option(action, projection, action_resources, actor_id))
         .collect::<Vec<_>>();
 
     if actions.is_empty() {
@@ -309,11 +313,13 @@ fn current_actor_option_summary(
 
     let available = actions
         .iter()
-        .any(|action| !action.target_options.is_empty());
+        .any(|action| action.available && !action.target_options.is_empty());
     let unavailable_reason = if available {
         None
-    } else {
+    } else if actions.iter().any(|action| action.available) {
         Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets)
+    } else {
+        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
     };
 
     CurrentActorOptionSummary {
@@ -365,6 +371,7 @@ fn current_actor_id_command_candidates(
     options
         .actions
         .iter()
+        .filter(|action| action.available)
         .flat_map(|action| {
             action.target_options.iter().map(move |target| {
                 let intent = UseActionIntent::new(
@@ -422,7 +429,33 @@ fn unavailable_current_actor_options(
 fn current_actor_action_option(
     action: &ActionDefinition,
     projection: &ScenarioProjection,
+    action_resources: &ActionResourceLedgerReadout,
+    actor_id: &str,
 ) -> CurrentActorActionOption {
+    let availability =
+        action_resource_costs_available(action_resources, actor_id, &action.resource_costs);
+    let (available, unavailable_reason) = match availability {
+        Ok(_) => (true, None),
+        Err((_, reason)) => (false, Some(reason)),
+    };
+    let resource_states = action_resources
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == actor_id)
+        .map(|combatant| {
+            action
+                .resource_costs
+                .iter()
+                .filter_map(|cost| {
+                    combatant
+                        .resources
+                        .iter()
+                        .find(|resource| resource.resource_id == cost.resource_id)
+                        .cloned()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let target_options = action
         .targeting
         .visible_target_ids
@@ -441,6 +474,10 @@ fn current_actor_action_option(
         action_id: action.id.clone(),
         ability_id: action.ability_id.clone(),
         action_name: action.name.clone(),
+        available,
+        unavailable_reason,
+        resource_costs: action.resource_costs.clone(),
+        resource_states,
         target_options,
     }
 }
