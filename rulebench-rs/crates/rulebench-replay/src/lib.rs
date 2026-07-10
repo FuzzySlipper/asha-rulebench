@@ -27,6 +27,11 @@ pub use verification::{
     verify_replay_package, ReplayMismatch, ReplayMismatchDimension, ReplayVerificationDecisionKind,
     ReplayVerificationReadout,
 };
+mod review;
+pub use review::{
+    inspect_replay_package, record_replay_package, ReplayCommandInspection,
+    ReplayCommandRecordingSpec, ReplayPackageInspection,
+};
 mod archive;
 mod archive_storage;
 pub use archive::{ReplayArchive, ReplayArchiveError, ReplayArchiveQuery};

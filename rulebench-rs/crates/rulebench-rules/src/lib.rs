@@ -55,12 +55,16 @@ pub use rulebench_content::{
 };
 pub use rulebench_core::Team;
 pub use rulebench_replay::{
+    compare_replay_packages, inspect_replay_package, record_replay_package,
     verify_automatic_run_replay, verify_replay_package,
     CombatSessionAutomaticRunReplayDecisionKind, CombatSessionAutomaticRunReplayReadout,
-    CombatSessionAutomaticRunReplaySpec, ReplayArchiveError, ReplayArchiveMetadata,
-    ReplayArchiveStorageError, ReplayComparisonDifference, ReplayComparisonDifferenceCode,
-    ReplayComparisonReadout, ReplayMismatch, ReplayMismatchDimension, ReplayPackage,
-    ReplayPackageValidationReport, ReplayVerificationDecisionKind, ReplayVerificationReadout,
+    CombatSessionAutomaticRunReplaySpec, InMemoryReplayArchiveStorage, ReplayArchive,
+    ReplayArchiveError, ReplayArchiveMetadata, ReplayArchiveQuery, ReplayArchiveStorageError,
+    ReplayCommand, ReplayCommandInspection, ReplayCommandRecord, ReplayCommandRecordingSpec,
+    ReplayComparisonDifference, ReplayComparisonDifferenceCode, ReplayComparisonReadout,
+    ReplayEvidence, ReplayMismatch, ReplayMismatchDimension, ReplayNarration, ReplayPackage,
+    ReplayPackageInspection, ReplayPackageValidationReport, ReplayStepEvidence,
+    ReplayVerificationDecisionKind, ReplayVerificationReadout,
 };
 pub use rulebench_ruleset::CombatEndPolicy;
 

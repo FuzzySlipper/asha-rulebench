@@ -1,4 +1,5 @@
 export * from './live-combat';
+export * from './replay-review';
 
 import type {
   RulebenchCombatLogEntryDto,

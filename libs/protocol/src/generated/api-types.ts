@@ -1312,6 +1312,29 @@ export interface RulebenchReplayPackageReviewDto {
   readonly fingerprintKind: string;
   readonly narrationTitle: string | null;
   readonly narrationSummary: string | null;
+  readonly commands: readonly RulebenchReplayCommandReviewDto[];
+}
+
+export interface RulebenchReplayCommandReviewDto {
+  readonly sequence: number;
+  readonly id: string;
+  readonly commandKind: string;
+  readonly suppliedRollStream: readonly number[];
+  readonly narrationSummary: string | null;
+  readonly expected: RulebenchReplayStepEvidenceDto;
+  readonly actual: RulebenchReplayStepEvidenceDto;
+  readonly snapshot: RulebenchLiveSessionSnapshotDto;
+}
+
+export interface RulebenchReplayStepEvidenceDto {
+  readonly accepted: boolean;
+  readonly decisionCode: string;
+  readonly stateBeforeFingerprint: RulebenchStateFingerprintDto;
+  readonly stateAfterFingerprint: RulebenchStateFingerprintDto;
+  readonly acceptedEvents: readonly RulebenchLiveDomainEventDto[];
+  readonly commandAudit: readonly RulebenchLiveAuditEntryDto[];
+  readonly rolls: readonly RulebenchLiveRollEvidenceDto[];
+  readonly trace: readonly RulebenchLiveTraceEntryDto[];
 }
 
 export interface RulebenchReplayMismatchDto {
@@ -1346,6 +1369,11 @@ export interface RulebenchReplayComparisonReadoutDto {
   readonly comparedCommandCount: number;
   readonly firstDifference: RulebenchReplayComparisonDifferenceDto | null;
   readonly differences: readonly RulebenchReplayComparisonDifferenceDto[];
+}
+
+export interface RulebenchReplayComparisonRequestDto {
+  readonly expectedPackageId: string;
+  readonly actualPackageId: string;
 }
 
 export interface RulebenchReplayArchiveErrorDto {

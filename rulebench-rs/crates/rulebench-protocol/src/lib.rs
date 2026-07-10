@@ -38,9 +38,10 @@ pub use live::{
     LiveStateFingerprintDto, LiveTargetOptionDto, LiveTraceEntryDto, LiveTransportErrorDto,
 };
 pub use replay::{
-    ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayComparisonDifferenceDto,
-    ReplayComparisonReadoutDto, ReplayMismatchDto, ReplayPackageReviewDto,
-    ReplayStateFingerprintDto, ReplayVerificationReadoutDto,
+    ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayCommandReviewDto,
+    ReplayComparisonDifferenceDto, ReplayComparisonReadoutDto, ReplayComparisonRequestDto,
+    ReplayMismatchDto, ReplayPackageReviewDto, ReplayStateFingerprintDto, ReplayStepEvidenceDto,
+    ReplayVerificationReadoutDto,
 };
 pub use session::CombatSessionHandleDto;
 pub use typescript::{render_api_types, ProtocolAlias, ProtocolField, ProtocolInterface};

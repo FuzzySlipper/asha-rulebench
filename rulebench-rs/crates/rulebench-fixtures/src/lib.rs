@@ -10,6 +10,7 @@ mod content_import;
 mod goldens;
 mod package;
 mod registry;
+mod replay_review;
 pub mod scenarios;
 
 pub use catalog::*;
@@ -30,6 +31,7 @@ pub use registry::{
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRegistry,
     ScenarioPackageRegistryError, ScenarioPackageSelectionError,
 };
+pub use replay_review::replay_review_packages;
 pub use rulebench_rules::*;
 pub use scenarios::hexing_bolt::{
     accepted_hexing_bolt_fixture_receipt, combat_session_automatic_run_readouts,

@@ -145,6 +145,49 @@ test("invokes live Rust authority through the Angular origin", async ({
     const remainingSessions = await transport.listSessions();
     expect(remainingSessions).toEqual({ ok: true, value: [] });
 
+    const replayPackages = await transport.listReplayPackages();
+    expect(replayPackages.ok).toBe(true);
+    if (!replayPackages.ok) return;
+    expect(replayPackages.value).toHaveLength(2);
+    const expectedReplayId = "hexing-bolt-replay";
+    const actualReplayId = "hexing-bolt-replay-explicit-start";
+    const replayReview = await transport.loadReplayPackage(expectedReplayId);
+    expect(replayReview.ok).toBe(true);
+    if (!replayReview.ok) return;
+    expect(replayReview.value.commands[0]).toEqual(
+      expect.objectContaining({
+        commandKind: "intent",
+        suppliedRollStream: [17, 5],
+        actual: expect.objectContaining({
+          accepted: true,
+          acceptedEvents: expect.arrayContaining([
+            expect.objectContaining({ kind: "damageApplied" }),
+          ]),
+        }),
+      }),
+    );
+    await expect(
+      transport.loadReplayVerification(expectedReplayId),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: expect.objectContaining({ accepted: true, finalized: true }),
+      }),
+    );
+    const replayComparison = await transport.compareReplayPackages(
+      expectedReplayId,
+      actualReplayId,
+    );
+    expect(replayComparison).toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: expect.objectContaining({
+          matches: false,
+          firstDifference: expect.objectContaining({ path: "commands.length" }),
+        }),
+      }),
+    );
+
     const missing = await transport.getSession("e2e-missing-session");
     expect(missing).toEqual({
       ok: false,
@@ -227,7 +270,7 @@ test("shows Rust automatic step and bounded-run decisions", async ({ page }) => 
   const runStatus = workspace.getByRole("region", { name: "Automatic run status" });
   await expect(runStatus).toContainText("Stopped At Max Steps");
   await expect(runStatus).toContainText("1/1 steps");
-  await expect(workspace.getByText("Replay verification: unavailable on the current live host protocol")).toBeVisible();
+  await expect(workspace.getByText("Replay verification: the current live session run is not archived")).toBeVisible();
 
   await workspace.getByRole("button", { name: "End", exact: true }).click();
   await workspace.getByRole("button", { name: "Close", exact: true }).click();
@@ -279,4 +322,43 @@ test("configures participants from Rust scenario readbacks", async ({ page }) =>
   await expect(workspace.getByRole("alert")).toContainText(
     "invalidRequest · Participant setup must include all 2 scenario participants exactly once.",
   );
+});
+
+test("reviews and compares archived Rust replay evidence", async ({ page }) => {
+  await page.goto("/");
+  const workspace = page.getByRole("region", { name: "Replay review workspace" });
+  const packages = workspace.getByLabel("Archived replay packages");
+  await expect(packages.getByRole("button")).toHaveCount(2);
+  await packages
+    .getByRole("button", { name: /hexing-bolt-replay ·/ })
+    .first()
+    .click();
+
+  const detail = workspace.getByRole("region", { name: "Replay package detail" });
+  await expect(detail).toContainText("Hexing Bolt Replay");
+  await expect(detail.getByRole("button")).toHaveCount(2);
+  await expect(workspace.getByRole("region", { name: "Replay verification" })).toContainText(
+    "Verified · Finalized",
+  );
+  const comparison = workspace.getByRole("region", { name: "Replay comparison" });
+  await expect(comparison).toContainText("Differences found");
+  await expect(comparison).toContainText("First difference · Replay Command Count Mismatch");
+  await expect(comparison).toContainText("commands.length");
+
+  const command = workspace.getByRole("region", { name: "Replay command evidence" });
+  await expect(command).toContainText("Supplied rolls · 17, 5");
+  await expect(command.getByRole("region", { name: "Expected replay evidence" })).toContainText(
+    "Damage Applied",
+  );
+  const actual = command.getByRole("region", { name: "Actual replay evidence" });
+  await expect(actual).toContainText("Attack Roll");
+  await expect(actual).toContainText("Resolution");
+  const state = command.getByRole("region", { name: "Replay resulting state" });
+  await expect(state).toContainText("Raider · 9/18 HP · Active");
+  await expect(state).toContainText("Adept hits Raider");
+  await expect(state).toContainText("Accepted By Resolver · 4 events · 5 trace entries");
+
+  await detail.getByRole("button", { name: /2 · Control · explicit-end/ }).click();
+  await expect(command).toContainText("No supplied rolls");
+  await expect(state).toContainText("Ended");
 });

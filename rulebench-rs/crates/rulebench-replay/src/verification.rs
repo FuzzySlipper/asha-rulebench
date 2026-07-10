@@ -143,7 +143,7 @@ pub fn verify_replay_package(package: &ReplayPackage) -> ReplayVerificationReado
     }
 }
 
-fn execute_command(
+pub(crate) fn execute_command(
     session: &mut CombatSessionState,
     command: &ReplayCommand,
 ) -> ReplayStepEvidence {

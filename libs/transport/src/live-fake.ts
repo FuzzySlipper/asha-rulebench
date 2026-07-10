@@ -1,7 +1,9 @@
 import type {
   RulebenchLiveTransportErrorDto,
   RulebenchProtocolHandshakeDto,
+  RulebenchReplayArchiveErrorDto,
 } from "@asha-rulebench/protocol";
+import type { ReplayReviewResult } from "./replay-review";
 import type {
   RulebenchLiveConnectionState,
   RulebenchLiveRequestOptions,
@@ -24,6 +26,16 @@ export function createFakeRulebenchLiveTransport(
     Promise.resolve({
       ok: false,
       error: fakeError(
+        "handlerNotConfigured",
+        `Fake live transport handler is not configured: ${operation}.`,
+      ),
+    });
+  const replayUnavailable = <T>(
+    operation: string,
+  ): Promise<ReplayReviewResult<T>> =>
+    Promise.resolve({
+      ok: false,
+      error: replayFakeError(
         "handlerNotConfigured",
         `Fake live transport handler is not configured: ${operation}.`,
       ),
@@ -82,7 +94,25 @@ export function createFakeRulebenchLiveTransport(
     runAutomaticCombat: (sessionId, request, requestOptions) =>
       handlers.runAutomaticCombat?.(sessionId, request, requestOptions) ??
       unavailable("runAutomaticCombat"),
+    listReplayPackages: () =>
+      handlers.listReplayPackages?.() ?? replayUnavailable("listReplayPackages"),
+    loadReplayPackage: (packageId) =>
+      handlers.loadReplayPackage?.(packageId) ??
+      replayUnavailable("loadReplayPackage"),
+    loadReplayVerification: (packageId) =>
+      handlers.loadReplayVerification?.(packageId) ??
+      replayUnavailable("loadReplayVerification"),
+    compareReplayPackages: (expectedPackageId, actualPackageId) =>
+      handlers.compareReplayPackages?.(expectedPackageId, actualPackageId) ??
+      replayUnavailable("compareReplayPackages"),
   };
+}
+
+function replayFakeError(
+  code: string,
+  message: string,
+): RulebenchReplayArchiveErrorDto {
+  return { kind: "storage", code, message, retryable: false };
 }
 
 function fakeError(

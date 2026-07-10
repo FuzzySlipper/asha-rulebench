@@ -36,6 +36,7 @@ impl ReplayArchiveError {
     }
 }
 
+#[derive(Debug)]
 pub struct ReplayArchive<S: ReplayArchiveStorage> {
     storage: S,
     cache: BTreeMap<String, ReplayPackage>,

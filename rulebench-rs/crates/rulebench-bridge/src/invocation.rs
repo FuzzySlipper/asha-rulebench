@@ -3,14 +3,18 @@ use std::collections::BTreeMap;
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
-    ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioOptionDto,
-    ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
+    ProtocolHandshakeDto, ProtocolRequestContextDto, ReplayArchiveMetadataDto,
+    ReplayComparisonReadoutDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
+    ScenarioOptionDto, ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID,
+    PROTOCOL_VERSION,
 };
 use rulebench_rules::{
-    CombatControlReadout, CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
+    compare_replay_packages, verify_replay_package, CombatControlReadout, CombatSessionApi,
+    CombatSessionArchive, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    CurrentActorOptionSummary, RulebenchScenario, AUTHORITY_SURFACE,
+    CurrentActorOptionSummary, InMemoryReplayArchiveStorage, ReplayArchive, ReplayArchiveQuery,
+    ReplayPackage, RulebenchScenario, AUTHORITY_SURFACE,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -66,14 +70,32 @@ impl BridgeScenario {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RulebenchBridge {
     scenarios: BTreeMap<String, BridgeScenario>,
     sessions: CombatSessionApi,
+    replays: ReplayArchive<InMemoryReplayArchiveStorage>,
+}
+
+impl Default for RulebenchBridge {
+    fn default() -> Self {
+        Self {
+            scenarios: BTreeMap::new(),
+            sessions: CombatSessionApi::new(),
+            replays: ReplayArchive::new(InMemoryReplayArchiveStorage::new()),
+        }
+    }
 }
 
 impl RulebenchBridge {
     pub fn new(scenarios: impl IntoIterator<Item = BridgeScenario>) -> Result<Self, BridgeError> {
+        Self::new_with_replays(scenarios, Vec::new())
+    }
+
+    pub fn new_with_replays(
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        replay_packages: impl IntoIterator<Item = ReplayPackage>,
+    ) -> Result<Self, BridgeError> {
         let mut indexed = BTreeMap::new();
         for scenario in scenarios {
             if scenario.option.id.is_empty() {
@@ -92,9 +114,16 @@ impl RulebenchBridge {
                 ));
             }
         }
+        let mut replays = ReplayArchive::new(InMemoryReplayArchiveStorage::new());
+        for (index, replay) in replay_packages.into_iter().enumerate() {
+            replays
+                .save(replay, format!("fixture-{index:04}"))
+                .map_err(BridgeError::from_replay_error)?;
+        }
         Ok(Self {
             scenarios: indexed,
             sessions: CombatSessionApi::new(),
+            replays,
         })
     }
 
@@ -269,6 +298,67 @@ impl RulebenchBridge {
         self.sessions
             .close_session(&session.to_combat_session_handle())
             .map_err(BridgeError::from_session_error)
+    }
+
+    pub fn list_replay_packages(
+        &self,
+        context: &ProtocolRequestContextDto,
+    ) -> Result<Vec<ReplayArchiveMetadataDto>, BridgeError> {
+        self.check_version(context)?;
+        Ok(self
+            .replays
+            .list(&ReplayArchiveQuery::default())
+            .iter()
+            .map(ReplayArchiveMetadataDto::from)
+            .collect())
+    }
+
+    pub fn load_replay_package(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        package_id: &str,
+    ) -> Result<ReplayPackageReviewDto, BridgeError> {
+        self.check_version(context)?;
+        let package = self
+            .replays
+            .retrieve(package_id)
+            .map_err(BridgeError::from_replay_error)?;
+        Ok(ReplayPackageReviewDto::from(&package))
+    }
+
+    pub fn verify_replay_package(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        package_id: &str,
+    ) -> Result<ReplayVerificationReadoutDto, BridgeError> {
+        self.check_version(context)?;
+        let package = self
+            .replays
+            .retrieve(package_id)
+            .map_err(BridgeError::from_replay_error)?;
+        Ok(ReplayVerificationReadoutDto::from(&verify_replay_package(
+            &package,
+        )))
+    }
+
+    pub fn compare_replay_packages(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        expected_package_id: &str,
+        actual_package_id: &str,
+    ) -> Result<ReplayComparisonReadoutDto, BridgeError> {
+        self.check_version(context)?;
+        let expected = self
+            .replays
+            .retrieve(expected_package_id)
+            .map_err(BridgeError::from_replay_error)?;
+        let actual = self
+            .replays
+            .retrieve(actual_package_id)
+            .map_err(BridgeError::from_replay_error)?;
+        Ok(ReplayComparisonReadoutDto::from(&compare_replay_packages(
+            &expected, &actual,
+        )))
     }
 
     fn check_version(&self, context: &ProtocolRequestContextDto) -> Result<(), BridgeError> {

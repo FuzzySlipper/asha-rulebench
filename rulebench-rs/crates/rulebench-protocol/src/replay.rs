@@ -1,9 +1,17 @@
 use rulebench_rules::{
-    ReplayArchiveError, ReplayArchiveMetadata, ReplayComparisonDifference, ReplayComparisonReadout,
-    ReplayMismatch, ReplayPackage, ReplayVerificationReadout, StateFingerprint,
+    inspect_replay_package, ReplayArchiveError, ReplayArchiveMetadata, ReplayCommandInspection,
+    ReplayComparisonDifference, ReplayComparisonReadout, ReplayMismatch, ReplayPackage,
+    ReplayStepEvidence, ReplayVerificationReadout, StateFingerprint,
+};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    LiveAuditEntryDto, LiveDomainEventDto, LiveRollEvidenceDto, LiveSessionSnapshotDto,
+    LiveTraceEntryDto,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayStateFingerprintDto {
     pub algorithm: String,
     pub value: String,
@@ -18,7 +26,8 @@ impl From<&StateFingerprint> for ReplayStateFingerprintDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayArchiveMetadataDto {
     pub package_id: String,
     pub session_id: String,
@@ -41,7 +50,8 @@ impl From<&ReplayArchiveMetadata> for ReplayArchiveMetadataDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayPackageReviewDto {
     pub package_version: String,
     pub package_id: String,
@@ -54,6 +64,7 @@ pub struct ReplayPackageReviewDto {
     pub fingerprint_kind: String,
     pub narration_title: Option<String>,
     pub narration_summary: Option<String>,
+    pub commands: Vec<ReplayCommandReviewDto>,
 }
 
 impl From<&ReplayPackage> for ReplayPackageReviewDto {
@@ -70,11 +81,85 @@ impl From<&ReplayPackage> for ReplayPackageReviewDto {
             fingerprint_kind: value.fingerprint_kind.clone(),
             narration_title: value.narration.as_ref().map(|item| item.title.clone()),
             narration_summary: value.narration.as_ref().map(|item| item.summary.clone()),
+            commands: inspect_replay_package(value)
+                .commands
+                .iter()
+                .map(ReplayCommandReviewDto::from)
+                .collect(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplayCommandReviewDto {
+    pub sequence: u32,
+    pub id: String,
+    pub command_kind: String,
+    pub supplied_roll_stream: Vec<i32>,
+    pub narration_summary: Option<String>,
+    pub expected: ReplayStepEvidenceDto,
+    pub actual: ReplayStepEvidenceDto,
+    pub snapshot: LiveSessionSnapshotDto,
+}
+
+impl From<&ReplayCommandInspection> for ReplayCommandReviewDto {
+    fn from(value: &ReplayCommandInspection) -> Self {
+        Self {
+            sequence: value.sequence,
+            id: value.id.clone(),
+            command_kind: value.command_kind.clone(),
+            supplied_roll_stream: value.supplied_roll_stream.clone(),
+            narration_summary: value.narration_summary.clone(),
+            expected: ReplayStepEvidenceDto::from(&value.expected),
+            actual: ReplayStepEvidenceDto::from(&value.actual),
+            snapshot: LiveSessionSnapshotDto::from(&value.snapshot),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplayStepEvidenceDto {
+    pub accepted: bool,
+    pub decision_code: String,
+    pub state_before_fingerprint: ReplayStateFingerprintDto,
+    pub state_after_fingerprint: ReplayStateFingerprintDto,
+    pub accepted_events: Vec<LiveDomainEventDto>,
+    pub command_audit: Vec<LiveAuditEntryDto>,
+    pub rolls: Vec<LiveRollEvidenceDto>,
+    pub trace: Vec<LiveTraceEntryDto>,
+}
+
+impl From<&ReplayStepEvidence> for ReplayStepEvidenceDto {
+    fn from(value: &ReplayStepEvidence) -> Self {
+        Self {
+            accepted: value.accepted,
+            decision_code: value.decision_code.clone(),
+            state_before_fingerprint: ReplayStateFingerprintDto::from(
+                &value.state_before_fingerprint,
+            ),
+            state_after_fingerprint: ReplayStateFingerprintDto::from(
+                &value.state_after_fingerprint,
+            ),
+            accepted_events: value
+                .accepted_events
+                .iter()
+                .map(LiveDomainEventDto::from)
+                .collect(),
+            command_audit: value
+                .command_audit
+                .iter()
+                .map(LiveAuditEntryDto::from)
+                .collect(),
+            rolls: value.rolls.iter().map(LiveRollEvidenceDto::from).collect(),
+            trace: value.trace.iter().map(LiveTraceEntryDto::from).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayMismatchDto {
     pub command_sequence: Option<u32>,
     pub command_id: Option<String>,
@@ -93,7 +178,8 @@ impl From<&ReplayMismatch> for ReplayMismatchDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayVerificationReadoutDto {
     pub accepted: bool,
     pub decision_kind: String,
@@ -119,7 +205,8 @@ impl From<&ReplayVerificationReadout> for ReplayVerificationReadoutDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayComparisonDifferenceDto {
     pub code: String,
     pub path: String,
@@ -142,7 +229,8 @@ impl From<&ReplayComparisonDifference> for ReplayComparisonDifferenceDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayComparisonReadoutDto {
     pub matches: bool,
     pub expected_package_id: String,
@@ -150,6 +238,13 @@ pub struct ReplayComparisonReadoutDto {
     pub compared_command_count: u32,
     pub first_difference: Option<ReplayComparisonDifferenceDto>,
     pub differences: Vec<ReplayComparisonDifferenceDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReplayComparisonRequestDto {
+    pub expected_package_id: String,
+    pub actual_package_id: String,
 }
 
 impl From<&ReplayComparisonReadout> for ReplayComparisonReadoutDto {
@@ -172,7 +267,8 @@ impl From<&ReplayComparisonReadout> for ReplayComparisonReadoutDto {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReplayArchiveErrorDto {
     pub kind: String,
     pub code: String,

@@ -32,6 +32,10 @@ describe("live Rulebench transport", () => {
       {},
       {},
       {},
+      [],
+      {},
+      {},
+      {},
       {},
       {},
       {},
@@ -104,6 +108,10 @@ describe("live Rulebench transport", () => {
     });
     await transport.runAutomaticStep(createRequest.sessionId, automaticStep);
     await transport.runAutomaticCombat(createRequest.sessionId, automaticRun);
+    await transport.listReplayPackages();
+    await transport.loadReplayPackage("replay/one");
+    await transport.loadReplayVerification("replay/one");
+    await transport.compareReplayPackages("expected", "actual");
 
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "GET http://rulebench.test/api/rulebench/v1/handshake",
@@ -119,6 +127,10 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/controls",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-step",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-run",
+      "GET http://rulebench.test/api/rulebench/v1/replays",
+      "GET http://rulebench.test/api/rulebench/v1/replays/replay%2Fone",
+      "POST http://rulebench.test/api/rulebench/v1/replays/replay%2Fone/verify",
+      "POST http://rulebench.test/api/rulebench/v1/replays/compare",
     ]);
     expect(calls.every((call) => call.version === "1")).toBe(true);
     expect(calls[3]?.body).toBe(JSON.stringify(createRequest));
@@ -126,6 +138,9 @@ describe("live Rulebench transport", () => {
     expect(calls[9]?.body).toBe(JSON.stringify(intentCommand));
     expect(calls[11]?.body).toBe(JSON.stringify(automaticStep));
     expect(calls[12]?.body).toBe(JSON.stringify(automaticRun));
+    expect(calls[16]?.body).toBe(
+      JSON.stringify({ expectedPackageId: "expected", actualPackageId: "actual" }),
+    );
   });
 
   it("tracks a verified handshake and rejects a mismatched protocol without repairing it", async () => {

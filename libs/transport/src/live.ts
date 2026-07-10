@@ -14,9 +14,15 @@ import type {
   RulebenchLiveSessionSnapshotDto,
   RulebenchLiveTransportErrorDto,
   RulebenchProtocolHandshakeDto,
+  RulebenchReplayArchiveErrorDto,
+  RulebenchReplayArchiveMetadataDto,
+  RulebenchReplayComparisonReadoutDto,
+  RulebenchReplayPackageReviewDto,
+  RulebenchReplayVerificationReadoutDto,
   RulebenchScenarioOptionDto,
   RulebenchUseActionIntentDto,
 } from "@asha-rulebench/protocol";
+import type { ReplayReviewResult, ReplayReviewTransport } from "./replay-review";
 
 export const RULEBENCH_PROTOCOL_ID = "asha-rulebench.protocol";
 export const RULEBENCH_PROTOCOL_VERSION = 1;
@@ -43,7 +49,7 @@ export interface RulebenchLiveRequestOptions {
   readonly signal?: AbortSignal;
 }
 
-export interface RulebenchLiveTransport {
+export interface RulebenchLiveTransport extends ReplayReviewTransport {
   readonly connectionState: () => RulebenchLiveConnectionState;
   readonly connect: (
     options?: RulebenchLiveRequestOptions,
@@ -209,6 +215,18 @@ export function createLiveRulebenchTransport(
 
   const sessionPath = (sessionId: string): string =>
     `/sessions/${encodeURIComponent(sessionId)}`;
+  const replayPath = (packageId: string): string =>
+    `/replays/${encodeURIComponent(packageId)}`;
+  const replayRequest = async <T>(
+    method: "GET" | "POST",
+    path: string,
+    body?: object,
+  ): Promise<ReplayReviewResult<T>> => {
+    const result = await request<T>(method, path, body, undefined);
+    return result.ok
+      ? result
+      : { ok: false, error: replayArchiveError(result.error) };
+  };
 
   return {
     connectionState: () => connectionState,
@@ -306,7 +324,45 @@ export function createLiveRulebenchTransport(
         automaticRequest,
         requestOptions,
       ),
+    listReplayPackages: () =>
+      replayRequest<readonly RulebenchReplayArchiveMetadataDto[]>(
+        "GET",
+        "/replays",
+      ),
+    loadReplayPackage: (packageId) =>
+      replayRequest<RulebenchReplayPackageReviewDto>(
+        "GET",
+        replayPath(packageId),
+      ),
+    loadReplayVerification: (packageId) =>
+      replayRequest<RulebenchReplayVerificationReadoutDto>(
+        "POST",
+        `${replayPath(packageId)}/verify`,
+      ),
+    compareReplayPackages: (expectedPackageId, actualPackageId) =>
+      replayRequest<RulebenchReplayComparisonReadoutDto>(
+        "POST",
+        "/replays/compare",
+        { expectedPackageId, actualPackageId },
+      ),
   };
+}
+
+function replayArchiveError(
+  error: RulebenchLiveTransportErrorDto,
+): RulebenchReplayArchiveErrorDto {
+  const kind: RulebenchReplayArchiveErrorDto["kind"] =
+    error.code === "unknownReplayPackage"
+      ? "notFound"
+      : error.code === "corruptReplayPackage"
+        ? "corrupt"
+        : error.code === "unsupportedReplayPackageVersion"
+          ? "unsupportedVersion"
+          : error.code === "invalidReplayPackage" ||
+              error.code === "replayCombatNotFinalized"
+            ? "invalidPackage"
+            : "storage";
+  return { kind, code: error.code, message: error.message, retryable: error.retryable };
 }
 
 async function decodeJsonResponse<T>(

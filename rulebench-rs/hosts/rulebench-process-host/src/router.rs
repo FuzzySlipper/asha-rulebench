@@ -1,11 +1,11 @@
 use rulebench_bridge::{BridgeError, BridgeErrorKind, BridgeScenario, RulebenchBridge};
-use rulebench_fixtures::aggregated_scenario_catalog_cases;
+use rulebench_fixtures::{aggregated_scenario_catalog_cases, replay_review_packages};
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
     LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
     LiveControlExecutionDto, LivePreflightDto, LiveSessionSnapshotDto, LiveTransportErrorDto,
-    ProtocolRequestContextDto, UseActionIntentDto,
+    ProtocolRequestContextDto, ReplayComparisonRequestDto, UseActionIntentDto,
 };
 
 use crate::{HttpMethod, HttpRequest, HttpResponse};
@@ -14,14 +14,17 @@ const API_PREFIX: &str = "/api/rulebench/v1";
 const PROTOCOL_VERSION_HEADER: &str = "x-rulebench-protocol-version";
 
 pub fn build_rulebench_bridge() -> Result<RulebenchBridge, BridgeError> {
-    RulebenchBridge::new(aggregated_scenario_catalog_cases().into_iter().map(|case| {
-        BridgeScenario::new(
-            case.summary.id,
-            case.summary.title,
-            case.summary.summary,
-            case.scenario,
-        )
-    }))
+    RulebenchBridge::new_with_replays(
+        aggregated_scenario_catalog_cases().into_iter().map(|case| {
+            BridgeScenario::new(
+                case.summary.id,
+                case.summary.title,
+                case.summary.summary,
+                case.scenario,
+            )
+        }),
+        replay_review_packages(),
+    )
 }
 
 #[derive(Debug)]
@@ -165,6 +168,26 @@ impl ProcessHostRouter {
                     Err(error) => bridge_error(error),
                 }
             }
+            (HttpMethod::Get, ["replays"]) => {
+                bridge_result(self.bridge.list_replay_packages(&context))
+            }
+            (HttpMethod::Post, ["replays", "compare"]) => {
+                let comparison = match decode_body::<ReplayComparisonRequestDto>(request) {
+                    Ok(comparison) => comparison,
+                    Err(response) => return response,
+                };
+                bridge_result(self.bridge.compare_replay_packages(
+                    &context,
+                    &comparison.expected_package_id,
+                    &comparison.actual_package_id,
+                ))
+            }
+            (HttpMethod::Get, ["replays", package_id]) => {
+                bridge_result(self.bridge.load_replay_package(&context, package_id))
+            }
+            (HttpMethod::Post, ["replays", package_id, "verify"]) => {
+                bridge_result(self.bridge.verify_replay_package(&context, package_id))
+            }
             _ => error_response(
                 404,
                 "transport",
@@ -251,6 +274,9 @@ fn bridge_error(error: BridgeError) -> HttpResponse {
         BridgeErrorKind::UnknownScenario | BridgeErrorKind::UnknownSession => 404,
         BridgeErrorKind::InvalidScenario | BridgeErrorKind::InvalidLifecycle => 422,
         BridgeErrorKind::InvalidRequest => 400,
+        BridgeErrorKind::ReplayArchive if error.code == "unknownReplayPackage" => 404,
+        BridgeErrorKind::ReplayArchive if error.retryable => 503,
+        BridgeErrorKind::ReplayArchive => 422,
     };
     error_response(status, "bridge", error.code, error.message, error.retryable)
 }

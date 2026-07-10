@@ -1,4 +1,4 @@
-use rulebench_rules::CombatSessionApiError;
+use rulebench_rules::{CombatSessionApiError, ReplayArchiveError};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,6 +10,7 @@ pub enum BridgeErrorKind {
     UnknownSession,
     InvalidScenario,
     InvalidLifecycle,
+    ReplayArchive,
 }
 
 impl BridgeErrorKind {
@@ -22,6 +23,7 @@ impl BridgeErrorKind {
             BridgeErrorKind::UnknownSession => "unknownSession",
             BridgeErrorKind::InvalidScenario => "invalidScenario",
             BridgeErrorKind::InvalidLifecycle => "invalidLifecycle",
+            BridgeErrorKind::ReplayArchive => "replayArchive",
         }
     }
 }
@@ -74,6 +76,15 @@ impl BridgeError {
                 BridgeErrorKind::InvalidScenario,
                 "Scenario content was rejected by Rust validation.",
             ),
+        }
+    }
+
+    pub(crate) fn from_replay_error(error: ReplayArchiveError) -> Self {
+        Self {
+            kind: BridgeErrorKind::ReplayArchive,
+            code: error.code().to_string(),
+            message: format!("{error:?}"),
+            retryable: matches!(error, ReplayArchiveError::Storage(_)),
         }
     }
 }

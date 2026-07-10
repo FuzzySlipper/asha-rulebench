@@ -141,7 +141,7 @@ import { LiveCombatStore } from '@asha-rulebench/store';
               <button type="button" [disabled]="!canRunAutomatic()" (click)="runAutomaticCombat()">Run bounded</button>
               <button type="button" [disabled]="!automationBusy()" (click)="cancelAutomation()">Stop</button>
             </div>
-            <p class="reason">Replay verification: unavailable on the current live host protocol</p>
+            <p class="reason">Replay verification: the current live session run is not archived</p>
             <div class="evidence-grid">
               <section class="evidence" aria-label="Automatic next decision"><h4>Next decision</h4>
                 @if (automaticStep().kind === 'data') { <p [class.accepted]="automaticStep().value.accepted" [class.rejected]="!automaticStep().value.accepted">{{ automaticStep().value.decisionLabel }} · {{ automaticStep().value.operationLabel ?? 'No operation' }}</p><p class="reason">{{ automaticStep().value.selectedActionId ?? 'No action' }} → {{ automaticStep().value.selectedTargetId ?? 'No target' }}</p><p class="reason">{{ automaticStep().value.reason }}</p> }

@@ -30,6 +30,7 @@ import {
   type RulebenchLiveTransport,
 } from "@asha-rulebench/transport";
 import type { AsyncState } from "./async-state";
+import { ReplayReviewStore } from "./replay-review-store";
 
 type LiveState<T> = AsyncState<T, RulebenchLiveTransportErrorDto>;
 
@@ -473,6 +474,12 @@ export function provideLiveCombatStoreKernel(): Provider[] {
       deps: [RULEBENCH_LIVE_TRANSPORT],
       useFactory: (transport: RulebenchLiveTransport) =>
         new LiveCombatStore(transport, browserClock),
+    },
+    {
+      provide: ReplayReviewStore,
+      deps: [RULEBENCH_LIVE_TRANSPORT],
+      useFactory: (transport: RulebenchLiveTransport) =>
+        new ReplayReviewStore(transport, browserClock),
     },
   ];
 }

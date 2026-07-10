@@ -7,8 +7,9 @@ use std::time::Duration;
 
 use rulebench_protocol::{
     CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
-    LiveControlExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ScenarioOptionDto,
-    PROTOCOL_VERSION,
+    LiveControlExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto,
+    ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayComparisonRequestDto,
+    ReplayPackageReviewDto, ReplayVerificationReadoutDto, ScenarioOptionDto, PROTOCOL_VERSION,
 };
 
 use crate::{build_rulebench_bridge, serve_until, HttpMethod, HttpRequest, ProcessHostRouter};
@@ -123,6 +124,66 @@ fn router_classifies_version_serialization_handle_and_lifecycle_errors() {
         "/api/rulebench/v1/sessions/ready",
     ));
     assert_eq!(close.status, 422);
+}
+
+#[test]
+fn router_exposes_rust_replay_review_verification_and_comparison() {
+    let mut router = router();
+    let listed = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/replays"));
+    assert_eq!(listed.status, 200);
+    let packages: Vec<ReplayArchiveMetadataDto> =
+        serde_json::from_slice(&listed.body).expect("replay archive list is JSON");
+    assert_eq!(packages.len(), 2);
+
+    let expected_id = &packages
+        .iter()
+        .find(|package| package.package_id == "hexing-bolt-replay")
+        .expect("expected replay is listed")
+        .package_id;
+    let actual_id = &packages
+        .iter()
+        .find(|package| package.package_id != **expected_id)
+        .expect("comparison replay is listed")
+        .package_id;
+    let loaded = router.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/{expected_id}"),
+    ));
+    let review: ReplayPackageReviewDto =
+        serde_json::from_slice(&loaded.body).expect("replay review is JSON");
+    assert!(!review.commands.is_empty());
+    assert!(!review.commands[0].actual.accepted_events.is_empty());
+    assert!(!review.commands[0].actual.rolls.is_empty());
+    assert!(!review.commands[0].actual.trace.is_empty());
+    assert!(!review.commands[0].snapshot.combat_log.is_empty());
+
+    let verified = router.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/{expected_id}/verify"),
+    ));
+    let verification: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&verified.body).expect("verification is JSON");
+    assert!(verification.accepted);
+    assert!(verification.finalized);
+
+    let compared = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/replays/compare",
+        &ReplayComparisonRequestDto {
+            expected_package_id: expected_id.clone(),
+            actual_package_id: actual_id.clone(),
+        },
+    ));
+    let comparison: ReplayComparisonReadoutDto =
+        serde_json::from_slice(&compared.body).expect("comparison is JSON");
+    assert!(!comparison.matches);
+    assert!(comparison.first_difference.is_some());
+
+    let missing = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/replays/missing",
+    ));
+    assert_eq!(missing.status, 404);
 }
 
 #[test]

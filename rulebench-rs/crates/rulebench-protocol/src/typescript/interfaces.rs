@@ -3042,6 +3042,84 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "narrationSummary",
                     ty: "string | null",
                 },
+                Field {
+                    name: "commands",
+                    ty: "readonly RulebenchReplayCommandReviewDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayCommandReviewDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "commandKind",
+                    ty: "string",
+                },
+                Field {
+                    name: "suppliedRollStream",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "narrationSummary",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "expected",
+                    ty: "RulebenchReplayStepEvidenceDto",
+                },
+                Field {
+                    name: "actual",
+                    ty: "RulebenchReplayStepEvidenceDto",
+                },
+                Field {
+                    name: "snapshot",
+                    ty: "RulebenchLiveSessionSnapshotDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayStepEvidenceDto",
+            fields: &[
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "decisionCode",
+                    ty: "string",
+                },
+                Field {
+                    name: "stateBeforeFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "stateAfterFingerprint",
+                    ty: "RulebenchStateFingerprintDto",
+                },
+                Field {
+                    name: "acceptedEvents",
+                    ty: "readonly RulebenchLiveDomainEventDto[]",
+                },
+                Field {
+                    name: "commandAudit",
+                    ty: "readonly RulebenchLiveAuditEntryDto[]",
+                },
+                Field {
+                    name: "rolls",
+                    ty: "readonly RulebenchLiveRollEvidenceDto[]",
+                },
+                Field {
+                    name: "trace",
+                    ty: "readonly RulebenchLiveTraceEntryDto[]",
+                },
             ],
         },
         Interface {
@@ -3149,6 +3227,19 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "differences",
                     ty: "readonly RulebenchReplayComparisonDifferenceDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchReplayComparisonRequestDto",
+            fields: &[
+                Field {
+                    name: "expectedPackageId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actualPackageId",
+                    ty: "string",
                 },
             ],
         },
