@@ -13,6 +13,7 @@ mod pack;
 mod pack_validation;
 mod scenario;
 mod stats;
+mod storage;
 mod validation;
 
 pub use active_modifier::ActiveModifier;
@@ -26,9 +27,9 @@ pub use import::{
     ContentImportDiagnosticCode, ContentImportLimits, ContentImportReport, ImportedContentPack,
 };
 pub use pack::{
-    CanonicalContentPack, ContentDefinitionKind, ContentFingerprint, ContentPackCatalogs,
-    ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity, ContentPackProvenance,
-    ContentPackReference, ContentPackSetReference, ContentPackSourceKind,
+    CanonicalContentPack, ContentDefinitionKind, ContentDefinitionReference, ContentFingerprint,
+    ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
+    ContentPackProvenance, ContentPackReference, ContentPackSetReference, ContentPackSourceKind,
     CONTENT_PACK_FINGERPRINT_ALGORITHM, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
 pub use pack_validation::{
@@ -43,6 +44,10 @@ pub use scenario::{
     ModifierStatAdjustmentContribution, RulebenchScenario, StatRequirement, UseActionIntent,
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
+pub use storage::{
+    ContentPackStorage, ContentStorageError, ContentStorageRecord, StorageReplacementPolicy,
+    StoredContentPayload,
+};
 pub use validation::{validate_scenario_content, validate_scenario_content_report};
 
 #[cfg(test)]

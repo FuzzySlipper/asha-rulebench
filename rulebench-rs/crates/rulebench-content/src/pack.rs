@@ -125,6 +125,26 @@ impl ContentDefinitionKind {
             ContentDefinitionKind::Action => "action",
         }
     }
+
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "ruleset" => Some(ContentDefinitionKind::Ruleset),
+            "entity" => Some(ContentDefinitionKind::Entity),
+            "ability" => Some(ContentDefinitionKind::Ability),
+            "class" => Some(ContentDefinitionKind::Class),
+            "stat" => Some(ContentDefinitionKind::Stat),
+            "modifier" => Some(ContentDefinitionKind::Modifier),
+            "item" => Some(ContentDefinitionKind::Item),
+            "action" => Some(ContentDefinitionKind::Action),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ContentDefinitionReference {
+    pub kind: ContentDefinitionKind,
+    pub id: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -169,5 +189,80 @@ pub struct CanonicalContentPack {
 impl CanonicalContentPack {
     pub fn exact_reference(&self) -> ContentPackReference {
         ContentPackReference::from_pack(self)
+    }
+
+    pub fn definition_references(&self) -> Vec<ContentDefinitionReference> {
+        let mut references = Vec::new();
+        references.extend(
+            self.catalogs
+                .rulesets
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Ruleset,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(
+            self.catalogs
+                .entities
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Entity,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(
+            self.catalogs
+                .abilities
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Ability,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(
+            self.catalogs
+                .classes
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Class,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(self.catalogs.stat_definitions.iter().map(|value| {
+            ContentDefinitionReference {
+                kind: ContentDefinitionKind::Stat,
+                id: value.id.clone(),
+            }
+        }));
+        references.extend(
+            self.catalogs
+                .modifiers
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Modifier,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(
+            self.catalogs
+                .items
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Item,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(
+            self.catalogs
+                .actions
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Action,
+                    id: value.id.clone(),
+                }),
+        );
+        references.sort();
+        references
     }
 }
