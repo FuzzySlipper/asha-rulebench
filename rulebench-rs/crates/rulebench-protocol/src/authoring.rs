@@ -1,7 +1,7 @@
 use rulebench_rules::{
-    ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, RuleModuleConfiguration,
-    RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError, RulesetMetadata,
-    TurnControlModuleConfiguration, TurnOrderPolicy,
+    ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, CheckHandlerKind,
+    RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,
+    RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,
 };
 
 /// Stable wire form of a ruleset definition authored outside Rust authority.
@@ -25,8 +25,13 @@ pub struct RuleModuleDeclarationDto {
 /// Closed configuration vocabulary carried over the protocol boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleModuleConfigurationDto {
-    ActionResolution { targeting_policy: String },
-    TurnControl { turn_order_policy: String },
+    ActionResolution {
+        targeting_policy: String,
+        supported_check_handlers: Vec<String>,
+    },
+    TurnControl {
+        turn_order_policy: String,
+    },
 }
 
 /// Rust-owned diagnostics for converting authored wire data into authority declarations.
@@ -34,6 +39,7 @@ pub enum RuleModuleConfigurationDto {
 pub enum RulesetAuthoringError {
     RuleModuleValidation(RuleModuleValidationError),
     UnsupportedActionResolutionTargetingPolicy { policy: String },
+    UnsupportedCheckHandler { handler: String },
     UnsupportedTurnOrderPolicy { policy: String },
 }
 
@@ -44,6 +50,7 @@ impl RulesetAuthoringError {
             RulesetAuthoringError::UnsupportedActionResolutionTargetingPolicy { .. } => {
                 "unsupportedActionResolutionTargetingPolicy"
             }
+            RulesetAuthoringError::UnsupportedCheckHandler { .. } => "unsupportedCheckHandler",
             RulesetAuthoringError::UnsupportedTurnOrderPolicy { .. } => {
                 "unsupportedTurnOrderPolicy"
             }
@@ -79,11 +86,16 @@ fn convert_module_declaration(
     let module = RuleModuleId::from_code(&declaration.module)
         .map_err(RulesetAuthoringError::RuleModuleValidation)?;
     let configuration = match &declaration.configuration {
-        RuleModuleConfigurationDto::ActionResolution { targeting_policy } => {
-            RuleModuleConfiguration::ActionResolution(ActionResolutionModuleConfiguration {
-                targeting_policy: action_resolution_targeting_policy(targeting_policy)?,
-            })
-        }
+        RuleModuleConfigurationDto::ActionResolution {
+            targeting_policy,
+            supported_check_handlers,
+        } => RuleModuleConfiguration::ActionResolution(ActionResolutionModuleConfiguration {
+            targeting_policy: action_resolution_targeting_policy(targeting_policy)?,
+            supported_check_handlers: supported_check_handlers
+                .iter()
+                .map(|handler| parse_check_handler(handler))
+                .collect::<Result<Vec<_>, _>>()?,
+        }),
         RuleModuleConfigurationDto::TurnControl {
             turn_order_policy: configured_policy,
         } => RuleModuleConfiguration::TurnControl(TurnControlModuleConfiguration {
@@ -95,6 +107,17 @@ fn convert_module_declaration(
         version: declaration.version.clone(),
         configuration,
     })
+}
+
+fn parse_check_handler(handler: &str) -> Result<CheckHandlerKind, RulesetAuthoringError> {
+    match handler {
+        "attackVsDefense" => Ok(CheckHandlerKind::AttackVsDefense),
+        "savingThrow" => Ok(CheckHandlerKind::SavingThrow),
+        "contested" => Ok(CheckHandlerKind::Contested),
+        _ => Err(RulesetAuthoringError::UnsupportedCheckHandler {
+            handler: handler.to_string(),
+        }),
+    }
 }
 
 fn action_resolution_targeting_policy(
@@ -139,6 +162,7 @@ mod tests {
                 version: "1".to_string(),
                 configuration: RuleModuleConfigurationDto::ActionResolution {
                     targeting_policy: "declaredTargetsAndLineOfSight".to_string(),
+                    supported_check_handlers: vec!["attackVsDefense".to_string()],
                 },
             }],
         }
@@ -169,6 +193,7 @@ mod tests {
         let mut definition = valid_definition();
         definition.modules[0].configuration = RuleModuleConfigurationDto::ActionResolution {
             targeting_policy: "unrecognizedPolicy".to_string(),
+            supported_check_handlers: vec!["attackVsDefense".to_string()],
         };
 
         let error = validate_ruleset_definition(&definition).expect_err("policy is invalid");

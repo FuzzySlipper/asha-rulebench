@@ -1043,6 +1043,8 @@ fn domain_event_type(event: &DomainEvent) -> String {
         DomainEvent::IntentShapeAccepted { .. } => "IntentShapeAccepted",
         DomainEvent::ActionUsed { .. } => "ActionUsed",
         DomainEvent::AttackRolled { .. } => "AttackRolled",
+        DomainEvent::SavingThrowResolved { .. } => "SavingThrowResolved",
+        DomainEvent::ContestedCheckResolved { .. } => "ContestedCheckResolved",
         DomainEvent::DamageApplied { .. } => "DamageApplied",
         DomainEvent::ModifierApplied { .. } => "ModifierApplied",
     }

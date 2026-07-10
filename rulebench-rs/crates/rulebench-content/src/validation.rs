@@ -5,8 +5,8 @@ use crate::{
     ContentValidationReport, RulebenchScenario, StatDefinitionKind,
 };
 use rulebench_ruleset::{
-    ActionDefinition, AttackCheckDeclaration, RuleModuleValidationError, TargetKind,
-    TargetSelection,
+    ActionDefinition, AttackCheckDeclaration, CheckDeclaration, ContestedCheckDeclaration,
+    RuleModuleValidationError, SavingThrowCheckDeclaration, TargetKind, TargetSelection,
 };
 
 pub fn validate_scenario_content_report(scenario: &RulebenchScenario) -> ContentValidationReport {
@@ -605,7 +605,11 @@ fn validate_action_references(
         ));
     }
 
-    if action.attack_check().is_none() {
+    let check_is_supported = scenario
+        .ruleset_by_id(&action.ruleset_id)
+        .and_then(|ruleset| ruleset.validate_modules().ok())
+        .map(|registry| registry.action_resolution().supports_check(&action.check));
+    if check_is_supported == Some(false) {
         diagnostics.push(ContentDiagnostic::error(
             ContentDiagnosticCode::UnsupportedCheckDeclaration,
             Some(action.id.clone()),
@@ -652,8 +656,18 @@ fn validate_action_references(
         }
     }
 
-    if let (Some(actor), Some(attack)) = (actor, action.attack_check()) {
-        validate_actor_attack_stat(scenario, action, attack, actor, diagnostics);
+    if let Some(actor) = actor {
+        match &action.check {
+            CheckDeclaration::Attack(attack) => {
+                validate_actor_attack_stat(scenario, action, attack, actor, diagnostics);
+            }
+            CheckDeclaration::SavingThrow(save) => {
+                validate_saving_throw(scenario, action, save, diagnostics);
+            }
+            CheckDeclaration::Contested(contested) => {
+                validate_contested_actor_stat(scenario, action, contested, actor, diagnostics);
+            }
+        }
     }
     validate_hit_modifier(scenario, action, diagnostics);
     validate_effect_operations(action, diagnostics);
@@ -664,10 +678,103 @@ fn validate_action_references(
             .iter()
             .find(|combatant| combatant.id == *target_id)
         {
-            if let Some(attack) = action.attack_check() {
-                validate_target_defense(action, attack, target, diagnostics);
+            match &action.check {
+                CheckDeclaration::Attack(attack) => {
+                    validate_target_defense(action, attack, target, diagnostics);
+                }
+                CheckDeclaration::SavingThrow(save) => {
+                    validate_combatant_check_stat(
+                        scenario,
+                        action,
+                        target,
+                        &save.save_stat_id,
+                        ContentDiagnosticCode::MissingSavingThrowStat,
+                        "saving throw",
+                        diagnostics,
+                    );
+                }
+                CheckDeclaration::Contested(contested) => {
+                    validate_combatant_check_stat(
+                        scenario,
+                        action,
+                        target,
+                        &contested.target_stat_id,
+                        ContentDiagnosticCode::MissingContestedTargetStat,
+                        "contested target",
+                        diagnostics,
+                    );
+                }
             }
         }
+    }
+}
+
+fn validate_saving_throw(
+    _scenario: &RulebenchScenario,
+    action: &ActionDefinition,
+    save: &SavingThrowCheckDeclaration,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    if save.difficulty_class < 0 {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::InvalidSavingThrowDifficultyClass,
+            Some(action.id.clone()),
+            format!(
+                "Action {} declares negative saving throw difficulty class {}.",
+                action.id, save.difficulty_class
+            ),
+        ));
+    }
+}
+
+fn validate_contested_actor_stat(
+    scenario: &RulebenchScenario,
+    action: &ActionDefinition,
+    contested: &ContestedCheckDeclaration,
+    actor: &Combatant,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    validate_combatant_check_stat(
+        scenario,
+        action,
+        actor,
+        &contested.actor_stat_id,
+        ContentDiagnosticCode::MissingContestedActorStat,
+        "contested actor",
+        diagnostics,
+    );
+}
+
+fn validate_combatant_check_stat(
+    scenario: &RulebenchScenario,
+    action: &ActionDefinition,
+    combatant: &Combatant,
+    stat_id: &str,
+    diagnostic_code: ContentDiagnosticCode,
+    role: &str,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let Some(definition) = scenario.stat_definition_by_id(stat_id) else {
+        diagnostics.push(ContentDiagnostic::error(
+            diagnostic_code,
+            Some(stat_id.to_string()),
+            format!(
+                "Action {} references {} stat {} that combatant {} does not have.",
+                action.id, role, stat_id, combatant.id
+            ),
+        ));
+        return;
+    };
+
+    if definition.kind == StatDefinitionKind::Base && combatant.stat_by_id(stat_id).is_none() {
+        diagnostics.push(ContentDiagnostic::error(
+            diagnostic_code,
+            Some(stat_id.to_string()),
+            format!(
+                "Action {} references {} base stat {} that combatant {} does not have.",
+                action.id, role, stat_id, combatant.id
+            ),
+        ));
     }
 }
 

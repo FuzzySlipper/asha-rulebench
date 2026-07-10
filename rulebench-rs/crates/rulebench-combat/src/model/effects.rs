@@ -14,6 +14,7 @@ pub enum RulebenchRejection {
     TargetOutOfRange,
     TargetNotVisible,
     MissingAttackRoll,
+    MissingCheckRoll,
     MissingDamageRoll,
 }
 
@@ -31,6 +32,7 @@ impl RulebenchRejection {
             RulebenchRejection::TargetOutOfRange => "targetOutOfRange",
             RulebenchRejection::TargetNotVisible => "targetNotVisible",
             RulebenchRejection::MissingAttackRoll => "missingAttackRoll",
+            RulebenchRejection::MissingCheckRoll => "missingCheckRoll",
             RulebenchRejection::MissingDamageRoll => "missingDamageRoll",
         }
     }
@@ -101,6 +103,18 @@ pub struct AttackRollResult {
     pub outcome: AttackOutcome,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SavingThrowOutcome {
+    Saved,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContestedCheckOutcome {
+    ActorWins,
+    TargetWins,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DamageOutcome {
     pub target_id: String,
@@ -137,6 +151,20 @@ pub enum DomainEvent {
         defense_id: String,
         defense_value: i32,
         outcome: AttackOutcome,
+    },
+    SavingThrowResolved {
+        actor_id: String,
+        target_id: String,
+        total: i32,
+        difficulty_class: i32,
+        outcome: SavingThrowOutcome,
+    },
+    ContestedCheckResolved {
+        actor_id: String,
+        target_id: String,
+        actor_total: i32,
+        target_total: i32,
+        outcome: ContestedCheckOutcome,
     },
     DamageApplied {
         target_id: String,

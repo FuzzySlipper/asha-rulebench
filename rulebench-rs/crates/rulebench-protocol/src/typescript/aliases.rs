@@ -30,6 +30,7 @@ pub fn aliases() -> &'static [super::ProtocolAlias] {
         "export type RulebenchCombatEndConditionKindDto = 'ongoing' | 'noActiveEnemies' | 'noActiveAllies' | 'noActiveCombatants';",
         "export type RulebenchRuleModuleIdDto = 'actionResolution' | 'turnControl';",
         "export type RulebenchActionResolutionTargetingPolicyDto = 'declaredTargetsAndLineOfSight';",
+        "export type RulebenchCheckHandlerKindDto = 'attackVsDefense' | 'savingThrow' | 'contested';",
         "export type RulebenchTurnOrderPolicyDto = 'explicit';",
         "export type RulebenchRuleModuleConfigurationDto = RulebenchActionResolutionModuleConfigurationDto | RulebenchTurnControlModuleConfigurationDto;",
     ]

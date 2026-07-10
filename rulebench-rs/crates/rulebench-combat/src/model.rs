@@ -17,8 +17,8 @@ pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerpri
 pub use rulebench_ruleset::{
     validate_rule_modules, AbilityDefinition, AbilityDefinitionKind, ActionDefinition,
     ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, AttackCheckDeclaration,
-    CheckDeclaration, ContestedCheckDeclaration, DamageEffectOperation, DefenseReference,
-    EffectOperationId, HealingEffectOperation, HitEffect, HitEffectOperation,
+    CheckDeclaration, CheckHandlerKind, ContestedCheckDeclaration, DamageEffectOperation,
+    DefenseReference, EffectOperationId, HealingEffectOperation, HitEffect, HitEffectOperation,
     ModifierEffectOperation, ModifierTenure, MovementEffectOperation, MovementKind,
     ReactionHookEffectOperation, ReactionWindow, ResourceChangeEffectOperation,
     RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId, RuleModuleValidationError,

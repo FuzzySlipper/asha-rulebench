@@ -428,6 +428,42 @@ fn render_event(sequence: u32, event: &DomainEvent) -> String {
                 &[actor_id.as_str(), target_id.as_str()],
             )
         }
+        DomainEvent::SavingThrowResolved {
+            actor_id,
+            target_id,
+            total,
+            difficulty_class,
+            outcome,
+        } => event_block(
+            sequence,
+            "SavingThrowResolved",
+            &format!(
+                "Saving throw total {total} against DC {difficulty_class}: {}.",
+                match outcome {
+                    rulebench_fixtures::SavingThrowOutcome::Saved => "saved",
+                    rulebench_fixtures::SavingThrowOutcome::Failed => "failed",
+                }
+            ),
+            &[actor_id.as_str(), target_id.as_str()],
+        ),
+        DomainEvent::ContestedCheckResolved {
+            actor_id,
+            target_id,
+            actor_total,
+            target_total,
+            outcome,
+        } => event_block(
+            sequence,
+            "ContestedCheckResolved",
+            &format!(
+                "Contested totals {actor_total} versus {target_total}: {}.",
+                match outcome {
+                    rulebench_fixtures::ContestedCheckOutcome::ActorWins => "actor wins",
+                    rulebench_fixtures::ContestedCheckOutcome::TargetWins => "target wins",
+                }
+            ),
+            &[actor_id.as_str(), target_id.as_str()],
+        ),
         DomainEvent::DamageApplied {
             target_id, amount, ..
         } => event_block(

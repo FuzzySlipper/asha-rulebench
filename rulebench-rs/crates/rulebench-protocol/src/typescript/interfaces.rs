@@ -65,6 +65,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "targetingPolicy",
                     ty: "RulebenchActionResolutionTargetingPolicyDto",
                 },
+                Field {
+                    name: "supportedCheckHandlers",
+                    ty: "readonly RulebenchCheckHandlerKindDto[]",
+                },
             ],
         },
         Interface {

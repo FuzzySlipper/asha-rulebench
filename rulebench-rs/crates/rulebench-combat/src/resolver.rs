@@ -4,6 +4,28 @@ use crate::model::*;
 use crate::modifiers::effective_stats_for_combatant;
 use crate::state::CombatState;
 
+struct CheckResolutionContext<'a> {
+    scenario: &'a RulebenchScenario,
+    intent: UseActionIntent,
+    actor: &'a Combatant,
+    action: &'a ActionDefinition,
+    action_resolution: &'a ActionResolutionModuleConfiguration,
+    roll_stream: &'a [i32],
+    trace: Vec<TraceEntry>,
+}
+
+struct CheckEffectResolution<'a> {
+    scenario: &'a RulebenchScenario,
+    intent: UseActionIntent,
+    target: &'a Combatant,
+    target_legality: TargetLegality,
+    check_event: DomainEvent,
+    hit_operations: HitOperations<'a>,
+    damage_roll: i32,
+    trace: Vec<TraceEntry>,
+    roll_consumption: Vec<RollConsumptionEntry>,
+}
+
 pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     let trace = vec![TraceEntry::new(
         1,
@@ -137,6 +159,48 @@ pub fn resolve_use_action(
             trace,
         );
     }
+    if !action_resolution.supports_check(&action.check) {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    }
+
+    match &action.check {
+        CheckDeclaration::SavingThrow(save) => {
+            return resolve_saving_throw_action(
+                CheckResolutionContext {
+                    scenario,
+                    intent,
+                    actor,
+                    action,
+                    action_resolution,
+                    roll_stream,
+                    trace,
+                },
+                save,
+            );
+        }
+        CheckDeclaration::Contested(contested) => {
+            return resolve_contested_action(
+                CheckResolutionContext {
+                    scenario,
+                    intent,
+                    actor,
+                    action,
+                    action_resolution,
+                    roll_stream,
+                    trace,
+                },
+                contested,
+            );
+        }
+        CheckDeclaration::Attack(_) => {}
+    }
+
     let Some(attack) = action.attack_check() else {
         return rejected_with_projection(
             scenario,
@@ -235,6 +299,378 @@ pub fn resolve_use_action(
         target_legality,
         roll_stream,
     )
+}
+
+fn resolve_saving_throw_action(
+    context: CheckResolutionContext<'_>,
+    save: &SavingThrowCheckDeclaration,
+) -> RulebenchReceipt {
+    let CheckResolutionContext {
+        scenario,
+        intent,
+        actor,
+        action,
+        action_resolution,
+        roll_stream,
+        mut trace,
+    } = context;
+    let Some(target) = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == intent.target_id)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidTarget,
+            None,
+            trace,
+        );
+    };
+    let target_legality =
+        validate_target_legality_for_module(actor, target, action, action_resolution);
+    if !target_legality.accepted {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            target_legality_rejection(&target_legality),
+            Some(target_legality),
+            trace,
+        );
+    }
+    let Some(modifier) = effective_stat_value(scenario, &target.id, &save.save_stat_id) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
+    };
+    let Some(hit_operations) = hit_operations(action) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
+    };
+    let Some(save_roll) = roll_stream.first().copied() else {
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::MissingCheckRoll,
+            Some(target_legality),
+            trace,
+            vec![missing_roll_consumption(
+                0,
+                RollRequestKind::SavingThrowRoll,
+                "Saving throw roll was requested but no roll value was supplied.",
+            )],
+        );
+    };
+    let total = save_roll + modifier;
+    let outcome = if total >= save.difficulty_class {
+        SavingThrowOutcome::Saved
+    } else {
+        SavingThrowOutcome::Failed
+    };
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Validation,
+        TraceStatus::Accepted,
+        "Target legality accepted.",
+        target_legality.reason.clone(),
+    ));
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Resolution,
+        TraceStatus::Accepted,
+        "Saving throw resolved.",
+        format!(
+            "Target roll {} plus {} equals {} against DC {}; ties save.",
+            save_roll, modifier, total, save.difficulty_class
+        ),
+    ));
+
+    let event = DomainEvent::SavingThrowResolved {
+        actor_id: intent.actor_id.clone(),
+        target_id: intent.target_id.clone(),
+        total,
+        difficulty_class: save.difficulty_class,
+        outcome,
+    };
+    if outcome == SavingThrowOutcome::Saved {
+        trace.push(TraceEntry::new(
+            trace.len() as u32 + 1,
+            TracePhase::Commit,
+            TraceStatus::Accepted,
+            "DomainEvents committed.",
+            "ActionUsed and SavingThrowResolved became accepted facts; effects were avoided.",
+        ));
+        return accepted_non_effect_receipt(
+            scenario,
+            intent,
+            target_legality,
+            event,
+            trace,
+            vec![consumed_roll(
+                0,
+                RollRequestKind::SavingThrowRoll,
+                save_roll,
+                "Saving throw roll value was consumed for save resolution.",
+            )],
+        );
+    }
+
+    let Some(damage_roll) = roll_stream.get(1).copied() else {
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::MissingDamageRoll,
+            Some(target_legality),
+            trace,
+            vec![
+                consumed_roll(
+                    0,
+                    RollRequestKind::SavingThrowRoll,
+                    save_roll,
+                    "Saving throw roll value was consumed for save resolution.",
+                ),
+                missing_roll_consumption(
+                    1,
+                    RollRequestKind::DamageRoll,
+                    "Damage roll was requested after a failed saving throw but no roll value was supplied.",
+                ),
+            ],
+        );
+    };
+    resolve_check_effects(CheckEffectResolution {
+        scenario,
+        intent,
+        target,
+        target_legality,
+        check_event: event,
+        hit_operations,
+        damage_roll,
+        trace,
+        roll_consumption: vec![
+            consumed_roll(
+                0,
+                RollRequestKind::SavingThrowRoll,
+                save_roll,
+                "Saving throw roll value was consumed for save resolution.",
+            ),
+            consumed_roll(
+                1,
+                RollRequestKind::DamageRoll,
+                damage_roll,
+                "Damage roll value was consumed after a failed saving throw.",
+            ),
+        ],
+    })
+}
+
+fn resolve_contested_action(
+    context: CheckResolutionContext<'_>,
+    contested: &ContestedCheckDeclaration,
+) -> RulebenchReceipt {
+    let CheckResolutionContext {
+        scenario,
+        intent,
+        actor,
+        action,
+        action_resolution,
+        roll_stream,
+        mut trace,
+    } = context;
+    let Some(target) = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == intent.target_id)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidTarget,
+            None,
+            trace,
+        );
+    };
+    let target_legality =
+        validate_target_legality_for_module(actor, target, action, action_resolution);
+    if !target_legality.accepted {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            target_legality_rejection(&target_legality),
+            Some(target_legality),
+            trace,
+        );
+    }
+    let Some(actor_modifier) = effective_stat_value(scenario, &actor.id, &contested.actor_stat_id)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
+    };
+    let Some(target_modifier) =
+        effective_stat_value(scenario, &target.id, &contested.target_stat_id)
+    else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
+    };
+    let Some(hit_operations) = hit_operations(action) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            Some(target_legality),
+            trace,
+        );
+    };
+    let Some(actor_roll) = roll_stream.first().copied() else {
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::MissingCheckRoll,
+            Some(target_legality),
+            trace,
+            vec![missing_roll_consumption(
+                0,
+                RollRequestKind::ContestedActorRoll,
+                "Contested actor roll was requested but no roll value was supplied.",
+            )],
+        );
+    };
+    let Some(target_roll) = roll_stream.get(1).copied() else {
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::MissingCheckRoll,
+            Some(target_legality),
+            trace,
+            vec![
+                consumed_roll(
+                    0,
+                    RollRequestKind::ContestedActorRoll,
+                    actor_roll,
+                    "Contested actor roll value was consumed.",
+                ),
+                missing_roll_consumption(
+                    1,
+                    RollRequestKind::ContestedTargetRoll,
+                    "Contested target roll was requested but no roll value was supplied.",
+                ),
+            ],
+        );
+    };
+    let actor_total = actor_roll + actor_modifier;
+    let target_total = target_roll + target_modifier;
+    let outcome = if actor_total > target_total {
+        ContestedCheckOutcome::ActorWins
+    } else {
+        ContestedCheckOutcome::TargetWins
+    };
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Validation,
+        TraceStatus::Accepted,
+        "Target legality accepted.",
+        target_legality.reason.clone(),
+    ));
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Resolution,
+        TraceStatus::Accepted,
+        "Contested check resolved.",
+        format!(
+            "Actor total {} versus target total {}; ties favor the target.",
+            actor_total, target_total
+        ),
+    ));
+    let event = DomainEvent::ContestedCheckResolved {
+        actor_id: intent.actor_id.clone(),
+        target_id: intent.target_id.clone(),
+        actor_total,
+        target_total,
+        outcome,
+    };
+    let contested_rolls = vec![
+        consumed_roll(
+            0,
+            RollRequestKind::ContestedActorRoll,
+            actor_roll,
+            "Contested actor roll value was consumed.",
+        ),
+        consumed_roll(
+            1,
+            RollRequestKind::ContestedTargetRoll,
+            target_roll,
+            "Contested target roll value was consumed.",
+        ),
+    ];
+    if outcome == ContestedCheckOutcome::TargetWins {
+        trace.push(TraceEntry::new(
+            trace.len() as u32 + 1,
+            TracePhase::Commit,
+            TraceStatus::Accepted,
+            "DomainEvents committed.",
+            "ActionUsed and ContestedCheckResolved became accepted facts; effects were avoided.",
+        ));
+        return accepted_non_effect_receipt(
+            scenario,
+            intent,
+            target_legality,
+            event,
+            trace,
+            contested_rolls,
+        );
+    }
+    let Some(damage_roll) = roll_stream.get(2).copied() else {
+        let mut rolls = contested_rolls;
+        rolls.push(missing_roll_consumption(
+            2,
+            RollRequestKind::DamageRoll,
+            "Damage roll was requested after a winning contested check but no roll value was supplied.",
+        ));
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::MissingDamageRoll,
+            Some(target_legality),
+            trace,
+            rolls,
+        );
+    };
+    let mut rolls = contested_rolls;
+    rolls.push(consumed_roll(
+        2,
+        RollRequestKind::DamageRoll,
+        damage_roll,
+        "Damage roll value was consumed after a winning contested check.",
+    ));
+    resolve_check_effects(CheckEffectResolution {
+        scenario,
+        intent,
+        target,
+        target_legality,
+        check_event: event,
+        hit_operations,
+        damage_roll,
+        trace,
+        roll_consumption: rolls,
+    })
 }
 
 fn validate_target_legality_for_module(
@@ -421,6 +857,118 @@ fn resolve_accepted_action(
             ),
         ],
     )
+}
+
+fn effective_stat_value(
+    scenario: &RulebenchScenario,
+    combatant_id: &str,
+    stat_id: &str,
+) -> Option<i32> {
+    effective_stats_for_combatant(scenario, combatant_id)?
+        .stats
+        .into_iter()
+        .find(|stat| stat.stat_id == stat_id)
+        .map(|stat| stat.effective_value)
+}
+
+fn accepted_non_effect_receipt(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    target_legality: TargetLegality,
+    check_event: DomainEvent,
+    trace: Vec<TraceEntry>,
+    roll_consumption: Vec<RollConsumptionEntry>,
+) -> RulebenchReceipt {
+    RulebenchReceipt {
+        accepted: true,
+        authority_surface: AUTHORITY_SURFACE,
+        intent: intent.clone(),
+        rejection: None,
+        target_legality: Some(target_legality),
+        attack_roll: None,
+        damage: None,
+        modifier: None,
+        roll_consumption,
+        events: vec![
+            DomainEvent::ActionUsed {
+                actor_id: intent.actor_id,
+                action_id: intent.action_id,
+                target_id: intent.target_id,
+            },
+            check_event,
+        ],
+        trace,
+        projection: Some(
+            CombatState::from_scenario(scenario)
+                .project("Check prevented effects; no authority state changed."),
+        ),
+    }
+}
+
+fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchReceipt {
+    let CheckEffectResolution {
+        scenario,
+        intent,
+        target,
+        target_legality,
+        check_event,
+        hit_operations,
+        damage_roll,
+        mut trace,
+        roll_consumption,
+    } = resolution;
+    let damage = apply_damage(
+        target,
+        damage_roll + hit_operations.damage.damage_bonus,
+        &hit_operations.damage.damage_type,
+    );
+    let modifier = ModifierOutcome {
+        target_id: target.id.clone(),
+        modifier_id: hit_operations.modifier.modifier_id.clone(),
+        label: hit_operations.modifier.modifier_label.clone(),
+        duration: hit_operations.modifier.modifier_duration.clone(),
+    };
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Commit,
+        TraceStatus::Accepted,
+        "DomainEvents committed.",
+        "ActionUsed, check resolution, DamageApplied, and ModifierApplied became accepted facts.",
+    ));
+    let mut state = CombatState::from_scenario(scenario);
+    state.apply_hit(&damage, &modifier);
+
+    RulebenchReceipt {
+        accepted: true,
+        authority_surface: AUTHORITY_SURFACE,
+        intent: intent.clone(),
+        rejection: None,
+        target_legality: Some(target_legality),
+        attack_roll: None,
+        damage: Some(damage.clone()),
+        modifier: Some(modifier.clone()),
+        roll_consumption,
+        events: vec![
+            DomainEvent::ActionUsed {
+                actor_id: intent.actor_id,
+                action_id: intent.action_id,
+                target_id: intent.target_id,
+            },
+            check_event,
+            DomainEvent::DamageApplied {
+                target_id: damage.target_id.clone(),
+                amount: damage.amount,
+                damage_type: damage.damage_type.clone(),
+            },
+            DomainEvent::ModifierApplied {
+                target_id: modifier.target_id.clone(),
+                modifier_id: modifier.modifier_id.clone(),
+                duration: modifier.duration.clone(),
+            },
+        ],
+        trace,
+        projection: Some(state.project("Check failed and effects were applied.")),
+    }
 }
 
 fn accepted_shape(intent: UseActionIntent, mut trace: Vec<TraceEntry>) -> RulebenchReceipt {

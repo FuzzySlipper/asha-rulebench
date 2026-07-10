@@ -52,12 +52,14 @@ fn parse_module(value: &str) -> Result<RuleModuleDeclarationDto, String> {
     let configuration = match module {
         "actionResolution" => RuleModuleConfigurationDto::ActionResolution {
             targeting_policy: configuration.to_string(),
+            supported_check_handlers: vec!["attackVsDefense".to_string()],
         },
         "turnControl" => RuleModuleConfigurationDto::TurnControl {
             turn_order_policy: configuration.to_string(),
         },
         _ => RuleModuleConfigurationDto::ActionResolution {
             targeting_policy: configuration.to_string(),
+            supported_check_handlers: vec!["attackVsDefense".to_string()],
         },
     };
     Ok(RuleModuleDeclarationDto {

@@ -1,6 +1,7 @@
 import type {
   RulebenchActionResolutionModuleConfigurationDto,
   RulebenchActionResolutionTargetingPolicyDto,
+  RulebenchCheckHandlerKindDto,
   RulebenchRuleModuleDeclarationDto,
   RulebenchRulesetDefinitionDto,
   RulebenchTurnControlModuleConfigurationDto,
@@ -18,6 +19,7 @@ export interface RulesetDefinitionOptions {
 export interface ActionResolutionModuleOptions {
   readonly version?: string;
   readonly targetingPolicy?: RulebenchActionResolutionTargetingPolicyDto;
+  readonly supportedCheckHandlers?: readonly RulebenchCheckHandlerKindDto[];
 }
 
 export interface TurnControlModuleOptions {
@@ -41,6 +43,7 @@ export function authorActionResolutionModule(
   const configuration: RulebenchActionResolutionModuleConfigurationDto = {
     module: 'actionResolution',
     targetingPolicy: options.targetingPolicy ?? 'declaredTargetsAndLineOfSight',
+    supportedCheckHandlers: options.supportedCheckHandlers ?? ['attackVsDefense'],
   };
   return {
     module: 'actionResolution',

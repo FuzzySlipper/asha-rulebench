@@ -498,6 +498,23 @@ fn content_diagnostics_reject_malformed_and_authored_derived_values() {
 }
 
 #[test]
+fn content_diagnostics_reject_check_handlers_not_enabled_by_the_ruleset() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0].check = CheckDeclaration::SavingThrow(SavingThrowCheckDeclaration {
+        save_stat_id: "mind".to_string(),
+        difficulty_class: 12,
+    });
+
+    let diagnostics = validate_scenario_content(&scenario);
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        ContentDiagnosticCode::UnsupportedCheckDeclaration
+    );
+}
+
+#[test]
 fn content_diagnostics_report_missing_combatant_stat_definition() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.combatants[0].stats.base_stats.push(NamedNumber {

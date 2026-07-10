@@ -21,6 +21,9 @@ pub struct ScenarioProjection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RollRequestKind {
     AttackRoll,
+    SavingThrowRoll,
+    ContestedActorRoll,
+    ContestedTargetRoll,
     DamageRoll,
 }
 
@@ -28,6 +31,9 @@ impl RollRequestKind {
     pub const fn code(self) -> &'static str {
         match self {
             RollRequestKind::AttackRoll => "attackRoll",
+            RollRequestKind::SavingThrowRoll => "savingThrowRoll",
+            RollRequestKind::ContestedActorRoll => "contestedActorRoll",
+            RollRequestKind::ContestedTargetRoll => "contestedTargetRoll",
             RollRequestKind::DamageRoll => "damageRoll",
         }
     }

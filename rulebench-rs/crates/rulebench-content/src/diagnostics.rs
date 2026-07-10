@@ -68,6 +68,10 @@ pub enum ContentDiagnosticCode {
     UnsupportedEffectOperation,
     VisibleTargetOutsideTargetIds,
     MissingAttackModifierStat,
+    MissingSavingThrowStat,
+    MissingContestedActorStat,
+    MissingContestedTargetStat,
+    InvalidSavingThrowDifficultyClass,
     MissingTargetDefense,
     MissingCombatantClass,
     MissingCombatantStatDefinition,
@@ -140,6 +144,12 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::UnsupportedEffectOperation => "unsupportedEffectOperation",
             ContentDiagnosticCode::VisibleTargetOutsideTargetIds => "visibleTargetOutsideTargetIds",
             ContentDiagnosticCode::MissingAttackModifierStat => "missingAttackModifierStat",
+            ContentDiagnosticCode::MissingSavingThrowStat => "missingSavingThrowStat",
+            ContentDiagnosticCode::MissingContestedActorStat => "missingContestedActorStat",
+            ContentDiagnosticCode::MissingContestedTargetStat => "missingContestedTargetStat",
+            ContentDiagnosticCode::InvalidSavingThrowDifficultyClass => {
+                "invalidSavingThrowDifficultyClass"
+            }
             ContentDiagnosticCode::MissingTargetDefense => "missingTargetDefense",
             ContentDiagnosticCode::MissingCombatantClass => "missingCombatantClass",
             ContentDiagnosticCode::MissingCombatantStatDefinition => {

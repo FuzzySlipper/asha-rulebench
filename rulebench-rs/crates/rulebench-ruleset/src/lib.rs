@@ -230,7 +230,7 @@ pub enum RuleModuleConfiguration {
 }
 
 impl RuleModuleConfiguration {
-    pub const fn module(self: &Self) -> RuleModuleId {
+    pub const fn module(&self) -> RuleModuleId {
         match self {
             RuleModuleConfiguration::ActionResolution(_) => RuleModuleId::ActionResolution,
             RuleModuleConfiguration::TurnControl(_) => RuleModuleId::TurnControl,
@@ -242,12 +242,56 @@ impl RuleModuleConfiguration {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionResolutionModuleConfiguration {
     pub targeting_policy: ActionResolutionTargetingPolicy,
+    pub supported_check_handlers: Vec<CheckHandlerKind>,
 }
 
 impl ActionResolutionModuleConfiguration {
-    pub const fn declared_targets_and_line_of_sight() -> Self {
+    pub fn declared_targets_and_line_of_sight() -> Self {
         Self {
             targeting_policy: ActionResolutionTargetingPolicy::DeclaredTargetsAndLineOfSight,
+            supported_check_handlers: vec![CheckHandlerKind::AttackVsDefense],
+        }
+    }
+
+    pub fn with_supported_check_handlers(
+        targeting_policy: ActionResolutionTargetingPolicy,
+        supported_check_handlers: Vec<CheckHandlerKind>,
+    ) -> Self {
+        Self {
+            targeting_policy,
+            supported_check_handlers,
+        }
+    }
+
+    pub fn supports_check(&self, check: &CheckDeclaration) -> bool {
+        self.supported_check_handlers
+            .iter()
+            .any(|handler| *handler == CheckHandlerKind::for_declaration(check))
+    }
+}
+
+/// Closed Rust handler families a ruleset may authorize for action checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckHandlerKind {
+    AttackVsDefense,
+    SavingThrow,
+    Contested,
+}
+
+impl CheckHandlerKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            CheckHandlerKind::AttackVsDefense => "attackVsDefense",
+            CheckHandlerKind::SavingThrow => "savingThrow",
+            CheckHandlerKind::Contested => "contested",
+        }
+    }
+
+    pub const fn for_declaration(check: &CheckDeclaration) -> Self {
+        match check {
+            CheckDeclaration::Attack(_) => CheckHandlerKind::AttackVsDefense,
+            CheckDeclaration::SavingThrow(_) => CheckHandlerKind::SavingThrow,
+            CheckDeclaration::Contested(_) => CheckHandlerKind::Contested,
         }
     }
 }

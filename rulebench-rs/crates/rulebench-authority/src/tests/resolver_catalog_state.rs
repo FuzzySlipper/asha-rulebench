@@ -428,6 +428,163 @@ fn resolver_uses_derived_actor_stat_for_attack_modifier() {
 }
 
 #[test]
+fn resolver_applies_effects_after_failed_saving_throw_and_records_the_decision() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    enable_check_handlers(&mut scenario, vec![CheckHandlerKind::SavingThrow]);
+    scenario.actions[0].check = CheckDeclaration::SavingThrow(SavingThrowCheckDeclaration {
+        save_stat_id: "mind".to_string(),
+        difficulty_class: 12,
+    });
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[10, 5],
+    );
+
+    assert!(receipt.accepted);
+    assert!(receipt.attack_roll.is_none());
+    assert_eq!(receipt.damage.as_ref().map(|damage| damage.amount), Some(9));
+    assert!(matches!(
+        receipt.events.as_slice(),
+        [
+            DomainEvent::ActionUsed { .. },
+            DomainEvent::SavingThrowResolved {
+                outcome: SavingThrowOutcome::Failed,
+                ..
+            },
+            DomainEvent::DamageApplied { .. },
+            DomainEvent::ModifierApplied { .. },
+        ]
+    ));
+    assert!(receipt
+        .trace
+        .iter()
+        .any(|entry| entry.detail.contains("ties save")));
+}
+
+#[test]
+fn resolver_rejects_check_handlers_not_enabled_by_the_ruleset() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0].check = CheckDeclaration::SavingThrow(SavingThrowCheckDeclaration {
+        save_stat_id: "mind".to_string(),
+        difficulty_class: 12,
+    });
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[10, 5],
+    );
+
+    assert!(!receipt.accepted);
+    assert_eq!(receipt.rejection, Some(RulebenchRejection::InvalidAction));
+    assert!(receipt.events.is_empty());
+}
+
+#[test]
+fn resolver_tie_saving_throw_avoids_effects_with_one_consumed_roll() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    enable_check_handlers(&mut scenario, vec![CheckHandlerKind::SavingThrow]);
+    scenario.actions[0].check = CheckDeclaration::SavingThrow(SavingThrowCheckDeclaration {
+        save_stat_id: "mind".to_string(),
+        difficulty_class: 12,
+    });
+
+    let receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[11],
+    );
+
+    assert!(receipt.accepted);
+    assert!(receipt.damage.is_none());
+    assert_eq!(receipt.roll_consumption.len(), 1);
+    assert!(matches!(
+        receipt.events.as_slice(),
+        [
+            DomainEvent::ActionUsed { .. },
+            DomainEvent::SavingThrowResolved {
+                outcome: SavingThrowOutcome::Saved,
+                ..
+            },
+        ]
+    ));
+}
+
+#[test]
+fn resolver_contested_tie_favors_target_and_actor_win_applies_effects() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    enable_check_handlers(&mut scenario, vec![CheckHandlerKind::Contested]);
+    scenario.actions[0].check = CheckDeclaration::Contested(ContestedCheckDeclaration {
+        actor_stat_id: "mind".to_string(),
+        target_stat_id: "body".to_string(),
+    });
+
+    let tie_receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[7, 8],
+    );
+    assert!(tie_receipt.accepted);
+    assert!(tie_receipt.damage.is_none());
+    assert!(matches!(
+        tie_receipt.events.as_slice(),
+        [
+            DomainEvent::ActionUsed { .. },
+            DomainEvent::ContestedCheckResolved {
+                outcome: ContestedCheckOutcome::TargetWins,
+                ..
+            },
+        ]
+    ));
+
+    let win_receipt = resolve_use_action(
+        &scenario,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        &[8, 1, 5],
+    );
+    assert!(win_receipt.accepted);
+    assert_eq!(
+        win_receipt.damage.as_ref().map(|damage| damage.amount),
+        Some(9)
+    );
+    assert!(matches!(
+        win_receipt.events.as_slice(),
+        [
+            DomainEvent::ActionUsed { .. },
+            DomainEvent::ContestedCheckResolved {
+                outcome: ContestedCheckOutcome::ActorWins,
+                ..
+            },
+            DomainEvent::DamageApplied { .. },
+            DomainEvent::ModifierApplied { .. },
+        ]
+    ));
+    assert!(win_receipt
+        .trace
+        .iter()
+        .any(|entry| entry.detail.contains("ties favor the target")));
+}
+
+fn enable_check_handlers(scenario: &mut RulebenchScenario, handlers: Vec<CheckHandlerKind>) {
+    let ruleset = scenario
+        .rulesets
+        .first_mut()
+        .expect("fixture has a ruleset");
+    let declaration = ruleset
+        .modules
+        .iter_mut()
+        .find(|declaration| declaration.module == RuleModuleId::ActionResolution)
+        .expect("fixture has action resolution");
+    let RuleModuleConfiguration::ActionResolution(configuration) = &mut declaration.configuration
+    else {
+        panic!("fixture action resolution declaration has the right configuration");
+    };
+    configuration.supported_check_handlers = handlers;
+}
+
+#[test]
 fn resolver_rejects_missing_attack_modifier_stat_source() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0]
