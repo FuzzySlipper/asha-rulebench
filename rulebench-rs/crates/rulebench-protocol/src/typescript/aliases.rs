@@ -1,4 +1,4 @@
-pub(crate) fn aliases() -> &'static [&'static str] {
+pub fn aliases() -> &'static [super::ProtocolAlias] {
     &[
         "export type RulebenchTeamDto = 'ally' | 'enemy';",
         "export type RulebenchLegalityDto = 'accepted' | 'rejected';",

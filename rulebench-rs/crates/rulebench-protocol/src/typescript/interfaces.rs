@@ -1,15 +1,17 @@
-pub(crate) struct Field {
-    pub(crate) name: &'static str,
-    pub(crate) ty: &'static str,
-}
+use super::{ProtocolField, ProtocolInterface};
 
-pub(crate) struct Interface {
-    pub(crate) name: &'static str,
-    pub(crate) fields: &'static [Field],
-}
+type Field = ProtocolField;
+type Interface = ProtocolInterface;
 
-pub(crate) fn interfaces() -> &'static [Interface] {
+pub fn interfaces() -> &'static [ProtocolInterface] {
     &[
+        Interface {
+            name: "RulebenchCombatSessionHandleDto",
+            fields: &[Field {
+                name: "id",
+                ty: "string",
+            }],
+        },
         Interface {
             name: "RulebenchRulesetCatalogDto",
             fields: &[

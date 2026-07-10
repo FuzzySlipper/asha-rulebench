@@ -18,6 +18,10 @@ pub use audit::{
     fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
     STATE_FINGERPRINT_ALGORITHM,
 };
+pub use rulebench_combat::{
+    CombatSessionApi, CombatSessionApiError, CombatSessionArchive, CombatSessionCreateReadout,
+    CombatSessionCreateRequest, CombatSessionHandle,
+};
 pub use content::{validate_scenario_content, validate_scenario_content_report};
 pub use model::*;
 pub use modifiers::{
