@@ -5,6 +5,16 @@ liveScenario('boot live evidence @live', async ({ page, collector, liveBaseUrl }
 
   await page.goto(liveBaseUrl);
   await expect(page.getByRole('heading', { name: 'ASHA Rulebench' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Content Packs' })).toBeVisible();
+  await page.getByRole('button', { name: /pack.error@1.0.0/ }).click();
+  await expect(page.getByLabel('Selected content pack review')).toContainText('missingContentPackDependency');
+  await collector.milestone('content diagnostics rendered', {
+    screenshot: true,
+    layerSnapshot: {
+      selectedPack: await page.getByLabel('Selected content pack review').innerText(),
+      validation: await page.getByLabel('Content validation review').innerText(),
+    },
+  });
   await collector.milestone('shell rendered', {
     screenshot: true,
     layerSnapshot: {

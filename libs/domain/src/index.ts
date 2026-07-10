@@ -8,7 +8,42 @@ import type {
   RulebenchTraceEntryDto,
   RulebenchContentImportDiagnosticDto,
   RulebenchContentImportReadoutDto,
+  RulebenchContentValidationReadoutDto,
 } from '@asha-rulebench/protocol';
+
+export interface RulebenchContentValidationView {
+  readonly scenarioId: string;
+  readonly scenarioTitle: string;
+  readonly statusLabel: string;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly diagnostics: readonly RulebenchContentValidationDiagnosticView[];
+}
+
+export interface RulebenchContentValidationDiagnosticView {
+  readonly severityLabel: string;
+  readonly code: string;
+  readonly sourceLabel: string;
+  readonly message: string;
+}
+
+export function projectContentValidationReadout(
+  readout: RulebenchContentValidationReadoutDto,
+): RulebenchContentValidationView {
+  return {
+    scenarioId: readout.scenarioId,
+    scenarioTitle: readout.scenarioTitle,
+    statusLabel: readout.report.accepted ? 'Accepted' : 'Rejected',
+    errorCount: readout.report.errorCount,
+    warningCount: readout.report.warningCount,
+    diagnostics: readout.report.diagnostics.map((diagnostic) => ({
+      severityLabel: diagnostic.severity === 'error' ? 'Error' : 'Warning',
+      code: diagnostic.code,
+      sourceLabel: diagnostic.contentId ?? readout.scenarioId,
+      message: diagnostic.message,
+    })),
+  };
+}
 
 export interface RulebenchContentImportView {
   readonly exampleId: string;

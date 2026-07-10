@@ -41,6 +41,30 @@ describe("ContentStore", () => {
       code: "missingContentPackDependency",
       locationLabel: "pack / pack.dependency",
     });
+    expect(store.selectedImportId()).toBe('content-import-valid');
+    store.selectImport('content-import-missing-dependency');
+    expect(store.selectedImportId()).toBe('content-import-missing-dependency');
+  });
+
+  it('carries Rust validation diagnostics and clears transient workspace state', async () => {
+    const store = new ContentStore(createFakeRulebenchTransport(), fixedClock);
+
+    await store.loadImportExamples();
+    await store.loadValidation('hexing-bolt-invalid-selected-ability');
+
+    expect(store.validation()).toMatchObject({
+      kind: 'data',
+      value: {
+        scenarioId: 'hexing-bolt-invalid-selected-ability',
+        statusLabel: 'Rejected',
+        diagnostics: [{ code: 'selectedAbilityMissingFromCatalog', sourceLabel: 'ability.missing' }],
+      },
+    });
+
+    store.clear();
+    expect(store.imports()).toEqual({ kind: 'idle' });
+    expect(store.validation()).toEqual({ kind: 'idle' });
+    expect(store.selectedImportId()).toBeNull();
   });
 
   it("classifies transport failures through AsyncState without TS rule inference", async () => {

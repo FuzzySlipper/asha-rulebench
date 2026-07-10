@@ -5,9 +5,11 @@ import { InjectionToken, Injectable, signal } from '@angular/core';
 import type { Provider, Signal } from '@angular/core';
 import {
   projectContentImportReadout,
+  projectContentValidationReadout,
   projectRulebenchCombatSessionStep,
   projectRulebenchScenario,
   type RulebenchContentImportView,
+  type RulebenchContentValidationView,
   type RulebenchCombatSessionStepView,
   type RulebenchScenarioView,
 } from '@asha-rulebench/domain';
@@ -169,6 +171,12 @@ export class ContentStore {
   private readonly _imports = signal<AsyncState<readonly RulebenchContentImportView[]>>({ kind: 'idle' });
   readonly imports: Signal<AsyncState<readonly RulebenchContentImportView[]>> = this._imports.asReadonly();
 
+  private readonly _selectedImportId = signal<string | null>(null);
+  readonly selectedImportId: Signal<string | null> = this._selectedImportId.asReadonly();
+
+  private readonly _validation = signal<AsyncState<RulebenchContentValidationView>>({ kind: 'idle' });
+  readonly validation: Signal<AsyncState<RulebenchContentValidationView>> = this._validation.asReadonly();
+
   constructor(
     private readonly transport: RulebenchTransport,
     private readonly clock: ClockPort,
@@ -182,6 +190,32 @@ export class ContentStore {
         ? { kind: 'data', value: result.value.map(projectContentImportReadout) }
         : { kind: 'error', error: result.error },
     );
+    if (result.ok && this._selectedImportId() === null) {
+      this._selectedImportId.set(result.value[0]?.exampleId ?? null);
+    }
+    this.clock.now();
+  }
+
+  selectImport(exampleId: string): void {
+    this._selectedImportId.set(exampleId);
+    this.clock.now();
+  }
+
+  async loadValidation(scenarioId?: string): Promise<void> {
+    this._validation.set({ kind: 'loading' });
+    const result = await this.transport.loadContentValidationReport(scenarioId);
+    this._validation.set(
+      result.ok
+        ? { kind: 'data', value: projectContentValidationReadout(result.value) }
+        : { kind: 'error', error: result.error },
+    );
+    this.clock.now();
+  }
+
+  clear(): void {
+    this._imports.set({ kind: 'idle' });
+    this._validation.set({ kind: 'idle' });
+    this._selectedImportId.set(null);
     this.clock.now();
   }
 }
