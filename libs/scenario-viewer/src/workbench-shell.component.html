@@ -224,9 +224,208 @@
     [panelNumber]="6"
     panelTitle="Available actions"
   >
-    <div class="empty-state">
-      <strong>No current actor</strong
-      ><span>Actions appear during an active turn</span>
+    <div class="command-panel">
+      <div class="panel-toolbar">
+        <strong>Current actor commands</strong>
+        <button
+          type="button"
+          [disabled]="commandBusy()"
+          (click)="refreshCommandEvidence()"
+        >
+          Refresh
+        </button>
+      </div>
+      @switch (options().kind) {
+        @case ("data") {
+          @if (!options().value.available) {
+            <p class="panel-state">{{ options().value.unavailableReason }}</p>
+          } @else {
+            <div
+              class="action-options"
+              role="list"
+              aria-label="Current actor actions"
+            >
+              @for (action of options().value.actions; track action.actionId) {
+                <section class="action-option" role="listitem">
+                  <button
+                    type="button"
+                    [disabled]="!action.available"
+                    [attr.aria-pressed]="intent().actionId === action.actionId"
+                    [attr.aria-label]="'Select ' + action.name"
+                    (click)="
+                      selectAction(
+                        options().value.currentActorId,
+                        action.actionId
+                      )
+                    "
+                  >
+                    {{ action.name }}
+                  </button>
+                  <span>{{ action.abilityId }}</span>
+                  <span>{{
+                    action.resourceCostLabels.join(", ") || "No resource cost"
+                  }}</span>
+                  <span>{{
+                    action.resourceLabels.join(", ") || "No resource state"
+                  }}</span>
+                  @if (!action.available) {
+                    <span>{{ action.unavailableReason }}</span>
+                  }
+                  <div
+                    class="target-options"
+                    aria-label="Targets for {{ action.name }}"
+                  >
+                    @for (target of action.targets; track target.id) {
+                      <button
+                        type="button"
+                        [attr.aria-pressed]="intent().targetId === target.id"
+                        [attr.aria-label]="
+                          'Target ' + target.name + ' with ' + action.name
+                        "
+                        (click)="selectTarget(target.id)"
+                      >
+                        {{ target.name }} · {{ target.hitPointLabel }}
+                      </button>
+                    }
+                  </div>
+                </section>
+              }
+            </div>
+          }
+        }
+        @case ("loading") {
+          <p class="panel-state">Loading current actor options</p>
+        }
+        @case ("error") {
+          <p class="panel-state panel-state--error" role="alert">
+            {{ options().error.message }}
+          </p>
+        }
+        @case ("idle") {
+          <p class="panel-state">Actions are not loaded</p>
+        }
+      }
+      <div class="roll-fields">
+        <label>
+          Attack roll
+          <input
+            #attackRoll
+            type="number"
+            [value]="attackRollInput()"
+            aria-describedby="roll-input-help roll-input-error"
+            (input)="setAttackRoll(attackRoll.value)"
+          />
+        </label>
+        <label>
+          Damage roll
+          <input
+            #damageRoll
+            type="number"
+            [value]="damageRollInput()"
+            aria-describedby="roll-input-help roll-input-error"
+            (input)="setDamageRoll(damageRoll.value)"
+          />
+        </label>
+        <span id="roll-input-help"
+          >Deterministic integer roll stream supplied to Rust authority.</span
+        >
+        @if (rollInputError(); as error) {
+          <span id="roll-input-error" role="alert">{{ error }}</span>
+        }
+        <button
+          type="button"
+          [disabled]="!canSubmit()"
+          (click)="preflightIntent()"
+        >
+          Preflight
+        </button>
+        <button
+          type="button"
+          [disabled]="!canSubmit()"
+          (click)="submitIntent()"
+        >
+          Submit
+        </button>
+      </div>
+      <section
+        #commandFeedback
+        class="command-feedback"
+        tabindex="-1"
+        aria-label="Command decision evidence"
+      >
+        <div>
+          <strong>Preflight</strong>
+          @switch (preflight().kind) {
+            @case ("data") {
+              <span
+                >{{ preflight().value.decisionLabel }} ·
+                {{ preflight().value.reason }}</span
+              >
+            }
+            @case ("loading") {
+              <span>Checking command</span>
+            }
+            @case ("error") {
+              <span role="alert">{{ preflight().error.message }}</span>
+            }
+            @case ("idle") {
+              <span>Not checked</span>
+            }
+          }
+        </div>
+        <div>
+          <strong>Candidates</strong>
+          @switch (candidates().kind) {
+            @case ("data") {
+              @for (
+                candidate of candidates().value.candidates;
+                track candidate.actionId + candidate.targetId
+              ) {
+                <span
+                  >{{ candidate.actionId }} → {{ candidate.targetName }} ·
+                  {{ candidate.decisionLabel }} · {{ candidate.reason }}</span
+                >
+              } @empty {
+                <span>No candidates</span>
+              }
+            }
+            @case ("loading") {
+              <span>Loading candidates</span>
+            }
+            @case ("error") {
+              <span role="alert">{{ candidates().error.message }}</span>
+            }
+            @case ("idle") {
+              <span>Not loaded</span>
+            }
+          }
+        </div>
+        <div>
+          <strong>Latest command</strong>
+          @switch (submission().kind) {
+            @case ("data") {
+              <span
+                >{{ submission().value.title }} ·
+                {{ submission().value.decisionLabel }}</span
+              >
+              <span>{{
+                submission().value.eventLabels.join(", ") ||
+                  submission().value.rejectionLabel
+              }}</span>
+              <span>{{ submission().value.traceLabels.join(" · ") }}</span>
+            }
+            @case ("loading") {
+              <span>Submitting command</span>
+            }
+            @case ("error") {
+              <span role="alert">{{ submission().error.message }}</span>
+            }
+            @case ("idle") {
+              <span>No command submitted</span>
+            }
+          }
+        </div>
+      </section>
     </div>
   </arb-workbench-panel>
 
@@ -236,9 +435,64 @@
     [panelNumber]="7"
     panelTitle="Active units"
   >
-    <div class="empty-state">
-      <strong>No active session</strong
-      ><span>Participants appear when an encounter is selected</span>
-    </div>
+    @switch (snapshot().kind) {
+      @case ("data") {
+        <ul class="unit-list" aria-label="Live participants">
+          @for (
+            participant of snapshot().value.participants;
+            track participant.id
+          ) {
+            <li
+              [class.unit--current]="
+                snapshot().value.currentActorId === participant.id
+              "
+              [class.unit--target]="intent().targetId === participant.id"
+              [attr.aria-label]="
+                participant.name +
+                ', ' +
+                participant.statusLabel +
+                (snapshot().value.currentActorId === participant.id
+                  ? ', current actor'
+                  : '') +
+                (intent().targetId === participant.id
+                  ? ', selected target'
+                  : '')
+              "
+            >
+              <div>
+                <strong>{{ participant.name }}</strong
+                ><span>{{ participant.statusLabel }}</span>
+              </div>
+              <span>{{ participant.hitPointLabel }}</span>
+              @if (participant.temporaryVitalityLabel) {
+                <span>{{ participant.temporaryVitalityLabel }}</span>
+              }
+              <span>{{
+                participant.conditionLabels.join(", ") || "No conditions"
+              }}</span>
+              <button
+                type="button"
+                [attr.aria-pressed]="intent().targetId === participant.id"
+                [attr.aria-label]="'Select ' + participant.name + ' as target'"
+                (click)="selectTarget(participant.id)"
+              >
+                Target
+              </button>
+            </li>
+          }
+        </ul>
+      }
+      @case ("loading") {
+        <p class="panel-state">Loading participants</p>
+      }
+      @case ("error") {
+        <p class="panel-state panel-state--error" role="alert">
+          {{ snapshot().error.message }}
+        </p>
+      }
+      @case ("idle") {
+        <p class="panel-state">No active session</p>
+      }
+    }
   </arb-workbench-panel>
 </section>

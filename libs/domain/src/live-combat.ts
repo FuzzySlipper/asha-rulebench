@@ -71,6 +71,7 @@ export interface RulebenchLiveActionOptionView {
   readonly name: string;
   readonly available: boolean;
   readonly unavailableReason: string | null;
+  readonly resourceCostLabels: readonly string[];
   readonly resourceLabels: readonly string[];
   readonly targets: readonly RulebenchLiveTargetOptionView[];
 }
@@ -210,6 +211,9 @@ export function projectLiveOptions(
       name: action.actionName,
       available: action.available,
       unavailableReason: action.unavailableReason,
+      resourceCostLabels: action.resourceCosts.map(
+        (cost) => `${cost.resourceId} costs ${cost.amount}`,
+      ),
       resourceLabels: action.resourceStates.map(
         (resource) =>
           `${resource.resourceId} ${resource.current}/${resource.max}`,

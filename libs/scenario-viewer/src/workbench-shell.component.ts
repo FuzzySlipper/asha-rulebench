@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from "@angular/core";
+import type { ElementRef } from "@angular/core";
 import {
   ApplicationMenubarComponent,
   type ApplicationMenuGroup,
@@ -40,6 +41,8 @@ export class WorkbenchShellComponent {
     viewChild.required<WorkbenchPanelComponent>("actionsPanel");
   private readonly unitsPanel =
     viewChild.required<WorkbenchPanelComponent>("unitsPanel");
+  private readonly commandFeedback =
+    viewChild<ElementRef<HTMLElement>>("commandFeedback");
 
   protected readonly gridCells = Array.from({ length: 96 });
   readonly additionalMenuGroups = input<readonly ApplicationMenuGroup[]>([]);
@@ -49,6 +52,35 @@ export class WorkbenchShellComponent {
   protected readonly connection = computed(() => this.liveStore.connection());
   protected readonly snapshot = computed(() => this.liveStore.snapshot());
   protected readonly control = computed(() => this.liveStore.control());
+  protected readonly options = computed(() => this.liveStore.options());
+  protected readonly candidates = computed(() => this.liveStore.candidates());
+  protected readonly preflight = computed(() => this.liveStore.preflight());
+  protected readonly submission = computed(() => this.liveStore.submission());
+  protected readonly intent = computed(() => this.liveStore.intent());
+  protected readonly attackRollInput = signal("17");
+  protected readonly damageRollInput = signal("5");
+  private commandSequence = 0;
+  protected readonly commandBusy = computed(() =>
+    [
+      this.options(),
+      this.candidates(),
+      this.preflight(),
+      this.submission(),
+    ].some((state) => state.kind === "loading"),
+  );
+  protected readonly rollInputError = computed(() =>
+    this.rollStream() === null
+      ? "Attack and damage rolls must be integers."
+      : null,
+  );
+  protected readonly canSubmit = computed(
+    () =>
+      this.intent().actorId.length > 0 &&
+      this.intent().actionId.length > 0 &&
+      this.intent().targetId.length > 0 &&
+      this.rollStream() !== null &&
+      !this.commandBusy(),
+  );
   protected readonly currentParticipantIndex = computed(() => {
     const snapshot = this.snapshot();
     return snapshot.kind === "data"
@@ -187,6 +219,53 @@ export class WorkbenchShellComponent {
       : null;
   }
 
+  protected setAttackRoll(value: string): void {
+    this.attackRollInput.set(value);
+  }
+
+  protected setDamageRoll(value: string): void {
+    this.damageRollInput.set(value);
+  }
+
+  protected selectAction(actorId: string | null, actionId: string): void {
+    this.liveStore.setIntent({
+      actorId: actorId ?? "",
+      actionId,
+      targetId: this.intent().targetId,
+    });
+  }
+
+  protected selectTarget(targetId: string): void {
+    this.liveStore.setIntent({ ...this.intent(), targetId });
+  }
+
+  protected refreshCommandEvidence(): void {
+    void this.refreshEvidence();
+  }
+
+  protected preflightIntent(): void {
+    void this.liveStore
+      .preflightIntent()
+      .then(() => this.focusCommandFeedback());
+  }
+
+  protected submitIntent(): void {
+    const rollStream = this.rollStream();
+    if (rollStream === null) return;
+    this.commandSequence += 1;
+    void this.liveStore
+      .submitIntent({
+        id: `panel-command-${this.commandSequence}`,
+        title: "Manual command",
+        summary: "Submitted from the Rulebench available actions panel.",
+        rollStream,
+      })
+      .then(async () => {
+        await this.refreshEvidence();
+        this.focusCommandFeedback();
+      });
+  }
+
   protected initiativePositionLabel(index: number): InitiativePosition {
     const snapshot = this.snapshot();
     if (snapshot.kind !== "data") return "Queued";
@@ -202,13 +281,13 @@ export class WorkbenchShellComponent {
   private invokeLifecycleCommand(commandId: string): boolean {
     switch (commandId) {
       case "start-combat":
-        void this.liveStore.submitControl("explicitStart");
+        void this.runLifecycleCommand("explicitStart");
         return true;
       case "advance-turn":
-        void this.liveStore.submitControl("advanceTurn");
+        void this.runLifecycleCommand("advanceTurn");
         return true;
       case "end-combat":
-        void this.liveStore.submitControl("explicitEnd");
+        void this.runLifecycleCommand("explicitEnd");
         return true;
       case "close-session":
         void this.liveStore.closeSession();
@@ -216,6 +295,32 @@ export class WorkbenchShellComponent {
       default:
         return false;
     }
+  }
+
+  private async runLifecycleCommand(
+    kind: "explicitStart" | "advanceTurn" | "explicitEnd",
+  ): Promise<void> {
+    await this.liveStore.submitControl(kind);
+    await this.refreshEvidence();
+  }
+
+  private async refreshEvidence(): Promise<void> {
+    await Promise.all([
+      this.liveStore.refreshOptions(),
+      this.liveStore.refreshCandidates(),
+    ]);
+  }
+
+  private rollStream(): readonly number[] | null {
+    const attack = Number(this.attackRollInput());
+    const damage = Number(this.damageRollInput());
+    return Number.isInteger(attack) && Number.isInteger(damage)
+      ? [attack, damage]
+      : null;
+  }
+
+  private focusCommandFeedback(): void {
+    this.commandFeedback()?.nativeElement.focus();
   }
 
   private panelForCommand(commandId: string): WorkbenchPanelComponent | null {
