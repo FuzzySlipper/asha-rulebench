@@ -91,6 +91,7 @@ pub struct CombatSessionIntentCommandSpec {
     pub summary: String,
     pub intent: UseActionIntent,
     pub roll_stream: Vec<i32>,
+    pub roll_mode: CommandRollMode,
 }
 
 impl CombatSessionIntentCommandSpec {
@@ -107,7 +108,14 @@ impl CombatSessionIntentCommandSpec {
             summary: summary.into(),
             intent,
             roll_stream,
+            roll_mode: CommandRollMode::Supplied,
         }
+    }
+
+    pub fn with_generated_rolls(mut self, seed: u64) -> Self {
+        self.roll_stream.clear();
+        self.roll_mode = CommandRollMode::AuthorityGenerated { seed };
+        self
     }
 }
 
@@ -172,6 +180,8 @@ impl CombatSessionState {
             spec.intent,
             spec.roll_stream,
             false,
+            CommandRollMode::Supplied,
+            Vec::new(),
         )
     }
 
@@ -179,14 +189,32 @@ impl CombatSessionState {
         &mut self,
         spec: CombatSessionIntentCommandSpec,
     ) -> CombatSessionStepReadout {
+        let roll_mode = spec.roll_mode;
+        let (roll_stream, generated_rolls) = match roll_mode {
+            CommandRollMode::Supplied => (spec.roll_stream, Vec::new()),
+            CommandRollMode::AuthorityGenerated { seed } => {
+                self.materialize_generated_rolls(&spec.id, &spec.intent, seed)
+            }
+            CommandRollMode::RecordedGenerated { seed } => {
+                let evidence = self.describe_recorded_generated_rolls(
+                    &spec.id,
+                    &spec.intent,
+                    seed,
+                    &spec.roll_stream,
+                );
+                (spec.roll_stream, evidence)
+            }
+        };
         self.submit_command_parts(
             spec.id,
             spec.title,
             spec.summary,
             None,
             spec.intent,
-            spec.roll_stream,
+            roll_stream,
             true,
+            roll_mode,
+            generated_rolls,
         )
     }
 
@@ -199,6 +227,8 @@ impl CombatSessionState {
         intent: UseActionIntent,
         roll_stream: Vec<i32>,
         preflight_enabled: bool,
+        roll_mode: CommandRollMode,
+        generated_rolls: Vec<GeneratedCommandRoll>,
     ) -> CombatSessionStepReadout {
         if self.lifecycle.phase == CombatLifecyclePhase::Ended {
             return self.post_end_command_readout(
@@ -209,6 +239,8 @@ impl CombatSessionState {
                 intent,
                 roll_stream,
                 preflight_enabled,
+                roll_mode,
+                generated_rolls,
             );
         }
 
@@ -230,7 +262,7 @@ impl CombatSessionState {
             None
         };
         let rejected_preflight = preflight.as_ref().filter(|readout| !readout.accepted);
-        let (receipt, mut state_after, should_apply_state, decision_kind) =
+        let (mut receipt, mut state_after, should_apply_state, decision_kind) =
             if let Some(preflight) = rejected_preflight {
                 let state_after = self
                     .state
@@ -287,6 +319,21 @@ impl CombatSessionState {
                     }
                 }
             };
+        for generated in &generated_rolls {
+            receipt.trace.push(TraceEntry::new(
+                receipt.trace.len() as u32 + 1,
+                TracePhase::Proposal,
+                TraceStatus::Info,
+                "Authority roll materialized.",
+                format!(
+                    "{} {} produced {} for {}.",
+                    generated.source_mode.code(),
+                    generated.die_expression,
+                    generated.value,
+                    generated.request_kind.code()
+                ),
+            ));
+        }
         let outcome_class = outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt));
         let preflight_decision_kind = preflight.as_ref().map(|readout| readout.decision_kind);
 
@@ -393,6 +440,8 @@ impl CombatSessionState {
             audit_entry,
             state_before,
             state_after,
+            roll_mode,
+            generated_rolls,
         }
     }
 
@@ -405,6 +454,8 @@ impl CombatSessionState {
         intent: UseActionIntent,
         roll_stream: Vec<i32>,
         preflight_enabled: bool,
+        roll_mode: CommandRollMode,
+        generated_rolls: Vec<GeneratedCommandRoll>,
     ) -> CombatSessionStepReadout {
         let scenario = self.state.apply_to_scenario(self.scenario.clone());
         let state = self
@@ -453,7 +504,92 @@ impl CombatSessionState {
             audit_entry,
             state_before: state.clone(),
             state_after: state,
+            roll_mode,
+            generated_rolls,
         }
+    }
+
+    fn materialize_generated_rolls(
+        &self,
+        command_id: &str,
+        intent: &UseActionIntent,
+        seed: u64,
+    ) -> (Vec<i32>, Vec<GeneratedCommandRoll>) {
+        if self
+            .scenario
+            .action_by_id(&intent.action_id)
+            .is_some_and(|action| action.movement.is_some())
+        {
+            return (Vec::new(), Vec::new());
+        }
+
+        let scenario = self.state.apply_to_scenario(self.scenario.clone());
+        let mut generator_state = seed;
+        let mut values = Vec::new();
+        let mut evidence = Vec::new();
+        for _ in 0..4 {
+            let receipt = resolve_use_action(&scenario, intent.clone(), &values);
+            let request_kind = match receipt.rejection {
+                Some(RulebenchRejection::MissingAttackRoll) => RollRequestKind::AttackRoll,
+                Some(RulebenchRejection::MissingCheckRoll) => RollRequestKind::SavingThrowRoll,
+                Some(RulebenchRejection::MissingDamageRoll) => RollRequestKind::DamageRoll,
+                _ => break,
+            };
+            let (die_expression, maximum) = match request_kind {
+                RollRequestKind::DamageRoll => ("1d8", 8),
+                RollRequestKind::AttackRoll
+                | RollRequestKind::SavingThrowRoll
+                | RollRequestKind::ContestedActorRoll
+                | RollRequestKind::ContestedTargetRoll => ("1d20", 20),
+            };
+            let value = next_generated_die(&mut generator_state, maximum);
+            let sequence = evidence.len() as u32;
+            values.push(value);
+            evidence.push(GeneratedCommandRoll {
+                sequence,
+                command_id: command_id.to_string(),
+                request_kind,
+                die_expression: die_expression.to_string(),
+                value,
+                source_mode: CommandRollMode::AuthorityGenerated { seed },
+            });
+        }
+        (values, evidence)
+    }
+
+    fn describe_recorded_generated_rolls(
+        &self,
+        command_id: &str,
+        intent: &UseActionIntent,
+        seed: u64,
+        values: &[i32],
+    ) -> Vec<GeneratedCommandRoll> {
+        let scenario = self.state.apply_to_scenario(self.scenario.clone());
+        values
+            .iter()
+            .enumerate()
+            .filter_map(|(index, value)| {
+                let receipt = resolve_use_action(&scenario, intent.clone(), &values[..index]);
+                let request_kind = match receipt.rejection {
+                    Some(RulebenchRejection::MissingAttackRoll) => RollRequestKind::AttackRoll,
+                    Some(RulebenchRejection::MissingCheckRoll) => RollRequestKind::SavingThrowRoll,
+                    Some(RulebenchRejection::MissingDamageRoll) => RollRequestKind::DamageRoll,
+                    _ => return None,
+                };
+                Some(GeneratedCommandRoll {
+                    sequence: index as u32,
+                    command_id: command_id.to_string(),
+                    request_kind,
+                    die_expression: if request_kind == RollRequestKind::DamageRoll {
+                        "1d8".to_string()
+                    } else {
+                        "1d20".to_string()
+                    },
+                    value: *value,
+                    source_mode: CommandRollMode::RecordedGenerated { seed },
+                })
+            })
+            .collect()
     }
 
     fn apply_receipt_effects_to_state(&mut self, receipt: &RulebenchReceipt) {
@@ -541,15 +677,23 @@ impl CombatSessionState {
             self.turn_order.current_actor_id.clone(),
             end_condition,
             || {
-                self.plan_auto_candidate_command(
-                    CombatSessionAutoCandidateCommandSpec::new(
-                        spec.id,
-                        spec.title,
-                        spec.summary,
-                        spec.roll_stream,
-                    )
-                    .with_policy(spec.policy),
+                let candidate_spec = CombatSessionAutoCandidateCommandSpec::new(
+                    spec.id,
+                    spec.title,
+                    spec.summary,
+                    spec.roll_stream,
                 )
+                .with_policy(spec.policy);
+                let candidate_spec = match spec.roll_mode {
+                    CommandRollMode::Supplied => candidate_spec,
+                    CommandRollMode::AuthorityGenerated { seed } => {
+                        candidate_spec.with_generated_rolls(seed)
+                    }
+                    CommandRollMode::RecordedGenerated { seed } => {
+                        candidate_spec.with_generated_rolls(seed)
+                    }
+                };
+                self.plan_auto_candidate_command(candidate_spec)
             },
         )
     }
@@ -647,17 +791,23 @@ impl CombatSessionState {
                 break;
             }
 
-            steps.push(
-                self.submit_automatic_step(
-                    CombatSessionAutomaticStepSpec::new(
-                        format!("{}-step-{step_index}", spec.id),
-                        format!("{} step {}", spec.title, step_index + 1),
-                        spec.summary.clone(),
-                        spec.roll_stream.clone(),
-                    )
-                    .with_policy(spec.policy.clone()),
-                ),
-            );
+            let step_spec = CombatSessionAutomaticStepSpec::new(
+                format!("{}-step-{step_index}", spec.id),
+                format!("{} step {}", spec.title, step_index + 1),
+                spec.summary.clone(),
+                spec.roll_stream.clone(),
+            )
+            .with_policy(spec.policy.clone());
+            let step_spec = match spec.roll_mode {
+                CommandRollMode::Supplied => step_spec,
+                CommandRollMode::AuthorityGenerated { seed } => {
+                    step_spec.with_generated_rolls(seed.wrapping_add(u64::from(step_index)))
+                }
+                CommandRollMode::RecordedGenerated { seed } => {
+                    step_spec.with_generated_rolls(seed.wrapping_add(u64::from(step_index)))
+                }
+            };
+            steps.push(self.submit_automatic_step(step_spec));
             if steps.last().is_some_and(|step| {
                 step.plan.decision_kind
                     == CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate
@@ -896,6 +1046,20 @@ impl CombatSessionState {
                 });
         }
     }
+}
+
+fn next_generated_die(state: &mut u64, maximum: i32) -> i32 {
+    let mut value = if *state == 0 {
+        0x9e37_79b9_7f4a_7c15
+    } else {
+        *state
+    };
+    value ^= value >> 12;
+    value ^= value << 25;
+    value ^= value >> 27;
+    *state = value;
+    let output = value.wrapping_mul(0x2545_f491_4f6c_dd1d);
+    (output % maximum as u64) as i32 + 1
 }
 
 fn ended_combat_receipt(

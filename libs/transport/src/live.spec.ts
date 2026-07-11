@@ -133,14 +133,17 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/replays/replay%2Fone/verify",
       "POST http://rulebench.test/api/rulebench/v1/replays/compare",
     ]);
-    expect(calls.every((call) => call.version === "2")).toBe(true);
+    expect(calls.every((call) => call.version === "3")).toBe(true);
     expect(calls[3]?.body).toBe(JSON.stringify(createRequest));
     expect(calls[7]?.body).toBe(JSON.stringify(intent));
     expect(calls[9]?.body).toBe(JSON.stringify(intentCommand));
     expect(calls[11]?.body).toBe(JSON.stringify(automaticStep));
     expect(calls[12]?.body).toBe(JSON.stringify(automaticRun));
     expect(calls[16]?.body).toBe(
-      JSON.stringify({ expectedPackageId: "expected", actualPackageId: "actual" }),
+      JSON.stringify({
+        expectedPackageId: "expected",
+        actualPackageId: "actual",
+      }),
     );
   });
 
@@ -157,7 +160,7 @@ describe("live Rulebench transport", () => {
     });
 
     const mismatched = createLiveRulebenchTransport({
-      fetch: async () => Response.json({ ...handshake, protocolVersion: 3 }),
+      fetch: async () => Response.json({ ...handshake, protocolVersion: 4 }),
     });
     const mismatchResult = await mismatched.connect();
 
@@ -167,7 +170,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v2; received asha-rulebench.protocol v3.",
+          "Expected asha-rulebench.protocol v3; received asha-rulebench.protocol v4.",
         retryable: false,
       },
     });
@@ -253,8 +256,13 @@ describe("fake live Rulebench transport", () => {
   it("has interface parity and returns configured authority evidence by identity", async () => {
     const scenarios: readonly RulebenchScenarioOptionDto[] = [
       {
-        id: "scenario", title: "Scenario", summary: "Authority fixture.",
-        rulesetId: "rules", rulesetVersion: "1.0.0", contentPackId: null, contentPackVersion: null,
+        id: "scenario",
+        title: "Scenario",
+        summary: "Authority fixture.",
+        rulesetId: "rules",
+        rulesetVersion: "1.0.0",
+        contentPackId: null,
+        contentPackVersion: null,
         participants: [],
       },
     ];

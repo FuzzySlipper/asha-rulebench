@@ -266,29 +266,21 @@ pub fn resolve_use_action(
             )],
         );
     }
-    if roll_stream.len() < 2 {
+    if !(1..=20).contains(&roll_stream[0]) {
         return rejected_with_projection_and_rolls(
             scenario,
             intent,
-            RulebenchRejection::MissingDamageRoll,
+            RulebenchRejection::InvalidRollValue,
             Some(target_legality),
             trace,
-            vec![
-                consumed_roll(
-                    0,
-                    RollRequestKind::AttackRoll,
-                    roll_stream[0],
-                    "Attack roll value was consumed for hit resolution.",
-                ),
-                missing_roll_consumption(
-                    1,
-                    RollRequestKind::DamageRoll,
-                    "Damage roll was requested after a hit but no roll value was supplied.",
-                ),
-            ],
+            vec![unconsumed_roll(
+                0,
+                RollRequestKind::AttackRoll,
+                Some(roll_stream[0]),
+                "Attack roll must be within the declared 1d20 bounds.",
+            )],
         );
     }
-
     resolve_accepted_action(
         scenario,
         intent,
@@ -446,6 +438,29 @@ fn resolve_saving_throw_action(
             ],
         );
     };
+    if !(1..=8).contains(&damage_roll) {
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidRollValue,
+            Some(target_legality),
+            trace,
+            vec![
+                consumed_roll(
+                    0,
+                    RollRequestKind::AttackRoll,
+                    roll_stream[0],
+                    "Attack roll value was consumed for hit resolution.",
+                ),
+                unconsumed_roll(
+                    1,
+                    RollRequestKind::DamageRoll,
+                    Some(damage_roll),
+                    "Damage roll must be within the declared 1d8 bounds.",
+                ),
+            ],
+        );
+    }
     resolve_check_effects(CheckEffectResolution {
         scenario,
         intent,
@@ -780,30 +795,67 @@ fn resolve_accepted_action(
             "DomainEvents committed.",
             "ActionUsed and AttackRolled became accepted facts.",
         ));
+        let mut roll_consumption = vec![
+            consumed_roll(
+                0,
+                RollRequestKind::AttackRoll,
+                roll_stream[0],
+                "Attack roll value was consumed for miss resolution.",
+            ),
+            unconsumed_roll(
+                1,
+                RollRequestKind::DamageRoll,
+                roll_stream.get(1).copied(),
+                "Damage roll value was supplied but not consumed because the attack missed.",
+            ),
+        ];
+        roll_consumption.extend(
+            roll_stream
+                .iter()
+                .skip(2)
+                .enumerate()
+                .map(|(index, value)| {
+                    unconsumed_roll(
+                        index as u32 + 2,
+                        RollRequestKind::DamageRoll,
+                        Some(*value),
+                        "Excess roll value was not requested by resolution.",
+                    )
+                }),
+        );
         return accepted_miss_receipt(
             scenario,
             intent,
             target_legality,
             attack_roll,
             trace,
+            roll_consumption,
+        );
+    }
+
+    let Some(damage_roll) = roll_stream.get(1).copied() else {
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            RulebenchRejection::MissingDamageRoll,
+            Some(target_legality),
+            trace,
             vec![
                 consumed_roll(
                     0,
                     RollRequestKind::AttackRoll,
                     roll_stream[0],
-                    "Attack roll value was consumed for miss resolution.",
+                    "Attack roll value was consumed for hit resolution.",
                 ),
-                unconsumed_roll(
+                missing_roll_consumption(
                     1,
                     RollRequestKind::DamageRoll,
-                    roll_stream.get(1).copied(),
-                    "Damage roll value was supplied but not consumed because the attack missed.",
+                    "Damage roll was requested after a hit but no roll value was supplied.",
                 ),
             ],
         );
-    }
+    };
 
-    let damage_roll = roll_stream[1];
     let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
     let damage = vitality_effects.damage.clone();
     let modifier = match hit_operations.modifier {
@@ -842,6 +894,34 @@ fn resolve_accepted_action(
         "ActionUsed, AttackRolled, vitality effects, and ModifierApplied became accepted facts.",
     ));
 
+    let mut roll_consumption = vec![
+        consumed_roll(
+            0,
+            RollRequestKind::AttackRoll,
+            roll_stream[0],
+            "Attack roll value was consumed for hit resolution.",
+        ),
+        consumed_roll(
+            1,
+            RollRequestKind::DamageRoll,
+            damage_roll,
+            "Damage roll value was consumed for damage resolution.",
+        ),
+    ];
+    roll_consumption.extend(
+        roll_stream
+            .iter()
+            .skip(2)
+            .enumerate()
+            .map(|(index, value)| {
+                unconsumed_roll(
+                    index as u32 + 2,
+                    RollRequestKind::DamageRoll,
+                    Some(*value),
+                    "Excess roll value was not requested by resolution.",
+                )
+            }),
+    );
     accepted_hit_receipt(
         scenario,
         intent,
@@ -852,20 +932,7 @@ fn resolve_accepted_action(
         vitality_effects.temporary_vitality,
         modifier,
         trace,
-        vec![
-            consumed_roll(
-                0,
-                RollRequestKind::AttackRoll,
-                roll_stream[0],
-                "Attack roll value was consumed for hit resolution.",
-            ),
-            consumed_roll(
-                1,
-                RollRequestKind::DamageRoll,
-                damage_roll,
-                "Damage roll value was consumed for damage resolution.",
-            ),
-        ],
+        roll_consumption,
     )
 }
 

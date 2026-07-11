@@ -267,6 +267,8 @@ export class LiveCombatStore {
     readonly title: string;
     readonly summary: string;
     readonly rollStream: readonly number[];
+    readonly rollMode?: "supplied" | "authorityGenerated";
+    readonly generatedSeed?: number | null;
   }): Promise<void> {
     const request = this.currentRequest();
     if (request === null) return;
@@ -465,7 +467,9 @@ export class LiveCombatStore {
   }
 }
 
-function protocolIntent(intent: RulebenchLiveIntentInput): RulebenchUseActionIntentDto {
+function protocolIntent(
+  intent: RulebenchLiveIntentInput,
+): RulebenchUseActionIntentDto {
   return {
     actorId: intent.actorId,
     actionId: intent.actionId,

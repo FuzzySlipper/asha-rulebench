@@ -231,6 +231,19 @@ pub struct LiveCommandStepDto {
     pub trace: Vec<LiveTraceEntryDto>,
     pub state_before_fingerprint: LiveStateFingerprintDto,
     pub state_after_fingerprint: LiveStateFingerprintDto,
+    pub roll_mode: String,
+    pub generated_rolls: Vec<LiveGeneratedRollDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveGeneratedRollDto {
+    pub sequence: u32,
+    pub command_id: String,
+    pub request_kind: String,
+    pub die_expression: String,
+    pub value: i32,
+    pub source_mode: String,
 }
 
 impl From<&CombatSessionStepReadout> for LiveCommandStepDto {
@@ -273,6 +286,19 @@ impl From<&CombatSessionStepReadout> for LiveCommandStepDto {
             state_after_fingerprint: LiveStateFingerprintDto::from(
                 &value.audit_entry.state_after_fingerprint,
             ),
+            roll_mode: value.roll_mode.code().to_string(),
+            generated_rolls: value
+                .generated_rolls
+                .iter()
+                .map(|roll| LiveGeneratedRollDto {
+                    sequence: roll.sequence,
+                    command_id: roll.command_id.clone(),
+                    request_kind: roll.request_kind.code().to_string(),
+                    die_expression: roll.die_expression.clone(),
+                    value: roll.value,
+                    source_mode: roll.source_mode.code().to_string(),
+                })
+                .collect(),
         }
     }
 }

@@ -6,7 +6,7 @@ use rulebench_rules::{
 use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -126,17 +126,35 @@ pub struct CombatSessionIntentCommandDto {
     pub summary: String,
     pub intent: UseActionIntentDto,
     pub roll_stream: Vec<i32>,
+    #[serde(default)]
+    pub roll_mode: CommandRollModeDto,
+    #[serde(default)]
+    pub generated_seed: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommandRollModeDto {
+    #[default]
+    Supplied,
+    AuthorityGenerated,
 }
 
 impl CombatSessionIntentCommandDto {
     pub fn to_authority(&self) -> CombatSessionIntentCommandSpec {
-        CombatSessionIntentCommandSpec::new(
+        let command = CombatSessionIntentCommandSpec::new(
             &self.id,
             &self.title,
             &self.summary,
             self.intent.to_authority(),
             self.roll_stream.clone(),
-        )
+        );
+        match self.roll_mode {
+            CommandRollModeDto::Supplied => command,
+            CommandRollModeDto::AuthorityGenerated => {
+                command.with_generated_rolls(u64::from(self.generated_seed.unwrap_or_default()))
+            }
+        }
     }
 }
 
@@ -210,17 +228,27 @@ pub struct AutomaticStepRequestDto {
     pub summary: String,
     pub roll_stream: Vec<i32>,
     pub policy: CombatAutomationPolicyDto,
+    #[serde(default)]
+    pub roll_mode: CommandRollModeDto,
+    #[serde(default)]
+    pub generated_seed: Option<u32>,
 }
 
 impl AutomaticStepRequestDto {
     pub fn to_authority(&self) -> CombatSessionAutomaticStepSpec {
-        CombatSessionAutomaticStepSpec::new(
+        let spec = CombatSessionAutomaticStepSpec::new(
             &self.id,
             &self.title,
             &self.summary,
             self.roll_stream.clone(),
         )
-        .with_policy(self.policy.to_authority())
+        .with_policy(self.policy.to_authority());
+        match self.roll_mode {
+            CommandRollModeDto::Supplied => spec,
+            CommandRollModeDto::AuthorityGenerated => {
+                spec.with_generated_rolls(u64::from(self.generated_seed.unwrap_or_default()))
+            }
+        }
     }
 }
 
@@ -233,18 +261,28 @@ pub struct AutomaticRunRequestDto {
     pub max_steps: u32,
     pub roll_stream: Vec<i32>,
     pub policy: CombatAutomationPolicyDto,
+    #[serde(default)]
+    pub roll_mode: CommandRollModeDto,
+    #[serde(default)]
+    pub generated_seed: Option<u32>,
 }
 
 impl AutomaticRunRequestDto {
     pub fn to_authority(&self) -> CombatSessionAutomaticRunSpec {
-        CombatSessionAutomaticRunSpec::new(
+        let spec = CombatSessionAutomaticRunSpec::new(
             &self.id,
             &self.title,
             &self.summary,
             self.max_steps,
             self.roll_stream.clone(),
         )
-        .with_policy(self.policy.to_authority())
+        .with_policy(self.policy.to_authority());
+        match self.roll_mode {
+            CommandRollModeDto::Supplied => spec,
+            CommandRollModeDto::AuthorityGenerated => {
+                spec.with_generated_rolls(u64::from(self.generated_seed.unwrap_or_default()))
+            }
+        }
     }
 }
 
@@ -266,6 +304,8 @@ mod tests {
                 observed_origin: None,
             },
             roll_stream: vec![17, 5],
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
         };
 
         let authority = command.to_authority();

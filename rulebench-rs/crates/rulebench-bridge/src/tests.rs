@@ -1,7 +1,7 @@
 use rulebench_protocol::{
     CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
-    CombatSessionHandleDto, CombatSessionIntentCommandDto, ProtocolRequestContextDto,
-    UseActionIntentDto, PROTOCOL_VERSION,
+    CombatSessionHandleDto, CombatSessionIntentCommandDto, CommandRollModeDto,
+    ProtocolRequestContextDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
 use rulebench_rules::*;
 
@@ -263,6 +263,8 @@ fn bridge_calls_real_authority_through_a_complete_manual_lifecycle() {
                     observed_origin: None,
                 },
                 roll_stream: vec![17, 5],
+                roll_mode: CommandRollModeDto::Supplied,
+                generated_seed: None,
             },
         )
         .expect("command reaches authority");
@@ -350,6 +352,8 @@ fn bridge_fails_closed_for_versions_handles_commands_and_lifecycle() {
                     observed_origin: None,
                 },
                 roll_stream: vec![17, 5],
+                roll_mode: CommandRollModeDto::Supplied,
+                generated_seed: None,
             },
         )
         .expect_err("empty command id must fail");

@@ -13,6 +13,7 @@ pub struct CombatSessionCandidateSelectionSpec {
     pub action_id: String,
     pub target_id: String,
     pub roll_stream: Vec<i32>,
+    pub roll_mode: CommandRollMode,
 }
 
 impl CombatSessionCandidateSelectionSpec {
@@ -31,7 +32,14 @@ impl CombatSessionCandidateSelectionSpec {
             action_id: action_id.into(),
             target_id: target_id.into(),
             roll_stream,
+            roll_mode: CommandRollMode::Supplied,
         }
+    }
+
+    pub fn with_generated_rolls(mut self, seed: u64) -> Self {
+        self.roll_stream.clear();
+        self.roll_mode = CommandRollMode::AuthorityGenerated { seed };
+        self
     }
 }
 
@@ -87,6 +95,7 @@ pub struct CombatSessionAutoCandidateCommandSpec {
     pub summary: String,
     pub roll_stream: Vec<i32>,
     pub policy: CombatAutomationPolicySpec,
+    pub roll_mode: CommandRollMode,
 }
 
 impl CombatSessionAutoCandidateCommandSpec {
@@ -102,7 +111,14 @@ impl CombatSessionAutoCandidateCommandSpec {
             summary: summary.into(),
             roll_stream,
             policy: CombatAutomationPolicySpec::first_accepted_candidate(),
+            roll_mode: CommandRollMode::Supplied,
         }
+    }
+
+    pub fn with_generated_rolls(mut self, seed: u64) -> Self {
+        self.roll_stream.clear();
+        self.roll_mode = CommandRollMode::AuthorityGenerated { seed };
+        self
     }
 
     pub fn with_policy(mut self, policy: CombatAutomationPolicySpec) -> Self {
@@ -165,6 +181,7 @@ pub struct CombatSessionAutomaticStepSpec {
     pub summary: String,
     pub roll_stream: Vec<i32>,
     pub policy: CombatAutomationPolicySpec,
+    pub roll_mode: CommandRollMode,
 }
 
 impl CombatSessionAutomaticStepSpec {
@@ -180,7 +197,14 @@ impl CombatSessionAutomaticStepSpec {
             summary: summary.into(),
             roll_stream,
             policy: CombatAutomationPolicySpec::first_accepted_candidate(),
+            roll_mode: CommandRollMode::Supplied,
         }
+    }
+
+    pub fn with_generated_rolls(mut self, seed: u64) -> Self {
+        self.roll_stream.clear();
+        self.roll_mode = CommandRollMode::AuthorityGenerated { seed };
+        self
     }
 
     pub fn with_policy(mut self, policy: CombatAutomationPolicySpec) -> Self {
@@ -258,6 +282,7 @@ pub struct CombatSessionAutomaticRunSpec {
     pub max_steps: u32,
     pub roll_stream: Vec<i32>,
     pub policy: CombatAutomationPolicySpec,
+    pub roll_mode: CommandRollMode,
 }
 
 impl CombatSessionAutomaticRunSpec {
@@ -275,7 +300,14 @@ impl CombatSessionAutomaticRunSpec {
             max_steps,
             roll_stream,
             policy: CombatAutomationPolicySpec::first_accepted_candidate(),
+            roll_mode: CommandRollMode::Supplied,
         }
+    }
+
+    pub fn with_generated_rolls(mut self, seed: u64) -> Self {
+        self.roll_stream.clear();
+        self.roll_mode = CommandRollMode::AuthorityGenerated { seed };
+        self
     }
 
     pub fn with_policy(mut self, policy: CombatAutomationPolicySpec) -> Self {
@@ -574,6 +606,11 @@ pub(super) fn plan_candidate_command(
         candidate.intent.clone(),
         spec.roll_stream,
     );
+    let command = match spec.roll_mode {
+        CommandRollMode::Supplied => command,
+        CommandRollMode::AuthorityGenerated { seed } => command.with_generated_rolls(seed),
+        CommandRollMode::RecordedGenerated { seed } => command.with_generated_rolls(seed),
+    };
 
     CombatSessionCandidateSelectionReadout {
         action_id: spec.action_id,
@@ -681,17 +718,20 @@ pub(super) fn plan_auto_candidate_command(
 
     let selected_action_id = candidate.action_id.clone();
     let selected_target_id = candidate.target_id.clone();
-    let selection = plan_candidate_command(
-        CombatSessionCandidateSelectionSpec::new(
-            spec.id,
-            spec.title,
-            spec.summary,
-            candidate.action_id,
-            candidate.target_id,
-            spec.roll_stream,
-        ),
-        candidates,
+    let selection_spec = CombatSessionCandidateSelectionSpec::new(
+        spec.id,
+        spec.title,
+        spec.summary,
+        candidate.action_id,
+        candidate.target_id,
+        spec.roll_stream,
     );
+    let selection_spec = match spec.roll_mode {
+        CommandRollMode::Supplied => selection_spec,
+        CommandRollMode::AuthorityGenerated { seed } => selection_spec.with_generated_rolls(seed),
+        CommandRollMode::RecordedGenerated { seed } => selection_spec.with_generated_rolls(seed),
+    };
+    let selection = plan_candidate_command(selection_spec, candidates);
 
     CombatSessionAutoCandidatePlanReadout {
         policy,

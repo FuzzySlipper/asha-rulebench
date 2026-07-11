@@ -35,7 +35,7 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 2,
+          protocolVersion: 3,
           authoritySurface: "test-authority",
         },
       }),
@@ -212,7 +212,7 @@ describe("LiveCombatStore", () => {
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 2,
+        protocolVersion: 3,
         authoritySurface: "late",
       },
     });

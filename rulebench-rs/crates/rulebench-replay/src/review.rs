@@ -1,12 +1,13 @@
 use rulebench_combat::{
-    CombatSessionCreateRequest, CombatSessionSnapshot, CombatSessionState,
+    CombatSessionCreateRequest, CombatSessionSnapshot, CombatSessionState, CommandRollMode,
     RulesetArtifactProvenance,
 };
 
 use crate::{
     verification::execute_command, ReplayAcceptedEvents, ReplayCommand,
-    ReplayCommandRandomnessProvenance, ReplayCommandRecord, ReplayEvidence, ReplayPackage,
-    ReplayRollEvidence, ReplayStepEvidence, ReplayTraceEvidence,
+    ReplayCommandRandomnessProvenance, ReplayCommandRecord, ReplayEvidence,
+    ReplayGeneratedRollRequest, ReplayPackage, ReplayRandomnessSource, ReplayRollEvidence,
+    ReplayStepEvidence, ReplayTraceEvidence,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +42,26 @@ pub fn record_replay_package(
         .map(|(index, command)| {
             let sequence = index as u32;
             let expected = execute_command(&mut session, &command.command);
-            let supplied_roll_stream = command.command.supplied_roll_stream().to_vec();
+            let generated_seed = match &command.command {
+                ReplayCommand::Intent(spec) => match spec.roll_mode {
+                    CommandRollMode::AuthorityGenerated { seed }
+                    | CommandRollMode::RecordedGenerated { seed } => Some(seed),
+                    CommandRollMode::Supplied => None,
+                },
+                _ => None,
+            };
+            let mut recorded_command = command.command.clone();
+            if let (Some(seed), ReplayCommand::Intent(spec)) =
+                (generated_seed, &mut recorded_command)
+            {
+                spec.roll_stream = expected
+                    .rolls
+                    .iter()
+                    .filter_map(|roll| roll.supplied_value)
+                    .collect();
+                spec.roll_mode = CommandRollMode::RecordedGenerated { seed };
+            }
+            let supplied_roll_stream = recorded_command.supplied_roll_stream().to_vec();
             evidence.accepted_events.push(ReplayAcceptedEvents {
                 command_sequence: sequence,
                 events: expected.accepted_events.clone(),
@@ -57,7 +77,41 @@ pub fn record_replay_package(
                 command_sequence: sequence,
                 entries: expected.trace.clone(),
             });
-            if !supplied_roll_stream.is_empty() {
+            if let Some(seed) = generated_seed {
+                let generated_requests = expected
+                    .rolls
+                    .iter()
+                    .filter_map(|roll| {
+                        roll.supplied_value.map(|value| {
+                            let maximum = if roll.request_kind.code() == "damageRoll" {
+                                8
+                            } else {
+                                20
+                            };
+                            ReplayGeneratedRollRequest {
+                                sequence: roll.sequence,
+                                request_id: format!("{}:{}", command.id, roll.request_kind.code()),
+                                request_kind: roll.request_kind,
+                                minimum: 1,
+                                maximum,
+                                value,
+                            }
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                evidence.randomness.push(ReplayCommandRandomnessProvenance {
+                    command_sequence: sequence,
+                    source_id: format!("command:{}", command.id),
+                    source: ReplayRandomnessSource::Generated {
+                        seed,
+                        algorithm_version: crate::REPLAY_RANDOMNESS_ALGORITHM_VERSION.to_string(),
+                    },
+                    supplied_values: supplied_roll_stream.clone(),
+                    generated_requests,
+                    consumption: expected.rolls.clone(),
+                    unused_values: Vec::new(),
+                });
+            } else if !supplied_roll_stream.is_empty() {
                 evidence
                     .randomness
                     .push(ReplayCommandRandomnessProvenance::supplied(
@@ -70,7 +124,7 @@ pub fn record_replay_package(
             ReplayCommandRecord {
                 sequence,
                 id: command.id,
-                command: command.command,
+                command: recorded_command,
                 expected,
             }
         })

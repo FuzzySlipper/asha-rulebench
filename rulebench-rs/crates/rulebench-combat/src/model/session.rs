@@ -5,9 +5,9 @@ use super::{
     CombatTurnOrder, CommandOutcomeClass, ContentPackSetReference, EquipmentLedgerReadout,
     EquipmentTransitionEntry, GridPosition, LifecycleTransitionEntry, LifecycleTransitionTrigger,
     ModifierDurationExpirationEntry, ReactionAuditEntry, ReactionWindowLifecycleEntry,
-    ReactionWindowReadout, RollConsumptionEntry, RulebenchReceipt, RulebenchRejection,
-    RulebenchScenario, ScenarioProjection, StateFingerprint, TargetKind, TargetLegality,
-    TurnTransitionEntry, UseActionIntent,
+    ReactionWindowReadout, RollConsumptionEntry, RollRequestKind, RulebenchReceipt,
+    RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint, TargetKind,
+    TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
 use rulebench_ruleset::{ActionResourceCost, CombatEndPolicy};
 
@@ -127,6 +127,34 @@ pub struct CommandAuditEntry {
     pub roll_consumption: Vec<RollConsumptionEntry>,
     pub state_before_fingerprint: StateFingerprint,
     pub state_after_fingerprint: StateFingerprint,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandRollMode {
+    Supplied,
+    AuthorityGenerated { seed: u64 },
+    RecordedGenerated { seed: u64 },
+}
+
+impl CommandRollMode {
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Supplied => "supplied",
+            Self::AuthorityGenerated { .. } | Self::RecordedGenerated { .. } => {
+                "authorityGenerated"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedCommandRoll {
+    pub sequence: u32,
+    pub command_id: String,
+    pub request_kind: RollRequestKind,
+    pub die_expression: String,
+    pub value: i32,
+    pub source_mode: CommandRollMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -409,6 +437,8 @@ pub struct CombatSessionStepReadout {
     pub audit_entry: CommandAuditEntry,
     pub state_before: ScenarioProjection,
     pub state_after: ScenarioProjection,
+    pub roll_mode: CommandRollMode,
+    pub generated_rolls: Vec<GeneratedCommandRoll>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

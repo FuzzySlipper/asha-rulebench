@@ -127,6 +127,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "rollStream",
                     ty: "readonly number[]",
                 },
+                Field {
+                    name: "rollMode?",
+                    ty: "\"supplied\" | \"authorityGenerated\"",
+                },
+                Field {
+                    name: "generatedSeed?",
+                    ty: "number | null",
+                },
             ],
         },
         Interface {
@@ -914,6 +922,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "policy",
                     ty: "RulebenchCombatAutomationPolicySpecDto",
                 },
+                Field {
+                    name: "rollMode?",
+                    ty: "\"supplied\" | \"authorityGenerated\"",
+                },
+                Field {
+                    name: "generatedSeed?",
+                    ty: "number | null",
+                },
             ],
         },
         Interface {
@@ -942,6 +958,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "policy",
                     ty: "RulebenchCombatAutomationPolicySpecDto",
+                },
+                Field {
+                    name: "rollMode?",
+                    ty: "\"supplied\" | \"authorityGenerated\"",
+                },
+                Field {
+                    name: "generatedSeed?",
+                    ty: "number | null",
                 },
             ],
         },

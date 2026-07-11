@@ -564,7 +564,7 @@ describe("RulebenchTransport fixtures", () => {
           accepted: false,
           rejection: "missingDamageRoll",
           eventCount: 0,
-          traceCount: 2,
+          traceCount: 3,
           rollConsumption: [
             {
               sequence: 0,

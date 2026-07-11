@@ -311,6 +311,9 @@ fn next_bounded_value(state: &mut u64, minimum: i32, maximum: i32) -> i32 {
     if minimum > maximum {
         return minimum;
     }
+    if *state == 0 {
+        *state = 0x9e37_79b9_7f4a_7c15;
+    }
     *state ^= *state >> 12;
     *state ^= *state << 25;
     *state ^= *state >> 27;

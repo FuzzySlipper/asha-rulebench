@@ -21,9 +21,9 @@ pub use authoring::{
 pub use bridge::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatAutomationNoCandidateBehaviorDto,
     CombatAutomationPolicyDto, CombatControlCommandDto, CombatControlCommandKindDto,
-    CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, ProtocolHandshakeDto,
-    ProtocolRequestContextDto, ScenarioOptionDto, ScenarioParticipantOptionDto, UseActionIntentDto,
-    PROTOCOL_ID, PROTOCOL_VERSION,
+    CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, CommandRollModeDto,
+    ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioOptionDto,
+    ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 pub use content::{
     ContentFingerprintDto, ContentImportDiagnosticDto, ContentImportReadoutDto,
@@ -34,9 +34,10 @@ pub use live::{
     LiveAutomaticRunDto, LiveAutomaticStepDto, LiveBoardCellDto, LiveBoardDto, LiveCandidateDto,
     LiveCandidateSummaryDto, LiveCellOptionDto, LiveCombatEndDto, LiveCombatLogEntryDto,
     LiveCommandExecutionDto, LiveCommandStepDto, LiveControlExecutionDto,
-    LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto, LiveGridPositionDto,
-    LiveParticipantDto, LivePreflightDto, LiveRollEvidenceDto, LiveSessionSnapshotDto,
-    LiveStateFingerprintDto, LiveTargetOptionDto, LiveTraceEntryDto, LiveTransportErrorDto,
+    LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto, LiveGeneratedRollDto,
+    LiveGridPositionDto, LiveParticipantDto, LivePreflightDto, LiveRollEvidenceDto,
+    LiveSessionSnapshotDto, LiveStateFingerprintDto, LiveTargetOptionDto, LiveTraceEntryDto,
+    LiveTransportErrorDto,
 };
 pub use replay::{
     ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayCommandReviewDto,

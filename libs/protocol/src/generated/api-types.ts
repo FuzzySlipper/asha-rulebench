@@ -10,7 +10,7 @@ export type RulebenchTracePhaseDto = 'proposal' | 'validation' | 'resolution' | 
 
 export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';
 
-export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingDamageRoll';
+export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingCheckRoll' | 'missingDamageRoll' | 'invalidRollValue' | 'movementDestinationMissing' | 'movementActorDefeated' | 'movementOutOfBounds' | 'movementDestinationOccupied' | 'movementDestinationBlocked' | 'movementStaleDestination' | 'movementOutOfRange' | 'movementBudgetExhausted';
 
 export type RulebenchRulesetCompatibilityErrorCodeDto = 'unknownRulesetId' | 'newerRulesetVersion' | 'incompatibleRulesetVersion' | 'incompatibleRulesetModules';
 
@@ -64,7 +64,7 @@ export type RulebenchAutomaticStepDecisionKindDto = 'conditionalEnd' | 'submitCa
 
 export type RulebenchAutomaticStepOperationKindDto = 'conditionalEnd' | 'submitCandidate' | 'advanceTurn';
 
-export type RulebenchRollRequestKindDto = 'attackRoll' | 'damageRoll';
+export type RulebenchRollRequestKindDto = 'attackRoll' | 'savingThrowRoll' | 'contestedActorRoll' | 'contestedTargetRoll' | 'damageRoll';
 
 export type RulebenchModifierTenureDto = 'temporary' | 'permanent';
 
@@ -237,6 +237,15 @@ export interface RulebenchLiveAuditEntryDto {
   readonly stateAfterFingerprint: RulebenchLiveStateFingerprintDto;
 }
 
+export interface RulebenchLiveGeneratedRollDto {
+  readonly sequence: number;
+  readonly commandId: string;
+  readonly requestKind: RulebenchRollRequestKindDto;
+  readonly dieExpression: string;
+  readonly value: number;
+  readonly sourceMode: "authorityGenerated";
+}
+
 export interface RulebenchLiveCombatEndDto {
   readonly shouldEnd: boolean;
   readonly conditionKind: RulebenchCombatEndConditionKindDto;
@@ -350,6 +359,8 @@ export interface RulebenchLiveCommandStepDto {
   readonly trace: readonly RulebenchLiveTraceEntryDto[];
   readonly stateBeforeFingerprint: RulebenchLiveStateFingerprintDto;
   readonly stateAfterFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly rollMode: "supplied" | "authorityGenerated";
+  readonly generatedRolls: readonly RulebenchLiveGeneratedRollDto[];
 }
 
 export interface RulebenchLiveCommandExecutionDto {
@@ -441,6 +452,8 @@ export interface RulebenchCombatSessionIntentCommandDto {
   readonly summary: string;
   readonly intent: RulebenchUseActionIntentDto;
   readonly rollStream: readonly number[];
+  readonly rollMode?: "supplied" | "authorityGenerated";
+  readonly generatedSeed?: number | null;
 }
 
 export interface RulebenchCombatControlCommandDto {
@@ -686,6 +699,8 @@ export interface RulebenchAutomaticStepSpecDto {
   readonly summary: string;
   readonly rollStream: readonly number[];
   readonly policy: RulebenchCombatAutomationPolicySpecDto;
+  readonly rollMode?: "supplied" | "authorityGenerated";
+  readonly generatedSeed?: number | null;
 }
 
 export interface RulebenchAutomaticRunSpecDto {
@@ -695,6 +710,8 @@ export interface RulebenchAutomaticRunSpecDto {
   readonly maxSteps: number;
   readonly rollStream: readonly number[];
   readonly policy: RulebenchCombatAutomationPolicySpecDto;
+  readonly rollMode?: "supplied" | "authorityGenerated";
+  readonly generatedSeed?: number | null;
 }
 
 export interface RulebenchAutomaticRunReadoutDto {

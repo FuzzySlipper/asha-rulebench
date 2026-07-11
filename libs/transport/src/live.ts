@@ -25,7 +25,7 @@ import type {
 import type { ReplayReviewResult, ReplayReviewTransport } from "./replay-review";
 
 export const RULEBENCH_PROTOCOL_ID = "asha-rulebench.protocol";
-export const RULEBENCH_PROTOCOL_VERSION = 2;
+export const RULEBENCH_PROTOCOL_VERSION = 3;
 
 const DEFAULT_API_BASE_URL = "/api/rulebench/v1";
 

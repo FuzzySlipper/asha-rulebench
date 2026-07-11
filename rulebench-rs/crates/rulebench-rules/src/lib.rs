@@ -63,8 +63,8 @@ pub use rulebench_replay::{
     ReplayCommand, ReplayCommandInspection, ReplayCommandRecord, ReplayCommandRecordingSpec,
     ReplayComparisonDifference, ReplayComparisonDifferenceCode, ReplayComparisonReadout,
     ReplayEvidence, ReplayMismatch, ReplayMismatchDimension, ReplayNarration, ReplayPackage,
-    ReplayPackageInspection, ReplayPackageValidationReport, ReplayStepEvidence,
-    ReplayVerificationDecisionKind, ReplayVerificationReadout,
+    ReplayPackageInspection, ReplayPackageValidationReport, ReplayRandomnessSource,
+    ReplayStepEvidence, ReplayVerificationDecisionKind, ReplayVerificationReadout,
 };
 pub use rulebench_ruleset::CombatEndPolicy;
 

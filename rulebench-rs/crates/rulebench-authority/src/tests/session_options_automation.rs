@@ -364,6 +364,168 @@ fn basic_attack_resolves_melee_and_rejects_range_and_line_of_sight() {
 }
 
 #[test]
+fn authority_generated_rolls_are_lazy_bounded_and_seed_reproducible() {
+    let command = || {
+        CombatSessionIntentCommandSpec::new(
+            "generated-basic-attack",
+            "Generated Focus Shot",
+            "Authority materializes only rolls requested by deterministic resolution.",
+            UseActionIntent::new("entity-adept", "basic-attack.entity-adept", "entity-raider"),
+            Vec::new(),
+        )
+        .with_generated_rolls(42)
+    };
+    let mut first = CombatSessionState::new("generated-first", hexing_bolt_fixture_scenario());
+    let mut second = CombatSessionState::new("generated-second", hexing_bolt_fixture_scenario());
+
+    let first_readout = first.submit_intent_command(command());
+    let second_readout = second.submit_intent_command(command());
+
+    assert_eq!(first_readout.roll_mode.code(), "authorityGenerated");
+    assert_eq!(
+        first_readout.generated_rolls,
+        second_readout.generated_rolls
+    );
+    assert!(!first_readout.generated_rolls.is_empty());
+    assert!(first_readout.generated_rolls.len() <= 2);
+    assert!(first_readout
+        .generated_rolls
+        .iter()
+        .all(|roll| match roll.request_kind {
+            RollRequestKind::DamageRoll => (1..=8).contains(&roll.value),
+            _ => (1..=20).contains(&roll.value),
+        }));
+    assert_eq!(
+        first_readout.command.roll_stream,
+        first_readout
+            .generated_rolls
+            .iter()
+            .map(|roll| roll.value)
+            .collect::<Vec<_>>()
+    );
+    assert!(first_readout
+        .receipt
+        .trace
+        .iter()
+        .any(|entry| entry.message == "Authority roll materialized."));
+}
+
+#[test]
+fn supplied_rolls_classify_invalid_and_excess_values() {
+    let command = |id: &str, rolls: Vec<i32>| {
+        CombatSessionIntentCommandSpec::new(
+            id,
+            "Supplied Focus Shot",
+            "Classify caller-supplied roll values.",
+            UseActionIntent::new("entity-adept", "basic-attack.entity-adept", "entity-raider"),
+            rolls,
+        )
+    };
+    let mut invalid_session =
+        CombatSessionState::new("invalid-roll", hexing_bolt_fixture_scenario());
+    let invalid = invalid_session.submit_intent_command(command("invalid-roll", vec![21, 5]));
+    assert_eq!(
+        invalid.receipt.rejection,
+        Some(RulebenchRejection::InvalidRollValue)
+    );
+
+    let mut excess_session = CombatSessionState::new("excess-roll", hexing_bolt_fixture_scenario());
+    let excess = excess_session.submit_intent_command(command("excess-roll", vec![20, 5, 7]));
+    assert!(excess.receipt.accepted);
+    assert_eq!(excess.receipt.roll_consumption.len(), 3);
+    assert!(!excess.receipt.roll_consumption[2].consumed);
+    assert_eq!(
+        excess.receipt.roll_consumption[2].reason,
+        "Excess roll value was not requested by resolution."
+    );
+}
+
+#[test]
+fn bounded_automatic_run_can_materialize_each_command_roll_stream() {
+    let mut session = CombatSessionState::new("generated-run", hexing_bolt_fixture_scenario());
+
+    let readout = session.run_automatic_combat(
+        CombatSessionAutomaticRunSpec::new(
+            "generated-run",
+            "Generated run",
+            "Run bounded combat without a pre-authored roll stream.",
+            6,
+            Vec::new(),
+        )
+        .with_generated_rolls(91),
+    );
+
+    assert!(matches!(
+        readout.decision_kind,
+        CombatSessionAutomaticRunDecisionKind::CompletedCombatEnded
+            | CombatSessionAutomaticRunDecisionKind::StoppedAtMaxSteps
+    ));
+    let submitted_steps = readout
+        .steps
+        .iter()
+        .filter_map(|step| step.auto_candidate.as_ref())
+        .filter_map(|execution| execution.submitted_step.as_ref())
+        .collect::<Vec<_>>();
+    assert!(!submitted_steps.is_empty());
+    assert!(submitted_steps.iter().all(|step| {
+        step.roll_mode.code() == "authorityGenerated" && !step.generated_rolls.is_empty()
+    }));
+}
+
+#[test]
+fn replay_records_generated_values_and_verifies_without_rerolling() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.content_pack_set = Some(
+        content_import_examples()
+            .into_iter()
+            .find_map(|example| match example.outcome {
+                ContentImportExampleOutcome::Accepted(imported) => {
+                    Some(imported.resolved_set.reference)
+                }
+                ContentImportExampleOutcome::Rejected { .. } => None,
+            })
+            .expect("fixture content import includes an accepted pack set"),
+    );
+    let ruleset = scenario
+        .selected_ruleset()
+        .expect("fixture selects a ruleset")
+        .artifact_provenance();
+    let generated = CombatSessionIntentCommandSpec::new(
+        "generated-replay-command",
+        "Generated replay attack",
+        "Record concrete generated values for replay.",
+        UseActionIntent::new("entity-adept", "basic-attack.entity-adept", "entity-raider"),
+        Vec::new(),
+    )
+    .with_generated_rolls(77);
+
+    let package = record_replay_package(
+        "generated-replay",
+        CombatSessionCreateRequest::new("generated-replay-session", scenario),
+        ruleset,
+        vec![ReplayCommandRecordingSpec::new(
+            "generated-replay-command",
+            ReplayCommand::Intent(generated),
+        )],
+    );
+
+    let ReplayCommand::Intent(recorded) = &package.commands[0].command else {
+        panic!("recorded command remains an intent");
+    };
+    assert!(!recorded.roll_stream.is_empty());
+    assert!(matches!(
+        recorded.roll_mode,
+        CommandRollMode::RecordedGenerated { seed: 77 }
+    ));
+    assert_eq!(package.evidence.randomness.len(), 1);
+    assert!(matches!(
+        package.evidence.randomness[0].source,
+        ReplayRandomnessSource::Generated { seed: 77, .. }
+    ));
+    assert!(verify_replay_package(&package).accepted);
+}
+
+#[test]
 fn session_runtime_projects_authoritative_legal_cell_affordances() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.grid.cells.push(GridCell {

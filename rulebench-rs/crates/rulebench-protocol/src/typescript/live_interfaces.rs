@@ -163,6 +163,17 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 ]),
             },
             Interface {
+                name: "RulebenchLiveGeneratedRollDto",
+                fields: fields(vec![
+                    field("sequence", "number"),
+                    field("commandId", "string"),
+                    field("requestKind", "RulebenchRollRequestKindDto"),
+                    field("dieExpression", "string"),
+                    field("value", "number"),
+                    field("sourceMode", "\"authorityGenerated\""),
+                ]),
+            },
+            Interface {
                 name: "RulebenchLiveCombatEndDto",
                 fields: fields(vec![
                     field("shouldEnd", "boolean"),
@@ -298,6 +309,8 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("trace", "readonly RulebenchLiveTraceEntryDto[]"),
                     field("stateBeforeFingerprint", "RulebenchLiveStateFingerprintDto"),
                     field("stateAfterFingerprint", "RulebenchLiveStateFingerprintDto"),
+                    field("rollMode", "\"supplied\" | \"authorityGenerated\""),
+                    field("generatedRolls", "readonly RulebenchLiveGeneratedRollDto[]"),
                 ]),
             },
             Interface {
