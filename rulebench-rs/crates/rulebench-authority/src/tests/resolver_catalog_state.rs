@@ -1225,8 +1225,8 @@ fn combat_state_applies_hit_damage_and_condition() {
     let mut state = CombatState::from_scenario(&scenario);
 
     assert_eq!(state.active_modifiers_for("entity-raider"), Some(&[][..]));
-    state.apply_hit(damage, modifier);
-    state.apply_hit(damage, modifier);
+    state.apply_hit(damage, Some(modifier));
+    state.apply_hit(damage, Some(modifier));
     let projection = state.project("After accepted hit.");
     let active_modifiers = state
         .active_modifiers_for("entity-raider")
@@ -1299,7 +1299,7 @@ fn combat_state_applies_active_modifiers_back_to_scenario() {
     let modifier = receipt.modifier.as_ref().expect("fixture hit has modifier");
     let mut state = CombatState::from_scenario(&scenario);
 
-    state.apply_hit(damage, modifier);
+    state.apply_hit(damage, Some(modifier));
     let next_scenario = state.apply_to_scenario(scenario);
     let raider = next_scenario
         .combatants

@@ -27,7 +27,7 @@ fn session_runtime_current_actor_options_read_initial_action_and_target() {
     assert!(!options.current_actor_defeated);
     assert!(options.available);
     assert_eq!(options.unavailable_reason, None);
-    assert_eq!(options.actions.len(), 2);
+    assert_eq!(options.actions.len(), 3);
     assert_eq!(options.actions[0].action_id, "hexing_bolt");
     assert_eq!(options.actions[0].ability_id, "ability.hexing-bolt");
     assert_eq!(options.actions[0].action_name, "Hexing Bolt");
@@ -189,7 +189,7 @@ fn session_runtime_rejects_blocked_occupied_out_of_bounds_and_exhausted_movement
 }
 
 #[test]
-fn replay_reproduces_accepted_and_rejected_movement_positions() {
+fn replay_reproduces_movement_and_basic_attack_evidence() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.content_pack_set = Some(
         content_import_examples()
@@ -218,6 +218,16 @@ fn replay_reproduces_accepted_and_rejected_movement_positions() {
             )),
         )
     };
+    let basic_attack = ReplayCommandRecordingSpec::new(
+        "basic-attack-replay",
+        ReplayCommand::Intent(CombatSessionIntentCommandSpec::new(
+            "basic-attack-replay",
+            "Focus Shot",
+            "Replay a content-defined basic attack.",
+            UseActionIntent::new("entity-adept", "basic-attack.entity-adept", "entity-raider"),
+            vec![14, 5],
+        )),
+    );
     let package = record_replay_package(
         "movement-replay",
         CombatSessionCreateRequest::new("movement-replay-session", scenario),
@@ -225,6 +235,7 @@ fn replay_reproduces_accepted_and_rejected_movement_positions() {
         vec![
             move_command("move-accepted", GridPosition { x: 2, y: 1 }),
             move_command("move-rejected", GridPosition { x: 4, y: 1 }),
+            basic_attack,
         ],
     );
 
@@ -241,8 +252,114 @@ fn replay_reproduces_accepted_and_rejected_movement_positions() {
         inspection.commands[1].actual
     );
     assert_eq!(
+        inspection.commands[2].expected,
+        inspection.commands[2].actual
+    );
+    assert_eq!(
         inspection.commands[1].snapshot.current_state.combatants[0].position,
         GridPosition { x: 2, y: 1 }
+    );
+    assert_eq!(
+        inspection.commands[2].snapshot.current_state.combatants[1]
+            .hit_points
+            .current,
+        13
+    );
+}
+
+#[test]
+fn basic_attack_resolves_ranged_hit_miss_and_defeat_without_a_modifier() {
+    let submit = |scenario: RulebenchScenario, id: &str, rolls: Vec<i32>| {
+        let mut session = CombatSessionState::new(id, scenario);
+        session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            id,
+            "Focus Shot",
+            "Resolve the content-defined ranged basic attack.",
+            UseActionIntent::new("entity-adept", "basic-attack.entity-adept", "entity-raider"),
+            rolls,
+        ))
+    };
+
+    let hit = submit(
+        hexing_bolt_fixture_scenario(),
+        "basic-ranged-hit",
+        vec![14, 5],
+    );
+    let miss = submit(
+        hexing_bolt_fixture_scenario(),
+        "basic-ranged-miss",
+        vec![1, 8],
+    );
+    let mut lethal_scenario = hexing_bolt_fixture_scenario();
+    lethal_scenario.combatants[1].hit_points.current = 3;
+    let lethal = submit(lethal_scenario, "basic-ranged-lethal", vec![14, 5]);
+
+    assert!(hit.receipt.accepted);
+    assert_eq!(hit.receipt.modifier, None);
+    assert_eq!(hit.state_after.combatants[1].hit_points.current, 13);
+    assert_eq!(
+        miss.receipt.attack_roll.as_ref().map(|roll| roll.outcome),
+        Some(AttackOutcome::Miss)
+    );
+    assert_eq!(miss.state_after.combatants[1].hit_points.current, 18);
+    assert_eq!(lethal.state_after.combatants[1].hit_points.current, 0);
+}
+
+#[test]
+fn basic_attack_resolves_melee_and_rejects_range_and_line_of_sight() {
+    let mut melee_scenario = hexing_bolt_fixture_scenario();
+    melee_scenario.combatants[1].position = GridPosition { x: 2, y: 1 };
+    let mut melee_session = CombatSessionState::new("basic-melee", melee_scenario);
+    melee_session.advance_turn();
+    let melee = melee_session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "basic-melee-hit",
+        "Raider Blade",
+        "Resolve the content-defined melee basic attack.",
+        UseActionIntent::new(
+            "entity-raider",
+            "basic-attack.entity-raider",
+            "entity-adept",
+        ),
+        vec![14, 4],
+    ));
+    assert!(melee.receipt.accepted);
+    assert_eq!(melee.state_after.combatants[0].hit_points.current, 20);
+
+    let mut ranged_session =
+        CombatSessionState::new("basic-out-of-range", hexing_bolt_fixture_scenario());
+    ranged_session.advance_turn();
+    let out_of_range = ranged_session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "basic-out-of-range",
+        "Raider Blade",
+        "Reject a melee target outside declared range.",
+        UseActionIntent::new(
+            "entity-raider",
+            "basic-attack.entity-raider",
+            "entity-adept",
+        ),
+        vec![14, 4],
+    ));
+    assert_eq!(
+        out_of_range.receipt.rejection,
+        Some(RulebenchRejection::TargetOutOfRange)
+    );
+
+    let mut blocked_scenario = hexing_bolt_fixture_scenario();
+    blocked_scenario.actions[2]
+        .targeting
+        .visible_target_ids
+        .clear();
+    let mut blocked_session = CombatSessionState::new("basic-blocked", blocked_scenario);
+    let blocked = blocked_session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "basic-blocked",
+        "Focus Shot",
+        "Reject a target outside declared line of sight.",
+        UseActionIntent::new("entity-adept", "basic-attack.entity-adept", "entity-raider"),
+        vec![14, 5],
+    ));
+    assert_eq!(
+        blocked.receipt.rejection,
+        Some(RulebenchRejection::TargetNotVisible)
     );
 }
 
@@ -295,7 +412,7 @@ fn session_runtime_current_actor_options_snapshot_readback_uses_current_state() 
         snapshot.current_actor_options.current_actor_id,
         Some("entity-adept".to_string())
     );
-    assert_eq!(snapshot.current_actor_options.actions.len(), 2);
+    assert_eq!(snapshot.current_actor_options.actions.len(), 3);
     assert_eq!(
         snapshot.current_actor_options.actions[0].target_options[0].target_id,
         "entity-raider"
@@ -307,24 +424,19 @@ fn session_runtime_current_actor_options_snapshot_readback_uses_current_state() 
 }
 
 #[test]
-fn session_runtime_current_actor_options_report_no_actions_after_turn_advance() {
+fn session_runtime_current_actor_options_report_raider_actions_after_turn_advance() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
     session.advance_turn();
 
     let options = session.current_actor_options();
 
-    assert!(!options.available);
+    assert!(options.available);
     assert_eq!(options.current_actor_id, Some("entity-raider".to_string()));
-    assert_eq!(
-        options.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
-    );
-    assert_eq!(
-        options.unavailable_reason.map(|reason| reason.code()),
-        Some("noMatchingActions")
-    );
-    assert!(options.actions.is_empty());
+    assert_eq!(options.unavailable_reason, None);
+    assert_eq!(options.actions.len(), 2);
+    assert_eq!(options.actions[0].action_id, "move.entity-raider");
+    assert_eq!(options.actions[1].action_id, "basic-attack.entity-raider");
 }
 
 #[test]
@@ -358,16 +470,9 @@ fn session_runtime_initial_turn_order_skips_defeated_combatants() {
 
     assert_eq!(options.current_actor_id, Some("entity-raider".to_string()));
     assert!(!options.current_actor_defeated);
-    assert!(!options.available);
-    assert_eq!(
-        options.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
-    );
-    assert_eq!(
-        options.unavailable_reason.map(|reason| reason.code()),
-        Some("noMatchingActions")
-    );
-    assert!(options.actions.is_empty());
+    assert!(options.available);
+    assert_eq!(options.unavailable_reason, None);
+    assert_eq!(options.actions.len(), 2);
 }
 
 #[test]
@@ -382,7 +487,7 @@ fn session_runtime_current_actor_options_filter_defeated_visible_targets() {
     assert!(!options.current_actor_defeated);
     assert!(options.available);
     assert_eq!(options.unavailable_reason, None);
-    assert_eq!(options.actions.len(), 2);
+    assert_eq!(options.actions.len(), 3);
     assert_eq!(options.actions[0].action_id, "hexing_bolt");
     assert!(options.actions[0].target_options.is_empty());
     assert!(!options.actions[1].destination_options.is_empty());
@@ -404,7 +509,7 @@ fn session_runtime_command_candidates_read_initial_current_actor_intents() {
     );
     assert!(!candidates.current_actor_defeated);
     assert_eq!(candidates.unavailable_reason, None);
-    assert_eq!(candidates.candidates.len(), 1);
+    assert_eq!(candidates.candidates.len(), 2);
 
     let candidate = &candidates.candidates[0];
     assert_eq!(
@@ -470,10 +575,7 @@ fn session_runtime_command_candidates_report_no_candidates_when_unavailable() {
         candidates.current_actor_id,
         Some("entity-raider".to_string())
     );
-    assert_eq!(
-        candidates.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
-    );
+    assert_eq!(candidates.unavailable_reason, None);
     assert!(candidates.candidates.is_empty());
 }
 
@@ -594,14 +696,8 @@ fn session_runtime_candidate_selection_rejects_unavailable_candidates() {
     );
     assert_eq!(plan.decision_kind.code(), "rejectedByUnavailableCandidates");
     assert_eq!(plan.current_actor_id, Some("entity-raider".to_string()));
-    assert_eq!(
-        plan.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
-    );
-    assert_eq!(
-        plan.reason,
-        "No command candidates are available because the current actor has no matching actions."
-    );
+    assert_eq!(plan.unavailable_reason, None);
+    assert_eq!(plan.reason, "No command candidates are available.");
     assert_eq!(plan.command, None);
     assert_eq!(after_plan, before_plan);
 }
@@ -640,7 +736,7 @@ fn session_runtime_candidate_selection_rejects_missing_candidate() {
 }
 
 #[test]
-fn session_runtime_candidate_selection_rejects_candidate_failed_by_preflight() {
+fn session_runtime_candidate_selection_omits_illegal_self_target() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0].targeting.target_ids = vec!["entity-adept".to_string()];
     scenario.actions[0].targeting.visible_target_ids = vec!["entity-adept".to_string()];
@@ -650,10 +746,9 @@ fn session_runtime_candidate_selection_rejects_candidate_failed_by_preflight() {
 
     assert!(candidates.available);
     assert_eq!(candidates.candidates.len(), 1);
-    assert!(!candidates.candidates[0].accepted);
     assert_eq!(
-        candidates.candidates[0].decision_kind,
-        CommandPreflightDecisionKind::RejectedByTargetLegality
+        candidates.candidates[0].action_id,
+        "basic-attack.entity-adept"
     );
     let before_plan = session.snapshot();
 
@@ -670,18 +765,12 @@ fn session_runtime_candidate_selection_rejects_candidate_failed_by_preflight() {
     assert!(!plan.accepted);
     assert_eq!(
         plan.decision_kind,
-        CombatSessionCandidateSelectionDecisionKind::RejectedByPreflight
+        CombatSessionCandidateSelectionDecisionKind::RejectedByMissingCandidate
     );
-    assert_eq!(plan.decision_kind.code(), "rejectedByPreflight");
+    assert_eq!(plan.decision_kind.code(), "rejectedByMissingCandidate");
     assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
-    assert_eq!(
-        plan.preflight_decision_kind,
-        Some(CommandPreflightDecisionKind::RejectedByTargetLegality)
-    );
-    assert_eq!(
-        plan.rejection,
-        Some(RulebenchRejection::TargetLegalityFailed)
-    );
+    assert_eq!(plan.preflight_decision_kind, None);
+    assert_eq!(plan.rejection, None);
     assert_eq!(plan.command, None);
     assert_eq!(after_plan, before_plan);
 }
@@ -754,8 +843,8 @@ fn session_runtime_auto_candidate_plan_selects_first_accepted_candidate_read_onl
     );
     assert_eq!(plan.decision_kind.code(), "accepted");
     assert_eq!(plan.current_actor_id, Some("entity-adept".to_string()));
-    assert_eq!(plan.candidate_count, 1);
-    assert_eq!(plan.accepted_candidate_count, 1);
+    assert_eq!(plan.candidate_count, 2);
+    assert_eq!(plan.accepted_candidate_count, 2);
     assert_eq!(plan.selected_action_id, Some("hexing_bolt".to_string()));
     assert_eq!(plan.selected_target_id, Some("entity-raider".to_string()));
     assert_eq!(plan.unavailable_reason, None);
@@ -911,10 +1000,7 @@ fn session_runtime_auto_candidate_submission_rejects_unavailable_candidates_read
     );
     assert_eq!(execution.plan.candidate_count, 0);
     assert_eq!(execution.plan.accepted_candidate_count, 0);
-    assert_eq!(
-        execution.plan.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoMatchingActions)
-    );
+    assert_eq!(execution.plan.unavailable_reason, None);
     assert_eq!(execution.submitted_step, None);
     assert_eq!(after_execution, before_execution);
     assert!(session.combat_log().is_empty());
@@ -1226,8 +1312,8 @@ fn session_runtime_automatic_policy_is_deterministic_and_rejects_unsupported_inp
             vec![17, 5],
         ));
     let evidence = &multi_execution.plan.policy_decision;
-    assert_eq!(evidence.candidate_count, 2);
-    assert_eq!(evidence.accepted_candidate_count, 2);
+    assert_eq!(evidence.candidate_count, 3);
+    assert_eq!(evidence.accepted_candidate_count, 3);
     assert_eq!(evidence.selected_candidate_index, Some(0));
     assert_eq!(
         evidence
@@ -1235,7 +1321,7 @@ fn session_runtime_automatic_policy_is_deterministic_and_rejects_unsupported_inp
             .iter()
             .map(|candidate| candidate.action_id.as_str())
             .collect::<Vec<_>>(),
-        vec!["hexing_bolt", "second_bolt"]
+        vec!["hexing_bolt", "basic-attack.entity-adept", "second_bolt",]
     );
     assert_eq!(
         multi_execution

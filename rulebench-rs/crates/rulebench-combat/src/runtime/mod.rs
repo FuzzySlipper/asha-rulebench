@@ -472,12 +472,11 @@ impl CombatSessionState {
             return;
         }
 
-        let (Some(damage), Some(modifier)) = (receipt.damage.as_ref(), receipt.modifier.as_ref())
-        else {
+        let Some(damage) = receipt.damage.as_ref() else {
             return;
         };
 
-        self.state.apply_hit(damage, modifier);
+        self.state.apply_hit(damage, receipt.modifier.as_ref());
     }
 
     pub fn plan_candidate_command(

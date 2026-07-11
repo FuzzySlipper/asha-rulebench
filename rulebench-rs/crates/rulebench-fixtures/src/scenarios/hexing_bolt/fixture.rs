@@ -46,7 +46,27 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
         modifiers: hexing_bolt_modifiers(),
         items: hexing_bolt_items(),
         selected_item_id: Some("item.hex-focus".to_string()),
-        actions: vec![selected_action.clone(), move_action("entity-adept")],
+        actions: vec![
+            selected_action.clone(),
+            move_action("entity-adept"),
+            basic_attack_action(
+                "entity-adept",
+                "Focus Shot",
+                "mind",
+                4,
+                "force",
+                vec!["entity-raider"],
+            ),
+            move_action("entity-raider"),
+            basic_attack_action(
+                "entity-raider",
+                "Raider Blade",
+                "body",
+                1,
+                "slashing",
+                vec!["entity-adept"],
+            ),
+        ],
         selected_action,
     }
 }
@@ -69,7 +89,9 @@ pub fn turn_control_fixture_scenario() -> RulebenchScenario {
         ],
     };
     scenario.selected_ruleset_id = ruleset_id.clone();
-    scenario.actions[0].ruleset_id = ruleset_id.clone();
+    for action in &mut scenario.actions {
+        action.ruleset_id = ruleset_id.clone();
+    }
     scenario.selected_action.ruleset_id = ruleset_id;
     scenario
 }
@@ -316,6 +338,59 @@ fn move_action(actor_id: &str) -> ActionDefinition {
     action
 }
 
+fn basic_attack_action(
+    actor_id: &str,
+    name: &str,
+    attack_stat_id: &str,
+    maximum_range: u32,
+    damage_type: &str,
+    target_ids: Vec<&str>,
+) -> ActionDefinition {
+    let targets = target_ids
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    ActionDefinition {
+        id: format!("basic-attack.{actor_id}"),
+        ruleset_id: "asha-rulebench.hexing-bolt.v0".to_string(),
+        ability_id: "ability.basic-attack".to_string(),
+        name: name.to_string(),
+        actor_id: actor_id.to_string(),
+        targeting: TargetingDeclaration {
+            target_kind: TargetKind::Combatant,
+            selection: TargetSelection::Single,
+            team_constraint: TargetTeamConstraint::Hostile,
+            maximum_range,
+            visibility_requirement: VisibilityRequirement::Required,
+            target_ids: targets.clone(),
+            visible_target_ids: targets,
+        },
+        check: CheckDeclaration::Attack(AttackCheckDeclaration {
+            modifier: 0,
+            modifier_stat_id: attack_stat_id.to_string(),
+            defense: DefenseReference {
+                id: "guard".to_string(),
+                label: "Guard".to_string(),
+            },
+        }),
+        hit: HitEffect {
+            damage_bonus: 0,
+            damage_type: damage_type.to_string(),
+            modifier_id: String::new(),
+            modifier_label: String::new(),
+            modifier_duration: String::new(),
+            operations: vec![HitEffectOperation::Damage(DamageEffectOperation {
+                damage_bonus: 0,
+                damage_type: damage_type.to_string(),
+            })],
+        },
+        resource_costs: vec![ActionResourceCost::standard_action()],
+        movement: None,
+        action_text: format!("{attack_stat_id} vs Guard at range {maximum_range}."),
+        effect_text: format!("1d8 {damage_type} damage on hit."),
+    }
+}
+
 fn hexing_bolt_abilities() -> Vec<AbilityDefinition> {
     vec![
         AbilityDefinition {
@@ -335,6 +410,13 @@ fn hexing_bolt_abilities() -> Vec<AbilityDefinition> {
             kind: AbilityDefinitionKind::Ability,
             summary: "Content-declared movement behavior.".to_string(),
             tags: vec!["movement".to_string()],
+        },
+        AbilityDefinition {
+            id: "ability.basic-attack".to_string(),
+            name: "Basic Attack".to_string(),
+            kind: AbilityDefinitionKind::Ability,
+            summary: "Content-defined ordinary weapon attack behavior.".to_string(),
+            tags: vec!["attack".to_string(), "weapon".to_string()],
         },
     ]
 }
@@ -558,7 +640,10 @@ fn adept_initial() -> Combatant {
         resource_pools: vec![ActionResourcePool::standard_action()],
         inventory_item_ids: vec!["item.hex-focus".to_string()],
         equipped_item_ids: vec!["item.hex-focus".to_string()],
-        base_ability_ids: vec!["ability.move".to_string()],
+        base_ability_ids: vec![
+            "ability.move".to_string(),
+            "ability.basic-attack".to_string(),
+        ],
         active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: true,
@@ -614,7 +699,10 @@ fn raider_initial() -> Combatant {
         resource_pools: vec![ActionResourcePool::standard_action()],
         inventory_item_ids: vec!["item.raider-mail".to_string()],
         equipped_item_ids: vec!["item.raider-mail".to_string()],
-        base_ability_ids: Vec::new(),
+        base_ability_ids: vec![
+            "ability.move".to_string(),
+            "ability.basic-attack".to_string(),
+        ],
         active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: false,

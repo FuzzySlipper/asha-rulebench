@@ -210,9 +210,22 @@ fn scenario_with_metadata(
     scenario.combatants[0].position = GridPosition { x: 1, y: 2 };
     scenario.combatants[0].hit_points.current = 30;
     scenario.combatants[0].hit_points.max = 30;
-    scenario.actions[0].actor_id = "entity-veteran-adept".to_string();
-    scenario.actions[1].actor_id = "entity-veteran-adept".to_string();
-    scenario.actions[1].id = "move.entity-veteran-adept".to_string();
+    for action in &mut scenario.actions {
+        if action.actor_id == "entity-adept" {
+            action.actor_id = "entity-veteran-adept".to_string();
+            action.id = action.id.replace("entity-adept", "entity-veteran-adept");
+        }
+        for target_id in &mut action.targeting.target_ids {
+            if target_id == "entity-adept" {
+                *target_id = "entity-veteran-adept".to_string();
+            }
+        }
+        for target_id in &mut action.targeting.visible_target_ids {
+            if target_id == "entity-adept" {
+                *target_id = "entity-veteran-adept".to_string();
+            }
+        }
+    }
     scenario.selected_action.actor_id = "entity-veteran-adept".to_string();
     scenario
 }

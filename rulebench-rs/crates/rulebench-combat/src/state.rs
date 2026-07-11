@@ -130,14 +130,14 @@ impl CombatState {
         true
     }
 
-    pub fn apply_hit(&mut self, damage: &DamageOutcome, modifier: &ModifierOutcome) {
+    pub fn apply_hit(&mut self, damage: &DamageOutcome, modifier: Option<&ModifierOutcome>) {
         for combatant in &mut self.combatants {
             if combatant.id == damage.target_id {
                 combatant.hit_points = damage.after;
                 combatant.temporary_vitality = damage.temporary_vitality_after;
             }
-            if combatant.id == modifier.target_id {
-                combatant.apply_modifier(modifier);
+            if modifier.is_some_and(|modifier| combatant.id == modifier.target_id) {
+                combatant.apply_modifier(modifier.expect("checked modifier presence"));
             }
         }
     }

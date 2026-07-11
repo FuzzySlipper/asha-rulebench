@@ -809,10 +809,7 @@ fn session_runtime_script_selected_candidate_rejection_is_read_only() {
     assert_eq!(step.command_audit_sequence, None);
     assert_eq!(step.control_history_sequence, None);
     assert_eq!(step.state_before_fingerprint, step.state_after_fingerprint);
-    assert_eq!(
-        step.reason,
-        "No command candidates are available because the current actor has no matching actions."
-    );
+    assert_eq!(step.reason, "No command candidates are available.");
 
     let after_script = session.snapshot();
     assert_eq!(after_script, before_script);

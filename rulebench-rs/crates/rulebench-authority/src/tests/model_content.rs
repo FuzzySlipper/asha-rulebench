@@ -94,7 +94,7 @@ fn scenario_carries_hexing_bolt_action_catalog_entry() {
     let scenario = hexing_bolt_fixture_scenario();
 
     assert!(validate_scenario_content(&scenario).is_empty());
-    assert_eq!(scenario.actions.len(), 2);
+    assert_eq!(scenario.actions.len(), 5);
     assert_eq!(scenario.actions[0].id, "hexing_bolt");
     assert_eq!(scenario.actions[0], scenario.selected_action);
     assert_eq!(
@@ -123,7 +123,11 @@ fn scenario_carries_ability_spell_catalog_and_action_reference() {
             .iter()
             .map(|ability| ability.id.as_str())
             .collect::<Vec<_>>(),
-        vec!["ability.hexing-bolt", "ability.move"]
+        vec![
+            "ability.hexing-bolt",
+            "ability.move",
+            "ability.basic-attack"
+        ]
     );
     assert_eq!(
         scenario

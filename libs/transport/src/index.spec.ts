@@ -424,13 +424,17 @@ describe("RulebenchTransport fixtures", () => {
           combatantId: "entity-adept",
           inventoryItemIds: ["item.hex-focus"],
           equippedItemIds: ["item.hex-focus"],
-          availableAbilityIds: ["ability.move", "ability.hexing-bolt"],
+          availableAbilityIds: [
+            "ability.move",
+            "ability.basic-attack",
+            "ability.hexing-bolt",
+          ],
         },
         {
           combatantId: "entity-raider",
           inventoryItemIds: ["item.raider-mail"],
           equippedItemIds: ["item.raider-mail"],
-          availableAbilityIds: [],
+          availableAbilityIds: ["ability.move", "ability.basic-attack"],
         },
       ]);
       expect(result.value.finalClassBuildLedger.combatants).toEqual([
@@ -580,11 +584,11 @@ describe("RulebenchTransport fixtures", () => {
           ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "f5c1f29004af40c7",
+            value: "f00d87042575a967",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "f5c1f29004af40c7",
+            value: "f00d87042575a967",
           },
         },
         {
@@ -616,11 +620,11 @@ describe("RulebenchTransport fixtures", () => {
           ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "f5c1f29004af40c7",
+            value: "f00d87042575a967",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "8957f17dccd071ac",
+            value: "0c98edaca2ce950c",
           },
         },
         {
@@ -637,11 +641,11 @@ describe("RulebenchTransport fixtures", () => {
           rollConsumption: [],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "8957f17dccd071ac",
+            value: "0c98edaca2ce950c",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "8957f17dccd071ac",
+            value: "0c98edaca2ce950c",
           },
         },
       ]);
@@ -829,6 +833,13 @@ describe("RulebenchTransport fixtures", () => {
         {
           index: 0,
           actionId: "hexing_bolt",
+          targetId: "entity-raider",
+          accepted: true,
+          decisionKind: "accepted",
+        },
+        {
+          index: 1,
+          actionId: "basic-attack.entity-adept",
           targetId: "entity-raider",
           accepted: true,
           decisionKind: "accepted",
@@ -1049,11 +1060,11 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.decisionKind).toBe("verified");
       expect(result.value.expectedFinalStateFingerprint).toEqual({
         algorithm: "fnv1a64.rulebench-projection.v0",
-        value: "f726f2f026a5ae34",
+        value: "12ec429e8201d5ce",
       });
       expect(result.value.actualFinalStateFingerprint).toEqual({
         algorithm: "fnv1a64.rulebench-projection.v0",
-        value: "f726f2f026a5ae34",
+        value: "12ec429e8201d5ce",
       });
       expect(result.value.finalStateFingerprintMatches).toBe(true);
       expect(result.value.finalizationMatches).toBe(true);

@@ -635,12 +635,22 @@ fn current_actor_action_option(
         })
         .unwrap_or_default();
     let target_mode = ActionTargetMode::from(action.targeting.target_kind);
+    let actor_position =
+        projected_combatant_by_id(projection, actor_id).map(|actor| actor.position);
     let target_options = action
         .targeting
         .visible_target_ids
         .iter()
         .filter_map(|target_id| projected_combatant_by_id(projection, target_id))
         .filter(|target| target.hit_points.current > 0)
+        .filter(|target| target.id != actor_id)
+        .filter(|target| {
+            actor_position.is_some_and(|actor_position| {
+                actor_position.x.abs_diff(target.position.x)
+                    + actor_position.y.abs_diff(target.position.y)
+                    <= action.targeting.maximum_range
+            })
+        })
         .map(|target| CurrentActorTargetOption {
             target_id: target.id.clone(),
             target_name: target.name.clone(),

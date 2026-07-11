@@ -806,16 +806,21 @@ fn resolve_accepted_action(
     let damage_roll = roll_stream[1];
     let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
     let damage = vitality_effects.damage.clone();
-    let Some(modifier) =
-        modifier_outcome(scenario, target, &intent.action_id, hit_operations.modifier)
-    else {
-        return rejected_with_projection(
-            scenario,
-            intent,
-            RulebenchRejection::InvalidAction,
-            Some(target_legality),
-            trace,
-        );
+    let modifier = match hit_operations.modifier {
+        Some(operation) => {
+            let Some(modifier) = modifier_outcome(scenario, target, &intent.action_id, operation)
+            else {
+                return rejected_with_projection(
+                    scenario,
+                    intent,
+                    RulebenchRejection::InvalidAction,
+                    Some(target_legality),
+                    trace,
+                );
+            };
+            Some(modifier)
+        }
+        None => None,
     };
 
     trace.push(TraceEntry::new(
@@ -926,16 +931,21 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
     } = resolution;
     let vitality_effects = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
     let damage = vitality_effects.damage.clone();
-    let Some(modifier) =
-        modifier_outcome(scenario, target, &intent.action_id, hit_operations.modifier)
-    else {
-        return rejected_with_projection(
-            scenario,
-            intent,
-            RulebenchRejection::InvalidAction,
-            Some(target_legality),
-            trace,
-        );
+    let modifier = match hit_operations.modifier {
+        Some(operation) => {
+            let Some(modifier) = modifier_outcome(scenario, target, &intent.action_id, operation)
+            else {
+                return rejected_with_projection(
+                    scenario,
+                    intent,
+                    RulebenchRejection::InvalidAction,
+                    Some(target_legality),
+                    trace,
+                );
+            };
+            Some(modifier)
+        }
+        None => None,
     };
     append_vitality_trace(&mut trace, &vitality_effects);
     trace.push(TraceEntry::new(
@@ -946,7 +956,7 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
         "ActionUsed, check resolution, vitality effects, and ModifierApplied became accepted facts.",
     ));
     let mut state = CombatState::from_scenario(scenario);
-    state.apply_hit(&damage, &modifier);
+    state.apply_hit(&damage, modifier.as_ref());
     if let Some(healing) = &vitality_effects.healing {
         state.apply_healing(healing);
     }
@@ -964,7 +974,7 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
         damage: Some(damage.clone()),
         healing: vitality_effects.healing.clone(),
         temporary_vitality: vitality_effects.temporary_vitality.clone(),
-        modifier: Some(modifier.clone()),
+        modifier: modifier.clone(),
         roll_consumption,
         events: accepted_check_effect_events(
             &intent,
@@ -972,7 +982,7 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
             &damage,
             vitality_effects.healing.as_ref(),
             vitality_effects.temporary_vitality.as_ref(),
-            &modifier,
+            modifier.as_ref(),
         ),
         trace,
         projection: Some(state.project("Check failed and effects were applied.")),
@@ -985,7 +995,7 @@ fn accepted_check_effect_events(
     damage: &DamageOutcome,
     healing: Option<&HealingOutcome>,
     temporary_vitality: Option<&TemporaryVitalityOutcome>,
-    modifier: &ModifierOutcome,
+    modifier: Option<&ModifierOutcome>,
 ) -> Vec<DomainEvent> {
     let mut events = vec![
         DomainEvent::ActionUsed {
@@ -1013,11 +1023,13 @@ fn accepted_check_effect_events(
             amount: temporary_vitality.after - temporary_vitality.before,
         });
     }
-    events.push(DomainEvent::ModifierApplied {
-        target_id: modifier.target_id.clone(),
-        modifier_id: modifier.modifier_id.clone(),
-        duration: modifier.duration.clone(),
-    });
+    if let Some(modifier) = modifier {
+        events.push(DomainEvent::ModifierApplied {
+            target_id: modifier.target_id.clone(),
+            modifier_id: modifier.modifier_id.clone(),
+            duration: modifier.duration.clone(),
+        });
+    }
     events
 }
 
@@ -1089,12 +1101,12 @@ fn accepted_hit_receipt(
     damage: DamageOutcome,
     healing: Option<HealingOutcome>,
     temporary_vitality: Option<TemporaryVitalityOutcome>,
-    modifier: ModifierOutcome,
+    modifier: Option<ModifierOutcome>,
     trace: Vec<TraceEntry>,
     roll_consumption: Vec<RollConsumptionEntry>,
 ) -> RulebenchReceipt {
     let mut state = CombatState::from_scenario(scenario);
-    state.apply_hit(&damage, &modifier);
+    state.apply_hit(&damage, modifier.as_ref());
     if let Some(healing) = &healing {
         state.apply_healing(healing);
     }
@@ -1112,7 +1124,7 @@ fn accepted_hit_receipt(
         damage: Some(damage.clone()),
         healing: healing.clone(),
         temporary_vitality: temporary_vitality.clone(),
-        modifier: Some(modifier.clone()),
+        modifier: modifier.clone(),
         roll_consumption,
         events: accepted_hit_events(
             &intent,
@@ -1120,7 +1132,7 @@ fn accepted_hit_receipt(
             &damage,
             healing.as_ref(),
             temporary_vitality.as_ref(),
-            &modifier,
+            modifier.as_ref(),
         ),
         trace,
         projection: Some(state.project("Raider is damaged and rattled; Adept is unchanged.")),
@@ -1176,7 +1188,7 @@ fn accepted_hit_events(
     damage: &DamageOutcome,
     healing: Option<&HealingOutcome>,
     temporary_vitality: Option<&TemporaryVitalityOutcome>,
-    modifier: &ModifierOutcome,
+    modifier: Option<&ModifierOutcome>,
 ) -> Vec<DomainEvent> {
     let mut events = vec![
         DomainEvent::ActionUsed {
@@ -1211,11 +1223,13 @@ fn accepted_hit_events(
             amount: temporary_vitality.after - temporary_vitality.before,
         });
     }
-    events.push(DomainEvent::ModifierApplied {
-        target_id: modifier.target_id.clone(),
-        modifier_id: modifier.modifier_id.clone(),
-        duration: modifier.duration.clone(),
-    });
+    if let Some(modifier) = modifier {
+        events.push(DomainEvent::ModifierApplied {
+            target_id: modifier.target_id.clone(),
+            modifier_id: modifier.modifier_id.clone(),
+            duration: modifier.duration.clone(),
+        });
+    }
     events
 }
 
@@ -1404,7 +1418,7 @@ struct HitOperations<'a> {
     damage: &'a DamageEffectOperation,
     healing: Option<&'a HealingEffectOperation>,
     temporary_vitality: Option<&'a TemporaryVitalityEffectOperation>,
-    modifier: &'a ModifierEffectOperation,
+    modifier: Option<&'a ModifierEffectOperation>,
 }
 
 struct AppliedVitalityEffects {
@@ -1442,7 +1456,7 @@ fn hit_operations(action: &ActionDefinition) -> Option<HitOperations<'_>> {
                 HitEffectOperation::GrantTemporaryVitality(vitality) => Some(vitality),
                 _ => None,
             }),
-        modifier: action.hit.modifier_operation()?,
+        modifier: action.hit.modifier_operation(),
     })
 }
 

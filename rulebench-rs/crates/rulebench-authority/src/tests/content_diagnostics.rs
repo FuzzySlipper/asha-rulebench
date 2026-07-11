@@ -472,6 +472,7 @@ fn content_diagnostics_report_missing_combatant_class() {
     scenario.combatants[0].base_ability_ids = vec![
         "ability.hexing-bolt".to_string(),
         "ability.move".to_string(),
+        "ability.basic-attack".to_string(),
     ];
 
     let diagnostics = validate_scenario_content(&scenario);
