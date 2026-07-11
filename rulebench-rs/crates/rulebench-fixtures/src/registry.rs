@@ -280,8 +280,8 @@ mod tests {
     fn registry_aggregates_fixture_readbacks_without_package_specific_paths() {
         let registry = crate::scenario_package_registry();
 
-        assert_eq!(registry.registrations().len(), 2);
-        assert_eq!(registry.scenario_catalog_cases().len(), 5);
+        assert_eq!(registry.registrations().len(), 3);
+        assert_eq!(registry.scenario_catalog_cases().len(), 6);
         assert_eq!(registry.combat_session_transcripts().len(), 2);
         assert_eq!(registry.combat_session_script_readouts().len(), 1);
     }

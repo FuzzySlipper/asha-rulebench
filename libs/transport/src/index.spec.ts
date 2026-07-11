@@ -142,6 +142,7 @@ describe("RulebenchTransport fixtures", () => {
         "hexing-bolt-self-target-rejected",
         "turn-control-hit",
         "hexing-bolt-veteran-hit",
+        "watchtower-skirmish",
       ]);
     }
     expect(result.ok).toBe(true);

@@ -978,7 +978,8 @@ fn catalog_enumerates_stable_scenario_summaries() {
             "hexing-bolt-miss",
             "hexing-bolt-self-target-rejected",
             "turn-control-hit",
-            "hexing-bolt-veteran-hit"
+            "hexing-bolt-veteran-hit",
+            "watchtower-skirmish"
         ]
     );
     assert_eq!(
@@ -990,6 +991,7 @@ fn catalog_enumerates_stable_scenario_summaries() {
             "acceptedHit",
             "acceptedMiss",
             "rejectedTargetLegality",
+            "acceptedHit",
             "acceptedHit",
             "acceptedHit"
         ]
