@@ -71,6 +71,7 @@
     class="status"
     [panelNumber]="4"
     panelTitle="Turn status"
+    [smallTitle]="true"
   >
     <div class="status-readout" [attr.aria-busy]="control().kind === 'loading'">
       @switch (connection().kind) {

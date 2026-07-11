@@ -7,11 +7,17 @@
 .menubar {
   align-items: center;
   display: flex;
+  justify-content: flex-start;
   min-width: 0;
+  width: 100%;
 }
 
-.menu-group { position: relative; }
-button { font: inherit; }
+.menu-group {
+  position: relative;
+}
+button {
+  font: inherit;
+}
 
 .menu-trigger,
 .menu-item {
@@ -27,7 +33,7 @@ button { font: inherit; }
   padding: 0 0.7rem;
 }
 
-.menu-trigger[aria-expanded='true'],
+.menu-trigger[aria-expanded="true"],
 .menu-trigger:hover,
 .menu-trigger:focus-visible,
 .menu-item:hover,
@@ -60,7 +66,7 @@ button { font: inherit; }
   white-space: nowrap;
 }
 
-.menu-item[aria-disabled='true'] {
+.menu-item[aria-disabled="true"] {
   color: #5f6872;
   cursor: default;
 }
@@ -82,5 +88,7 @@ button { font: inherit; }
     right: 0;
   }
 
-  .menu-trigger { padding: 0 0.55rem; }
+  .menu-trigger {
+    padding: 0 0.55rem;
+  }
 }

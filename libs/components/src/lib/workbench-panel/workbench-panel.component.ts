@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, input, viewChild } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  viewChild,
+} from "@angular/core";
 import type { ElementRef } from "@angular/core";
 
 @Component({
@@ -14,6 +19,7 @@ export class WorkbenchPanelComponent {
   readonly panelTitle = input.required<string>();
   readonly compact = input(false);
   readonly overlayTools = input(false);
+  readonly smallTitle = input(false);
 
   focus(): void {
     this.panel().nativeElement.focus();
