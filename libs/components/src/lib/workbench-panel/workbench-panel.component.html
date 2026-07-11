@@ -1,7 +1,10 @@
 <section
+  #panel
   class="panel"
   [class.panel--compact]="compact()"
+  [class.panel--overlay-tools]="overlayTools()"
   role="region"
+  tabindex="-1"
   [attr.aria-label]="panelNumber() + '. ' + panelTitle()"
 >
   <header class="panel__header">

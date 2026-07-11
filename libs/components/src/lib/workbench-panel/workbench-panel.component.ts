@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, input } from "@angular/core";
+import { ChangeDetectionStrategy, Component, input, viewChild } from "@angular/core";
+import type { ElementRef } from "@angular/core";
 
 @Component({
   selector: "arb-workbench-panel",
@@ -8,7 +9,13 @@ import { ChangeDetectionStrategy, Component, input } from "@angular/core";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkbenchPanelComponent {
+  private readonly panel = viewChild.required<ElementRef<HTMLElement>>("panel");
   readonly panelNumber = input.required<number>();
   readonly panelTitle = input.required<string>();
   readonly compact = input(false);
+  readonly overlayTools = input(false);
+
+  focus(): void {
+    this.panel().nativeElement.focus();
+  }
 }

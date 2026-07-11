@@ -1,0 +1,44 @@
+<nav class="application-menubar" aria-label="Rulebench application commands" [attr.aria-busy]="busy()">
+  <div class="menubar" role="menubar" aria-label="Rulebench application menu">
+    @for (group of visibleGroups(); track group.id; let groupIndex = $index) {
+      <div class="menu-group">
+        <button
+          #menuTrigger
+          class="menu-trigger"
+          type="button"
+          role="menuitem"
+          aria-haspopup="menu"
+          [id]="triggerId(group)"
+          [attr.aria-controls]="menuId(group)"
+          [attr.aria-expanded]="openGroupIndex() === groupIndex"
+          [attr.tabindex]="activeGroupIndex() === groupIndex ? 0 : -1"
+          (focus)="onTriggerFocus(groupIndex)"
+          (click)="onTriggerClick(groupIndex)"
+          (keydown)="onTriggerKeydown($event, groupIndex)"
+        >
+          {{ group.label }}
+        </button>
+
+        @if (openGroupIndex() === groupIndex) {
+          <div class="menu" role="menu" [id]="menuId(group)" [attr.aria-labelledby]="triggerId(group)">
+            @for (item of group.items; track item.id; let itemIndex = $index) {
+              <button
+                #menuItem
+                class="menu-item"
+                type="button"
+                role="menuitem"
+                tabindex="-1"
+                [attr.aria-disabled]="item.disabled === true"
+                (click)="onItemClick(item)"
+                (keydown)="onItemKeydown($event, item, itemIndex)"
+              >
+                {{ item.label }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+  <span class="visually-hidden" role="status" aria-live="polite">{{ statusMessage() }}</span>
+</nav>

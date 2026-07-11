@@ -20,6 +20,8 @@
 
 .menu {
   grid-area: menu;
+  position: relative;
+  z-index: 100;
 }
 .initiative {
   grid-area: initiative;

@@ -1,0 +1,86 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.application-menubar,
+.menubar {
+  align-items: center;
+  display: flex;
+  min-width: 0;
+}
+
+.menu-group { position: relative; }
+button { font: inherit; }
+
+.menu-trigger,
+.menu-item {
+  background: transparent;
+  border: 0;
+  color: var(--arb-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu-trigger {
+  height: 2.55rem;
+  padding: 0 0.7rem;
+}
+
+.menu-trigger[aria-expanded='true'],
+.menu-trigger:hover,
+.menu-trigger:focus-visible,
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: #20262d;
+  color: var(--arb-text);
+}
+
+.menu-trigger:focus-visible,
+.menu-item:focus-visible {
+  outline: 2px solid var(--arb-accent);
+  outline-offset: -2px;
+}
+
+.menu {
+  background: var(--arb-panel-header);
+  border: 1px solid var(--arb-border);
+  box-shadow: 0 10px 24px #00000066;
+  display: grid;
+  left: 0;
+  min-width: 13rem;
+  position: absolute;
+  top: calc(100% + 1px);
+  z-index: 50;
+}
+
+.menu-item {
+  min-height: 2.35rem;
+  padding: 0.55rem 0.75rem;
+  white-space: nowrap;
+}
+
+.menu-item[aria-disabled='true'] {
+  color: #5f6872;
+  cursor: default;
+}
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+@media (max-width: 850px) {
+  .menu {
+    left: auto;
+    max-width: calc(100vw - 1rem);
+    right: 0;
+  }
+
+  .menu-trigger { padding: 0 0.55rem; }
+}

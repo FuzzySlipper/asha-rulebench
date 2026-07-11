@@ -4,16 +4,18 @@
     [panelNumber]="3"
     panelTitle="Application menu"
     [compact]="true"
+    [overlayTools]="true"
   >
-    <nav panelTools aria-label="Application menu">
-      <button type="button">File</button>
-      <button type="button">Edit</button>
-      <button type="button">View</button>
-      <button type="button">Preferences</button>
-    </nav>
+    <arb-application-menubar
+      panelTools
+      [groups]="menuGroups"
+      [statusMessage]="menuStatus()"
+      (itemInvoked)="invokeMenuItem($event)"
+    />
   </arb-workbench-panel>
 
   <arb-workbench-panel
+    #initiativePanel
     class="initiative"
     [panelNumber]="2"
     panelTitle="Initiative"
@@ -28,6 +30,7 @@
   </arb-workbench-panel>
 
   <arb-workbench-panel
+    #statusPanel
     class="status"
     [panelNumber]="4"
     panelTitle="Turn status"
@@ -41,7 +44,7 @@
     </div>
   </arb-workbench-panel>
 
-  <arb-workbench-panel class="grid" [panelNumber]="1" panelTitle="Combat grid">
+  <arb-workbench-panel #gridPanel class="grid" [panelNumber]="1" panelTitle="Combat grid">
     <div class="grid-stage" aria-label="Empty combat grid">
       @for (cell of gridCells; track $index) {
         <span class="grid-cell" aria-hidden="true"></span>
@@ -50,7 +53,7 @@
     </div>
   </arb-workbench-panel>
 
-  <arb-workbench-panel class="log" [panelNumber]="5" panelTitle="Evidence log">
+  <arb-workbench-panel #logPanel class="log" [panelNumber]="5" panelTitle="Evidence log">
     <div panelTools class="tabs" role="tablist" aria-label="Evidence log views">
       <button
         type="button"
@@ -92,6 +95,7 @@
   </arb-workbench-panel>
 
   <arb-workbench-panel
+    #actionsPanel
     class="actions"
     [panelNumber]="6"
     panelTitle="Available actions"
@@ -103,6 +107,7 @@
   </arb-workbench-panel>
 
   <arb-workbench-panel
+    #unitsPanel
     class="units"
     [panelNumber]="7"
     panelTitle="Active units"
