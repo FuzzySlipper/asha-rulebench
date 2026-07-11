@@ -22,6 +22,7 @@ describe("live combat domain projections", () => {
       statusLabel: "Active",
       conditionLabels: ["rattled"],
       position: { x: 4, y: 1 },
+      coordinateLabel: "4,1",
       movementLabel: "0/0",
     });
     expect(view.options.actions[0]?.targets[0]?.id).toBe("entity-raider");
@@ -32,6 +33,14 @@ describe("live combat domain projections", () => {
       accepted: true,
       stateChanged: true,
       eventLabels: ["Damage Applied"],
+      rollModeLabel: "Authority Generated",
+      generatedRolls: [
+        {
+          purposeLabel: "Attack Roll",
+          dieExpression: "1d20",
+          valueLabel: "17",
+        },
+      ],
     });
     expect(projectLiveCommandExecution(execution(false))).toMatchObject({
       accepted: false,
@@ -158,6 +167,7 @@ function execution(accepted: boolean): RulebenchLiveCommandExecutionDto {
         actionId: "hexing_bolt",
         targetId: "entity-raider",
         destinationCell: null,
+        observedOrigin: null,
       },
       rolls: [],
       events: accepted
@@ -169,6 +179,19 @@ function execution(accepted: boolean): RulebenchLiveCommandExecutionDto {
         algorithm: "test",
         value: accepted ? "state-1" : "state-0",
       },
+      rollMode: accepted ? "authorityGenerated" : "supplied",
+      generatedRolls: accepted
+        ? [
+            {
+              sequence: 0,
+              commandId: "accepted",
+              requestKind: "attackRoll",
+              dieExpression: "1d20",
+              value: 17,
+              sourceMode: "authorityGenerated",
+            },
+          ]
+        : [],
     },
     snapshot: snapshot(accepted ? 9 : 18, accepted ? "state-1" : "state-0"),
   };

@@ -114,6 +114,9 @@ export class WorkbenchShellComponent {
       : { kind: "idle" as const };
   });
   protected readonly intent = computed(() => this.liveStore.intent());
+  protected readonly defaultRollMode = computed(() =>
+    this.liveStore.defaultRollMode(),
+  );
   protected readonly attackRollInput = signal("17");
   protected readonly damageRollInput = signal("5");
   protected readonly automationConfigOpen = signal(false);
@@ -140,8 +143,10 @@ export class WorkbenchShellComponent {
     () =>
       this.intent().actorId.length > 0 &&
       this.intent().actionId.length > 0 &&
-      this.intent().targetId.length > 0 &&
-      this.rollStream() !== null &&
+      (this.intent().targetId.length > 0 ||
+        this.intent().destinationCell !== undefined) &&
+      (this.defaultRollMode() === "authorityGenerated" ||
+        this.rollStream() !== null) &&
       !this.commandBusy(),
   );
   protected readonly automationBusy = computed(
@@ -155,14 +160,18 @@ export class WorkbenchShellComponent {
       snapshot.kind === "data" &&
       snapshot.value.lifecycleLabel === "In Progress" &&
       !this.automationBusy() &&
-      this.automaticRollStream() !== null &&
+      (this.defaultRollMode() === "authorityGenerated" ||
+        this.automaticRollStream() !== null) &&
       this.maxSteps() !== null
     );
   });
   protected readonly automationValidation = computed(() => {
     if (this.maxSteps() === null)
       return "Max steps must be a positive integer.";
-    if (this.automaticRollStream() === null)
+    if (
+      this.defaultRollMode() === "supplied" &&
+      this.automaticRollStream() === null
+    )
       return "Roll stream must be a comma-separated list of integers.";
     return null;
   });
@@ -266,7 +275,20 @@ export class WorkbenchShellComponent {
           label: "View",
           items: [{ id: "focus-units", label: "Active units" }],
         },
-        { id: "preferences", label: "Preferences", items: [] },
+        {
+          id: "preferences",
+          label: "Preferences",
+          items: [
+            {
+              id: "roll-mode-supplied",
+              label: `Supplied rolls${this.defaultRollMode() === "supplied" ? " (current)" : ""}`,
+            },
+            {
+              id: "roll-mode-generated",
+              label: `Authority-generated rolls${this.defaultRollMode() === "authorityGenerated" ? " (current)" : ""}`,
+            },
+          ],
+        },
       ];
     },
   );
@@ -334,6 +356,7 @@ export class WorkbenchShellComponent {
   }
 
   protected invokeMenuItem(item: ApplicationMenuItem): void {
+    if (this.invokePreferenceCommand(item.id)) return;
     if (this.invokeAutomationCommand(item.id)) return;
     if (this.invokeLifecycleCommand(item.id)) return;
     const target = this.panelForCommand(item.id);
@@ -399,15 +422,12 @@ export class WorkbenchShellComponent {
   }
 
   protected selectAction(actorId: string | null, actionId: string): void {
-    this.liveStore.setIntent({
-      actorId: actorId ?? "",
-      actionId,
-      targetId: this.intent().targetId,
-    });
+    if (actorId === null) return;
+    this.liveStore.selectAction(actionId);
   }
 
   protected selectTarget(targetId: string): void {
-    this.liveStore.setIntent({ ...this.intent(), targetId });
+    this.liveStore.selectEntityTarget(targetId);
   }
 
   protected refreshCommandEvidence(): void {
@@ -422,14 +442,14 @@ export class WorkbenchShellComponent {
 
   protected submitIntent(): void {
     const rollStream = this.rollStream();
-    if (rollStream === null) return;
+    if (rollStream === null && this.defaultRollMode() === "supplied") return;
     this.commandSequence += 1;
     void this.liveStore
       .submitIntent({
         id: `panel-command-${this.commandSequence}`,
         title: "Manual command",
         summary: "Submitted from the Rulebench available actions panel.",
-        rollStream,
+        rollStream: rollStream ?? [],
       })
       .then(async () => {
         await this.refreshEvidence();
@@ -447,6 +467,15 @@ export class WorkbenchShellComponent {
 
   protected closeAutomationConfig(): void {
     this.automationConfigOpen.set(false);
+  }
+
+  protected setDefaultRollMode(mode: "supplied" | "authorityGenerated"): void {
+    this.liveStore.setDefaultRollMode(mode);
+    this.menuStatus.set(
+      mode === "supplied"
+        ? "Supplied rolls selected"
+        : "Authority-generated rolls selected",
+    );
   }
 
   protected initiativePositionLabel(index: number): InitiativePosition {
@@ -501,15 +530,27 @@ export class WorkbenchShellComponent {
     }
   }
 
+  private invokePreferenceCommand(commandId: string): boolean {
+    if (commandId === "roll-mode-supplied") {
+      this.setDefaultRollMode("supplied");
+      return true;
+    }
+    if (commandId === "roll-mode-generated") {
+      this.setDefaultRollMode("authorityGenerated");
+      return true;
+    }
+    return false;
+  }
+
   private async runAutomaticStep(): Promise<void> {
     const rollStream = this.automaticRollStream();
-    if (rollStream === null) return;
+    if (rollStream === null && this.defaultRollMode() === "supplied") return;
     this.commandSequence += 1;
     await this.liveStore.runAutomaticStep({
       id: `panel-automatic-step-${this.commandSequence}`,
       title: "Automatic policy step",
       summary: "One Rust-selected deterministic policy operation.",
-      rollStream,
+      rollStream: rollStream ?? [],
       policy: this.automationPolicy(),
     });
     await this.refreshEvidence();
@@ -518,7 +559,11 @@ export class WorkbenchShellComponent {
   private async runAutomaticCombat(): Promise<void> {
     const rollStream = this.automaticRollStream();
     const maxSteps = this.maxSteps();
-    if (rollStream === null || maxSteps === null) return;
+    if (
+      (rollStream === null && this.defaultRollMode() === "supplied") ||
+      maxSteps === null
+    )
+      return;
     this.commandSequence += 1;
     await this.liveStore.runAutomaticCombat({
       id: `panel-automatic-run-${this.commandSequence}`,
@@ -526,7 +571,7 @@ export class WorkbenchShellComponent {
       summary:
         "Rust-selected deterministic operations within the configured guard.",
       maxSteps,
-      rollStream,
+      rollStream: rollStream ?? [],
       policy: this.automationPolicy(),
     });
     await this.refreshEvidence();

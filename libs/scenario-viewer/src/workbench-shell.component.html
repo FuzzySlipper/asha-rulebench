@@ -1214,6 +1214,29 @@
         Stop run</label
       >
     </fieldset>
+    <fieldset>
+      <legend>Roll source</legend>
+      <label
+        ><input
+          type="radio"
+          name="roll-source"
+          value="supplied"
+          [checked]="defaultRollMode() === 'supplied'"
+          (change)="setDefaultRollMode('supplied')"
+        />
+        Supplied rolls</label
+      >
+      <label
+        ><input
+          type="radio"
+          name="roll-source"
+          value="authorityGenerated"
+          [checked]="defaultRollMode() === 'authorityGenerated'"
+          (change)="setDefaultRollMode('authorityGenerated')"
+        />
+        Authority-generated rolls</label
+      >
+    </fieldset>
     <label>
       Max steps
       <input
@@ -1225,7 +1248,7 @@
         (input)="setMaxSteps(maxSteps.value)"
       />
     </label>
-    <label>
+    <label [hidden]="defaultRollMode() === 'authorityGenerated'">
       Roll stream
       <input
         #automaticRolls
@@ -1234,7 +1257,9 @@
         (input)="setAutomaticRolls(automaticRolls.value)"
       />
     </label>
-    <span id="automation-roll-help"
+    <span
+      id="automation-roll-help"
+      [hidden]="defaultRollMode() === 'authorityGenerated'"
       >Comma-separated deterministic integers supplied to Rust authority.</span
     >
     @if (automationValidation(); as error) {

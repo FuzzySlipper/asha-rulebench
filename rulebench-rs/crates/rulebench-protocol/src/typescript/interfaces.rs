@@ -2513,6 +2513,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "destinationCell",
                     ty: "RulebenchLiveGridPositionDto | null",
                 },
+                Field {
+                    name: "observedOrigin",
+                    ty: "RulebenchLiveGridPositionDto | null",
+                },
             ],
         },
         Interface {

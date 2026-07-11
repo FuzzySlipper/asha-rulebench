@@ -67,6 +67,7 @@ describe("live Rulebench transport", () => {
       actionId: "hexing-bolt",
       targetId: "raider",
       destinationCell: null,
+      observedOrigin: null,
     };
     const intentCommand = {
       id: "step-1",
@@ -74,6 +75,8 @@ describe("live Rulebench transport", () => {
       summary: "Adept attacks Raider.",
       intent,
       rollStream: [17, 5],
+      rollMode: "authorityGenerated" as const,
+      generatedSeed: 42,
     };
     const policy: RulebenchCombatAutomationPolicySpecDto = {
       id: "first-accepted-candidate",
@@ -85,6 +88,8 @@ describe("live Rulebench transport", () => {
       title: "Automatic step",
       summary: "Run one authority-selected step.",
       rollStream: [17, 5],
+      rollMode: "authorityGenerated" as const,
+      generatedSeed: 43,
       policy,
     };
     const automaticRun = {

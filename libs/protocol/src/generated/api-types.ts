@@ -1185,6 +1185,7 @@ export interface RulebenchUseActionIntentDto {
   readonly actionId: string;
   readonly targetId: string;
   readonly destinationCell: RulebenchLiveGridPositionDto | null;
+  readonly observedOrigin: RulebenchLiveGridPositionDto | null;
 }
 
 export interface RulebenchResolutionReceiptDto {

@@ -58,6 +58,7 @@ export interface RulebenchLiveParticipantView {
   readonly statusLabel: string;
   readonly conditionLabels: readonly string[];
   readonly position: Readonly<{ x: number; y: number }>;
+  readonly coordinateLabel: string;
   readonly movementLabel: string;
 }
 
@@ -74,6 +75,8 @@ export interface RulebenchLiveBoardCellView {
   readonly terrainLabels: readonly string[];
   readonly blocksMovement: boolean;
   readonly occupantIds: readonly string[];
+  readonly coordinateLabel: string;
+  readonly occupied: boolean;
 }
 
 export interface RulebenchLiveOptionsView {
@@ -172,6 +175,16 @@ export interface RulebenchLiveCommandExecutionView {
   readonly eventLabels: readonly string[];
   readonly traceLabels: readonly string[];
   readonly stateChanged: boolean;
+  readonly rollModeLabel: string;
+  readonly generatedRolls: readonly RulebenchLiveGeneratedRollView[];
+}
+
+export interface RulebenchLiveGeneratedRollView {
+  readonly sequenceLabel: string;
+  readonly purposeLabel: string;
+  readonly dieExpression: string;
+  readonly valueLabel: string;
+  readonly sourceLabel: string;
 }
 
 export function projectLiveSessionSnapshot(
@@ -196,6 +209,7 @@ export function projectLiveSessionSnapshot(
       statusLabel: participant.defeated ? "Defeated" : "Active",
       conditionLabels: participant.conditions,
       position: participant.position,
+      coordinateLabel: `${participant.position.x},${participant.position.y}`,
       movementLabel: `${participant.movementRemaining}/${participant.movementMaximum}`,
     })),
     board: {
@@ -208,6 +222,8 @@ export function projectLiveSessionSnapshot(
         terrainLabels: cell.terrainTags,
         blocksMovement: cell.blocksMovement,
         occupantIds: cell.occupantIds,
+        coordinateLabel: `${cell.position.x},${cell.position.y}`,
+        occupied: cell.occupantIds.length > 0,
       })),
     },
     options: projectLiveOptions(snapshot.options),
@@ -336,6 +352,14 @@ export function projectLiveCommandExecution(
     stateChanged:
       execution.step.stateBeforeFingerprint.value !==
       execution.step.stateAfterFingerprint.value,
+    rollModeLabel: labelCode(execution.step.rollMode),
+    generatedRolls: execution.step.generatedRolls.map((roll) => ({
+      sequenceLabel: String(roll.sequence + 1),
+      purposeLabel: labelCode(roll.requestKind),
+      dieExpression: roll.dieExpression,
+      valueLabel: String(roll.value),
+      sourceLabel: labelCode(roll.sourceMode),
+    })),
   };
 }
 

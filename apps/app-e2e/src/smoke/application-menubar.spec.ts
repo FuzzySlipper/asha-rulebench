@@ -17,8 +17,8 @@ test("operates the application menubar entirely by keyboard", async ({
   await expect(run).toBeFocused();
 
   await page.keyboard.press("End");
-  const view = menubar.getByRole("menuitem", { name: "View" });
-  await expect(view).toBeFocused();
+  const preferences = menubar.getByRole("menuitem", { name: "Preferences" });
+  await expect(preferences).toBeFocused();
 
   await page.keyboard.press("Home");
   const file = menubar.getByRole("menuitem", { name: "File" });

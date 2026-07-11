@@ -40,7 +40,10 @@ export interface RulebenchLiveIntentInput {
   readonly actionId: string;
   readonly targetId: string;
   readonly destinationCell?: Readonly<{ x: number; y: number }>;
+  readonly observedOrigin?: Readonly<{ x: number; y: number }>;
 }
+
+export type RulebenchRollMode = "supplied" | "authorityGenerated";
 
 export const RULEBENCH_LIVE_TRANSPORT =
   new InjectionToken<RulebenchLiveTransport>("RULEBENCH_LIVE_TRANSPORT", {
@@ -112,6 +115,8 @@ export class LiveCombatStore {
     targetId: "",
   });
   readonly intent = this._intent.asReadonly();
+  private readonly _defaultRollMode = signal<RulebenchRollMode>("supplied");
+  readonly defaultRollMode = this._defaultRollMode.asReadonly();
   private lifecycleGeneration = 0;
   private automationGeneration = 0;
   private automationController: AbortController | null = null;
@@ -187,6 +192,8 @@ export class LiveCombatStore {
         ? { kind: "data", value: projectLiveSessionSnapshot(result.value) }
         : { kind: "error", error: result.error },
     );
+    if (result.ok)
+      this.reconcileIntent(projectLiveSessionSnapshot(result.value));
     this.clock.now();
   }
 
@@ -206,6 +213,8 @@ export class LiveCombatStore {
         ? { kind: "data", value: projectLiveSessionSnapshot(result.value) }
         : { kind: "error", error: result.error },
     );
+    if (result.ok)
+      this.reconcileIntent(projectLiveSessionSnapshot(result.value));
     this.clock.now();
   }
 
@@ -245,6 +254,41 @@ export class LiveCombatStore {
     this.clock.now();
   }
 
+  setDefaultRollMode(mode: RulebenchRollMode): void {
+    this._defaultRollMode.set(mode);
+    this.clock.now();
+  }
+
+  selectAction(actionId: string): void {
+    const snapshot = this.currentSnapshot();
+    const actorId = snapshot?.currentActorId ?? "";
+    this.setIntent({ actorId, actionId, targetId: "" });
+  }
+
+  selectEntityTarget(targetId: string): void {
+    const current = this._intent();
+    this.setIntent({
+      actorId: current.actorId,
+      actionId: current.actionId,
+      targetId,
+    });
+  }
+
+  selectCellTarget(destinationCell: Readonly<{ x: number; y: number }>): void {
+    const current = this._intent();
+    const snapshot = this.currentSnapshot();
+    const observedOrigin = snapshot?.participants.find(
+      (participant) => participant.id === current.actorId,
+    )?.position;
+    this.setIntent({
+      actorId: current.actorId,
+      actionId: current.actionId,
+      targetId: "",
+      destinationCell,
+      ...(observedOrigin === undefined ? {} : { observedOrigin }),
+    });
+  }
+
   async preflightIntent(): Promise<void> {
     const request = this.currentRequest();
     if (request === null) return;
@@ -273,8 +317,17 @@ export class LiveCombatStore {
     const request = this.currentRequest();
     if (request === null) return;
     this._submission.set({ kind: "loading" });
+    const rollMode = command.rollMode ?? this._defaultRollMode();
     const result = await this.transport.submitIntent(request.sessionId, {
-      ...command,
+      id: command.id,
+      title: command.title,
+      summary: command.summary,
+      rollStream: rollMode === "supplied" ? command.rollStream : [],
+      rollMode,
+      generatedSeed:
+        rollMode === "authorityGenerated"
+          ? (command.generatedSeed ?? this.generatedSeed())
+          : null,
       intent: protocolIntent(this._intent()),
     });
     if (!this.isCurrent(request.sessionId, request.generation)) return;
@@ -287,6 +340,7 @@ export class LiveCombatStore {
         kind: "data",
         value: projectLiveSessionSnapshot(result.value.snapshot),
       });
+      this.reconcileIntent(projectLiveSessionSnapshot(result.value.snapshot));
     } else {
       this._submission.set({ kind: "error", error: result.error });
     }
@@ -307,6 +361,7 @@ export class LiveCombatStore {
       const snapshot = projectLiveSessionSnapshot(result.value.snapshot);
       this._control.set({ kind: "data", value: snapshot });
       this._snapshot.set({ kind: "data", value: snapshot });
+      this.reconcileIntent(snapshot);
     } else {
       this._control.set({ kind: "error", error: result.error });
     }
@@ -318,9 +373,10 @@ export class LiveCombatStore {
     if (request === null) return;
     const automation = this.beginAutomation();
     this._automaticStep.set({ kind: "loading" });
+    const configuredSpec = this.configureRollMode(spec);
     const result = await this.transport.runAutomaticStep(
       request.sessionId,
-      spec,
+      configuredSpec,
       { signal: automation.controller.signal },
     );
     if (!this.isCurrentAutomation(request, automation.generation)) return;
@@ -335,6 +391,7 @@ export class LiveCombatStore {
           kind: "data",
           value: projectLiveSessionSnapshot(result.value.snapshot),
         });
+        this.reconcileIntent(projectLiveSessionSnapshot(result.value.snapshot));
       }
     } else {
       this._automaticStep.set({ kind: "error", error: result.error });
@@ -347,9 +404,10 @@ export class LiveCombatStore {
     if (request === null) return;
     const automation = this.beginAutomation();
     this._automaticRun.set({ kind: "loading" });
+    const configuredSpec = this.configureRollMode(spec);
     const result = await this.transport.runAutomaticCombat(
       request.sessionId,
-      spec,
+      configuredSpec,
       { signal: automation.controller.signal },
     );
     if (!this.isCurrentAutomation(request, automation.generation)) return;
@@ -363,6 +421,9 @@ export class LiveCombatStore {
         kind: "data",
         value: projectLiveSessionSnapshot(result.value.finalSnapshot),
       });
+      this.reconcileIntent(
+        projectLiveSessionSnapshot(result.value.finalSnapshot),
+      );
     } else {
       this._automaticRun.set({ kind: "error", error: result.error });
     }
@@ -445,6 +506,95 @@ export class LiveCombatStore {
     );
   }
 
+  private currentSnapshot(): RulebenchLiveSessionView | null {
+    const snapshot = this._snapshot();
+    return snapshot.kind === "data" ? snapshot.value : null;
+  }
+
+  private reconcileIntent(snapshot: RulebenchLiveSessionView): void {
+    const current = this._intent();
+    if (snapshot.currentActorId !== current.actorId) {
+      this._intent.set({
+        actorId: snapshot.currentActorId ?? "",
+        actionId: "",
+        targetId: "",
+      });
+      this._preflight.set({ kind: "idle" });
+      return;
+    }
+    const action = snapshot.options.actions.find(
+      (option) => option.actionId === current.actionId,
+    );
+    if (action === undefined) {
+      this._intent.set({
+        actorId: current.actorId,
+        actionId: "",
+        targetId: "",
+      });
+      this._preflight.set({ kind: "idle" });
+      return;
+    }
+    if (
+      action.targetMode === "entity" &&
+      !action.targets.some((target) => target.id === current.targetId)
+    ) {
+      this._intent.set({
+        actorId: current.actorId,
+        actionId: current.actionId,
+        targetId: "",
+      });
+      this._preflight.set({ kind: "idle" });
+      return;
+    }
+    if (action.targetMode === "cell") {
+      const destination = current.destinationCell;
+      const origin = snapshot.participants.find(
+        (participant) => participant.id === current.actorId,
+      )?.position;
+      const destinationStillLegal =
+        destination !== undefined &&
+        action.destinations.some(
+          (option) => option.x === destination.x && option.y === destination.y,
+        );
+      const originStillCurrent =
+        current.observedOrigin !== undefined &&
+        origin !== undefined &&
+        current.observedOrigin.x === origin.x &&
+        current.observedOrigin.y === origin.y;
+      if (!destinationStillLegal || !originStillCurrent) {
+        this._intent.set({
+          actorId: current.actorId,
+          actionId: current.actionId,
+          targetId: "",
+        });
+        this._preflight.set({ kind: "idle" });
+      }
+    }
+  }
+
+  private generatedSeed(): number {
+    return this.clock.now().getTime() >>> 0;
+  }
+
+  private configureRollMode<
+    T extends {
+      readonly rollStream: readonly number[];
+      readonly rollMode?: RulebenchRollMode;
+      readonly generatedSeed?: number | null;
+    },
+  >(spec: T): T {
+    const rollMode = spec.rollMode ?? this._defaultRollMode();
+    return {
+      ...spec,
+      rollStream: rollMode === "supplied" ? spec.rollStream : [],
+      rollMode,
+      generatedSeed:
+        rollMode === "authorityGenerated"
+          ? (spec.generatedSeed ?? this.generatedSeed())
+          : null,
+    };
+  }
+
   private beginAutomation(): {
     readonly generation: number;
     readonly controller: AbortController;
@@ -475,6 +625,7 @@ function protocolIntent(
     actionId: intent.actionId,
     targetId: intent.targetId,
     destinationCell: intent.destinationCell ?? null,
+    observedOrigin: intent.observedOrigin ?? null,
   };
 }
 

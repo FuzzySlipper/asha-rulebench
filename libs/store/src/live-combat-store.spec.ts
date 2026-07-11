@@ -25,6 +25,8 @@ const intent = {
   actorId: "entity-adept",
   actionId: "hexing_bolt",
   targetId: "entity-raider",
+  destinationCell: null,
+  observedOrigin: null,
 };
 
 describe("LiveCombatStore", () => {
@@ -43,8 +45,13 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: [
           {
-            id: "scenario", title: "Scenario", summary: "Test scenario.",
-            rulesetId: "rules", rulesetVersion: "1.0.0", contentPackId: null, contentPackVersion: null,
+            id: "scenario",
+            title: "Scenario",
+            summary: "Test scenario.",
+            rulesetId: "rules",
+            rulesetVersion: "1.0.0",
+            contentPackId: null,
+            contentPackVersion: null,
             participants: [],
           },
         ],
@@ -133,6 +140,80 @@ describe("LiveCombatStore", () => {
     expect(store.snapshot()).toMatchObject({
       kind: "data",
       value: { participants: [{}, { hitPointLabel: "18/18 HP" }] },
+    });
+  });
+
+  it("owns default roll mode and materializes generated request configuration", async () => {
+    let submitted:
+      | Parameters<RulebenchLiveTransport["submitIntent"]>[1]
+      | undefined;
+    const transport = createFakeRulebenchLiveTransport({
+      getSession: async () => ({ ok: true, value: makeLiveSessionSnapshot() }),
+      submitIntent: async (_sessionId, command) => {
+        submitted = command;
+        return { ok: true, value: makeLiveCommandExecution(true) };
+      },
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+    await store.selectSession("live-session");
+    store.setIntent(intent);
+    store.setDefaultRollMode("authorityGenerated");
+
+    await store.submitIntent({
+      id: "generated",
+      title: "Generated",
+      summary: "Generate authority rolls.",
+      rollStream: [99, 99],
+    });
+
+    expect(submitted).toMatchObject({
+      rollMode: "authorityGenerated",
+      rollStream: [],
+      generatedSeed: fixedClock.now().getTime() >>> 0,
+    });
+    expect(store.defaultRollMode()).toBe("authorityGenerated");
+  });
+
+  it("clears stale targets when action selection or authority actor changes", async () => {
+    const transport = createFakeRulebenchLiveTransport({
+      getSession: async () => ({ ok: true, value: makeLiveSessionSnapshot() }),
+      submitControl: async () => ({
+        ok: true,
+        value: {
+          commandKind: "advanceTurn",
+          accepted: true,
+          decisionKind: "accepted",
+          previousLifecyclePhase: "inProgress",
+          nextLifecyclePhase: "inProgress",
+          stateBeforeFingerprint: { algorithm: "test", value: "state-0" },
+          stateAfterFingerprint: { algorithm: "test", value: "state-0" },
+          reason: "Advanced.",
+          snapshot: {
+            ...makeLiveSessionSnapshot(),
+            currentActorId: "entity-raider",
+            turnIndex: 1,
+          },
+        },
+      }),
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+    await store.selectSession("live-session");
+    store.selectAction("hexing_bolt");
+    store.selectEntityTarget("entity-raider");
+    expect(store.intent().targetId).toBe("entity-raider");
+
+    store.selectAction("move.entity-adept");
+    expect(store.intent()).toEqual({
+      actorId: "entity-adept",
+      actionId: "move.entity-adept",
+      targetId: "",
+    });
+
+    await store.submitControl("advanceTurn");
+    expect(store.intent()).toEqual({
+      actorId: "entity-raider",
+      actionId: "",
+      targetId: "",
     });
   });
 
@@ -561,6 +642,8 @@ function makeLiveCommandExecution(
         algorithm: "test",
         value: accepted ? "state-1" : "state-0",
       },
+      rollMode: "supplied",
+      generatedRolls: [],
     },
     snapshot: makeLiveSessionSnapshot({
       raiderHitPoints: accepted ? 9 : 18,

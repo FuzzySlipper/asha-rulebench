@@ -137,6 +137,7 @@ test("invokes live Rust authority through the Angular origin", async ({
         actionId: "hexing_bolt",
         targetId: "entity-raider",
         destinationCell: null,
+        observedOrigin: null,
       },
       rollStream: [17, 5],
     });
