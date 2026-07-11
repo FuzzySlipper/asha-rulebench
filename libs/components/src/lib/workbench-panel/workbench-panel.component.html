@@ -1,0 +1,13 @@
+<section
+  class="panel"
+  [class.panel--compact]="compact()"
+  role="region"
+  [attr.aria-label]="panelNumber() + '. ' + panelTitle()"
+>
+  <header class="panel__header">
+    <span class="panel__number" aria-hidden="true">{{ panelNumber() }}</span>
+    <h2>{{ panelTitle() }}</h2>
+    <div class="panel__tools"><ng-content select="[panelTools]" /></div>
+  </header>
+  <div class="panel__body"><ng-content /></div>
+</section>

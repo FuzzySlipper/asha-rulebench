@@ -16,3 +16,5 @@ import { Component, input } from '@angular/core';
 export class StatusLineComponent {
   readonly label = input.required<string>();
 }
+
+export * from './lib/workbench-panel/workbench-panel.component';

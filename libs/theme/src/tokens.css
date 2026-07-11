@@ -1,12 +1,18 @@
 :root {
-  --arb-bg: #f7f5ef;
-  --arb-surface: #ffffff;
-  --arb-text: #1d2528;
-  --arb-muted: #5f6f73;
-  --arb-border: #d9ded8;
-  --arb-accent: #2f7d6d;
-  --arb-accent-strong: #184c43;
-  --arb-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --arb-bg: #0d1014;
+  --arb-surface: #181d22;
+  --arb-panel: #14181d;
+  --arb-panel-header: #101419;
+  --arb-text: #e7ebee;
+  --arb-muted: #8e99a5;
+  --arb-border: #303842;
+  --arb-accent: #58c9bd;
+  --arb-accent-strong: #7ce0d5;
+  --arb-warning: #d6a85f;
+  --arb-danger: #dc6b73;
+  --arb-font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
   --arb-font-size-base: 16px;
   --arb-line-height-base: 1.5;
 }

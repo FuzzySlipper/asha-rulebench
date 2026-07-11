@@ -1,0 +1,115 @@
+<section class="workbench" aria-label="Rulebench panel layout">
+  <arb-workbench-panel
+    class="menu"
+    [panelNumber]="3"
+    panelTitle="Application menu"
+    [compact]="true"
+  >
+    <nav panelTools aria-label="Application menu">
+      <button type="button">File</button>
+      <button type="button">Edit</button>
+      <button type="button">View</button>
+      <button type="button">Preferences</button>
+    </nav>
+  </arb-workbench-panel>
+
+  <arb-workbench-panel
+    class="initiative"
+    [panelNumber]="2"
+    panelTitle="Initiative"
+  >
+    <ol class="initiative-track">
+      <li class="initiative-slot initiative-slot--current">
+        <strong>Current</strong><span>--</span>
+      </li>
+      <li class="initiative-slot"><strong>Next</strong><span>--</span></li>
+      <li class="initiative-slot"><strong>Queue</strong><span>--</span></li>
+    </ol>
+  </arb-workbench-panel>
+
+  <arb-workbench-panel
+    class="status"
+    [panelNumber]="4"
+    panelTitle="Turn status"
+  >
+    <div class="status-readout">
+      <div><span>Encounter</span><strong>Not selected</strong></div>
+      <div><span>Round</span><strong>--</strong></div>
+      <div>
+        <span>Authority</span><strong class="status-offline">Offline</strong>
+      </div>
+    </div>
+  </arb-workbench-panel>
+
+  <arb-workbench-panel class="grid" [panelNumber]="1" panelTitle="Combat grid">
+    <div class="grid-stage" aria-label="Empty combat grid">
+      @for (cell of gridCells; track $index) {
+        <span class="grid-cell" aria-hidden="true"></span>
+      }
+      <p>No encounter loaded</p>
+    </div>
+  </arb-workbench-panel>
+
+  <arb-workbench-panel class="log" [panelNumber]="5" panelTitle="Evidence log">
+    <div panelTools class="tabs" role="tablist" aria-label="Evidence log views">
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="selectedEvidenceTab() === 'combat'"
+        (click)="selectEvidenceTab('combat')"
+      >
+        Combat
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="selectedEvidenceTab() === 'events'"
+        (click)="selectEvidenceTab('events')"
+      >
+        DomainEvents
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="selectedEvidenceTab() === 'trace'"
+        (click)="selectEvidenceTab('trace')"
+      >
+        Rule trace
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="selectedEvidenceTab() === 'audit'"
+        (click)="selectEvidenceTab('audit')"
+      >
+        Audit
+      </button>
+    </div>
+    <div class="empty-state" role="tabpanel">
+      <strong>{{ evidenceTabLabel() }}</strong
+      ><span>No entries</span>
+    </div>
+  </arb-workbench-panel>
+
+  <arb-workbench-panel
+    class="actions"
+    [panelNumber]="6"
+    panelTitle="Available actions"
+  >
+    <div class="empty-state">
+      <strong>No current actor</strong
+      ><span>Actions appear during an active turn</span>
+    </div>
+  </arb-workbench-panel>
+
+  <arb-workbench-panel
+    class="units"
+    [panelNumber]="7"
+    panelTitle="Active units"
+  >
+    <div class="empty-state">
+      <strong>No active session</strong
+      ><span>Participants appear when an encounter is selected</span>
+    </div>
+  </arb-workbench-panel>
+</section>

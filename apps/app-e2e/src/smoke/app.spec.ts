@@ -3,6 +3,21 @@ import { expect, test } from '@playwright/test';
 test('boots the rulebench shell', async ({ page }) => {
   await page.goto('/');
 
+  await expect(page.getByLabel('Rulebench panel layout')).toBeVisible();
+  for (const label of [
+    '1. Combat grid',
+    '2. Initiative',
+    '3. Application menu',
+    '4. Turn status',
+    '5. Evidence log',
+    '6. Available actions',
+    '7. Active units',
+  ]) {
+    await expect(page.getByRole('region', { name: label })).toBeVisible();
+  }
+  await page.getByRole('tab', { name: 'DomainEvents' }).click();
+  await expect(page.getByRole('tabpanel')).toContainText('Accepted DomainEvents');
+
   await expect(page.getByRole('heading', { name: 'ASHA Rulebench', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Combat Session' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Content Packs' })).toBeVisible();

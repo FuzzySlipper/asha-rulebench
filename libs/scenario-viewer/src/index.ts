@@ -6,9 +6,10 @@ import type { RulebenchCommandOutcomeClassDto, RulebenchScenarioOutcomeClassDto 
 import { ContentWorkspaceComponent } from './content-workspace';
 import { ManualCombatWorkspaceComponent } from './manual-combat-workspace';
 import { ReplayReviewWorkspaceComponent } from './replay-review-workspace';
+import { WorkbenchShellComponent } from './workbench-shell.component';
 
 @Component({
-  imports: [RulebenchScenarioRendererComponent, ContentWorkspaceComponent, ManualCombatWorkspaceComponent, ReplayReviewWorkspaceComponent],
+  imports: [RulebenchScenarioRendererComponent, ContentWorkspaceComponent, ManualCombatWorkspaceComponent, ReplayReviewWorkspaceComponent, WorkbenchShellComponent],
   selector: 'arb-scenario-viewer-feature',
   standalone: true,
   styles: [
@@ -35,7 +36,16 @@ import { ReplayReviewWorkspaceComponent } from './replay-review-workspace';
 
       .viewer {
         display: grid;
-        gap: 16px;
+      }
+
+      .current-workspaces {
+        border-bottom: 1px solid var(--arb-border);
+        border-top: 1px solid var(--arb-border);
+        color: var(--arb-muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 10px 44px;
+        text-transform: uppercase;
       }
 
       .catalog {
@@ -166,6 +176,8 @@ import { ReplayReviewWorkspaceComponent } from './replay-review-workspace';
   ],
   template: `
     <div class="viewer">
+      <arb-workbench-shell />
+      <div class="current-workspaces">Current functional workspaces</div>
       <arb-content-workspace />
       <arb-manual-combat-workspace />
       <arb-replay-review-workspace />
