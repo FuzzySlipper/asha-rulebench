@@ -118,6 +118,7 @@ pub struct UseActionIntent {
     pub actor_id: String,
     pub action_id: String,
     pub target_id: String,
+    pub destination_cell: Option<GridPosition>,
 }
 
 impl UseActionIntent {
@@ -130,6 +131,20 @@ impl UseActionIntent {
             actor_id: actor_id.into(),
             action_id: action_id.into(),
             target_id: target_id.into(),
+            destination_cell: None,
+        }
+    }
+
+    pub fn for_cell(
+        actor_id: impl Into<String>,
+        action_id: impl Into<String>,
+        destination_cell: GridPosition,
+    ) -> Self {
+        Self {
+            actor_id: actor_id.into(),
+            action_id: action_id.into(),
+            target_id: String::new(),
+            destination_cell: Some(destination_cell),
         }
     }
 }

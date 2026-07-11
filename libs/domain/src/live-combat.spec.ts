@@ -21,6 +21,8 @@ describe("live combat domain projections", () => {
       temporaryVitalityLabel: null,
       statusLabel: "Active",
       conditionLabels: ["rattled"],
+      position: { x: 4, y: 1 },
+      movementLabel: "0/0",
     });
     expect(view.options.actions[0]?.targets[0]?.id).toBe("entity-raider");
   });
@@ -62,6 +64,9 @@ function snapshot(
         temporaryVitality: 0,
         defeated: false,
         conditions: [],
+        position: { x: 1, y: 1 },
+        movementRemaining: 0,
+        movementMaximum: 0,
       },
       {
         id: "entity-raider",
@@ -71,8 +76,24 @@ function snapshot(
         temporaryVitality: 0,
         defeated: false,
         conditions: raiderHitPoints < 18 ? ["rattled"] : [],
+        position: { x: 4, y: 1 },
+        movementRemaining: 0,
+        movementMaximum: 0,
       },
     ],
+    board: {
+      id: "two-combatant-hexing-bolt",
+      width: 6,
+      height: 4,
+      cells: [
+        {
+          position: { x: 1, y: 1 },
+          terrainTags: ["clear"],
+          blocksMovement: false,
+          occupantIds: ["entity-adept"],
+        },
+      ],
+    },
     options: {
       roundNumber: 1,
       turnIndex: 0,
@@ -90,12 +111,15 @@ function snapshot(
           unavailableReason: null,
           resourceCosts: [],
           resourceStates: [],
+          targetMode: "entity",
+          destinations: [],
           targets: [
             {
               targetId: "entity-raider",
               targetName: "Raider",
               currentHitPoints: raiderHitPoints,
               maxHitPoints: 18,
+              reason: "Target is legal.",
             },
           ],
         },
@@ -133,6 +157,7 @@ function execution(accepted: boolean): RulebenchLiveCommandExecutionDto {
         actorId: "entity-adept",
         actionId: "hexing_bolt",
         targetId: "entity-raider",
+        destinationCell: null,
       },
       rolls: [],
       events: accepted

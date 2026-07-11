@@ -1,12 +1,12 @@
 use rulebench_rules::{
     CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
     CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec, CombatSessionIntentCommandSpec,
-    UseActionIntent,
+    GridPosition, UseActionIntent,
 };
 use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -67,11 +67,39 @@ pub struct UseActionIntentDto {
     pub actor_id: String,
     pub action_id: String,
     pub target_id: String,
+    #[serde(default)]
+    pub destination_cell: Option<crate::LiveGridPositionDto>,
 }
 
 impl UseActionIntentDto {
     pub fn to_authority(&self) -> UseActionIntent {
-        UseActionIntent::new(&self.actor_id, &self.action_id, &self.target_id)
+        match &self.destination_cell {
+            Some(cell) => UseActionIntent::for_cell(
+                &self.actor_id,
+                &self.action_id,
+                GridPosition {
+                    x: cell.x,
+                    y: cell.y,
+                },
+            ),
+            None => UseActionIntent::new(&self.actor_id, &self.action_id, &self.target_id),
+        }
+    }
+}
+
+impl From<&UseActionIntent> for UseActionIntentDto {
+    fn from(value: &UseActionIntent) -> Self {
+        Self {
+            actor_id: value.actor_id.clone(),
+            action_id: value.action_id.clone(),
+            target_id: value.target_id.clone(),
+            destination_cell: value
+                .destination_cell
+                .map(|cell| crate::LiveGridPositionDto {
+                    x: cell.x,
+                    y: cell.y,
+                }),
+        }
     }
 }
 
@@ -219,6 +247,7 @@ mod tests {
                 actor_id: "actor".to_string(),
                 action_id: "action".to_string(),
                 target_id: "target".to_string(),
+                destination_cell: None,
             },
             roll_stream: vec![17, 5],
         };
@@ -228,5 +257,39 @@ mod tests {
         assert_eq!(authority.id, "step-1");
         assert_eq!(authority.intent.actor_id, "actor");
         assert_eq!(authority.roll_stream, vec![17, 5]);
+    }
+
+    #[test]
+    fn cell_destination_round_trips_as_a_distinct_protocol_target() {
+        let dto = UseActionIntentDto {
+            actor_id: "actor".to_string(),
+            action_id: "move".to_string(),
+            target_id: String::new(),
+            destination_cell: Some(crate::LiveGridPositionDto { x: 3, y: 4 }),
+        };
+
+        let json = serde_json::to_string(&dto).expect("cell intent serializes");
+        let decoded: UseActionIntentDto =
+            serde_json::from_str(&json).expect("cell intent deserializes");
+        let authority = decoded.to_authority();
+
+        assert_eq!(authority.target_id, "");
+        assert_eq!(
+            authority.destination_cell,
+            Some(GridPosition { x: 3, y: 4 })
+        );
+    }
+
+    #[test]
+    fn legacy_entity_intent_without_destination_remains_compatible() {
+        let decoded: UseActionIntentDto =
+            serde_json::from_str(r#"{"actorId":"actor","actionId":"attack","targetId":"target"}"#)
+                .expect("version one entity intent remains accepted");
+
+        assert_eq!(decoded.destination_cell, None);
+        assert_eq!(
+            decoded.to_authority(),
+            UseActionIntent::new("actor", "attack", "target")
+        );
     }
 }

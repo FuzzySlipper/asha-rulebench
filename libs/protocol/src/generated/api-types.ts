@@ -126,6 +126,25 @@ export interface RulebenchLiveStateFingerprintDto {
   readonly value: string;
 }
 
+export interface RulebenchLiveGridPositionDto {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface RulebenchLiveBoardCellDto {
+  readonly position: RulebenchLiveGridPositionDto;
+  readonly terrainTags: readonly string[];
+  readonly blocksMovement: boolean;
+  readonly occupantIds: readonly string[];
+}
+
+export interface RulebenchLiveBoardDto {
+  readonly id: string;
+  readonly width: number;
+  readonly height: number;
+  readonly cells: readonly RulebenchLiveBoardCellDto[];
+}
+
 export interface RulebenchLiveParticipantDto {
   readonly id: string;
   readonly name: string;
@@ -134,6 +153,9 @@ export interface RulebenchLiveParticipantDto {
   readonly temporaryVitality: number;
   readonly defeated: boolean;
   readonly conditions: readonly string[];
+  readonly position: RulebenchLiveGridPositionDto;
+  readonly movementRemaining: number;
+  readonly movementMaximum: number;
 }
 
 export interface RulebenchLiveActionResourceCostDto {
@@ -158,6 +180,12 @@ export interface RulebenchLiveTargetOptionDto {
   readonly targetName: string;
   readonly currentHitPoints: number;
   readonly maxHitPoints: number;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveCellOptionDto {
+  readonly position: RulebenchLiveGridPositionDto;
+  readonly reason: string;
 }
 
 export interface RulebenchLiveActionOptionDto {
@@ -168,7 +196,9 @@ export interface RulebenchLiveActionOptionDto {
   readonly unavailableReason: string | null;
   readonly resourceCosts: readonly RulebenchLiveActionResourceCostDto[];
   readonly resourceStates: readonly RulebenchLiveActionResourceStateDto[];
+  readonly targetMode: 'self' | 'entity' | 'cell';
   readonly targets: readonly RulebenchLiveTargetOptionDto[];
+  readonly destinations: readonly RulebenchLiveCellOptionDto[];
 }
 
 export interface RulebenchLiveCurrentActorOptionsDto {
@@ -238,6 +268,7 @@ export interface RulebenchLiveSessionSnapshotDto {
   readonly participantOrder: readonly string[];
   readonly currentActorId: string | null;
   readonly participants: readonly RulebenchLiveParticipantDto[];
+  readonly board: RulebenchLiveBoardDto;
   readonly options: RulebenchLiveCurrentActorOptionsDto;
   readonly combatEnd: RulebenchLiveCombatEndDto;
   readonly finalization: RulebenchLiveFinalizationDto | null;
@@ -1136,6 +1167,7 @@ export interface RulebenchUseActionIntentDto {
   readonly actorId: string;
   readonly actionId: string;
   readonly targetId: string;
+  readonly destinationCell: RulebenchLiveGridPositionDto | null;
 }
 
 export interface RulebenchResolutionReceiptDto {

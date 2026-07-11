@@ -9,18 +9,21 @@ use crate::model::{
     ActionResourceRefreshReadout, ActionResourceSpendDecisionKind, ActionResourceSpendReadout,
     ActiveModifier, ClassBuildLedgerReadout, CombatantActionResourceReadout,
     CombatantClassBuildReadout, CombatantEquipmentReadout, DamageOutcome, EquipmentLedgerReadout,
-    HealingOutcome, ItemDefinition, ModifierDefinition, ModifierDurationExpirationReadout,
-    ModifierOutcome, RulebenchScenario, ScenarioProjection, TemporaryVitalityOutcome,
+    GridPosition, HealingOutcome, ItemDefinition, ModifierDefinition,
+    ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario, ScenarioProjection,
+    SpatialBoardState, SpatialCellState, TemporaryVitalityOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatState {
+    board: SpatialBoardState,
     combatants: Vec<CombatantState>,
 }
 
 impl CombatState {
     pub fn from_scenario(scenario: &RulebenchScenario) -> Self {
         Self {
+            board: board_from_scenario(scenario),
             combatants: scenario
                 .combatants
                 .iter()
@@ -38,6 +41,7 @@ impl CombatState {
 
     pub fn from_projection(projection: &ScenarioProjection) -> Self {
         Self {
+            board: projection.board.clone(),
             combatants: projection
                 .combatants
                 .iter()
@@ -47,13 +51,24 @@ impl CombatState {
     }
 
     pub fn project(&self, summary: &str) -> ScenarioProjection {
+        let combatants = self
+            .combatants
+            .iter()
+            .map(CombatantState::to_final_state)
+            .collect::<Vec<_>>();
+        let mut board = self.board.clone();
+        for cell in &mut board.cells {
+            cell.occupant_ids = combatants
+                .iter()
+                .filter(|combatant| combatant.position == cell.position)
+                .map(|combatant| combatant.id.clone())
+                .collect();
+            cell.occupant_ids.sort();
+        }
         ScenarioProjection {
             summary: summary.to_string(),
-            combatants: self
-                .combatants
-                .iter()
-                .map(CombatantState::to_final_state)
-                .collect(),
+            board,
+            combatants,
         }
     }
 
@@ -350,10 +365,42 @@ impl CombatState {
                 combatant.temporary_vitality = state.temporary_vitality;
                 combatant.active_modifiers = state.active_modifiers.clone();
                 combatant.conditions = state.condition_labels();
+                combatant.position = state.position;
                 combatant.equipped_item_ids = state.equipped_item_ids.clone();
             }
         }
         scenario
+    }
+}
+
+fn board_from_scenario(scenario: &RulebenchScenario) -> SpatialBoardState {
+    let mut cells = Vec::new();
+    for y in 0..scenario.grid.height {
+        for x in 0..scenario.grid.width {
+            let position = GridPosition { x, y };
+            let terrain_tags = scenario
+                .grid
+                .cells
+                .iter()
+                .find(|cell| cell.position == position)
+                .map(|cell| cell.terrain_tags.clone())
+                .unwrap_or_default();
+            let blocks_movement = terrain_tags
+                .iter()
+                .any(|tag| tag == "blocked" || tag == "wall");
+            cells.push(SpatialCellState {
+                position,
+                terrain_tags,
+                blocks_movement,
+                occupant_ids: Vec::new(),
+            });
+        }
+    }
+    SpatialBoardState {
+        id: scenario.metadata.id.clone(),
+        width: scenario.grid.width,
+        height: scenario.grid.height,
+        cells,
     }
 }
 
@@ -923,6 +970,48 @@ mod tests {
                 .conditions
                 .as_slice(),
             &["rattled".to_string()]
+        );
+    }
+
+    #[test]
+    fn combat_state_owns_board_positions_occupancy_and_movement_state() {
+        let mut scenario = test_scenario();
+        scenario.combatants[1].position = GridPosition { x: 1, y: 0 };
+        scenario.grid.cells.push(GridCell {
+            position: GridPosition { x: 1, y: 0 },
+            terrain_tags: vec!["wall".to_string()],
+        });
+
+        let state = CombatState::from_scenario(&scenario);
+        let projection = state.project("Spatial state.");
+
+        assert_eq!(projection.board.id, "state-test");
+        assert_eq!(projection.board.cells.len(), 2);
+        assert_eq!(projection.board.cells[0].occupant_ids, vec!["entity-adept"]);
+        assert_eq!(
+            projection.board.cells[1].occupant_ids,
+            vec!["entity-raider"]
+        );
+        assert!(projection.board.cells[1].blocks_movement);
+        assert_eq!(
+            projection.combatants[1].position,
+            GridPosition { x: 1, y: 0 }
+        );
+        assert_eq!(projection.combatants[1].movement_remaining, 0);
+    }
+
+    #[test]
+    fn spatial_position_changes_authoritative_state_fingerprint() {
+        let state = CombatState::from_scenario(&test_scenario());
+        let before = state.project("Spatial state.");
+        let mut after = before.clone();
+        after.combatants[0].position = GridPosition { x: 1, y: 0 };
+        after.board.cells[0].occupant_ids.clear();
+        after.board.cells[1].occupant_ids = vec!["entity-adept".to_string()];
+
+        assert_ne!(
+            crate::fingerprint_projected_state(&before),
+            crate::fingerprint_projected_state(&after)
         );
     }
 }

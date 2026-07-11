@@ -9,3 +9,4 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 rulebench-rs/target/
+rulebench-rs/portable-consumer-smoke/target/

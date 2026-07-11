@@ -10,6 +10,7 @@ pub use evidence::{
 };
 pub use snapshot::{
     LiveActionOptionDto, LiveActionResourceCostDto, LiveActionResourceStateDto, LiveAuditEntryDto,
-    LiveCombatEndDto, LiveCombatLogEntryDto, LiveCurrentActorOptionsDto, LiveFinalizationDto,
-    LiveParticipantDto, LiveSessionSnapshotDto, LiveStateFingerprintDto, LiveTargetOptionDto,
+    LiveBoardCellDto, LiveBoardDto, LiveCellOptionDto, LiveCombatEndDto, LiveCombatLogEntryDto,
+    LiveCurrentActorOptionsDto, LiveFinalizationDto, LiveGridPositionDto, LiveParticipantDto,
+    LiveSessionSnapshotDto, LiveStateFingerprintDto, LiveTargetOptionDto,
 };

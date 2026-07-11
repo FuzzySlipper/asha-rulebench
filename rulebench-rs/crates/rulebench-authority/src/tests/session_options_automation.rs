@@ -31,6 +31,8 @@ fn session_runtime_current_actor_options_read_initial_action_and_target() {
     assert_eq!(options.actions[0].action_id, "hexing_bolt");
     assert_eq!(options.actions[0].ability_id, "ability.hexing-bolt");
     assert_eq!(options.actions[0].action_name, "Hexing Bolt");
+    assert_eq!(options.actions[0].target_mode, ActionTargetMode::Entity);
+    assert!(options.actions[0].destination_options.is_empty());
     assert_eq!(options.actions[0].target_options.len(), 1);
     assert_eq!(
         options.actions[0].target_options[0].target_id,
@@ -39,6 +41,35 @@ fn session_runtime_current_actor_options_read_initial_action_and_target() {
     assert_eq!(options.actions[0].target_options[0].target_name, "Raider");
     assert_eq!(options.actions[0].target_options[0].current_hit_points, 18);
     assert_eq!(options.actions[0].target_options[0].max_hit_points, 18);
+}
+
+#[test]
+fn session_runtime_projects_authoritative_legal_cell_affordances() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.actions[0].targeting.target_kind = TargetKind::Area;
+    scenario.selected_action.targeting.target_kind = TargetKind::Area;
+    scenario.grid.cells.push(GridCell {
+        position: GridPosition { x: 2, y: 1 },
+        terrain_tags: vec!["wall".to_string()],
+    });
+    let session = CombatSessionState::new("runtime-cell-options", scenario);
+
+    let action = &session.current_actor_options().actions[0];
+
+    assert_eq!(action.target_mode, ActionTargetMode::Cell);
+    assert_eq!(action.destination_options.len(), 21);
+    assert!(!action
+        .destination_options
+        .iter()
+        .any(|option| option.position == GridPosition { x: 1, y: 1 }));
+    assert!(!action
+        .destination_options
+        .iter()
+        .any(|option| option.position == GridPosition { x: 2, y: 1 }));
+    assert!(action
+        .destination_options
+        .iter()
+        .all(|option| !option.reason.is_empty()));
 }
 
 #[test]

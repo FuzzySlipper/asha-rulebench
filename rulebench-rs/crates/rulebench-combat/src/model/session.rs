@@ -3,11 +3,11 @@ use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
     ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase,
     CombatTurnOrder, CommandOutcomeClass, ContentPackSetReference, EquipmentLedgerReadout,
-    EquipmentTransitionEntry, LifecycleTransitionEntry, LifecycleTransitionTrigger,
+    EquipmentTransitionEntry, GridPosition, LifecycleTransitionEntry, LifecycleTransitionTrigger,
     ModifierDurationExpirationEntry, ReactionAuditEntry, ReactionWindowLifecycleEntry,
     ReactionWindowReadout, RollConsumptionEntry, RulebenchReceipt, RulebenchRejection,
-    RulebenchScenario, ScenarioProjection, StateFingerprint, TargetLegality, TurnTransitionEntry,
-    UseActionIntent,
+    RulebenchScenario, ScenarioProjection, StateFingerprint, TargetKind, TargetLegality,
+    TurnTransitionEntry, UseActionIntent,
 };
 use rulebench_ruleset::{ActionResourceCost, CombatEndPolicy};
 
@@ -283,6 +283,39 @@ pub struct CurrentActorTargetOption {
     pub target_name: String,
     pub current_hit_points: i32,
     pub max_hit_points: i32,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionTargetMode {
+    SelfActor,
+    Entity,
+    Cell,
+}
+
+impl ActionTargetMode {
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::SelfActor => "self",
+            Self::Entity => "entity",
+            Self::Cell => "cell",
+        }
+    }
+}
+
+impl From<TargetKind> for ActionTargetMode {
+    fn from(value: TargetKind) -> Self {
+        match value {
+            TargetKind::Combatant => Self::Entity,
+            TargetKind::Area => Self::Cell,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentActorCellOption {
+    pub position: GridPosition,
+    pub reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -294,7 +327,9 @@ pub struct CurrentActorActionOption {
     pub unavailable_reason: Option<String>,
     pub resource_costs: Vec<ActionResourceCost>,
     pub resource_states: Vec<ActionResourceState>,
+    pub target_mode: ActionTargetMode,
     pub target_options: Vec<CurrentActorTargetOption>,
+    pub destination_options: Vec<CurrentActorCellOption>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

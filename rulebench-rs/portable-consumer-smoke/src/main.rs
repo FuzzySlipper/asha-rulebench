@@ -22,7 +22,10 @@ fn main() {
 
     assert!(step.receipt.accepted);
     assert!(!step.receipt.events.is_empty());
-    assert_eq!(api.snapshot(&session).expect("snapshot").combat_log.len(), 1);
+    let snapshot = api.snapshot(&session).expect("snapshot");
+    assert_eq!(snapshot.combat_log.len(), 1);
+    assert_eq!(snapshot.current_state.board.width, 6);
+    assert_eq!(snapshot.current_state.combatants[0].position, GridPosition { x: 0, y: 0 });
 }
 
 fn scenario() -> RulebenchScenario {

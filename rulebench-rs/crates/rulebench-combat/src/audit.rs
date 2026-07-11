@@ -32,13 +32,44 @@ pub fn fingerprint_projected_state(projection: &ScenarioProjection) -> StateFing
 }
 
 fn feed_projected_combatants(builder: &mut FingerprintBuilder, projection: &ScenarioProjection) {
-    builder.feed_u32(projection.combatants.len() as u32);
-    for combatant in &projection.combatants {
+    builder.feed_str("board");
+    builder.feed_str(&projection.board.id);
+    builder.feed_u32(projection.board.width);
+    builder.feed_u32(projection.board.height);
+    let mut cells = projection.board.cells.iter().collect::<Vec<_>>();
+    cells.sort_by_key(|cell| (cell.position.y, cell.position.x));
+    builder.feed_u32(cells.len() as u32);
+    for cell in cells {
+        builder.feed_u32(cell.position.x);
+        builder.feed_u32(cell.position.y);
+        builder.feed_u32(cell.blocks_movement as u32);
+        let mut terrain_tags = cell.terrain_tags.iter().collect::<Vec<_>>();
+        terrain_tags.sort();
+        builder.feed_u32(terrain_tags.len() as u32);
+        for tag in terrain_tags {
+            builder.feed_str(tag);
+        }
+        let mut occupants = cell.occupant_ids.iter().collect::<Vec<_>>();
+        occupants.sort();
+        builder.feed_u32(occupants.len() as u32);
+        for occupant in occupants {
+            builder.feed_str(occupant);
+        }
+    }
+
+    let mut combatants = projection.combatants.iter().collect::<Vec<_>>();
+    combatants.sort_by(|left, right| left.id.cmp(&right.id));
+    builder.feed_u32(combatants.len() as u32);
+    for combatant in combatants {
         builder.feed_str("combatant");
         builder.feed_str(&combatant.id);
         builder.feed_str(&combatant.name);
         builder.feed_i32(combatant.hit_points.current);
         builder.feed_i32(combatant.hit_points.max);
+        builder.feed_u32(combatant.position.x);
+        builder.feed_u32(combatant.position.y);
+        builder.feed_u32(combatant.movement_remaining);
+        builder.feed_u32(combatant.movement_maximum);
 
         builder.feed_u32(combatant.conditions.len() as u32);
         for condition in &combatant.conditions {

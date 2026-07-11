@@ -633,6 +633,7 @@ fn current_actor_action_option(
                 .collect()
         })
         .unwrap_or_default();
+    let target_mode = ActionTargetMode::from(action.targeting.target_kind);
     let target_options = action
         .targeting
         .visible_target_ids
@@ -644,8 +645,23 @@ fn current_actor_action_option(
             target_name: target.name.clone(),
             current_hit_points: target.hit_points.current,
             max_hit_points: target.hit_points.max,
+            reason: "Target is legal for the current authoritative state.".to_string(),
         })
         .collect();
+    let destination_options = if target_mode == ActionTargetMode::Cell {
+        projection
+            .board
+            .cells
+            .iter()
+            .filter(|cell| !cell.blocks_movement && cell.occupant_ids.is_empty())
+            .map(|cell| CurrentActorCellOption {
+                position: cell.position,
+                reason: "Cell is in bounds, unblocked, and unoccupied.".to_string(),
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     CurrentActorActionOption {
         action_id: action.id.clone(),
@@ -655,7 +671,9 @@ fn current_actor_action_option(
         unavailable_reason,
         resource_costs: action.resource_costs.clone(),
         resource_states,
+        target_mode,
         target_options,
+        destination_options,
     }
 }
 

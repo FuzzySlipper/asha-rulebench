@@ -66,6 +66,7 @@ describe("live Rulebench transport", () => {
       actorId: "adept",
       actionId: "hexing-bolt",
       targetId: "raider",
+      destinationCell: null,
     };
     const intentCommand = {
       id: "step-1",
@@ -132,7 +133,7 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/replays/replay%2Fone/verify",
       "POST http://rulebench.test/api/rulebench/v1/replays/compare",
     ]);
-    expect(calls.every((call) => call.version === "1")).toBe(true);
+    expect(calls.every((call) => call.version === "2")).toBe(true);
     expect(calls[3]?.body).toBe(JSON.stringify(createRequest));
     expect(calls[7]?.body).toBe(JSON.stringify(intent));
     expect(calls[9]?.body).toBe(JSON.stringify(intentCommand));
@@ -156,7 +157,7 @@ describe("live Rulebench transport", () => {
     });
 
     const mismatched = createLiveRulebenchTransport({
-      fetch: async () => Response.json({ ...handshake, protocolVersion: 2 }),
+      fetch: async () => Response.json({ ...handshake, protocolVersion: 3 }),
     });
     const mismatchResult = await mismatched.connect();
 
@@ -166,7 +167,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v1; received asha-rulebench.protocol v2.",
+          "Expected asha-rulebench.protocol v2; received asha-rulebench.protocol v3.",
         retryable: false,
       },
     });

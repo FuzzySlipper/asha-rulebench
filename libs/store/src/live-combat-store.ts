@@ -22,6 +22,7 @@ import type {
   RulebenchAutomaticStepSpecDto,
   RulebenchCombatControlCommandKindDto,
   RulebenchLiveTransportErrorDto,
+  RulebenchUseActionIntentDto,
   RulebenchProtocolHandshakeDto,
   RulebenchScenarioOptionDto,
 } from "@asha-rulebench/protocol";
@@ -38,6 +39,7 @@ export interface RulebenchLiveIntentInput {
   readonly actorId: string;
   readonly actionId: string;
   readonly targetId: string;
+  readonly destinationCell?: Readonly<{ x: number; y: number }>;
 }
 
 export const RULEBENCH_LIVE_TRANSPORT =
@@ -249,7 +251,7 @@ export class LiveCombatStore {
     this._preflight.set({ kind: "loading" });
     const result = await this.transport.preflightIntent(
       request.sessionId,
-      this._intent(),
+      protocolIntent(this._intent()),
     );
     if (!this.isCurrent(request.sessionId, request.generation)) return;
     this._preflight.set(
@@ -271,7 +273,7 @@ export class LiveCombatStore {
     this._submission.set({ kind: "loading" });
     const result = await this.transport.submitIntent(request.sessionId, {
       ...command,
-      intent: this._intent(),
+      intent: protocolIntent(this._intent()),
     });
     if (!this.isCurrent(request.sessionId, request.generation)) return;
     if (result.ok) {
@@ -461,6 +463,15 @@ export class LiveCombatStore {
       this.automationGeneration === automationGeneration
     );
   }
+}
+
+function protocolIntent(intent: RulebenchLiveIntentInput): RulebenchUseActionIntentDto {
+  return {
+    actorId: intent.actorId,
+    actionId: intent.actionId,
+    targetId: intent.targetId,
+    destinationCell: intent.destinationCell ?? null,
+  };
 }
 
 export function provideLiveCombatStoreKernel(): Provider[] {

@@ -1,8 +1,25 @@
 /// Authoritative action receipts and projected combat state.
 use super::{
-    AttackRollResult, BoundedValue, DamageOutcome, DomainEvent, HealingOutcome, ModifierOutcome,
-    RulebenchRejection, TargetLegality, TemporaryVitalityOutcome, TraceEntry, UseActionIntent,
+    AttackRollResult, BoundedValue, DamageOutcome, DomainEvent, GridPosition, HealingOutcome,
+    ModifierOutcome, RulebenchRejection, TargetLegality, TemporaryVitalityOutcome, TraceEntry,
+    UseActionIntent,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpatialBoardState {
+    pub id: String,
+    pub width: u32,
+    pub height: u32,
+    pub cells: Vec<SpatialCellState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpatialCellState {
+    pub position: GridPosition,
+    pub terrain_tags: Vec<String>,
+    pub blocks_movement: bool,
+    pub occupant_ids: Vec<String>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FinalCombatantState {
@@ -11,11 +28,15 @@ pub struct FinalCombatantState {
     pub hit_points: BoundedValue,
     pub temporary_vitality: i32,
     pub conditions: Vec<String>,
+    pub position: GridPosition,
+    pub movement_remaining: u32,
+    pub movement_maximum: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScenarioProjection {
     pub summary: String,
+    pub board: SpatialBoardState,
     pub combatants: Vec<FinalCombatantState>,
 }
 

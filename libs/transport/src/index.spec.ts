@@ -579,11 +579,11 @@ describe("RulebenchTransport fixtures", () => {
           ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "43b17555d3d7ff0d",
+            value: "698b5a1bcdda87e7",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "43b17555d3d7ff0d",
+            value: "698b5a1bcdda87e7",
           },
         },
         {
@@ -615,11 +615,11 @@ describe("RulebenchTransport fixtures", () => {
           ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "43b17555d3d7ff0d",
+            value: "698b5a1bcdda87e7",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "1872b66dd0de303a",
+            value: "4fbace9b57d9dc4c",
           },
         },
         {
@@ -636,11 +636,11 @@ describe("RulebenchTransport fixtures", () => {
           rollConsumption: [],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "1872b66dd0de303a",
+            value: "4fbace9b57d9dc4c",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "1872b66dd0de303a",
+            value: "4fbace9b57d9dc4c",
           },
         },
       ]);
@@ -1054,11 +1054,11 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.decisionKind).toBe("verified");
       expect(result.value.expectedFinalStateFingerprint).toEqual({
         algorithm: "fnv1a64.rulebench-projection.v0",
-        value: "977a31e4f5dc71bc",
+        value: "e4f96047f9dafa36",
       });
       expect(result.value.actualFinalStateFingerprint).toEqual({
         algorithm: "fnv1a64.rulebench-projection.v0",
-        value: "977a31e4f5dc71bc",
+        value: "e4f96047f9dafa36",
       });
       expect(result.value.finalStateFingerprintMatches).toBe(true);
       expect(result.value.finalizationMatches).toBe(true);

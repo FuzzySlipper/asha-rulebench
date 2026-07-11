@@ -42,6 +42,7 @@ export interface RulebenchLiveSessionView {
   readonly fingerprintLabel: string;
   readonly participantOrderIds: readonly string[];
   readonly participants: readonly RulebenchLiveParticipantView[];
+  readonly board: RulebenchLiveBoardView;
   readonly options: RulebenchLiveOptionsView;
   readonly combatEndLabel: string;
   readonly finalizationLabel: string | null;
@@ -56,6 +57,23 @@ export interface RulebenchLiveParticipantView {
   readonly temporaryVitalityLabel: string | null;
   readonly statusLabel: string;
   readonly conditionLabels: readonly string[];
+  readonly position: Readonly<{ x: number; y: number }>;
+  readonly movementLabel: string;
+}
+
+export interface RulebenchLiveBoardView {
+  readonly id: string;
+  readonly width: number;
+  readonly height: number;
+  readonly cells: readonly RulebenchLiveBoardCellView[];
+}
+
+export interface RulebenchLiveBoardCellView {
+  readonly x: number;
+  readonly y: number;
+  readonly terrainLabels: readonly string[];
+  readonly blocksMovement: boolean;
+  readonly occupantIds: readonly string[];
 }
 
 export interface RulebenchLiveOptionsView {
@@ -73,13 +91,22 @@ export interface RulebenchLiveActionOptionView {
   readonly unavailableReason: string | null;
   readonly resourceCostLabels: readonly string[];
   readonly resourceLabels: readonly string[];
+  readonly targetMode: "self" | "entity" | "cell";
   readonly targets: readonly RulebenchLiveTargetOptionView[];
+  readonly destinations: readonly RulebenchLiveCellOptionView[];
 }
 
 export interface RulebenchLiveTargetOptionView {
   readonly id: string;
   readonly name: string;
   readonly hitPointLabel: string;
+  readonly reason: string;
+}
+
+export interface RulebenchLiveCellOptionView {
+  readonly x: number;
+  readonly y: number;
+  readonly reason: string;
 }
 
 export interface RulebenchLiveLogEntryView {
@@ -168,7 +195,21 @@ export function projectLiveSessionSnapshot(
           : `${participant.temporaryVitality} temporary vitality`,
       statusLabel: participant.defeated ? "Defeated" : "Active",
       conditionLabels: participant.conditions,
+      position: participant.position,
+      movementLabel: `${participant.movementRemaining}/${participant.movementMaximum}`,
     })),
+    board: {
+      id: snapshot.board.id,
+      width: snapshot.board.width,
+      height: snapshot.board.height,
+      cells: snapshot.board.cells.map((cell) => ({
+        x: cell.position.x,
+        y: cell.position.y,
+        terrainLabels: cell.terrainTags,
+        blocksMovement: cell.blocksMovement,
+        occupantIds: cell.occupantIds,
+      })),
+    },
     options: projectLiveOptions(snapshot.options),
     combatEndLabel: snapshot.combatEnd.reason,
     finalizationLabel: snapshot.finalization?.reason ?? null,
@@ -218,10 +259,17 @@ export function projectLiveOptions(
         (resource) =>
           `${resource.resourceId} ${resource.current}/${resource.max}`,
       ),
+      targetMode: action.targetMode,
       targets: action.targets.map((target) => ({
         id: target.targetId,
         name: target.targetName,
         hitPointLabel: `${target.currentHitPoints}/${target.maxHitPoints} HP`,
+        reason: target.reason,
+      })),
+      destinations: action.destinations.map((destination) => ({
+        x: destination.position.x,
+        y: destination.position.y,
+        reason: destination.reason,
       })),
     })),
   };

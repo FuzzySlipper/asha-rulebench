@@ -116,11 +116,7 @@ pub struct LivePreflightDto {
 impl From<&CommandPreflightReadout> for LivePreflightDto {
     fn from(value: &CommandPreflightReadout) -> Self {
         Self {
-            intent: UseActionIntentDto {
-                actor_id: value.intent.actor_id.clone(),
-                action_id: value.intent.action_id.clone(),
-                target_id: value.intent.target_id.clone(),
-            },
+            intent: UseActionIntentDto::from(&value.intent),
             accepted: value.accepted,
             decision_kind: value.decision_kind.code().to_string(),
             rejection_code: value
@@ -170,11 +166,7 @@ pub struct LiveCandidateDto {
 impl From<&CommandCandidateEntry> for LiveCandidateDto {
     fn from(value: &CommandCandidateEntry) -> Self {
         Self {
-            intent: UseActionIntentDto {
-                actor_id: value.intent.actor_id.clone(),
-                action_id: value.intent.action_id.clone(),
-                target_id: value.intent.target_id.clone(),
-            },
+            intent: UseActionIntentDto::from(&value.intent),
             ability_id: value.ability_id.clone(),
             target_name: value.target_name.clone(),
             target_current_hit_points: value.target_current_hit_points,
@@ -256,11 +248,7 @@ impl From<&CombatSessionStepReadout> for LiveCommandStepDto {
                 .audit_entry
                 .rejection
                 .map(|rejection| rejection.code().to_string()),
-            intent: UseActionIntentDto {
-                actor_id: value.command.actor_id.clone(),
-                action_id: value.command.action_id.clone(),
-                target_id: value.command.target_id.clone(),
-            },
+            intent: UseActionIntentDto::from(&value.receipt.intent),
             rolls: value
                 .receipt
                 .roll_consumption

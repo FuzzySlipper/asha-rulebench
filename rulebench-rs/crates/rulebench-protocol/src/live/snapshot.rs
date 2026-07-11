@@ -1,8 +1,9 @@
 use rulebench_rules::{
     ActionResourceCost, ActionResourceRefreshPolicy, ActionResourceState,
     CombatEndConditionReadout, CombatFinalizationReadout, CombatLogEntry, CombatSessionSnapshot,
-    CommandAuditEntry, CurrentActorActionOption, CurrentActorOptionSummary,
-    CurrentActorTargetOption, FinalCombatantState, StateFingerprint,
+    CommandAuditEntry, CurrentActorActionOption, CurrentActorCellOption, CurrentActorOptionSummary,
+    CurrentActorTargetOption, FinalCombatantState, SpatialBoardState, SpatialCellState,
+    StateFingerprint,
 };
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +33,59 @@ pub struct LiveParticipantDto {
     pub temporary_vitality: i32,
     pub defeated: bool,
     pub conditions: Vec<String>,
+    pub position: LiveGridPositionDto,
+    pub movement_remaining: u32,
+    pub movement_maximum: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveGridPositionDto {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveBoardCellDto {
+    pub position: LiveGridPositionDto,
+    pub terrain_tags: Vec<String>,
+    pub blocks_movement: bool,
+    pub occupant_ids: Vec<String>,
+}
+
+impl From<&SpatialCellState> for LiveBoardCellDto {
+    fn from(value: &SpatialCellState) -> Self {
+        Self {
+            position: LiveGridPositionDto {
+                x: value.position.x,
+                y: value.position.y,
+            },
+            terrain_tags: value.terrain_tags.clone(),
+            blocks_movement: value.blocks_movement,
+            occupant_ids: value.occupant_ids.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveBoardDto {
+    pub id: String,
+    pub width: u32,
+    pub height: u32,
+    pub cells: Vec<LiveBoardCellDto>,
+}
+
+impl From<&SpatialBoardState> for LiveBoardDto {
+    fn from(value: &SpatialBoardState) -> Self {
+        Self {
+            id: value.id.clone(),
+            width: value.width,
+            height: value.height,
+            cells: value.cells.iter().map(LiveBoardCellDto::from).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +146,7 @@ pub struct LiveTargetOptionDto {
     pub target_name: String,
     pub current_hit_points: i32,
     pub max_hit_points: i32,
+    pub reason: String,
 }
 
 impl From<&CurrentActorTargetOption> for LiveTargetOptionDto {
@@ -101,6 +156,26 @@ impl From<&CurrentActorTargetOption> for LiveTargetOptionDto {
             target_name: value.target_name.clone(),
             current_hit_points: value.current_hit_points,
             max_hit_points: value.max_hit_points,
+            reason: value.reason.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveCellOptionDto {
+    pub position: LiveGridPositionDto,
+    pub reason: String,
+}
+
+impl From<&CurrentActorCellOption> for LiveCellOptionDto {
+    fn from(value: &CurrentActorCellOption) -> Self {
+        Self {
+            position: LiveGridPositionDto {
+                x: value.position.x,
+                y: value.position.y,
+            },
+            reason: value.reason.clone(),
         }
     }
 }
@@ -115,7 +190,9 @@ pub struct LiveActionOptionDto {
     pub unavailable_reason: Option<String>,
     pub resource_costs: Vec<LiveActionResourceCostDto>,
     pub resource_states: Vec<LiveActionResourceStateDto>,
+    pub target_mode: String,
     pub targets: Vec<LiveTargetOptionDto>,
+    pub destinations: Vec<LiveCellOptionDto>,
 }
 
 impl From<&CurrentActorActionOption> for LiveActionOptionDto {
@@ -136,10 +213,16 @@ impl From<&CurrentActorActionOption> for LiveActionOptionDto {
                 .iter()
                 .map(LiveActionResourceStateDto::from)
                 .collect(),
+            target_mode: value.target_mode.code().to_string(),
             targets: value
                 .target_options
                 .iter()
                 .map(LiveTargetOptionDto::from)
+                .collect(),
+            destinations: value
+                .destination_options
+                .iter()
+                .map(LiveCellOptionDto::from)
                 .collect(),
         }
     }
@@ -312,6 +395,7 @@ pub struct LiveSessionSnapshotDto {
     pub participant_order: Vec<String>,
     pub current_actor_id: Option<String>,
     pub participants: Vec<LiveParticipantDto>,
+    pub board: LiveBoardDto,
     pub options: LiveCurrentActorOptionsDto,
     pub combat_end: LiveCombatEndDto,
     pub finalization: Option<LiveFinalizationDto>,
@@ -338,6 +422,7 @@ impl From<&CombatSessionSnapshot> for LiveSessionSnapshotDto {
                 .iter()
                 .map(|combatant| participant(combatant, value))
                 .collect(),
+            board: LiveBoardDto::from(&value.current_state.board),
             options: LiveCurrentActorOptionsDto::from(&value.current_actor_options),
             combat_end: LiveCombatEndDto::from(&value.combat_end_condition),
             finalization: value.finalization.as_ref().map(LiveFinalizationDto::from),
@@ -374,5 +459,11 @@ fn participant(
         temporary_vitality: combatant.temporary_vitality,
         defeated,
         conditions: combatant.conditions.clone(),
+        position: LiveGridPositionDto {
+            x: combatant.position.x,
+            y: combatant.position.y,
+        },
+        movement_remaining: combatant.movement_remaining,
+        movement_maximum: combatant.movement_maximum,
     }
 }

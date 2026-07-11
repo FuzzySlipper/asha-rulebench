@@ -85,6 +85,12 @@ fn router_serializes_lifecycle_and_isolates_multiple_sessions() {
         serde_json::from_slice(&second.body).expect("second snapshot is JSON");
     assert_eq!(first.lifecycle_phase, "inProgress");
     assert_eq!(second.lifecycle_phase, "ready");
+    assert_eq!(first.board.width, 6);
+    assert_eq!(first.board.height, 4);
+    assert_eq!(first.participants[0].position.x, 1);
+    assert!(first.board.cells.iter().any(|cell| {
+        cell.position.x == 1 && cell.position.y == 1 && cell.occupant_ids == vec!["entity-adept"]
+    }));
 }
 
 #[test]

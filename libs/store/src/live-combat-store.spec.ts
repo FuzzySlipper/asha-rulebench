@@ -35,7 +35,7 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 1,
+          protocolVersion: 2,
           authoritySurface: "test-authority",
         },
       }),
@@ -212,7 +212,7 @@ describe("LiveCombatStore", () => {
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 1,
+        protocolVersion: 2,
         authoritySurface: "late",
       },
     });
@@ -462,6 +462,9 @@ function makeLiveSessionSnapshot(
         temporaryVitality: 0,
         defeated: false,
         conditions: [],
+        position: { x: 1, y: 1 },
+        movementRemaining: 0,
+        movementMaximum: 0,
       },
       {
         id: "entity-raider",
@@ -471,8 +474,17 @@ function makeLiveSessionSnapshot(
         temporaryVitality: 0,
         defeated: false,
         conditions: raiderHitPoints < 18 ? ["rattled"] : [],
+        position: { x: 4, y: 1 },
+        movementRemaining: 0,
+        movementMaximum: 0,
       },
     ],
+    board: {
+      id: "two-combatant-hexing-bolt",
+      width: 6,
+      height: 4,
+      cells: [],
+    },
     options: {
       roundNumber: 1,
       turnIndex: 0,
@@ -493,12 +505,15 @@ function makeLiveSessionSnapshot(
                 unavailableReason: null,
                 resourceCosts: [],
                 resourceStates: [],
+                targetMode: "entity",
+                destinations: [],
                 targets: [
                   {
                     targetId: "entity-raider",
                     targetName: "Raider",
                     currentHitPoints: raiderHitPoints,
                     maxHitPoints: 18,
+                    reason: "Target is legal.",
                   },
                 ],
               },

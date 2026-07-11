@@ -22,6 +22,28 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 fields: fields(vec![field("algorithm", "string"), field("value", "string")]),
             },
             Interface {
+                name: "RulebenchLiveGridPositionDto",
+                fields: fields(vec![field("x", "number"), field("y", "number")]),
+            },
+            Interface {
+                name: "RulebenchLiveBoardCellDto",
+                fields: fields(vec![
+                    field("position", "RulebenchLiveGridPositionDto"),
+                    field("terrainTags", "readonly string[]"),
+                    field("blocksMovement", "boolean"),
+                    field("occupantIds", "readonly string[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchLiveBoardDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("width", "number"),
+                    field("height", "number"),
+                    field("cells", "readonly RulebenchLiveBoardCellDto[]"),
+                ]),
+            },
+            Interface {
                 name: "RulebenchLiveParticipantDto",
                 fields: fields(vec![
                     field("id", "string"),
@@ -31,6 +53,9 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("temporaryVitality", "number"),
                     field("defeated", "boolean"),
                     field("conditions", "readonly string[]"),
+                    field("position", "RulebenchLiveGridPositionDto"),
+                    field("movementRemaining", "number"),
+                    field("movementMaximum", "number"),
                 ]),
             },
             Interface {
@@ -61,6 +86,14 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("targetName", "string"),
                     field("currentHitPoints", "number"),
                     field("maxHitPoints", "number"),
+                    field("reason", "string"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchLiveCellOptionDto",
+                fields: fields(vec![
+                    field("position", "RulebenchLiveGridPositionDto"),
+                    field("reason", "string"),
                 ]),
             },
             Interface {
@@ -79,7 +112,9 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                         "resourceStates",
                         "readonly RulebenchLiveActionResourceStateDto[]",
                     ),
+                    field("targetMode", "'self' | 'entity' | 'cell'"),
                     field("targets", "readonly RulebenchLiveTargetOptionDto[]"),
+                    field("destinations", "readonly RulebenchLiveCellOptionDto[]"),
                 ]),
             },
             Interface {
@@ -164,6 +199,7 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("participantOrder", "readonly string[]"),
                     field("currentActorId", "string | null"),
                     field("participants", "readonly RulebenchLiveParticipantDto[]"),
+                    field("board", "RulebenchLiveBoardDto"),
                     field("options", "RulebenchLiveCurrentActorOptionsDto"),
                     field("combatEnd", "RulebenchLiveCombatEndDto"),
                     field("finalization", "RulebenchLiveFinalizationDto | null"),

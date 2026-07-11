@@ -31,9 +31,10 @@ pub use content::{
 };
 pub use live::{
     LiveActionOptionDto, LiveActionResourceCostDto, LiveActionResourceStateDto, LiveAuditEntryDto,
-    LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateDto, LiveCandidateSummaryDto,
-    LiveCombatEndDto, LiveCombatLogEntryDto, LiveCommandExecutionDto, LiveCommandStepDto,
-    LiveControlExecutionDto, LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto,
+    LiveAutomaticRunDto, LiveAutomaticStepDto, LiveBoardCellDto, LiveBoardDto, LiveCandidateDto,
+    LiveCandidateSummaryDto, LiveCellOptionDto, LiveCombatEndDto, LiveCombatLogEntryDto,
+    LiveCommandExecutionDto, LiveCommandStepDto, LiveControlExecutionDto,
+    LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto, LiveGridPositionDto,
     LiveParticipantDto, LivePreflightDto, LiveRollEvidenceDto, LiveSessionSnapshotDto,
     LiveStateFingerprintDto, LiveTargetOptionDto, LiveTraceEntryDto, LiveTransportErrorDto,
 };

@@ -41,7 +41,7 @@ pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     if intent.action_id.is_empty() {
         return rejected(intent.clone(), RulebenchRejection::EmptyActionId, trace);
     }
-    if intent.target_id.is_empty() {
+    if intent.target_id.is_empty() && intent.destination_cell.is_none() {
         return rejected(intent.clone(), RulebenchRejection::EmptyTargetId, trace);
     }
 
@@ -88,7 +88,7 @@ pub fn resolve_use_action(
             trace,
         );
     }
-    if intent.target_id.is_empty() {
+    if intent.target_id.is_empty() && intent.destination_cell.is_none() {
         return rejected_with_projection(
             scenario,
             intent,

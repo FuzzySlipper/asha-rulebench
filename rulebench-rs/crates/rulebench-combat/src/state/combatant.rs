@@ -4,7 +4,7 @@ use crate::model::{
     ActionResourceKind, ActionResourceRefreshDecisionKind, ActionResourceRefreshReadout,
     ActionResourceSpendDecisionKind, ActionResourceSpendReadout, ActionResourceState,
     ActiveModifier, BoundedValue, ClassBuildInputReadout, ClassDefinition, ClassLevelInput,
-    Combatant, CombatantActionResourceReadout, FinalCombatantState, ItemDefinition,
+    Combatant, CombatantActionResourceReadout, FinalCombatantState, GridPosition, ItemDefinition,
     ModifierDefinition, ModifierDurationExpirationDecisionKind, ModifierDurationExpirationReadout,
     ModifierDurationPolicy, ModifierOutcome, ModifierStackingPolicy, ModifierTenure,
 };
@@ -23,6 +23,9 @@ pub(super) struct CombatantState {
     pub(super) base_ability_ids: Vec<String>,
     pub(super) available_ability_ids: Vec<String>,
     pub(super) class_inputs: Vec<ClassBuildInputReadout>,
+    pub(super) position: GridPosition,
+    pub(super) movement_remaining: u32,
+    pub(super) movement_maximum: u32,
 }
 
 impl CombatantState {
@@ -45,6 +48,9 @@ impl CombatantState {
             base_ability_ids: combatant.base_ability_ids.clone(),
             available_ability_ids: combatant.base_ability_ids.clone(),
             class_inputs: Vec::new(),
+            position: combatant.position,
+            movement_remaining: 0,
+            movement_maximum: 0,
         };
         for input in &combatant.class_inputs {
             if let Some(class) = classes.iter().find(|class| class.id == input.class_id) {
@@ -68,6 +74,9 @@ impl CombatantState {
             hit_points: self.hit_points,
             temporary_vitality: self.temporary_vitality,
             conditions: self.condition_labels(),
+            position: self.position,
+            movement_remaining: self.movement_remaining,
+            movement_maximum: self.movement_maximum,
         }
     }
 
@@ -85,6 +94,9 @@ impl CombatantState {
             base_ability_ids: Vec::new(),
             available_ability_ids: Vec::new(),
             class_inputs: Vec::new(),
+            position: combatant.position,
+            movement_remaining: combatant.movement_remaining,
+            movement_maximum: combatant.movement_maximum,
         }
     }
 
