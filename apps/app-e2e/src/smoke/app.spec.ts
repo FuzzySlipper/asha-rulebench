@@ -40,13 +40,13 @@ test("boots the rulebench shell", async ({ page }) => {
   );
   await expect(page.getByRole("tabpanel")).toContainText("DamageApplied");
   await page.getByRole("tab", { name: "DomainEvents" }).press("End");
-  await expect(page.getByRole("tab", { name: "State" })).toBeFocused();
-  await expect(page.getByRole("tab", { name: "State" })).toHaveAttribute(
+  await expect(page.getByRole("tab", { name: "Replay" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  await expect(page.getByRole("tabpanel")).toContainText("Before");
-  await page.getByRole("tab", { name: "State" }).press("Home");
+  await expect(page.getByRole("tabpanel")).toContainText("Replay review");
+  await page.getByRole("tab", { name: "Replay" }).press("Home");
   await expect(page.getByRole("tab", { name: "Combat" })).toBeFocused();
   await expect(page.getByRole("tabpanel")).toContainText("Adept hits Raider");
 

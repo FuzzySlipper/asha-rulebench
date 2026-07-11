@@ -217,8 +217,15 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         <arb-manual-combat-workspace />
       </arb-application-dialog>
 
-      <div class="current-workspaces">Current functional workspaces</div>
-      <arb-replay-review-workspace />
+      <arb-application-dialog
+        dialogId="replay-review-dialog"
+        dialogTitle="Replay archive"
+        dialogDescription="Select, verify, and compare Rust replay packages."
+        [open]="activeDialog() === 'replay'"
+        (closeRequested)="closeDialog()"
+      >
+        <arb-replay-review-workspace />
+      </arb-application-dialog>
 
       <arb-application-dialog
         dialogId="scenario-cases-dialog"
@@ -438,7 +445,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
 export class ScenarioViewerFeatureComponent implements OnInit {
   private readonly sessionStore = inject(SessionStore);
   protected readonly activeDialog = signal<
-    "content" | "scenario" | "live" | null
+    "content" | "scenario" | "live" | "replay" | null
   >(null);
   protected readonly applicationMenuGroups: readonly ApplicationMenuGroup[] = [
     {
@@ -453,6 +460,11 @@ export class ScenarioViewerFeatureComponent implements OnInit {
         { id: "open-scenario-cases", label: "Scenario cases" },
         { id: "open-live-combat", label: "Live combat setup" },
       ],
+    },
+    {
+      id: "replay",
+      label: "Replay",
+      items: [{ id: "open-replay-review", label: "Replay archive" }],
     },
   ];
   protected readonly viewerMode = signal<"session" | "scenario">("session");
@@ -504,6 +516,9 @@ export class ScenarioViewerFeatureComponent implements OnInit {
         return;
       case "open-live-combat":
         this.activeDialog.set("live");
+        return;
+      case "open-replay-review":
+        this.activeDialog.set("replay");
         return;
     }
   }

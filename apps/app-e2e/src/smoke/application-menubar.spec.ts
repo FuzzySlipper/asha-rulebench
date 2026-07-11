@@ -94,7 +94,7 @@ test("keeps application menus accessible at mobile width", async ({ page }) => {
   const replayMenu = page.getByRole("menu", { name: "Replay" });
   await expect(replayMenu).toBeInViewport();
   await expect(
-    replayMenu.getByRole("menuitem", { name: "Evidence log" }),
+    replayMenu.getByRole("menuitem", { name: "Replay archive" }),
   ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(replayMenu).toHaveCount(0);

@@ -324,6 +324,18 @@
       >
         State
       </button>
+      <button
+        id="evidence-tab-replay"
+        type="button"
+        role="tab"
+        aria-controls="evidence-panel-replay"
+        [attr.aria-selected]="selectedEvidenceTab() === 'replay'"
+        [attr.tabindex]="selectedEvidenceTab() === 'replay' ? 0 : -1"
+        (click)="selectEvidenceTab('replay')"
+        (keydown)="handleEvidenceTabKeydown($event)"
+      >
+        Replay
+      </button>
     </div>
     <section
       class="evidence-panel"
@@ -658,6 +670,179 @@
               </section>
             } @else {
               <p>No state evidence selected</p>
+            }
+          </div>
+        }
+        @case ("replay") {
+          <div class="replay-review">
+            @switch (replayReview().kind) {
+              @case ("loading") {
+                <p aria-busy="true">Loading replay evidence</p>
+              }
+              @case ("error") {
+                <p class="panel-state--error" role="alert">
+                  {{ replayReview().error.message }}
+                </p>
+              }
+              @case ("data") {
+                <section>
+                  <h4>{{ replayReview().value.title }}</h4>
+                  <span>{{ replayReview().value.summary }}</span>
+                  <span>{{ replayReview().value.provenanceLabel }}</span>
+                  <span>{{ replayReview().value.finalFingerprintLabel }}</span>
+                </section>
+
+                <div class="replay-summary-columns">
+                  <section aria-label="Replay verification summary">
+                    <h4>Verification</h4>
+                    @if (replayVerification().kind === "data") {
+                      <strong>{{
+                        replayVerification().value.decisionLabel
+                      }}</strong>
+                      <span>{{
+                        replayVerification().value.finalizedLabel
+                      }}</span>
+                      <span>{{
+                        replayVerification().value.verifiedStepLabel
+                      }}</span>
+                      <span>{{
+                        replayVerification().value.mismatchLabel ??
+                          "No mismatch"
+                      }}</span>
+                    } @else {
+                      <span>No verification result selected</span>
+                    }
+                  </section>
+                  <section aria-label="Replay comparison summary">
+                    <h4>Comparison</h4>
+                    @if (replayComparison().kind === "data") {
+                      <strong>{{
+                        replayComparison().value.resultLabel
+                      }}</strong>
+                      <span>{{ replayComparison().value.packageLabel }}</span>
+                      <span>{{
+                        replayComparison().value.comparedCommandLabel
+                      }}</span>
+                      @if (
+                        replayComparison().value.firstDifference;
+                        as difference
+                      ) {
+                        <span
+                          >First difference · {{ difference.codeLabel }} ·
+                          {{ difference.commandLabel }} ·
+                          {{ difference.path }}</span
+                        >
+                        <span>Expected: {{ difference.expectedSummary }}</span>
+                        <span>Actual: {{ difference.actualSummary }}</span>
+                      }
+                    } @else {
+                      <span>No comparison result selected</span>
+                    }
+                  </section>
+                </div>
+
+                @if (selectedReplayCommand(); as command) {
+                  <section aria-label="Selected replay command summary">
+                    <h4>{{ command.sequenceLabel }} · {{ command.id }}</h4>
+                    <span>{{ command.summary }}</span>
+                    <span
+                      >Supplied rolls · {{ command.suppliedRollLabel }}</span
+                    >
+                  </section>
+                  <div class="replay-summary-columns">
+                    <section aria-label="Expected replay summary">
+                      <h4>Expected</h4>
+                      <strong>{{ command.expected.decisionLabel }}</strong>
+                      <span
+                        >Before {{ command.expected.stateBeforeLabel }}</span
+                      >
+                      <span>After {{ command.expected.stateAfterLabel }}</span>
+                      <span>{{
+                        command.expected.eventLabels.join(" · ") ||
+                          "No accepted events"
+                      }}</span>
+                      <span>{{
+                        command.expected.rollLabels.join(" · ") ||
+                          "No consumed rolls"
+                      }}</span>
+                      <span>{{
+                        command.expected.auditLabels.join(" · ") ||
+                          "No command audit entries"
+                      }}</span>
+                      @for (
+                        entry of command.expected.trace;
+                        track entry.sequenceLabel
+                      ) {
+                        <span
+                          >{{ entry.sequenceLabel }} · {{ entry.phaseLabel }} ·
+                          {{ entry.statusLabel }} · {{ entry.message }} ·
+                          {{ entry.detail }}</span
+                        >
+                      }
+                    </section>
+                    <section aria-label="Actual replay summary">
+                      <h4>Actual</h4>
+                      <strong>{{ command.actual.decisionLabel }}</strong>
+                      <span>Before {{ command.actual.stateBeforeLabel }}</span>
+                      <span>After {{ command.actual.stateAfterLabel }}</span>
+                      <span>{{
+                        command.actual.eventLabels.join(" · ") ||
+                          "No accepted events"
+                      }}</span>
+                      <span>{{
+                        command.actual.rollLabels.join(" · ") ||
+                          "No consumed rolls"
+                      }}</span>
+                      <span>{{
+                        command.actual.auditLabels.join(" · ") ||
+                          "No command audit entries"
+                      }}</span>
+                      @for (
+                        entry of command.actual.trace;
+                        track entry.sequenceLabel
+                      ) {
+                        <span
+                          >{{ entry.sequenceLabel }} · {{ entry.phaseLabel }} ·
+                          {{ entry.statusLabel }} · {{ entry.message }} ·
+                          {{ entry.detail }}</span
+                        >
+                      }
+                    </section>
+                  </div>
+                  <section aria-label="Replay resulting state summary">
+                    <h4>Resulting state</h4>
+                    <span
+                      >Round {{ command.snapshot.roundLabel }} · turn
+                      {{ command.snapshot.turnLabel }} ·
+                      {{ command.snapshot.lifecycleLabel }}</span
+                    >
+                    @for (
+                      participant of command.snapshot.participants;
+                      track participant.id
+                    ) {
+                      <span
+                        >{{ participant.name }} ·
+                        {{ participant.hitPointLabel }} ·
+                        {{ participant.statusLabel }}</span
+                      >
+                    }
+                    @for (entry of command.snapshot.combatLog; track entry.id) {
+                      <span
+                        >{{ entry.sequenceLabel }} · {{ entry.title }} ·
+                        {{ entry.summary }}</span
+                      >
+                    }
+                  </section>
+                } @else {
+                  <p>No replay command selected</p>
+                }
+              }
+              @case ("idle") {
+                <p>
+                  Open Replay archive from the application menu to select replay
+                  evidence.
+                </p>
+              }
             }
           </div>
         }

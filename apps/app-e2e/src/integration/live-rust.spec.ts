@@ -483,7 +483,10 @@ test("configures participants from Rust scenario readbacks", async ({
 
 test("reviews and compares archived Rust replay evidence", async ({ page }) => {
   await page.goto("/");
-  const workspace = page.getByRole("region", {
+  await page.getByRole("menuitem", { name: "Replay" }).click();
+  await page.getByRole("menuitem", { name: "Replay archive" }).click();
+  const dialog = page.getByRole("dialog", { name: "Replay archive" });
+  const workspace = dialog.getByRole("region", {
     name: "Replay review workspace",
   });
   const packages = workspace.getByLabel("Archived replay packages");
@@ -534,4 +537,22 @@ test("reviews and compares archived Rust replay evidence", async ({ page }) => {
     .click();
   await expect(command).toContainText("No supplied rolls");
   await expect(state).toContainText("Ended");
+
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("tab", { name: "Replay" }).click();
+  const replayPanel = page.getByRole("tabpanel", {
+    name: "Replay",
+  });
+  await expect(replayPanel).toContainText("Hexing Bolt Replay");
+  await expect(replayPanel).toContainText("Verified");
+  await expect(replayPanel).toContainText(
+    "First difference · Replay Command Count Mismatch",
+  );
+  await expect(
+    replayPanel.getByRole("region", { name: "Expected replay summary" }),
+  ).toBeVisible();
+  await expect(
+    replayPanel.getByRole("region", { name: "Actual replay summary" }),
+  ).toBeVisible();
+  await expect(replayPanel).toContainText("Resulting state");
 });

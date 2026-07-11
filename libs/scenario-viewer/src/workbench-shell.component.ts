@@ -16,9 +16,13 @@ import {
   type ApplicationMenuItem,
   WorkbenchPanelComponent,
 } from "@asha-rulebench/components";
-import { LiveCombatStore, SessionStore } from "@asha-rulebench/store";
+import {
+  LiveCombatStore,
+  ReplayReviewStore,
+  SessionStore,
+} from "@asha-rulebench/store";
 
-type EvidenceTab = "combat" | "events" | "trace" | "audit" | "state";
+type EvidenceTab = "combat" | "events" | "trace" | "audit" | "state" | "replay";
 type InitiativePosition = "Current" | "Next" | "Queued" | "Complete";
 
 @Component({
@@ -39,9 +43,11 @@ export class WorkbenchShellComponent {
     "trace",
     "audit",
     "state",
+    "replay",
   ];
   private readonly liveStore = inject(LiveCombatStore);
   private readonly sessionStore = inject(SessionStore);
+  private readonly replayStore = inject(ReplayReviewStore);
   private readonly gridPanel =
     viewChild.required<WorkbenchPanelComponent>("gridPanel");
   private readonly initiativePanel =
@@ -78,6 +84,22 @@ export class WorkbenchShellComponent {
   protected readonly deterministicStep = computed(() =>
     this.sessionStore.sessionStep(),
   );
+  protected readonly replayReview = computed(() => this.replayStore.review());
+  protected readonly replayVerification = computed(() =>
+    this.replayStore.verification(),
+  );
+  protected readonly replayComparison = computed(() =>
+    this.replayStore.comparison(),
+  );
+  protected readonly selectedReplayCommand = computed(() => {
+    const review = this.replayReview();
+    const sequence = this.replayStore.selectedCommandSequence();
+    return review.kind === "data"
+      ? (review.value.commands.find(
+          (command) => command.sequence === sequence,
+        ) ?? null)
+      : null;
+  });
   protected readonly deterministicScenario = computed(() => {
     if (this.deterministicMode() === "scenario") {
       return this.sessionStore.scenario();
@@ -277,6 +299,8 @@ export class WorkbenchShellComponent {
         return "Command audit";
       case "state":
         return "State review";
+      case "replay":
+        return "Replay review";
     }
   });
 
