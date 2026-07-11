@@ -221,6 +221,42 @@ fn tcp_server_starts_serves_json_and_stops_cleanly() {
         .expect("server stops without error");
 }
 
+#[test]
+fn tcp_server_survives_clients_that_disconnect_before_a_response() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("ephemeral listener binds");
+    let address = listener.local_addr().expect("listener has address");
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let server_shutdown = Arc::clone(&shutdown);
+    let server = thread::spawn(move || serve_until(listener, router(), server_shutdown));
+
+    for _ in 0..8 {
+        let mut abandoned = connect_with_retry(address);
+        abandoned
+            .write_all(b"GET /api/rulebench/v1/handshake HTTP/1.1\r\n")
+            .expect("partial request writes");
+        drop(abandoned);
+    }
+
+    let mut subsequent = connect_with_retry(address);
+    write!(
+        subsequent,
+        "GET /api/rulebench/v1/handshake HTTP/1.1\r\nHost: 127.0.0.1\r\nx-rulebench-protocol-version: {}\r\nConnection: close\r\n\r\n",
+        PROTOCOL_VERSION
+    )
+    .expect("subsequent request writes");
+    let mut response = String::new();
+    subsequent
+        .read_to_string(&mut response)
+        .expect("subsequent response reads");
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+
+    shutdown.store(true, Ordering::Release);
+    server
+        .join()
+        .expect("server thread joins")
+        .expect("per-connection failures do not stop the listener");
+}
+
 fn connect_with_retry(address: std::net::SocketAddr) -> TcpStream {
     for _ in 0..50 {
         if let Ok(stream) = TcpStream::connect(address) {

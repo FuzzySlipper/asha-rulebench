@@ -46,9 +46,7 @@ pub fn serve_until(
     while !shutdown.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((mut stream, _)) => {
-                stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-                stream.set_write_timeout(Some(Duration::from_secs(5)))?;
-                serve_connection(&mut stream, &mut router)?;
+                let _ = serve_accepted_connection(&mut stream, &mut router);
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(10));
@@ -57,6 +55,15 @@ pub fn serve_until(
         }
     }
     Ok(())
+}
+
+fn serve_accepted_connection(
+    stream: &mut TcpStream,
+    router: &mut ProcessHostRouter,
+) -> Result<(), ServerError> {
+    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+    serve_connection(stream, router)
 }
 
 fn serve_connection(
