@@ -1,6 +1,5 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import type { OnInit } from "@angular/core";
-import { RulebenchScenarioRendererComponent } from "@asha-rulebench/renderer";
 import { SessionStore } from "@asha-rulebench/store";
 import type {
   RulebenchCommandOutcomeClassDto,
@@ -11,18 +10,17 @@ import {
   type ApplicationMenuGroup,
   type ApplicationMenuItem,
 } from "@asha-rulebench/components";
-import { ContentWorkspaceComponent } from "./content-workspace";
-import { ManualCombatWorkspaceComponent } from "./manual-combat-workspace";
-import { ReplayReviewWorkspaceComponent } from "./replay-review-workspace";
+import { ContentPacksDialogContentComponent } from "./content-packs-dialog-content";
+import { LiveCombatSetupDialogContentComponent } from "./live-combat-setup-dialog-content";
+import { ReplayArchiveDialogContentComponent } from "./replay-archive-dialog-content";
 import { WorkbenchShellComponent } from "./workbench-shell.component";
 
 @Component({
   imports: [
     ApplicationDialogComponent,
-    RulebenchScenarioRendererComponent,
-    ContentWorkspaceComponent,
-    ManualCombatWorkspaceComponent,
-    ReplayReviewWorkspaceComponent,
+    ContentPacksDialogContentComponent,
+    LiveCombatSetupDialogContentComponent,
+    ReplayArchiveDialogContentComponent,
     WorkbenchShellComponent,
   ],
   selector: "arb-scenario-viewer-feature",
@@ -34,47 +32,19 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         min-height: 100vh;
       }
 
-      .state {
-        align-items: center;
-        display: grid;
-        min-height: 100vh;
-        padding: 24px;
-      }
-
-      .state-inner {
-        border-left: 4px solid var(--arb-accent);
-        display: grid;
-        gap: 8px;
-        max-width: 720px;
-        padding-left: 16px;
-      }
-
       .viewer {
         display: grid;
       }
 
-      .current-workspaces {
-        border-bottom: 1px solid var(--arb-border);
-        border-top: 1px solid var(--arb-border);
-        color: var(--arb-muted);
-        font-size: 0.72rem;
-        font-weight: 800;
-        padding: 10px 44px;
-        text-transform: uppercase;
-      }
-
-      .catalog {
-        border-bottom: 1px solid var(--arb-border);
+      .catalog,
+      .session {
         display: grid;
         gap: 10px;
-        padding: 16px 44px 0;
+        padding: 0.75rem 0;
       }
 
       .session {
         border-bottom: 1px solid var(--arb-border);
-        display: grid;
-        gap: 12px;
-        padding: 16px 44px 0;
       }
 
       .catalog h2 {
@@ -95,8 +65,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
       }
 
       .session-row,
-      .session-actions,
-      .state-pair {
+      .session-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
@@ -140,44 +109,9 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
       .scenario-meta,
       .step-meta,
       .catalog-status,
-      .session-status,
-      .command-line,
-      .log-event-types {
+      .session-status {
         color: var(--arb-muted);
         font-size: 0.85rem;
-      }
-
-      .session-detail {
-        border: 1px solid var(--arb-border);
-        border-radius: 6px;
-        display: grid;
-        gap: 10px;
-        padding: 12px;
-      }
-
-      .log-list,
-      .state-list {
-        display: grid;
-        gap: 6px;
-        list-style: none;
-        margin: 0;
-        padding: 0;
-      }
-
-      .log-list li,
-      .state-card {
-        border-left: 3px solid var(--arb-border);
-        padding-left: 8px;
-      }
-
-      .state-card {
-        display: grid;
-        gap: 4px;
-      }
-
-      .state-card h4 {
-        font-size: 0.85rem;
-        margin: 0;
       }
 
       h1,
@@ -204,7 +138,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         [open]="activeDialog() === 'content'"
         (closeRequested)="closeDialog()"
       >
-        <arb-content-workspace />
+        <arb-content-packs-dialog-content />
       </arb-application-dialog>
 
       <arb-application-dialog
@@ -214,7 +148,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         [open]="activeDialog() === 'live'"
         (closeRequested)="closeDialog()"
       >
-        <arb-manual-combat-workspace />
+        <arb-live-combat-setup-dialog-content />
       </arb-application-dialog>
 
       <arb-application-dialog
@@ -224,7 +158,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         [open]="activeDialog() === 'replay'"
         (closeRequested)="closeDialog()"
       >
-        <arb-replay-review-workspace />
+        <arb-replay-archive-dialog-content />
       </arb-application-dialog>
 
       <arb-application-dialog
@@ -291,84 +225,6 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
               <p class="session-status">Combat session idle</p>
             }
           }
-
-          @switch (sessionStep().kind) {
-            @case ("data") {
-              <section class="session-detail" aria-label="Combat session step">
-                <h3>
-                  {{ sessionStep().value.step.indexLabel }} ·
-                  {{ sessionStep().value.step.title }}
-                </h3>
-                <p class="command-line">
-                  {{ sessionStep().value.command.actorId }} ·
-                  {{ sessionStep().value.command.actionId }} →
-                  {{ sessionStep().value.command.targetId }} · rolls
-                  {{ sessionStep().value.command.rollStreamLabel }} ·
-                  {{ sessionStep().value.command.outcomeLabel }}
-                </p>
-                <ul class="log-list" aria-label="Combat log">
-                  @for (
-                    entry of sessionStep().value.combatLog;
-                    track entry.id
-                  ) {
-                    <li>
-                      <strong
-                        >{{ entry.logIndexLabel }} · {{ entry.title }}</strong
-                      >
-                      <p>{{ entry.summary }}</p>
-                      <p class="log-event-types">
-                        {{
-                          entry.eventTypeLabels.join(", ") ||
-                            "No accepted DomainEvents"
-                        }}
-                      </p>
-                    </li>
-                  }
-                </ul>
-                <div class="state-pair" aria-label="Step state review">
-                  <div class="state-card">
-                    <h4>Before</h4>
-                    <p>{{ sessionStep().value.stateBefore.summary }}</p>
-                    <ul class="state-list">
-                      @for (
-                        combatant of sessionStep().value.stateBefore.combatants;
-                        track combatant.id
-                      ) {
-                        <li>
-                          {{ combatant.name }} · {{ combatant.hitPointLabel }} ·
-                          {{ combatant.conditionLabels.join(", ") }}
-                        </li>
-                      }
-                    </ul>
-                  </div>
-                  <div class="state-card">
-                    <h4>After</h4>
-                    <p>{{ sessionStep().value.stateAfter.summary }}</p>
-                    <ul class="state-list">
-                      @for (
-                        combatant of sessionStep().value.stateAfter.combatants;
-                        track combatant.id
-                      ) {
-                        <li>
-                          {{ combatant.name }} · {{ combatant.hitPointLabel }} ·
-                          {{ combatant.conditionLabels.join(", ") }}
-                        </li>
-                      }
-                    </ul>
-                  </div>
-                </div>
-              </section>
-            }
-            @case ("loading") {
-              <p class="session-status">Loading combat session step</p>
-            }
-            @case ("error") {
-              <p class="session-status">{{ sessionStep().error.message }}</p>
-            }
-            @case ("idle") {
-              <p class="session-status">Combat session step idle</p>
-            }
-          }
         </section>
 
         <section class="catalog" aria-label="Scenario catalog">
@@ -407,38 +263,6 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
           }
         </section>
       </arb-application-dialog>
-
-      @switch (activeScenario().kind) {
-        @case ("idle") {
-          <section class="state" aria-label="Scenario status">
-            <div class="state-inner">
-              <h1>ASHA Rulebench</h1>
-              <p>Scenario idle</p>
-            </div>
-          </section>
-        }
-        @case ("loading") {
-          <section class="state" aria-label="Scenario status">
-            <div class="state-inner">
-              <h1>ASHA Rulebench</h1>
-              <p>Loading scenario</p>
-            </div>
-          </section>
-        }
-        @case ("data") {
-          <arb-rulebench-scenario-renderer
-            [scenario]="activeScenario().value"
-          />
-        }
-        @case ("error") {
-          <section class="state" aria-label="Scenario status">
-            <div class="state-inner">
-              <h1>ASHA Rulebench</h1>
-              <p>{{ activeScenario().error.message }}</p>
-            </div>
-          </section>
-        }
-      }
     </div>
   `,
 })
@@ -472,7 +296,6 @@ export class ScenarioViewerFeatureComponent implements OnInit {
   protected readonly selectedScenarioId = computed(() =>
     this.sessionStore.selectedScenarioId(),
   );
-  protected readonly scenario = computed(() => this.sessionStore.scenario());
   protected readonly sessionCatalog = computed(() =>
     this.sessionStore.sessionCatalog(),
   );
@@ -482,25 +305,6 @@ export class ScenarioViewerFeatureComponent implements OnInit {
   protected readonly selectedSessionStepId = computed(() =>
     this.sessionStore.selectedSessionStepId(),
   );
-  protected readonly sessionStep = computed(() =>
-    this.sessionStore.sessionStep(),
-  );
-  protected readonly activeScenario = computed(() => {
-    if (this.viewerMode() === "scenario") {
-      return this.scenario();
-    }
-
-    const step = this.sessionStep();
-    if (step.kind === "data") {
-      return { kind: "data" as const, value: step.value.scenario };
-    }
-    if (step.kind === "error") {
-      return { kind: "error" as const, error: step.error };
-    }
-    return step.kind === "loading"
-      ? { kind: "loading" as const }
-      : { kind: "idle" as const };
-  });
 
   ngOnInit(): void {
     void this.loadInitialScenario();

@@ -112,3 +112,57 @@ test("keeps application menus accessible at mobile width", async ({ page }) => {
   }));
   expect(dimensions.body).toBe(dimensions.viewport);
 });
+
+test("preserves panel and dialog navigation under accessibility media", async ({
+  page,
+}) => {
+  await page.emulateMedia({
+    colorScheme: "dark",
+    forcedColors: "active",
+    reducedMotion: "reduce",
+  });
+  await page.setViewportSize({ width: 640, height: 450 });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = "200%";
+  });
+
+  const layout = page.getByLabel("Rulebench panel layout");
+  await expect(layout).toBeVisible();
+  for (const name of [
+    "1. Combat grid",
+    "2. Initiative",
+    "3. Application menu",
+    "4. Turn status",
+    "5. Evidence log",
+    "6. Available actions",
+    "7. Active units",
+  ]) {
+    await expect(layout.getByRole("region", { name })).toHaveCount(1);
+  }
+
+  const menubar = layout.getByRole("menubar", {
+    name: "Rulebench application menu",
+  });
+  await menubar.getByRole("menuitem", { name: "Replay" }).focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  const replayDialog = page.getByRole("dialog", { name: "Replay archive" });
+  await expect(replayDialog).toBeVisible();
+  await expect(
+    replayDialog.getByRole("region", { name: "Replay archive controls" }),
+  ).toHaveCount(1);
+  await expect(
+    replayDialog.getByRole("button", { name: "Close" }),
+  ).toBeFocused();
+
+  const dimensions = await page.evaluate(() => ({
+    body: document.body.scrollWidth,
+    viewport: document.documentElement.clientWidth,
+  }));
+  expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
+
+  await page.keyboard.press("Escape");
+  await expect(replayDialog).toHaveCount(0);
+  await expect(menubar.getByRole("menuitem", { name: "Replay" })).toBeFocused();
+});

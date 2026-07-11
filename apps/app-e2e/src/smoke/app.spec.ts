@@ -50,9 +50,7 @@ test("boots the rulebench shell", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Combat" })).toBeFocused();
   await expect(page.getByRole("tabpanel")).toContainText("Adept hits Raider");
 
-  await expect(
-    page.getByRole("heading", { name: "ASHA Rulebench", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByLabel("Rulebench panel layout")).toBeVisible();
   const menubar = page.getByRole("menubar", {
     name: "Rulebench application menu",
   });
@@ -104,82 +102,26 @@ test("boots the rulebench shell", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /Adept targets themself/ }),
   ).toBeVisible();
-  await expect(page.getByLabel("Combat session step")).toContainText(
-    "1 · Adept hits Raider",
-  );
-  await expect(page.getByLabel("Combat log")).toContainText("DamageApplied");
-  await expect(page.getByLabel("Step state review")).toContainText("Before");
-  await expect(page.getByLabel("Step state review")).toContainText(
-    "Raider · 9/18 HP · rattled",
-  );
+  const scenarioDialog = page.getByRole("dialog", { name: "Scenario cases" });
+  const combatSession = scenarioDialog.getByRole("region", {
+    name: "Combat session",
+  });
+  await combatSession.getByRole("button", { name: "Next" }).first().click();
   await expect(
-    page.getByText("Adept hits Raider · roll-stream:17,5"),
-  ).toBeVisible();
-  await expect(page.getByLabel("DomainEvents timeline")).toContainText(
-    "DamageApplied",
-  );
-  await expect(page.getByLabel("Final state")).toContainText(
-    "Raider is damaged and rattled",
-  );
-
-  await page
-    .getByRole("region", { name: "Combat session" })
-    .getByRole("button", { name: "Next" })
-    .first()
+    combatSession.getByRole("button", { name: /Adept misses Raider/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await scenarioDialog
+    .getByRole("button", { name: /Adept targets themself/ })
     .click();
-
-  await expect(page.getByLabel("Combat session step")).toContainText(
-    "2 · Adept misses Raider",
-  );
   await expect(
-    page.getByText("Adept misses Raider · roll-stream:2,5"),
-  ).toBeVisible();
-  await expect(page.getByLabel("DomainEvents timeline")).toContainText(
-    "AttackRolled",
-  );
-  await expect(page.getByLabel("Rule trace")).toContainText(
-    "Miss branch selected",
-  );
-  await expect(page.getByLabel("Final state")).toContainText(
-    "Attack missed; no authority state changed.",
-  );
-  await expect(page.getByLabel("Step state review")).toContainText(
-    "Raider · 9/18 HP · rattled",
-  );
-
-  await page.getByRole("button", { name: /Adept targets themself/ }).click();
-
-  await expect(page.getByLabel("Combat session step")).toContainText(
-    "3 · Adept targets themself",
-  );
+    combatSession.getByRole("button", { name: /Adept targets themself/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await combatSession.getByRole("button", { name: "Previous" }).first().click();
   await expect(
-    page.getByText("Adept targets themself · roll-stream:17,5"),
-  ).toBeVisible();
-  await expect(page.getByLabel("Combat log")).toContainText(
-    "No accepted DomainEvents",
-  );
-  await expect(page.getByLabel("Selected action")).toContainText(
-    "Rejected: Target is not hostile.",
-  );
-  await expect(page.getByLabel("Rule trace")).toContainText("Intent rejected");
-  await expect(page.getByLabel("Final state")).toContainText(
-    "No authority state changed; intent rejected.",
-  );
-  await expect(page.getByLabel("Step state review")).toContainText(
-    "Raider · 9/18 HP · rattled",
-  );
+    combatSession.getByRole("button", { name: /Adept misses Raider/ }),
+  ).toHaveAttribute("aria-pressed", "true");
 
-  await page
-    .getByRole("region", { name: "Combat session" })
-    .getByRole("button", { name: "Previous" })
-    .first()
-    .click();
-
-  await expect(page.getByLabel("Combat session step")).toContainText(
-    "2 · Adept misses Raider",
-  );
-
-  const scenarioCatalog = page.getByRole("region", {
+  const scenarioCatalog = scenarioDialog.getByRole("region", {
     name: "Scenario catalog",
   });
   await expect(
@@ -197,35 +139,22 @@ test("boots the rulebench shell", async ({ page }) => {
     }),
   ).toBeVisible();
 
-  await scenarioCatalog
-    .getByRole("button", { name: /Hexing Bolt Miss/ })
-    .click();
+  const rejectedScenario = scenarioCatalog.getByRole("button", {
+    name: /Hexing Bolt Self Target Rejected/,
+  });
+  await rejectedScenario.click();
+  await expect(rejectedScenario).toHaveAttribute("aria-pressed", "true");
+  await scenarioDialog.getByRole("button", { name: "Close" }).click();
 
-  await expect(
-    page.getByText("Hexing Bolt Miss · roll-stream:2,5"),
-  ).toBeVisible();
-  await expect(page.getByLabel("DomainEvents timeline")).toContainText(
-    "AttackRolled",
-  );
-  await expect(page.getByLabel("Rule trace")).toContainText(
-    "Miss branch selected",
-  );
-  await expect(page.getByLabel("Final state")).toContainText(
-    "Attack missed; no authority state changed.",
-  );
-
-  await scenarioCatalog
-    .getByRole("button", { name: /Hexing Bolt Self Target Rejected/ })
-    .click();
-
-  await expect(
-    page.getByText("Hexing Bolt Self Target Rejected · roll-stream:17,5"),
-  ).toBeVisible();
-  await expect(page.getByLabel("Selected action")).toContainText(
+  const evidence = page.getByRole("region", { name: "5. Evidence log" });
+  await evidence.getByRole("tab", { name: "Audit" }).click();
+  await expect(evidence.getByRole("tabpanel")).toContainText(
     "Rejected: Target is not hostile.",
   );
-  await expect(page.getByLabel("Rule trace")).toContainText("Intent rejected");
-  await expect(page.getByLabel("Final state")).toContainText(
-    "No authority state changed; intent rejected.",
+  await evidence.getByRole("tab", { name: "Rule trace" }).click();
+  await expect(evidence.getByRole("tabpanel")).toContainText("Intent rejected");
+  await evidence.getByRole("tab", { name: "State" }).click();
+  await expect(evidence.getByRole("tabpanel")).toContainText(
+    "No authority state changed",
   );
 });

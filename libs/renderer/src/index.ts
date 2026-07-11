@@ -1,8 +1,8 @@
-import { Component, input } from '@angular/core';
-import type { RulebenchScenarioView } from '@asha-rulebench/domain';
+import { Component, input } from "@angular/core";
+import type { RulebenchScenarioView } from "@asha-rulebench/domain";
 
 @Component({
-  selector: 'arb-rulebench-scenario-renderer',
+  selector: "arb-rulebench-scenario-renderer",
   standalone: true,
   styles: [
     `
@@ -178,18 +178,31 @@ import type { RulebenchScenarioView } from '@asha-rulebench/domain';
     <main class="workspace">
       <header>
         <h1>ASHA Rulebench</h1>
-        <p class="summary">{{ scenario().title }} · {{ scenario().seedLabel }}</p>
+        <p class="summary">
+          {{ scenario().title }} · {{ scenario().seedLabel }}
+        </p>
         <p>{{ scenario().summary }}</p>
       </header>
 
       <section class="layout">
         <div class="panel" aria-label="Scenario board">
           <h2>Board</h2>
-          <div class="board" [style.grid-template-columns]="'repeat(' + scenario().board.width + ', minmax(36px, 1fr))'">
-            @for (cell of scenario().board.cells; track cell.x + ':' + cell.y) {
-              <div class="cell" [class.cell-cover]="cell.terrainLabel.includes('cover')" [attr.aria-label]="'Cell ' + cell.x + ', ' + cell.y">
+          <div
+            class="board"
+            [style.grid-template-columns]="
+              'repeat(' + scenario().board.width + ', minmax(36px, 1fr))'
+            "
+          >
+            @for (cell of scenario().board.cells; track cell.x + ":" + cell.y) {
+              <div
+                class="cell"
+                [class.cell-cover]="cell.terrainLabel.includes('cover')"
+                [attr.aria-label]="'Cell ' + cell.x + ', ' + cell.y"
+              >
                 @for (occupantId of cell.occupantIds; track occupantId) {
-                  <span class="occupant">{{ occupantId.slice(7, 8).toUpperCase() }}</span>
+                  <span class="occupant">{{
+                    occupantId.slice(7, 8).toUpperCase()
+                  }}</span>
                 }
               </div>
             }
@@ -199,10 +212,15 @@ import type { RulebenchScenarioView } from '@asha-rulebench/domain';
         <div class="panel" aria-label="Selected action">
           <h2>{{ scenario().selectedAction.name }}</h2>
           <p class="meta">Actor: {{ scenario().selectedAction.actorLabel }}</p>
-          <p class="meta">Target: {{ scenario().selectedAction.targetLabels.join(', ') }}</p>
+          <p class="meta">
+            Target: {{ scenario().selectedAction.targetLabels.join(", ") }}
+          </p>
           <p>{{ scenario().selectedAction.actionText }}</p>
           <p>{{ scenario().selectedAction.effectText }}</p>
-          <p class="meta">{{ scenario().selectedTarget.legalityLabel }}: {{ scenario().selectedTarget.reason }}</p>
+          <p class="meta">
+            {{ scenario().selectedTarget.legalityLabel }}:
+            {{ scenario().selectedTarget.reason }}
+          </p>
         </div>
       </section>
 
@@ -213,12 +231,18 @@ import type { RulebenchScenarioView } from '@asha-rulebench/domain';
             @for (combatant of scenario().combatants; track combatant.id) {
               <article class="row" [class.actor]="combatant.isActor">
                 <h3>{{ combatant.name }}</h3>
-                <p class="meta">{{ combatant.teamLabel }} · {{ combatant.positionLabel }} · {{ combatant.hitPointLabel }}</p>
+                <p class="meta">
+                  {{ combatant.teamLabel }} · {{ combatant.positionLabel }} ·
+                  {{ combatant.hitPointLabel }}
+                </p>
                 <div class="chip-row">
                   @for (defense of combatant.defenseLabels; track defense) {
                     <span class="chip">{{ defense }}</span>
                   }
-                  @for (condition of combatant.conditionLabels; track condition) {
+                  @for (
+                    condition of combatant.conditionLabels;
+                    track condition
+                  ) {
                     <span class="chip">{{ condition }}</span>
                   }
                 </div>
@@ -231,9 +255,12 @@ import type { RulebenchScenarioView } from '@asha-rulebench/domain';
           <h2>DomainEvents</h2>
           @for (event of scenario().timeline; track event.sequenceLabel) {
             <article class="event">
-              <p><span class="event-sequence">{{ event.sequenceLabel }}</span> {{ event.typeLabel }}</p>
+              <p>
+                <span class="event-sequence">{{ event.sequenceLabel }}</span>
+                {{ event.typeLabel }}
+              </p>
               <p>{{ event.summary }}</p>
-              <p class="meta">{{ event.participantLabels.join(', ') }}</p>
+              <p class="meta">{{ event.participantLabels.join(", ") }}</p>
             </article>
           }
         </div>
@@ -245,9 +272,12 @@ import type { RulebenchScenarioView } from '@asha-rulebench/domain';
           @for (group of scenario().traceGroups; track group.phaseLabel) {
             <article class="trace-group">
               <h3>{{ group.phaseLabel }}</h3>
-              @for (entry of group.entries; track entry.sequenceLabel) {
+              @for (entry of group.entries; track $index) {
                 <div class="trace-entry">
-                  <p>{{ entry.sequenceLabel }} · {{ entry.statusLabel }} · {{ entry.message }}</p>
+                  <p>
+                    {{ entry.sequenceLabel }} · {{ entry.statusLabel }} ·
+                    {{ entry.message }}
+                  </p>
                   <p class="meta">{{ entry.detail }}</p>
                 </div>
               }
@@ -258,7 +288,10 @@ import type { RulebenchScenarioView } from '@asha-rulebench/domain';
         <div class="panel final-state" aria-label="Final state">
           <h2>Final State</h2>
           <p>{{ scenario().finalState.summary }}</p>
-          @for (combatant of scenario().finalState.combatants; track combatant.id) {
+          @for (
+            combatant of scenario().finalState.combatants;
+            track combatant.id
+          ) {
             <article class="row">
               <h3>{{ combatant.name }}</h3>
               <p class="meta">{{ combatant.hitPointLabel }}</p>

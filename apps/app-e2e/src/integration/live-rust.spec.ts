@@ -15,7 +15,7 @@ async function openLiveCombatWorkspace(page: Page) {
     .click();
   const dialog = page.getByRole("dialog", { name: "Live combat setup" });
   await expect(dialog).toBeVisible();
-  return dialog.getByRole("region", { name: "Live combat controls" });
+  return dialog.getByRole("region", { name: "Live combat setup controls" });
 }
 
 async function invokeApplicationCommand(
@@ -269,10 +269,6 @@ test("completes a supported scenario through the visible panel workbench", async
     .fill("e2e-visible-panel-session");
   await workspace.getByRole("button", { name: "Create session" }).click();
 
-  const sessionState = workspace.getByRole("region", {
-    name: "Live session state",
-  });
-  await expect(sessionState).toContainText("e2e-visible-panel-session · Ready");
   await page
     .getByRole("dialog", { name: "Live combat setup" })
     .getByLabel("Close", { exact: true })
@@ -436,7 +432,7 @@ test("configures participants from Rust scenario readbacks", async ({
     .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
     .click();
 
-  const setup = workspace.getByRole("region", { name: "Scenario setup" });
+  const setup = workspace.getByLabel("Scenario setup");
   await expect(setup).toContainText("asha-rulebench.hexing-bolt.v0");
   await expect(setup).toContainText("Adept · ally · initiative 15");
   await expect(setup).toContainText("Raider · enemy · initiative 10");
@@ -446,12 +442,16 @@ test("configures participants from Rust scenario readbacks", async ({
     .getByLabel("Session", { exact: true })
     .fill("e2e-reordered-setup-session");
   await workspace.getByRole("button", { name: "Create session" }).click();
-  const sessionState = workspace.getByRole("region", {
-    name: "Live session state",
-  });
-  await expect(sessionState).toContainText("actor entity-raider");
-  await workspace.getByRole("button", { name: "End", exact: true }).click();
-  await workspace.getByRole("button", { name: "Close", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "4. Turn status" }),
+  ).toContainText("entity-raider");
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await invokeApplicationCommand(page, "Run", "Close session");
+  const nextWorkspace = await openLiveCombatWorkspace(page);
 
   await page.route("**/api/rulebench/v1/sessions", async (route) => {
     const body: unknown = route.request().postDataJSON();
@@ -472,11 +472,11 @@ test("configures participants from Rust scenario readbacks", async ({
     });
     await route.fulfill({ response });
   });
-  await workspace
+  await nextWorkspace
     .getByRole("textbox", { name: "Session" })
     .fill("e2e-visible-invalid-setup");
-  await workspace.getByRole("button", { name: "Create session" }).click();
-  await expect(workspace.getByRole("alert")).toContainText(
+  await nextWorkspace.getByRole("button", { name: "Create session" }).click();
+  await expect(nextWorkspace.getByRole("alert")).toContainText(
     "invalidRequest · Participant setup must include all 2 scenario participants exactly once.",
   );
 });
@@ -487,7 +487,7 @@ test("reviews and compares archived Rust replay evidence", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Replay archive" }).click();
   const dialog = page.getByRole("dialog", { name: "Replay archive" });
   const workspace = dialog.getByRole("region", {
-    name: "Replay review workspace",
+    name: "Replay archive controls",
   });
   const packages = workspace.getByLabel("Archived replay packages");
   await expect(packages.getByRole("button")).toHaveCount(2);

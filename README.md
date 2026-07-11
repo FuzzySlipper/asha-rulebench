@@ -102,12 +102,15 @@ Good TypeScript describes which Rust operations to run:
 
 ```ts
 action({
-  id: 'hexing_bolt',
+  id: "hexing_bolt",
   target: target.singleEnemy({ range: 10, lineOfSight: true }),
-  attack: attack.vs('Nerve').using('Mind'),
+  attack: attack.vs("Nerve").using("Mind"),
   onHit: [
-    effects.damage({ dice: '1d8', stat: 'Mind', type: 'psychic' }),
-    effects.modifier({ id: 'rattled', duration: duration.untilEndOfNextTurn() }),
+    effects.damage({ dice: "1d8", stat: "Mind", type: "psychic" }),
+    effects.modifier({
+      id: "rattled",
+      duration: duration.untilEndOfNextTurn(),
+    }),
   ],
 });
 ```
@@ -217,4 +220,16 @@ the printed `lan:` URL for human inspection from another machine.
 
 ## Current State
 
-This repo was bootstrapped from the UI pattern template, so some code still carries template naming. Treat those names as startup residue, not product direction. Clean them up through workspace-aware generators or focused rename tasks, not opportunistic edits during feature work.
+The human testing surface is a seven-panel Angular workbench. Application menus
+open focused setup tools for content packs, deterministic cases, live Rust
+sessions, automatic runs, and replay packages; panels retain the board,
+initiative, encounter status, available actions, participants, and evidence.
+The focused tools configure or select authority behavior, while panel view models
+display Rust-owned outcomes.
+
+The current surface proves one developed Hexing Bolt rules fixture through
+deterministic cases, live commands, bounded automatic control, and replay
+inspection. Replay packages are currently in-memory fixtures rather than a
+durable archive of arbitrary finalized sessions. Live session snapshots do not
+yet expose authoritative positions, so panel 1 labels its board as selected
+scenario setup evidence rather than live movement state.

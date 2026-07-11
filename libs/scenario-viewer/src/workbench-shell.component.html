@@ -402,9 +402,9 @@
               } @else {
                 <li>No live command event evidence</li>
               }
-            } @else if (deterministicStep().kind === "data") {
+            } @else if (deterministicScenario().kind === "data") {
               @for (
-                entry of deterministicStep().value.scenario.timeline;
+                entry of deterministicScenario().value.timeline;
                 track entry.sequenceLabel
               ) {
                 <li>
@@ -439,12 +439,12 @@
               } @else {
                 <li>No live rule trace selected</li>
               }
-            } @else if (deterministicStep().kind === "data") {
+            } @else if (deterministicScenario().kind === "data") {
               @for (
-                group of deterministicStep().value.scenario.traceGroups;
+                group of deterministicScenario().value.traceGroups;
                 track group.phaseLabel
               ) {
-                @for (entry of group.entries; track entry.sequenceLabel) {
+                @for (entry of group.entries; track $index) {
                   <li>
                     <strong
                       >{{ entry.sequenceLabel }} · {{ group.phaseLabel }} ·
@@ -574,6 +574,32 @@
                   </li>
                 }
               }
+            } @else if (
+              deterministicMode() === "scenario" &&
+              deterministicScenario().kind === "data"
+            ) {
+              <li>
+                <strong>{{
+                  deterministicScenario().value.selectedAction.name
+                }}</strong>
+                <span
+                  >{{ deterministicScenario().value.selectedAction.actorLabel }}
+                  →
+                  {{
+                    deterministicScenario().value.selectedAction.targetLabels.join(
+                      ", "
+                    )
+                  }}</span
+                >
+                <span
+                  >{{
+                    deterministicScenario().value.selectedTarget.legalityLabel
+                  }}:
+                  {{
+                    deterministicScenario().value.selectedTarget.reason
+                  }}</span
+                >
+              </li>
             } @else if (deterministicStep().kind === "data") {
               <li>
                 <strong
@@ -611,6 +637,28 @@
                   <span
                     >{{ participant.name }} · {{ participant.hitPointLabel }} ·
                     {{ participant.statusLabel }} ·
+                    {{
+                      participant.conditionLabels.join(", ") || "No conditions"
+                    }}</span
+                  >
+                }
+              </section>
+            } @else if (
+              deterministicMode() === "scenario" &&
+              deterministicScenario().kind === "data"
+            ) {
+              <section>
+                <h4>Scenario resulting state</h4>
+                <span>{{
+                  deterministicScenario().value.finalState.summary
+                }}</span>
+                @for (
+                  participant of deterministicScenario().value.finalState
+                    .combatants;
+                  track participant.id
+                ) {
+                  <span
+                    >{{ participant.name }} · {{ participant.hitPointLabel }} ·
                     {{
                       participant.conditionLabels.join(", ") || "No conditions"
                     }}</span
@@ -769,10 +817,7 @@
                         command.expected.auditLabels.join(" · ") ||
                           "No command audit entries"
                       }}</span>
-                      @for (
-                        entry of command.expected.trace;
-                        track entry.sequenceLabel
-                      ) {
+                      @for (entry of command.expected.trace; track $index) {
                         <span
                           >{{ entry.sequenceLabel }} · {{ entry.phaseLabel }} ·
                           {{ entry.statusLabel }} · {{ entry.message }} ·
@@ -797,10 +842,7 @@
                         command.actual.auditLabels.join(" · ") ||
                           "No command audit entries"
                       }}</span>
-                      @for (
-                        entry of command.actual.trace;
-                        track entry.sequenceLabel
-                      ) {
+                      @for (entry of command.actual.trace; track $index) {
                         <span
                           >{{ entry.sequenceLabel }} · {{ entry.phaseLabel }} ·
                           {{ entry.statusLabel }} · {{ entry.message }} ·
