@@ -277,7 +277,7 @@ test("completes a supported scenario through the visible panel workbench", async
     workspace.getByText("asha-rulebench.local-authority.v0"),
   ).toBeVisible();
   await workspace
-    .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+    .getByRole("button", { name: "Ruined Watchtower Skirmish", exact: true })
     .click();
   await workspace
     .getByLabel("Session", { exact: true })
@@ -303,7 +303,12 @@ test("completes a supported scenario through the visible panel workbench", async
   ).toBeVisible();
   await expect(
     initiativePanel.getByRole("listitem", { name: "Raider, Next" }),
+  ).toHaveCount(0);
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Scout, Next" }),
   ).toBeVisible();
+  await expect(initiativePanel.getByRole("listitem", { name: "Raider, Queued" })).toBeVisible();
+  await expect(initiativePanel.getByRole("listitem", { name: "Bruiser, Queued" })).toBeVisible();
 
   await invokeApplicationCommand(page, "Run", "Start combat");
   await expect(statusPanel).toContainText("In Progress");
@@ -383,12 +388,12 @@ test("completes a supported scenario through the visible panel workbench", async
 
   await invokeApplicationCommand(page, "Run", "Advance turn");
   await expect(
-    initiativePanel.getByRole("listitem", { name: "Raider, Current" }),
+    initiativePanel.getByRole("listitem", { name: "Scout, Current" }),
   ).toBeVisible();
   await expect(
-    initiativePanel.getByRole("listitem", { name: "Adept, Next" }),
+    initiativePanel.getByRole("listitem", { name: "Raider, Next" }),
   ).toBeVisible();
-  await expect(statusPanel).toContainText("entity-raider");
+  await expect(statusPanel).toContainText("entity-scout");
   await invokeApplicationCommand(page, "Run", "End combat");
   await expect(statusPanel).toContainText("Ended");
   await expect(
@@ -399,6 +404,21 @@ test("completes a supported scenario through the visible panel workbench", async
   ).toBeVisible();
   await invokeApplicationCommand(page, "Run", "Close session");
   await expect(statusPanel).toContainText("Not selected");
+  await invokeApplicationCommand(page, "Replay", "Replay archive");
+  const replayDialog = page.getByRole("dialog", { name: "Replay archive" });
+  const replayWorkspace = replayDialog.getByRole("region", { name: "Replay archive controls" });
+  const liveReplay = replayWorkspace
+    .getByLabel("Archived replay packages")
+    .getByRole("button", { name: /live-e2e-visible-panel-session ·/ });
+  await expect(liveReplay).toBeVisible();
+  await liveReplay.click();
+  await expect(replayWorkspace.getByRole("region", { name: "Replay verification" })).toContainText("Verified · Finalized");
+  await replayWorkspace
+    .getByRole("region", { name: "Replay package detail" })
+    .getByRole("button", { name: /panel-command-1/ })
+    .click();
+  await expect(replayWorkspace.getByRole("region", { name: "Replay command evidence" })).toContainText("Move");
+  await replayDialog.getByLabel("Close", { exact: true }).click();
 });
 
 test("shows Rust automatic step and bounded-run decisions", async ({

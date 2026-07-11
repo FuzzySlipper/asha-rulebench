@@ -125,6 +125,7 @@ export class LiveCombatStore {
   constructor(
     private readonly transport: RulebenchLiveTransport,
     private readonly clock: ClockPort,
+    private readonly replayStore?: ReplayReviewStore,
   ) {}
 
   async connect(): Promise<void> {
@@ -450,7 +451,10 @@ export class LiveCombatStore {
       return;
     }
     this.clearSessionState();
-    await this.loadSessions();
+    await Promise.all([
+      this.loadSessions(),
+      this.replayStore?.loadPackages() ?? Promise.resolve(),
+    ]);
   }
 
   disconnect(): void {
@@ -636,16 +640,18 @@ export function provideLiveCombatStoreKernel(): Provider[] {
       useFactory: () => createLiveRulebenchTransport(),
     },
     {
-      provide: LiveCombatStore,
-      deps: [RULEBENCH_LIVE_TRANSPORT],
-      useFactory: (transport: RulebenchLiveTransport) =>
-        new LiveCombatStore(transport, browserClock),
-    },
-    {
       provide: ReplayReviewStore,
       deps: [RULEBENCH_LIVE_TRANSPORT],
       useFactory: (transport: RulebenchLiveTransport) =>
         new ReplayReviewStore(transport, browserClock),
+    },
+    {
+      provide: LiveCombatStore,
+      deps: [RULEBENCH_LIVE_TRANSPORT, ReplayReviewStore],
+      useFactory: (
+        transport: RulebenchLiveTransport,
+        replayStore: ReplayReviewStore,
+      ) => new LiveCombatStore(transport, browserClock, replayStore),
     },
   ];
 }
