@@ -284,6 +284,31 @@ fn bridge_calls_real_authority_through_a_complete_manual_lifecycle() {
         .close_session(&context(), &session)
         .expect("ended session can close");
     assert_eq!(archive.session.id, "manual");
+    assert_eq!(
+        bridge
+            .close_session(&context(), &session)
+            .expect("closing an archived session is idempotent"),
+        archive
+    );
+    let packages = bridge
+        .list_replay_packages(&context())
+        .expect("recorded replay is listed");
+    assert_eq!(
+        packages
+            .iter()
+            .filter(|package| package.package_id == "live-manual")
+            .count(),
+        1
+    );
+    let review = bridge
+        .load_replay_package(&context(), "live-manual")
+        .expect("recorded replay loads");
+    assert_eq!(review.session_id, "manual");
+    let verification = bridge
+        .verify_replay_package(&context(), "live-manual")
+        .expect("recorded replay verifies");
+    assert!(verification.accepted);
+    assert!(verification.finalized);
 }
 
 #[test]

@@ -9,12 +9,12 @@ use rulebench_protocol::{
     PROTOCOL_VERSION,
 };
 use rulebench_rules::{
-    compare_replay_packages, verify_replay_package, CombatControlReadout, CombatSessionApi,
-    CombatSessionArchive, CombatSessionAutomaticRunReadout,
+    compare_replay_packages, record_replay_package, verify_replay_package, CombatControlReadout,
+    CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
     CurrentActorOptionSummary, InMemoryReplayArchiveStorage, ReplayArchive, ReplayArchiveQuery,
-    ReplayPackage, RulebenchScenario, AUTHORITY_SURFACE,
+    ReplayCommand, ReplayCommandRecordingSpec, ReplayPackage, RulebenchScenario, AUTHORITY_SURFACE,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -75,6 +75,13 @@ pub struct RulebenchBridge {
     scenarios: BTreeMap<String, BridgeScenario>,
     sessions: CombatSessionApi,
     replays: ReplayArchive<InMemoryReplayArchiveStorage>,
+    recordings: BTreeMap<String, LiveReplayRecording>,
+}
+
+#[derive(Debug)]
+struct LiveReplayRecording {
+    initial_session: rulebench_rules::CombatSessionCreateRequest,
+    commands: Vec<ReplayCommandRecordingSpec>,
 }
 
 impl Default for RulebenchBridge {
@@ -83,6 +90,7 @@ impl Default for RulebenchBridge {
             scenarios: BTreeMap::new(),
             sessions: CombatSessionApi::new(),
             replays: ReplayArchive::new(InMemoryReplayArchiveStorage::new()),
+            recordings: BTreeMap::new(),
         }
     }
 }
@@ -124,6 +132,7 @@ impl RulebenchBridge {
             scenarios: indexed,
             sessions: CombatSessionApi::new(),
             replays,
+            recordings: BTreeMap::new(),
         })
     }
 
@@ -171,12 +180,25 @@ impl RulebenchBridge {
         })?;
         let configured_scenario =
             configure_participant_order(scenario.scenario.clone(), &request.participant_order)?;
-        self.sessions
+        let initial_session = rulebench_rules::CombatSessionCreateRequest::new(
+            &request.session_id,
+            replay_ready_scenario(configured_scenario.clone()),
+        );
+        let readout = self
+            .sessions
             .create_session(rulebench_rules::CombatSessionCreateRequest::new(
                 &request.session_id,
                 configured_scenario,
             ))
-            .map_err(BridgeError::from_session_error)
+            .map_err(BridgeError::from_session_error)?;
+        self.recordings.insert(
+            request.session_id.clone(),
+            LiveReplayRecording {
+                initial_session,
+                commands: Vec::new(),
+            },
+        );
+        Ok(readout)
     }
 
     pub fn list_sessions(
@@ -240,9 +262,17 @@ impl RulebenchBridge {
     ) -> Result<CombatSessionStepReadout, BridgeError> {
         self.check_version(context)?;
         require_command_id(&command.id)?;
-        self.sessions
-            .submit_intent(&session.to_combat_session_handle(), command.to_authority())
-            .map_err(BridgeError::from_session_error)
+        let authority = command.to_authority();
+        let readout = self
+            .sessions
+            .submit_intent(&session.to_combat_session_handle(), authority.clone())
+            .map_err(BridgeError::from_session_error)?;
+        self.record_command(
+            &session.id,
+            command.id.clone(),
+            ReplayCommand::Intent(authority),
+        )?;
+        Ok(readout)
     }
 
     pub fn submit_control(
@@ -252,9 +282,14 @@ impl RulebenchBridge {
         command: &CombatControlCommandDto,
     ) -> Result<CombatControlReadout, BridgeError> {
         self.check_version(context)?;
-        self.sessions
-            .submit_control(&session.to_combat_session_handle(), command.to_authority())
-            .map_err(BridgeError::from_session_error)
+        let authority = command.to_authority();
+        let readout = self
+            .sessions
+            .submit_control(&session.to_combat_session_handle(), authority.clone())
+            .map_err(BridgeError::from_session_error)?;
+        let id = format!("control-{}", self.recording_command_count(&session.id)?);
+        self.record_command(&session.id, id, ReplayCommand::Control(authority))?;
+        Ok(readout)
     }
 
     pub fn automatic_step(
@@ -265,9 +300,17 @@ impl RulebenchBridge {
     ) -> Result<CombatSessionAutomaticStepExecutionReadout, BridgeError> {
         self.check_version(context)?;
         require_command_id(&command.id)?;
-        self.sessions
-            .automatic_step(&session.to_combat_session_handle(), command.to_authority())
-            .map_err(BridgeError::from_session_error)
+        let authority = command.to_authority();
+        let readout = self
+            .sessions
+            .automatic_step(&session.to_combat_session_handle(), authority.clone())
+            .map_err(BridgeError::from_session_error)?;
+        self.record_command(
+            &session.id,
+            command.id.clone(),
+            ReplayCommand::AutomaticStep(authority),
+        )?;
+        Ok(readout)
     }
 
     pub fn automatic_run(
@@ -284,9 +327,17 @@ impl RulebenchBridge {
                 "Automatic run max steps must be greater than zero.",
             ));
         }
-        self.sessions
-            .automatic_run(&session.to_combat_session_handle(), command.to_authority())
-            .map_err(BridgeError::from_session_error)
+        let authority = command.to_authority();
+        let readout = self
+            .sessions
+            .automatic_run(&session.to_combat_session_handle(), authority.clone())
+            .map_err(BridgeError::from_session_error)?;
+        self.record_command(
+            &session.id,
+            command.id.clone(),
+            ReplayCommand::AutomaticRun(authority),
+        )?;
+        Ok(readout)
     }
 
     pub fn close_session(
@@ -295,9 +346,55 @@ impl RulebenchBridge {
         session: &CombatSessionHandleDto,
     ) -> Result<CombatSessionArchive, BridgeError> {
         self.check_version(context)?;
-        self.sessions
-            .close_session(&session.to_combat_session_handle())
-            .map_err(BridgeError::from_session_error)
+        let handle = session.to_combat_session_handle();
+        if let Some(archive) = self.sessions.archived_session(&handle) {
+            return Ok(archive.clone());
+        }
+        if self
+            .sessions
+            .snapshot(&handle)
+            .map_err(BridgeError::from_session_error)?
+            .finalization
+            .is_none()
+        {
+            return self
+                .sessions
+                .close_session(&handle)
+                .map_err(BridgeError::from_session_error);
+        }
+        let recording = self.recordings.get(&session.id).ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "Live session recording does not exist.",
+            )
+        })?;
+        let ruleset = recording
+            .initial_session
+            .scenario
+            .selected_ruleset()
+            .ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    "Live session ruleset does not exist.",
+                )
+            })?
+            .artifact_provenance();
+        let package_id = format!("live-{}", session.id);
+        let package = record_replay_package(
+            &package_id,
+            recording.initial_session.clone(),
+            ruleset,
+            recording.commands.clone(),
+        );
+        self.replays
+            .save(package, format!("session:{}", session.id))
+            .map_err(BridgeError::from_replay_error)?;
+        let archive = self
+            .sessions
+            .close_session(&handle)
+            .map_err(BridgeError::from_session_error)?;
+        self.recordings.remove(&session.id);
+        Ok(archive)
     }
 
     pub fn list_replay_packages(
@@ -373,6 +470,57 @@ impl RulebenchBridge {
             ),
         ))
     }
+
+    fn recording_command_count(&self, session_id: &str) -> Result<usize, BridgeError> {
+        self.recordings
+            .get(session_id)
+            .map(|recording| recording.commands.len())
+            .ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    "Live session recording does not exist.",
+                )
+            })
+    }
+
+    fn record_command(
+        &mut self,
+        session_id: &str,
+        id: String,
+        command: ReplayCommand,
+    ) -> Result<(), BridgeError> {
+        let recording = self.recordings.get_mut(session_id).ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "Live session recording does not exist.",
+            )
+        })?;
+        recording
+            .commands
+            .push(ReplayCommandRecordingSpec::new(id, command));
+        Ok(())
+    }
+}
+
+fn replay_ready_scenario(mut scenario: RulebenchScenario) -> RulebenchScenario {
+    if scenario.content_pack_set.is_some() {
+        return scenario;
+    }
+    let root = rulebench_rules::ContentPackReference {
+        id: format!("scenario.{}", scenario.metadata.id),
+        version: "0.1.0".to_string(),
+        fingerprint: rulebench_rules::ContentFingerprint {
+            algorithm: "rulebench-scenario.v0".to_string(),
+            value: scenario.metadata.id.clone(),
+        },
+    };
+    let packs = vec![root.clone()];
+    scenario.content_pack_set = Some(rulebench_rules::ContentPackSetReference {
+        fingerprint: rulebench_rules::fingerprint_content_pack_set(&root, &packs),
+        root,
+        packs,
+    });
+    scenario
 }
 
 fn configure_participant_order(
