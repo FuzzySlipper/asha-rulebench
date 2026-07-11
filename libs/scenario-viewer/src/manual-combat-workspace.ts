@@ -71,7 +71,7 @@ import { LiveCombatStore } from '@asha-rulebench/store';
                 <section class="evidence"><h4>Participant order</h4>
                   @for (participantId of participantOrder(); track participantId; let index = $index) {
                     @if (participantById(participantId); as participant) {
-                      <div class="choice-row"><span>{{ index + 1 }} · {{ participant.name }} · {{ participant.sideId }} · initiative {{ participant.initiative }}</span><button type="button" [disabled]="index === 0" (click)="moveParticipant(index, -1)">Earlier</button><button type="button" [disabled]="index === participantOrder().length - 1" (click)="moveParticipant(index, 1)">Later</button></div>
+                      <div class="choice-row"><span>{{ index + 1 }} · {{ participant.name }} · {{ participant.sideId }} · initiative {{ participant.initiative }}</span><button type="button" [attr.aria-label]="participant.name + ' earlier'" [disabled]="index === 0" (click)="moveParticipant(index, -1)">Earlier</button><button type="button" [attr.aria-label]="participant.name + ' later'" [disabled]="index === participantOrder().length - 1" (click)="moveParticipant(index, 1)">Later</button></div>
                     }
                   }
                 </section>

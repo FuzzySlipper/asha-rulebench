@@ -1,7 +1,17 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { createLiveRulebenchTransport } from "@asha-rulebench/transport";
 
 test.describe.configure({ mode: "serial" });
+
+async function openLiveCombatWorkspace(page: Page) {
+  const menubar = page.getByRole("menubar", { name: "Rulebench application menu" });
+  await menubar.getByRole("menuitem", { name: "Scenario" }).click();
+  await page.getByRole("menu", { name: "Scenario" }).getByRole("menuitem", { name: "Live combat setup" }).click();
+  const dialog = page.getByRole("dialog", { name: "Live combat setup" });
+  await expect(dialog).toBeVisible();
+  return dialog.getByRole("region", { name: "Live combat controls" });
+}
 
 test("invokes live Rust authority through the Angular origin", async ({
   page,
@@ -224,7 +234,7 @@ test("invokes live Rust authority through the Angular origin", async ({
 
 test("completes a supported scenario through the visible manual workspace", async ({ page }) => {
   await page.goto("/");
-  const workspace = page.getByRole("region", { name: "Live combat controls" });
+  const workspace = await openLiveCombatWorkspace(page);
 
   await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
   await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
@@ -254,7 +264,7 @@ test("completes a supported scenario through the visible manual workspace", asyn
 
 test("shows Rust automatic step and bounded-run decisions", async ({ page }) => {
   await page.goto("/");
-  const workspace = page.getByRole("region", { name: "Live combat controls" });
+  const workspace = await openLiveCombatWorkspace(page);
   await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
   await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
   await workspace.getByLabel("Session").fill("e2e-visible-automatic-session");
@@ -279,7 +289,7 @@ test("shows Rust automatic step and bounded-run decisions", async ({ page }) => 
 
 test("configures participants from Rust scenario readbacks", async ({ page }) => {
   await page.goto("/");
-  const workspace = page.getByRole("region", { name: "Live combat controls" });
+  const workspace = await openLiveCombatWorkspace(page);
   await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
   await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
 

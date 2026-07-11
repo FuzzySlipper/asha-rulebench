@@ -3,13 +3,14 @@ import type { OnInit } from '@angular/core';
 import { RulebenchScenarioRendererComponent } from '@asha-rulebench/renderer';
 import { SessionStore } from '@asha-rulebench/store';
 import type { RulebenchCommandOutcomeClassDto, RulebenchScenarioOutcomeClassDto } from '@asha-rulebench/protocol';
+import { ApplicationDialogComponent, type ApplicationMenuGroup, type ApplicationMenuItem } from '@asha-rulebench/components';
 import { ContentWorkspaceComponent } from './content-workspace';
 import { ManualCombatWorkspaceComponent } from './manual-combat-workspace';
 import { ReplayReviewWorkspaceComponent } from './replay-review-workspace';
 import { WorkbenchShellComponent } from './workbench-shell.component';
 
 @Component({
-  imports: [RulebenchScenarioRendererComponent, ContentWorkspaceComponent, ManualCombatWorkspaceComponent, ReplayReviewWorkspaceComponent, WorkbenchShellComponent],
+  imports: [ApplicationDialogComponent, RulebenchScenarioRendererComponent, ContentWorkspaceComponent, ManualCombatWorkspaceComponent, ReplayReviewWorkspaceComponent, WorkbenchShellComponent],
   selector: 'arb-scenario-viewer-feature',
   standalone: true,
   styles: [
@@ -176,11 +177,41 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
   ],
   template: `
     <div class="viewer">
-      <arb-workbench-shell />
+      <arb-workbench-shell
+        [additionalMenuGroups]="applicationMenuGroups"
+        (applicationCommand)="handleApplicationCommand($event)"
+      />
+
+      <arb-application-dialog
+        dialogId="content-packs-dialog"
+        dialogTitle="Content packs"
+        dialogDescription="Load imported packs and inspect Rust-owned validation diagnostics."
+        [open]="activeDialog() === 'content'"
+        (closeRequested)="closeDialog()"
+      >
+        <arb-content-workspace />
+      </arb-application-dialog>
+
+      <arb-application-dialog
+        dialogId="live-combat-dialog"
+        dialogTitle="Live combat setup"
+        dialogDescription="Connect to the Rust authority, configure a scenario, and operate the current session."
+        [open]="activeDialog() === 'live'"
+        (closeRequested)="closeDialog()"
+      >
+        <arb-manual-combat-workspace />
+      </arb-application-dialog>
+
       <div class="current-workspaces">Current functional workspaces</div>
-      <arb-content-workspace />
-      <arb-manual-combat-workspace />
       <arb-replay-review-workspace />
+
+      <arb-application-dialog
+        dialogId="scenario-cases-dialog"
+        dialogTitle="Scenario cases"
+        dialogDescription="Select deterministic scenarios and inspect ordered combat-session steps."
+        [open]="activeDialog() === 'scenario'"
+        (closeRequested)="closeDialog()"
+      >
       <section class="session" aria-label="Combat session">
         <h2>Combat Session</h2>
         @switch (sessionCatalog().kind) {
@@ -297,6 +328,7 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
           }
         }
       </section>
+      </arb-application-dialog>
 
       @switch (activeScenario().kind) {
         @case ('idle') {
@@ -332,6 +364,22 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
 })
 export class ScenarioViewerFeatureComponent implements OnInit {
   private readonly sessionStore = inject(SessionStore);
+  protected readonly activeDialog = signal<'content' | 'scenario' | 'live' | null>(null);
+  protected readonly applicationMenuGroups: readonly ApplicationMenuGroup[] = [
+    {
+      id: 'file',
+      label: 'File',
+      items: [{ id: 'open-content-packs', label: 'Content packs' }],
+    },
+    {
+      id: 'scenario',
+      label: 'Scenario',
+      items: [
+        { id: 'open-scenario-cases', label: 'Scenario cases' },
+        { id: 'open-live-combat', label: 'Live combat setup' },
+      ],
+    },
+  ];
   protected readonly viewerMode = signal<'session' | 'scenario'>('session');
   protected readonly catalog = computed(() => this.sessionStore.catalog());
   protected readonly selectedScenarioId = computed(() => this.sessionStore.selectedScenarioId());
@@ -357,6 +405,24 @@ export class ScenarioViewerFeatureComponent implements OnInit {
 
   ngOnInit(): void {
     void this.loadInitialScenario();
+  }
+
+  protected handleApplicationCommand(item: ApplicationMenuItem): void {
+    switch (item.id) {
+      case 'open-content-packs':
+        this.activeDialog.set('content');
+        return;
+      case 'open-scenario-cases':
+        this.activeDialog.set('scenario');
+        return;
+      case 'open-live-combat':
+        this.activeDialog.set('live');
+        return;
+    }
+  }
+
+  protected closeDialog(): void {
+    this.activeDialog.set(null);
   }
 
   protected selectScenario(scenarioId: string): void {

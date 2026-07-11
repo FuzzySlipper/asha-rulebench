@@ -2,6 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  input,
+  output,
   signal,
   viewChild,
 } from "@angular/core";
@@ -30,8 +32,11 @@ export class WorkbenchShellComponent {
   private readonly unitsPanel = viewChild.required<WorkbenchPanelComponent>("unitsPanel");
 
   protected readonly gridCells = Array.from({ length: 96 });
+  readonly additionalMenuGroups = input<readonly ApplicationMenuGroup[]>([]);
+  readonly applicationCommand = output<ApplicationMenuItem>();
+
   protected readonly menuStatus = signal("");
-  protected readonly menuGroups: readonly ApplicationMenuGroup[] = [
+  private readonly panelMenuGroups: readonly ApplicationMenuGroup[] = [
     { id: "file", label: "File", items: [] },
     {
       id: "scenario",
@@ -54,6 +59,15 @@ export class WorkbenchShellComponent {
     { id: "view", label: "View", items: [{ id: "focus-units", label: "Active units" }] },
     { id: "preferences", label: "Preferences", items: [] },
   ];
+  protected readonly menuGroups = computed(() =>
+    this.panelMenuGroups.map((panelGroup) => {
+      const additionalGroup = this.additionalMenuGroups().find((group) => group.id === panelGroup.id);
+      return {
+        ...panelGroup,
+        items: [...(additionalGroup?.items ?? []), ...panelGroup.items],
+      };
+    }),
+  );
   protected readonly selectedEvidenceTab = signal<EvidenceTab>("combat");
   protected readonly evidenceTabLabel = computed(() => {
     switch (this.selectedEvidenceTab()) {
@@ -74,9 +88,13 @@ export class WorkbenchShellComponent {
 
   protected invokeMenuItem(item: ApplicationMenuItem): void {
     const target = this.panelForCommand(item.id);
-    if (target === null) return;
-    target.focus();
-    this.menuStatus.set(`Focused ${item.label}`);
+    if (target !== null) {
+      target.focus();
+      this.menuStatus.set(`Focused ${item.label}`);
+      return;
+    }
+    this.applicationCommand.emit(item);
+    this.menuStatus.set(`Opened ${item.label}`);
   }
 
   private panelForCommand(commandId: string): WorkbenchPanelComponent | null {

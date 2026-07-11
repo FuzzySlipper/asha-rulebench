@@ -1,0 +1,77 @@
+:host {
+  display: block;
+}
+
+.application-dialog {
+  background: var(--arb-panel);
+  border: 1px solid var(--arb-border);
+  color: var(--arb-text);
+  height: min(52rem, calc(100vh - 3rem));
+  margin: auto;
+  max-height: calc(100vh - 3rem);
+  max-width: min(76rem, calc(100vw - 2rem));
+  padding: 0;
+  width: min(76rem, calc(100vw - 2rem));
+}
+
+.application-dialog::backdrop {
+  background: #05070acc;
+}
+
+header {
+  align-items: center;
+  background: var(--arb-panel-header);
+  border-bottom: 1px solid var(--arb-border);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-height: 4rem;
+  padding: 0.65rem 0.9rem;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+h2 {
+  font-size: 0.95rem;
+}
+
+p {
+  color: var(--arb-muted);
+  font-size: 0.78rem;
+}
+
+.close {
+  background: var(--arb-surface);
+  border: 1px solid var(--arb-border);
+  color: var(--arb-text);
+  cursor: pointer;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--arb-accent);
+  outline-offset: 2px;
+}
+
+.dialog-content {
+  height: calc(100% - 4rem);
+  min-height: 0;
+  overflow: auto;
+}
+
+@media (max-width: 850px) {
+  .application-dialog {
+    height: calc(100vh - 1rem);
+    max-height: calc(100vh - 1rem);
+    max-width: calc(100vw - 1rem);
+    width: calc(100vw - 1rem);
+  }
+
+  header {
+    align-items: start;
+  }
+}

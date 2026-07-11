@@ -19,8 +19,11 @@ test('boots the rulebench shell', async ({ page }) => {
   await expect(page.getByRole('tabpanel')).toContainText('Accepted DomainEvents');
 
   await expect(page.getByRole('heading', { name: 'ASHA Rulebench', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Combat Session' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Content Packs' })).toBeVisible();
+  const menubar = page.getByRole('menubar', { name: 'Rulebench application menu' });
+  await menubar.getByRole('menuitem', { name: 'File' }).click();
+  await page.getByRole('menu', { name: 'File' }).getByRole('menuitem', { name: 'Content packs' }).click();
+  const contentDialog = page.getByRole('dialog', { name: 'Content packs' });
+  await expect(contentDialog.getByRole('heading', { name: 'Content Packs', exact: true })).toBeVisible();
   await expect(page.getByLabel('Selected content pack review')).toContainText('pack.valid@1.0.0');
   await expect(page.getByLabel('Selected content pack review')).toContainText('fnv1a64.rulebench-content-pack.v0');
   await expect(page.getByLabel('Content validation review')).toContainText('Hexing Bolt Hit');
@@ -28,6 +31,11 @@ test('boots the rulebench shell', async ({ page }) => {
   await expect(page.getByLabel('Selected content pack review')).toContainText('duplicateContentTagCanonicalized');
   await page.getByRole('button', { name: /pack.error@1.0.0/ }).click();
   await expect(page.getByLabel('Selected content pack review')).toContainText('missingContentPackDependency');
+  await contentDialog.getByRole('button', { name: 'Close' }).click();
+
+  await menubar.getByRole('menuitem', { name: 'Scenario' }).click();
+  await page.getByRole('menu', { name: 'Scenario' }).getByRole('menuitem', { name: 'Scenario cases' }).click();
+  await expect(page.getByRole('heading', { name: 'Combat Session' })).toBeVisible();
   await expect(page.getByRole('button', { name: '1 · Adept hits Raider Accepted hit', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Adept misses Raider/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Adept targets themself/ })).toBeVisible();

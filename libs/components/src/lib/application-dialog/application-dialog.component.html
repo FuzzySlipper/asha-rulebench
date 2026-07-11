@@ -1,0 +1,17 @@
+<dialog
+  #dialog
+  class="application-dialog"
+  [id]="dialogId()"
+  [attr.aria-labelledby]="titleId()"
+  [attr.aria-describedby]="descriptionId()"
+  (cancel)="onCancel($event)"
+>
+  <header>
+    <div>
+      <h2 [id]="titleId()">{{ dialogTitle() }}</h2>
+      <p [id]="descriptionId()">{{ dialogDescription() }}</p>
+    </div>
+    <button class="close" type="button" aria-label="Close" autofocus (click)="requestClose()">Close</button>
+  </header>
+  <div class="dialog-content"><ng-content /></div>
+</dialog>

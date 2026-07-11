@@ -17,12 +17,15 @@ test('operates the application menubar entirely by keyboard', async ({ page }) =
   await expect(view).toBeFocused();
 
   await page.keyboard.press('Home');
+  const file = menubar.getByRole('menuitem', { name: 'File' });
+  await expect(file).toBeFocused();
+  await page.keyboard.press('ArrowRight');
   await expect(scenario).toBeFocused();
   await page.keyboard.press('ArrowDown');
 
   const scenarioMenu = page.getByRole('menu', { name: 'Scenario' });
   await expect(scenarioMenu).toBeVisible();
-  await expect(scenarioMenu.getByRole('menuitem', { name: 'Combat grid' })).toBeFocused();
+  await expect(scenarioMenu.getByRole('menuitem', { name: 'Scenario cases' })).toBeFocused();
 
   await page.keyboard.press('i');
   const initiative = scenarioMenu.getByRole('menuitem', { name: 'Initiative' });
@@ -43,6 +46,13 @@ test('operates the application menubar entirely by keyboard', async ({ page }) =
   await page.keyboard.press('Escape');
   await expect(runMenu).toHaveCount(0);
   await expect(run).toBeFocused();
+
+  await file.click();
+  await page.getByRole('menu', { name: 'File' }).getByRole('menuitem', { name: 'Content packs' }).click();
+  const contentDialog = page.getByRole('dialog', { name: 'Content packs' });
+  await expect(contentDialog.getByRole('button', { name: 'Close' })).toBeFocused();
+  await contentDialog.getByRole('button', { name: 'Close' }).click();
+  await expect(file).toBeFocused();
 });
 
 test('keeps application menus accessible at mobile width', async ({ page }) => {

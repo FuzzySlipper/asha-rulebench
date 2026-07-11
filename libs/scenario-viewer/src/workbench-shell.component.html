@@ -8,7 +8,7 @@
   >
     <arb-application-menubar
       panelTools
-      [groups]="menuGroups"
+      [groups]="menuGroups()"
       [statusMessage]="menuStatus()"
       (itemInvoked)="invokeMenuItem($event)"
     />

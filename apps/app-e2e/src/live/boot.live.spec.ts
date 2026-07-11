@@ -6,7 +6,11 @@ liveScenario('boot live evidence @live', async ({ page, collector, liveBaseUrl }
 
   await page.goto(liveBaseUrl);
   await expect(page.getByRole('heading', { name: 'ASHA Rulebench' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Content Packs' })).toBeVisible();
+  const menubar = page.getByRole('menubar', { name: 'Rulebench application menu' });
+  await menubar.getByRole('menuitem', { name: 'File' }).click();
+  await page.getByRole('menu', { name: 'File' }).getByRole('menuitem', { name: 'Content packs' }).click();
+  const contentDialog = page.getByRole('dialog', { name: 'Content packs' });
+  await expect(contentDialog.getByRole('heading', { name: 'Content Packs', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /pack.error@1.0.0/ }).click();
   await expect(page.getByLabel('Selected content pack review')).toContainText('missingContentPackDependency');
   await collector.milestone('content diagnostics rendered', {
@@ -16,7 +20,10 @@ liveScenario('boot live evidence @live', async ({ page, collector, liveBaseUrl }
       validation: await page.getByLabel('Content validation review').innerText(),
     },
   });
-  const liveWorkspace = page.getByRole('region', { name: 'Live combat controls' });
+  await contentDialog.getByRole('button', { name: 'Close' }).click();
+  await menubar.getByRole('menuitem', { name: 'Scenario' }).click();
+  await page.getByRole('menu', { name: 'Scenario' }).getByRole('menuitem', { name: 'Live combat setup' }).click();
+  const liveWorkspace = page.getByRole('dialog', { name: 'Live combat setup' }).getByRole('region', { name: 'Live combat controls' });
   await expect(liveWorkspace.getByText('asha-rulebench.local-authority.v0')).toBeVisible();
   await liveWorkspace.getByRole('button', { name: 'Hexing Bolt Hit', exact: true }).click();
   await liveWorkspace.getByLabel('Session').fill(liveSessionId);
