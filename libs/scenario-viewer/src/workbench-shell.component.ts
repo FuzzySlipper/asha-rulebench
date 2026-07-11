@@ -15,9 +15,9 @@ import {
   type ApplicationMenuItem,
   WorkbenchPanelComponent,
 } from "@asha-rulebench/components";
-import { LiveCombatStore } from "@asha-rulebench/store";
+import { LiveCombatStore, SessionStore } from "@asha-rulebench/store";
 
-type EvidenceTab = "combat" | "events" | "trace" | "audit";
+type EvidenceTab = "combat" | "events" | "trace" | "audit" | "state";
 type InitiativePosition = "Current" | "Next" | "Queued" | "Complete";
 
 @Component({
@@ -28,7 +28,15 @@ type InitiativePosition = "Current" | "Next" | "Queued" | "Complete";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkbenchShellComponent {
+  private readonly evidenceTabOrder: readonly EvidenceTab[] = [
+    "combat",
+    "events",
+    "trace",
+    "audit",
+    "state",
+  ];
   private readonly liveStore = inject(LiveCombatStore);
+  private readonly sessionStore = inject(SessionStore);
   private readonly gridPanel =
     viewChild.required<WorkbenchPanelComponent>("gridPanel");
   private readonly initiativePanel =
@@ -56,6 +64,9 @@ export class WorkbenchShellComponent {
   protected readonly candidates = computed(() => this.liveStore.candidates());
   protected readonly preflight = computed(() => this.liveStore.preflight());
   protected readonly submission = computed(() => this.liveStore.submission());
+  protected readonly deterministicStep = computed(() =>
+    this.sessionStore.sessionStep(),
+  );
   protected readonly intent = computed(() => this.liveStore.intent());
   protected readonly attackRollInput = signal("17");
   protected readonly damageRollInput = signal("5");
@@ -181,6 +192,11 @@ export class WorkbenchShellComponent {
     }),
   );
   protected readonly selectedEvidenceTab = signal<EvidenceTab>("combat");
+  protected readonly evidenceAnnouncement = computed(() => {
+    const snapshot = this.snapshot();
+    if (snapshot.kind !== "data") return "Deterministic evidence selected";
+    return `${snapshot.value.combatLog.length} combat log entries and ${snapshot.value.auditLog.length} command audit entries available`;
+  });
   protected readonly evidenceTabLabel = computed(() => {
     switch (this.selectedEvidenceTab()) {
       case "combat":
@@ -191,11 +207,38 @@ export class WorkbenchShellComponent {
         return "Rule resolution trace";
       case "audit":
         return "Command audit";
+      case "state":
+        return "State review";
     }
   });
 
   protected selectEvidenceTab(tab: EvidenceTab): void {
     this.selectedEvidenceTab.set(tab);
+  }
+
+  protected handleEvidenceTabKeydown(event: KeyboardEvent): void {
+    if (!(event.currentTarget instanceof HTMLButtonElement)) return;
+    const tablist = event.currentTarget.parentElement;
+    if (tablist === null) return;
+    const tabs = Array.from(
+      tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+    );
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    if (currentIndex < 0) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight")
+      nextIndex = (currentIndex + 1) % tabs.length;
+    if (event.key === "ArrowLeft")
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    const nextTab = this.evidenceTabOrder[nextIndex];
+    if (nextTab !== undefined) this.selectedEvidenceTab.set(nextTab);
+    tabs[nextIndex]?.focus();
   }
 
   protected invokeMenuItem(item: ApplicationMenuItem): void {

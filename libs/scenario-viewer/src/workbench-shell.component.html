@@ -180,42 +180,335 @@
   >
     <div panelTools class="tabs" role="tablist" aria-label="Evidence log views">
       <button
+        id="evidence-tab-combat"
         type="button"
         role="tab"
+        aria-controls="evidence-panel-combat"
         [attr.aria-selected]="selectedEvidenceTab() === 'combat'"
+        [attr.tabindex]="selectedEvidenceTab() === 'combat' ? 0 : -1"
         (click)="selectEvidenceTab('combat')"
+        (keydown)="handleEvidenceTabKeydown($event)"
       >
         Combat
       </button>
       <button
+        id="evidence-tab-events"
         type="button"
         role="tab"
+        aria-controls="evidence-panel-events"
         [attr.aria-selected]="selectedEvidenceTab() === 'events'"
+        [attr.tabindex]="selectedEvidenceTab() === 'events' ? 0 : -1"
         (click)="selectEvidenceTab('events')"
+        (keydown)="handleEvidenceTabKeydown($event)"
       >
         DomainEvents
       </button>
       <button
+        id="evidence-tab-trace"
         type="button"
         role="tab"
+        aria-controls="evidence-panel-trace"
         [attr.aria-selected]="selectedEvidenceTab() === 'trace'"
+        [attr.tabindex]="selectedEvidenceTab() === 'trace' ? 0 : -1"
         (click)="selectEvidenceTab('trace')"
+        (keydown)="handleEvidenceTabKeydown($event)"
       >
         Rule trace
       </button>
       <button
+        id="evidence-tab-audit"
         type="button"
         role="tab"
+        aria-controls="evidence-panel-audit"
         [attr.aria-selected]="selectedEvidenceTab() === 'audit'"
+        [attr.tabindex]="selectedEvidenceTab() === 'audit' ? 0 : -1"
         (click)="selectEvidenceTab('audit')"
+        (keydown)="handleEvidenceTabKeydown($event)"
       >
         Audit
       </button>
+      <button
+        id="evidence-tab-state"
+        type="button"
+        role="tab"
+        aria-controls="evidence-panel-state"
+        [attr.aria-selected]="selectedEvidenceTab() === 'state'"
+        [attr.tabindex]="selectedEvidenceTab() === 'state' ? 0 : -1"
+        (click)="selectEvidenceTab('state')"
+        (keydown)="handleEvidenceTabKeydown($event)"
+      >
+        State
+      </button>
     </div>
-    <div class="empty-state" role="tabpanel">
-      <strong>{{ evidenceTabLabel() }}</strong
-      ><span>No entries</span>
-    </div>
+    <section
+      class="evidence-panel"
+      role="tabpanel"
+      [id]="'evidence-panel-' + selectedEvidenceTab()"
+      [attr.aria-labelledby]="'evidence-tab-' + selectedEvidenceTab()"
+    >
+      <h3>{{ evidenceTabLabel() }}</h3>
+      @switch (selectedEvidenceTab()) {
+        @case ("combat") {
+          <ol class="evidence-list">
+            @if (snapshot().kind === "data") {
+              @for (entry of snapshot().value.combatLog; track entry.id) {
+                <li>
+                  <strong>{{ entry.sequenceLabel }} · {{ entry.title }}</strong
+                  ><span>{{ entry.summary }}</span
+                  ><span
+                    >{{ entry.outcomeLabel }} ·
+                    {{ entry.eventTypeLabels.join(", ") }}</span
+                  >
+                </li>
+              } @empty {
+                <li>No live combat log entries</li>
+              }
+            } @else if (deterministicStep().kind === "data") {
+              @for (
+                entry of deterministicStep().value.combatLog;
+                track entry.id
+              ) {
+                <li>
+                  <strong>{{ entry.logIndexLabel }} · {{ entry.title }}</strong
+                  ><span>{{ entry.summary }}</span
+                  ><span
+                    >{{ entry.outcomeLabel }} ·
+                    {{
+                      entry.eventTypeLabels.join(", ") ||
+                        "No accepted DomainEvents"
+                    }}</span
+                  >
+                </li>
+              } @empty {
+                <li>No deterministic combat log entries</li>
+              }
+            } @else {
+              <li>No combat evidence selected</li>
+            }
+          </ol>
+        }
+        @case ("events") {
+          <ol class="evidence-list">
+            @if (snapshot().kind === "data") {
+              @if (submission().kind === "data") {
+                @for (
+                  eventLabel of submission().value.eventLabels;
+                  track $index
+                ) {
+                  <li>
+                    <strong>{{ $index + 1 }} · {{ eventLabel }}</strong
+                    ><span>Accepted DomainEvent from the latest command</span>
+                  </li>
+                } @empty {
+                  <li>No accepted DomainEvents in the latest command</li>
+                }
+              } @else {
+                <li>No live command event evidence</li>
+              }
+            } @else if (deterministicStep().kind === "data") {
+              @for (
+                entry of deterministicStep().value.scenario.timeline;
+                track entry.sequenceLabel
+              ) {
+                <li>
+                  <strong
+                    >{{ entry.sequenceLabel }} · {{ entry.typeLabel }}</strong
+                  ><span>{{ entry.summary }}</span
+                  ><span>{{ entry.participantLabels.join(", ") }}</span>
+                </li>
+              } @empty {
+                <li>No accepted deterministic DomainEvents</li>
+              }
+            } @else {
+              <li>No DomainEvent evidence selected</li>
+            }
+          </ol>
+        }
+        @case ("trace") {
+          <ol class="evidence-list">
+            @if (snapshot().kind === "data") {
+              @if (submission().kind === "data") {
+                @for (
+                  traceLabel of submission().value.traceLabels;
+                  track $index
+                ) {
+                  <li>
+                    <strong>{{ $index + 1 }}</strong
+                    ><span>{{ traceLabel }}</span>
+                  </li>
+                } @empty {
+                  <li>No latest-command trace entries</li>
+                }
+              } @else {
+                <li>No live rule trace selected</li>
+              }
+            } @else if (deterministicStep().kind === "data") {
+              @for (
+                group of deterministicStep().value.scenario.traceGroups;
+                track group.phaseLabel
+              ) {
+                @for (entry of group.entries; track entry.sequenceLabel) {
+                  <li>
+                    <strong
+                      >{{ entry.sequenceLabel }} · {{ group.phaseLabel }} ·
+                      {{ entry.statusLabel }}</strong
+                    ><span>{{ entry.message }}</span
+                    ><span>{{ entry.detail }}</span>
+                  </li>
+                }
+              } @empty {
+                <li>No deterministic trace entries</li>
+              }
+            } @else {
+              <li>No rule trace evidence selected</li>
+            }
+          </ol>
+        }
+        @case ("audit") {
+          <ol class="evidence-list">
+            @if (snapshot().kind === "data") {
+              @for (entry of snapshot().value.auditLog; track entry.id) {
+                <li>
+                  <strong
+                    >{{ entry.sequenceLabel }} ·
+                    {{ entry.decisionLabel }}</strong
+                  ><span
+                    >{{ entry.eventCount }} events ·
+                    {{ entry.traceCount }} trace entries · state
+                    {{ entry.stateChanged ? "changed" : "unchanged" }}</span
+                  ><span>{{ entry.rejectionLabel ?? "No rejection" }}</span>
+                </li>
+              } @empty {
+                <li>No live command audit entries</li>
+              }
+              @if (preflight().kind === "data") {
+                <li>
+                  <strong
+                    >Latest preflight ·
+                    {{ preflight().value.decisionLabel }}</strong
+                  ><span>{{ preflight().value.reason }}</span>
+                </li>
+              }
+              @if (candidates().kind === "data") {
+                @for (
+                  candidate of candidates().value.candidates;
+                  track candidate.actionId + candidate.targetId
+                ) {
+                  <li>
+                    <strong
+                      >Candidate · {{ candidate.actionId }} →
+                      {{ candidate.targetName }}</strong
+                    ><span
+                      >{{ candidate.decisionLabel }} ·
+                      {{ candidate.reason }}</span
+                    >
+                  </li>
+                }
+              }
+            } @else if (deterministicStep().kind === "data") {
+              <li>
+                <strong
+                  >{{ deterministicStep().value.step.indexLabel }} ·
+                  {{ deterministicStep().value.step.title }}</strong
+                ><span
+                  >{{ deterministicStep().value.command.actorId }} ·
+                  {{ deterministicStep().value.command.actionId }} →
+                  {{ deterministicStep().value.command.targetId }}</span
+                ><span
+                  >Supplied rolls
+                  {{ deterministicStep().value.command.rollStreamLabel }} ·
+                  {{ deterministicStep().value.command.outcomeLabel }}</span
+                >
+              </li>
+            } @else {
+              <li>No command audit evidence selected</li>
+            }
+          </ol>
+        }
+        @case ("state") {
+          <div class="state-review">
+            @if (snapshot().kind === "data") {
+              <section>
+                <h4>Live resulting state</h4>
+                <span>{{ snapshot().value.fingerprintLabel }}</span
+                ><span>{{ snapshot().value.combatEndLabel }}</span
+                ><span>{{
+                  snapshot().value.finalizationLabel ?? "Not finalized"
+                }}</span>
+                @for (
+                  participant of snapshot().value.participants;
+                  track participant.id
+                ) {
+                  <span
+                    >{{ participant.name }} · {{ participant.hitPointLabel }} ·
+                    {{ participant.statusLabel }} ·
+                    {{
+                      participant.conditionLabels.join(", ") || "No conditions"
+                    }}</span
+                  >
+                }
+              </section>
+            } @else if (deterministicStep().kind === "data") {
+              <section>
+                <h4>Before</h4>
+                <span>{{ deterministicStep().value.stateBefore.summary }}</span>
+                @for (
+                  participant of deterministicStep().value.stateBefore
+                    .combatants;
+                  track participant.id
+                ) {
+                  <span
+                    >{{ participant.name }} · {{ participant.hitPointLabel }} ·
+                    {{
+                      participant.conditionLabels.join(", ") || "No conditions"
+                    }}</span
+                  >
+                }
+              </section>
+              <section>
+                <h4>After</h4>
+                <span>{{ deterministicStep().value.stateAfter.summary }}</span>
+                @for (
+                  participant of deterministicStep().value.stateAfter
+                    .combatants;
+                  track participant.id
+                ) {
+                  <span
+                    >{{ participant.name }} · {{ participant.hitPointLabel }} ·
+                    {{
+                      participant.conditionLabels.join(", ") || "No conditions"
+                    }}</span
+                  >
+                }
+              </section>
+              <section>
+                <h4>Final state</h4>
+                <span>{{
+                  deterministicStep().value.scenario.finalState.summary
+                }}</span>
+                @for (
+                  participant of deterministicStep().value.scenario.finalState
+                    .combatants;
+                  track participant.id
+                ) {
+                  <span
+                    >{{ participant.name }} · {{ participant.hitPointLabel }} ·
+                    {{
+                      participant.conditionLabels.join(", ") || "No conditions"
+                    }}</span
+                  >
+                }
+              </section>
+            } @else {
+              <p>No state evidence selected</p>
+            }
+          </div>
+        }
+      }
+    </section>
+    <span class="visually-hidden" aria-live="polite">{{
+      evidenceAnnouncement()
+    }}</span>
   </arb-workbench-panel>
 
   <arb-workbench-panel

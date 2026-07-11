@@ -442,9 +442,7 @@ import { LiveCombatStore } from "@asha-rulebench/store";
                     {{ automaticStep().value.operationLabel ?? "No operation" }}
                   </p>
                   <p class="reason">
-                    {{
-                      automaticStep().value.selectedActionId ?? "No action"
-                    }}
+                    {{ automaticStep().value.selectedActionId ?? "No action" }}
                     →
                     {{ automaticStep().value.selectedTargetId ?? "No target" }}
                   </p>
@@ -499,52 +497,6 @@ import { LiveCombatStore } from "@asha-rulebench/store";
               </section>
             </div>
           </section>
-
-          <div class="evidence-grid">
-            <section class="evidence" aria-label="Live combat log">
-              <h4>Combat log</h4>
-              <ul class="log">
-                @for (entry of snapshot().value.combatLog; track entry.id) {
-                  <li>
-                    <strong
-                      >{{ entry.sequenceLabel }} · {{ entry.title }}</strong
-                    >
-                    <p>{{ entry.summary }}</p>
-                    <p class="reason">{{ entry.eventTypeLabels.join(", ") }}</p>
-                  </li>
-                } @empty {
-                  <li class="state">No combat log entries</li>
-                }
-              </ul>
-            </section>
-            <section class="evidence" aria-label="Live command audit">
-              <h4>Command audit</h4>
-              <ul class="log">
-                @for (entry of snapshot().value.auditLog; track entry.id) {
-                  <li>
-                    <strong
-                      >{{ entry.sequenceLabel }} ·
-                      {{ entry.decisionLabel }}</strong
-                    >
-                    <p class="reason">
-                      {{ entry.eventCount }} events ·
-                      {{ entry.traceCount }} trace entries · state
-                      {{ entry.stateChanged ? "changed" : "unchanged" }}
-                    </p>
-                  </li>
-                } @empty {
-                  <li class="state">No audit entries</li>
-                }
-              </ul>
-            </section>
-            <section class="evidence" aria-label="Live combat end evidence">
-              <h4>Combat end</h4>
-              <p>{{ snapshot().value.combatEndLabel }}</p>
-              <p class="reason">
-                {{ snapshot().value.finalizationLabel ?? "Not finalized" }}
-              </p>
-            </section>
-          </div>
         }
       }
     </section>

@@ -327,6 +327,27 @@ test("completes a supported scenario through the visible panel workbench", async
     }),
   ).toContainText("9/18 HP");
   await expect(commandEvidence).toContainText("Damage Applied");
+  const evidencePanel = page.getByRole("region", { name: "5. Evidence log" });
+  await evidencePanel.getByRole("tab", { name: "Combat" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Manual command",
+  );
+  await evidencePanel.getByRole("tab", { name: "DomainEvents" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Damage Applied",
+  );
+  await evidencePanel.getByRole("tab", { name: "Rule trace" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Hit branch selected",
+  );
+  await evidencePanel.getByRole("tab", { name: "Audit" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "state changed",
+  );
+  await evidencePanel.getByRole("tab", { name: "State" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Raider · 9/18 HP",
+  );
 
   await invokeApplicationCommand(page, "Run", "Advance turn");
   await expect(
