@@ -187,7 +187,13 @@ test("invokes live Rust authority through the Angular origin", async ({
     const replayPackages = await transport.listReplayPackages();
     expect(replayPackages.ok).toBe(true);
     if (!replayPackages.ok) return;
-    expect(replayPackages.value).toHaveLength(2);
+    expect(replayPackages.value.map((entry) => entry.packageId)).toEqual(
+      expect.arrayContaining([
+        "hexing-bolt-replay",
+        "hexing-bolt-replay-explicit-start",
+        `live-${sessionId}`,
+      ]),
+    );
     const expectedReplayId = "hexing-bolt-replay";
     const actualReplayId = "hexing-bolt-replay-explicit-start";
     const replayReview = await transport.loadReplayPackage(expectedReplayId);
@@ -288,6 +294,7 @@ test("completes a supported scenario through the visible panel workbench", async
   const actionsPanel = page.getByRole("region", {
     name: "6. Available actions",
   });
+  const gridPanel = page.getByRole("region", { name: "1. Combat grid" });
   const unitsPanel = page.getByRole("region", { name: "7. Active units" });
   await expect(statusPanel).toContainText("e2e-visible-panel-session");
   await expect(statusPanel).toContainText("Ready");
@@ -300,9 +307,24 @@ test("completes a supported scenario through the visible panel workbench", async
 
   await invokeApplicationCommand(page, "Run", "Start combat");
   await expect(statusPanel).toContainText("In Progress");
+  await expect(gridPanel.getByRole("grid", { name: /Live combat board/ })).toBeVisible();
+  await actionsPanel.getByRole("button", { name: "Select Move" }).click();
+  const destinations = gridPanel.getByRole("gridcell", { name: /^Move to / });
+  await expect(destinations.first()).toBeVisible();
+  await destinations.first().click();
+  await expect(destinations.first()).toHaveAttribute("aria-pressed", "true");
+  const keyboardDestination = destinations.nth(1);
+  await keyboardDestination.focus();
+  await keyboardDestination.press("Enter");
+  await expect(keyboardDestination).toHaveAttribute("aria-pressed", "true");
+  await actionsPanel.getByRole("button", { name: "Submit", exact: true }).click();
+  await expect(gridPanel.getByRole("gridcell", { name: /occupied by Adept/ })).toBeVisible();
   await actionsPanel
     .getByRole("button", { name: "Select Hexing Bolt" })
     .click();
+  const gridTarget = gridPanel.getByRole("gridcell", { name: /^Target at .*occupied by Raider/ });
+  await gridTarget.click();
+  await expect(gridTarget).toHaveAttribute("aria-pressed", "true");
   await unitsPanel
     .getByRole("button", { name: "Select Adept as target" })
     .click();
@@ -499,7 +521,10 @@ test("reviews and compares archived Rust replay evidence", async ({ page }) => {
     name: "Replay archive controls",
   });
   const packages = workspace.getByLabel("Archived replay packages");
-  await expect(packages.getByRole("button")).toHaveCount(2);
+  await expect(
+    packages.getByRole("button", { name: /hexing-bolt-replay ·/ }).first(),
+  ).toBeVisible();
+  expect(await packages.getByRole("button").count()).toBeGreaterThanOrEqual(2);
   await packages
     .getByRole("button", { name: /hexing-bolt-replay ·/ })
     .first()

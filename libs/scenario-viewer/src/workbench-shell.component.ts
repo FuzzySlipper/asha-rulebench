@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from "@angular/core";
+import { NgTemplateOutlet } from "@angular/common";
 import type { ElementRef } from "@angular/core";
 import {
   ApplicationDialogComponent,
@@ -31,6 +32,7 @@ type InitiativePosition = "Current" | "Next" | "Queued" | "Complete";
     ApplicationDialogComponent,
     ApplicationMenubarComponent,
     WorkbenchPanelComponent,
+    NgTemplateOutlet,
   ],
   templateUrl: "./workbench-shell.component.html",
   styleUrl: "./workbench-shell.component.css",
@@ -401,6 +403,58 @@ export class WorkbenchShellComponent {
         ? "unoccupied"
         : `occupied by ${occupantNames.join(", ")}`;
     return `Coordinate ${x}, ${y}; ${terrainLabel}; ${occupants}`;
+  }
+
+  protected liveGridCellLabel(
+    x: number,
+    y: number,
+    terrainLabels: readonly string[],
+    occupantIds: readonly string[],
+  ): string {
+    const occupantNames = occupantIds
+      .map((occupantId) => this.participantById(occupantId)?.name)
+      .filter((name) => name !== undefined);
+    const terrain = terrainLabels.join(", ") || "open";
+    const occupants = occupantNames.length === 0
+      ? "unoccupied"
+      : `occupied by ${occupantNames.join(", ")}`;
+    return `Coordinate ${x}, ${y}; ${terrain}; ${occupants}`;
+  }
+
+  protected liveCellOperation(x: number, y: number): "destination" | "target" | null {
+    const options = this.options();
+    const snapshot = this.snapshot();
+    if (options.kind !== "data" || snapshot.kind !== "data") return null;
+    const action = options.value.actions.find(
+      (candidate) => candidate.actionId === this.intent().actionId,
+    );
+    if (action === undefined || !action.available) return null;
+    if (action.targetMode === "cell") {
+      return action.destinations.some((cell) => cell.x === x && cell.y === y)
+        ? "destination"
+        : null;
+    }
+    if (action.targetMode !== "entity") return null;
+    const boardCell = snapshot.value.board.cells.find((cell) => cell.x === x && cell.y === y);
+    return boardCell?.occupantIds.some((id) => action.targets.some((target) => target.id === id)) === true
+      ? "target"
+      : null;
+  }
+
+  protected selectLiveGridCell(x: number, y: number): void {
+    const operation = this.liveCellOperation(x, y);
+    if (operation === "destination") {
+      this.liveStore.selectCellTarget({ x, y });
+      return;
+    }
+    if (operation !== "target") return;
+    const snapshot = this.snapshot();
+    const options = this.options();
+    if (snapshot.kind !== "data" || options.kind !== "data") return;
+    const action = options.value.actions.find((candidate) => candidate.actionId === this.intent().actionId);
+    const cell = snapshot.value.board.cells.find((candidate) => candidate.x === x && candidate.y === y);
+    const targetId = cell?.occupantIds.find((id) => action?.targets.some((target) => target.id === id));
+    if (targetId !== undefined) this.liveStore.selectEntityTarget(targetId);
   }
 
   protected occupantStateLabel(combatantId: string): string {

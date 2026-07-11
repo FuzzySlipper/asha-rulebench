@@ -165,6 +165,71 @@
     [panelNumber]="1"
     panelTitle="Combat grid"
   >
+    @if (snapshot().kind === "data") {
+      <div class="grid-context">
+        <strong>{{ snapshot().value.board.id }}</strong>
+        <span>{{ snapshot().value.board.width }}×{{ snapshot().value.board.height }}</span>
+        <span>{{ snapshot().value.lifecycleLabel }} · {{ snapshot().value.turnLabel }}</span>
+        @if (intent().destinationCell; as destination) {
+          <span>Proposed destination {{ destination.x }},{{ destination.y }}</span>
+        } @else if (intent().targetId) {
+          <span>Proposed target {{ participantById(intent().targetId)?.name ?? intent().targetId }}</span>
+        }
+      </div>
+      <div
+        class="grid-stage"
+        role="grid"
+        [attr.aria-label]="'Live combat board, ' + snapshot().value.lifecycleLabel"
+        [attr.aria-rowcount]="snapshot().value.board.height"
+        [attr.aria-colcount]="snapshot().value.board.width"
+        [style.grid-template-columns]="'repeat(' + snapshot().value.board.width + ', minmax(2.5rem, 1fr))'"
+        [style.grid-template-rows]="'repeat(' + snapshot().value.board.height + ', minmax(2.5rem, 1fr))'"
+      >
+        @for (cell of snapshot().value.board.cells; track cell.x + "-" + cell.y) {
+          @if (liveCellOperation(cell.x, cell.y); as operation) {
+            <button
+              type="button"
+              class="grid-cell grid-cell--operable"
+              role="gridcell"
+              [class.grid-cell--selected]="intent().destinationCell?.x === cell.x && intent().destinationCell?.y === cell.y"
+              [class.grid-cell--terrain]="cell.terrainLabels.length > 0"
+              [attr.aria-rowindex]="cell.y + 1"
+              [attr.aria-colindex]="cell.x + 1"
+              [attr.aria-label]="(operation === 'destination' ? 'Move to ' : 'Target at ') + liveGridCellLabel(cell.x, cell.y, cell.terrainLabels, cell.occupantIds)"
+              [attr.aria-pressed]="intent().destinationCell?.x === cell.x && intent().destinationCell?.y === cell.y || (cell.occupantIds.includes(intent().targetId))"
+              (click)="selectLiveGridCell(cell.x, cell.y)"
+            >
+              <ng-container *ngTemplateOutlet="liveCell; context: { $implicit: cell }" />
+            </button>
+          } @else {
+            <div
+              class="grid-cell"
+              role="gridcell"
+              [class.grid-cell--terrain]="cell.terrainLabels.length > 0"
+              [attr.aria-rowindex]="cell.y + 1"
+              [attr.aria-colindex]="cell.x + 1"
+              [attr.aria-label]="liveGridCellLabel(cell.x, cell.y, cell.terrainLabels, cell.occupantIds)"
+            >
+              <ng-container *ngTemplateOutlet="liveCell; context: { $implicit: cell }" />
+            </div>
+          }
+        }
+      </div>
+      <ng-template #liveCell let-cell>
+        <span class="grid-coordinate" aria-hidden="true">{{ cell.x }},{{ cell.y }}</span>
+        @for (occupantId of cell.occupantIds; track occupantId) {
+          @if (participantById(occupantId); as participant) {
+            <span class="grid-occupant" [class.grid-occupant--actor]="snapshot().value.currentActorId === occupantId" [class.grid-occupant--target]="intent().targetId === occupantId">
+              <strong>{{ participant.name }}</strong>
+              <span>{{ participant.hitPointLabel }}</span>
+            </span>
+          }
+        }
+        @if (cell.terrainLabels.length > 0) {
+          <span class="grid-terrain">{{ cell.terrainLabels.join(", ") }}</span>
+        }
+      </ng-template>
+    } @else {
     @switch (deterministicScenario().kind) {
       @case ("data") {
         <div class="grid-context">
@@ -255,6 +320,7 @@
       @case ("idle") {
         <p class="panel-state">No scenario board selected</p>
       }
+    }
     }
   </arb-workbench-panel>
 
