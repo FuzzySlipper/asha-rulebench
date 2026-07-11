@@ -219,12 +219,10 @@ nav,
 
 .grid-stage {
   display: grid;
-  grid-template-columns: repeat(12, minmax(1.5rem, 1fr));
-  grid-template-rows: repeat(8, minmax(1.5rem, 1fr));
-  height: 100%;
+  height: calc(100% - 3.1rem);
   min-height: 28rem;
-  min-width: 36rem;
-  overflow: hidden;
+  min-width: max-content;
+  overflow: auto;
   position: relative;
 }
 
@@ -232,19 +230,61 @@ nav,
   background: #171c22;
   border-bottom: 1px solid #252c34;
   border-right: 1px solid #252c34;
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+  position: relative;
 }
 
-.grid-stage p {
-  background: #11151acc;
-  border: 1px solid var(--arb-border);
-  color: var(--arb-muted);
-  left: 50%;
-  margin: 0;
-  padding: 0.6rem 0.85rem;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
+.grid-context {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  min-height: 3.1rem;
+  overflow-x: auto;
+  padding: 0 0.75rem;
   white-space: nowrap;
+}
+
+.grid-context span,
+.grid-coordinate,
+.grid-terrain,
+.grid-occupant span {
+  color: var(--arb-muted);
+  font-size: 0.68rem;
+}
+
+.grid-coordinate {
+  left: 0.2rem;
+  position: absolute;
+  top: 0.1rem;
+}
+
+.grid-cell--terrain {
+  background: #202229;
+}
+
+.grid-terrain {
+  bottom: 0.15rem;
+  position: absolute;
+  right: 0.2rem;
+}
+
+.grid-occupant {
+  background: var(--arb-surface);
+  border-left: 3px solid var(--arb-border);
+  display: grid;
+  inset: 0.75rem 0.3rem 0.3rem;
+  overflow: hidden;
+  padding: 0.2rem 0.3rem;
+  position: absolute;
+}
+
+.grid-occupant--actor {
+  border-left-color: var(--arb-accent);
+}
+
+.grid-occupant--target {
+  border-left-color: var(--arb-warning);
 }
 
 .empty-state {

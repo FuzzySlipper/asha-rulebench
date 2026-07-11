@@ -164,12 +164,97 @@
     [panelNumber]="1"
     panelTitle="Combat grid"
   >
-    <div class="grid-stage" aria-label="Empty combat grid">
-      @for (cell of gridCells; track $index) {
-        <span class="grid-cell" aria-hidden="true"></span>
+    @switch (deterministicScenario().kind) {
+      @case ("data") {
+        <div class="grid-context">
+          <strong>{{ deterministicScenario().value.title }}</strong>
+          <span
+            >{{ deterministicScenario().value.board.width }}×{{
+              deterministicScenario().value.board.height
+            }}
+            · {{ deterministicScenario().value.selectedAction.name }}</span
+          >
+          @if (snapshot().kind === "data") {
+            <span
+              >Live positions unavailable; showing selected scenario setup
+              board.</span
+            >
+          }
+        </div>
+        <div
+          class="grid-stage"
+          role="grid"
+          [attr.aria-label]="
+            'Scenario board for ' + deterministicScenario().value.title
+          "
+          [attr.aria-rowcount]="deterministicScenario().value.board.height"
+          [attr.aria-colcount]="deterministicScenario().value.board.width"
+          [style.grid-template-columns]="
+            'repeat(' +
+            deterministicScenario().value.board.width +
+            ', minmax(2.5rem, 1fr))'
+          "
+          [style.grid-template-rows]="
+            'repeat(' +
+            deterministicScenario().value.board.height +
+            ', minmax(2.5rem, 1fr))'
+          "
+        >
+          @for (
+            cell of deterministicScenario().value.board.cells;
+            track cell.x + "-" + cell.y
+          ) {
+            <div
+              class="grid-cell"
+              role="gridcell"
+              [class.grid-cell--terrain]="cell.terrainLabel !== 'Open'"
+              [attr.aria-rowindex]="cell.y + 1"
+              [attr.aria-colindex]="cell.x + 1"
+              [attr.aria-label]="
+                gridCellLabel(
+                  cell.x,
+                  cell.y,
+                  cell.terrainLabel,
+                  cell.occupantIds
+                )
+              "
+            >
+              <span class="grid-coordinate" aria-hidden="true"
+                >{{ cell.x }},{{ cell.y }}</span
+              >
+              @for (occupantId of cell.occupantIds; track occupantId) {
+                @if (combatantById(occupantId); as combatant) {
+                  <span
+                    class="grid-occupant"
+                    [class.grid-occupant--actor]="combatant.isActor"
+                    [class.grid-occupant--target]="
+                      occupantStateLabel(occupantId) === 'Selected target'
+                    "
+                  >
+                    <strong>{{ combatant.name }}</strong>
+                    <span>{{ occupantStateLabel(occupantId) }}</span>
+                  </span>
+                }
+              }
+              @if (cell.terrainLabel !== "Open") {
+                <span class="grid-terrain">{{ cell.terrainLabel }}</span>
+              }
+            </div>
+          }
+        </div>
       }
-      <p>No encounter loaded</p>
-    </div>
+      @case ("loading") {
+        <p class="panel-state">Loading scenario board</p>
+      }
+      @case ("error") {
+        <p class="panel-state panel-state--error" role="alert">
+          {{ deterministicScenario().error.message }}
+        </p>
+      }
+      @case ("idle") {
+        <p class="panel-state">No scenario board selected</p>
+      }
+    }
   </arb-workbench-panel>
 
   <arb-workbench-panel

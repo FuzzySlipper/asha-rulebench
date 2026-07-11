@@ -1,17 +1,31 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import type { OnInit } from '@angular/core';
-import { RulebenchScenarioRendererComponent } from '@asha-rulebench/renderer';
-import { SessionStore } from '@asha-rulebench/store';
-import type { RulebenchCommandOutcomeClassDto, RulebenchScenarioOutcomeClassDto } from '@asha-rulebench/protocol';
-import { ApplicationDialogComponent, type ApplicationMenuGroup, type ApplicationMenuItem } from '@asha-rulebench/components';
-import { ContentWorkspaceComponent } from './content-workspace';
-import { ManualCombatWorkspaceComponent } from './manual-combat-workspace';
-import { ReplayReviewWorkspaceComponent } from './replay-review-workspace';
-import { WorkbenchShellComponent } from './workbench-shell.component';
+import { Component, computed, inject, signal } from "@angular/core";
+import type { OnInit } from "@angular/core";
+import { RulebenchScenarioRendererComponent } from "@asha-rulebench/renderer";
+import { SessionStore } from "@asha-rulebench/store";
+import type {
+  RulebenchCommandOutcomeClassDto,
+  RulebenchScenarioOutcomeClassDto,
+} from "@asha-rulebench/protocol";
+import {
+  ApplicationDialogComponent,
+  type ApplicationMenuGroup,
+  type ApplicationMenuItem,
+} from "@asha-rulebench/components";
+import { ContentWorkspaceComponent } from "./content-workspace";
+import { ManualCombatWorkspaceComponent } from "./manual-combat-workspace";
+import { ReplayReviewWorkspaceComponent } from "./replay-review-workspace";
+import { WorkbenchShellComponent } from "./workbench-shell.component";
 
 @Component({
-  imports: [ApplicationDialogComponent, RulebenchScenarioRendererComponent, ContentWorkspaceComponent, ManualCombatWorkspaceComponent, ReplayReviewWorkspaceComponent, WorkbenchShellComponent],
-  selector: 'arb-scenario-viewer-feature',
+  imports: [
+    ApplicationDialogComponent,
+    RulebenchScenarioRendererComponent,
+    ContentWorkspaceComponent,
+    ManualCombatWorkspaceComponent,
+    ReplayReviewWorkspaceComponent,
+    WorkbenchShellComponent,
+  ],
+  selector: "arb-scenario-viewer-feature",
   standalone: true,
   styles: [
     `
@@ -112,8 +126,8 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
         padding: 7px 12px;
       }
 
-      .scenario-button[aria-pressed='true'],
-      .step-button[aria-pressed='true'] {
+      .scenario-button[aria-pressed="true"],
+      .step-button[aria-pressed="true"] {
         border-color: var(--arb-accent);
         box-shadow: inset 3px 0 0 var(--arb-accent);
       }
@@ -179,6 +193,7 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
     <div class="viewer">
       <arb-workbench-shell
         [additionalMenuGroups]="applicationMenuGroups"
+        [deterministicMode]="viewerMode()"
         (applicationCommand)="handleApplicationCommand($event)"
       />
 
@@ -212,126 +227,182 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
         [open]="activeDialog() === 'scenario'"
         (closeRequested)="closeDialog()"
       >
-      <section class="session" aria-label="Combat session">
-        <h2>Combat Session</h2>
-        @switch (sessionCatalog().kind) {
-          @case ('data') {
-            @for (session of sessionCatalog().value; track session.id) {
-              <div class="session-row">
-                @for (step of session.steps; track step.id) {
+        <section class="session" aria-label="Combat session">
+          <h2>Combat Session</h2>
+          @switch (sessionCatalog().kind) {
+            @case ("data") {
+              @for (session of sessionCatalog().value; track session.id) {
+                <div class="session-row">
+                  @for (step of session.steps; track step.id) {
+                    <button
+                      class="step-button"
+                      type="button"
+                      [attr.aria-pressed]="
+                        selectedSessionId() === session.id &&
+                        selectedSessionStepId() === step.id &&
+                        viewerMode() === 'session'
+                      "
+                      (click)="selectSessionStep(session.id, step.id)"
+                    >
+                      <span class="step-title"
+                        >{{ step.logIndex }} · {{ step.title }}</span
+                      >
+                      <span class="step-meta">{{
+                        sessionOutcomeClassLabel(step.outcomeClass)
+                      }}</span>
+                    </button>
+                  }
+                </div>
+                <div
+                  class="session-actions"
+                  aria-label="Combat session controls"
+                >
                   <button
-                    class="step-button"
+                    class="control-button"
                     type="button"
-                    [attr.aria-pressed]="selectedSessionId() === session.id && selectedSessionStepId() === step.id && viewerMode() === 'session'"
-                    (click)="selectSessionStep(session.id, step.id)"
+                    (click)="previousSessionStep()"
                   >
-                    <span class="step-title">{{ step.logIndex }} · {{ step.title }}</span>
-                    <span class="step-meta">{{ sessionOutcomeClassLabel(step.outcomeClass) }}</span>
+                    Previous
+                  </button>
+                  <button
+                    class="control-button"
+                    type="button"
+                    (click)="nextSessionStep()"
+                  >
+                    Next
+                  </button>
+                </div>
+              }
+            }
+            @case ("loading") {
+              <p class="session-status">Loading combat session</p>
+            }
+            @case ("error") {
+              <p class="session-status">{{ sessionCatalog().error.message }}</p>
+            }
+            @case ("idle") {
+              <p class="session-status">Combat session idle</p>
+            }
+          }
+
+          @switch (sessionStep().kind) {
+            @case ("data") {
+              <section class="session-detail" aria-label="Combat session step">
+                <h3>
+                  {{ sessionStep().value.step.indexLabel }} ·
+                  {{ sessionStep().value.step.title }}
+                </h3>
+                <p class="command-line">
+                  {{ sessionStep().value.command.actorId }} ·
+                  {{ sessionStep().value.command.actionId }} →
+                  {{ sessionStep().value.command.targetId }} · rolls
+                  {{ sessionStep().value.command.rollStreamLabel }} ·
+                  {{ sessionStep().value.command.outcomeLabel }}
+                </p>
+                <ul class="log-list" aria-label="Combat log">
+                  @for (
+                    entry of sessionStep().value.combatLog;
+                    track entry.id
+                  ) {
+                    <li>
+                      <strong
+                        >{{ entry.logIndexLabel }} · {{ entry.title }}</strong
+                      >
+                      <p>{{ entry.summary }}</p>
+                      <p class="log-event-types">
+                        {{
+                          entry.eventTypeLabels.join(", ") ||
+                            "No accepted DomainEvents"
+                        }}
+                      </p>
+                    </li>
+                  }
+                </ul>
+                <div class="state-pair" aria-label="Step state review">
+                  <div class="state-card">
+                    <h4>Before</h4>
+                    <p>{{ sessionStep().value.stateBefore.summary }}</p>
+                    <ul class="state-list">
+                      @for (
+                        combatant of sessionStep().value.stateBefore.combatants;
+                        track combatant.id
+                      ) {
+                        <li>
+                          {{ combatant.name }} · {{ combatant.hitPointLabel }} ·
+                          {{ combatant.conditionLabels.join(", ") }}
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                  <div class="state-card">
+                    <h4>After</h4>
+                    <p>{{ sessionStep().value.stateAfter.summary }}</p>
+                    <ul class="state-list">
+                      @for (
+                        combatant of sessionStep().value.stateAfter.combatants;
+                        track combatant.id
+                      ) {
+                        <li>
+                          {{ combatant.name }} · {{ combatant.hitPointLabel }} ·
+                          {{ combatant.conditionLabels.join(", ") }}
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            }
+            @case ("loading") {
+              <p class="session-status">Loading combat session step</p>
+            }
+            @case ("error") {
+              <p class="session-status">{{ sessionStep().error.message }}</p>
+            }
+            @case ("idle") {
+              <p class="session-status">Combat session step idle</p>
+            }
+          }
+        </section>
+
+        <section class="catalog" aria-label="Scenario catalog">
+          <h2>Scenario Cases</h2>
+          @switch (catalog().kind) {
+            @case ("data") {
+              <div class="catalog-row">
+                @for (summary of catalog().value; track summary.id) {
+                  <button
+                    class="scenario-button"
+                    type="button"
+                    [attr.aria-pressed]="
+                      viewerMode() === 'scenario' &&
+                      selectedScenarioId() === summary.id
+                    "
+                    (click)="selectScenario(summary.id)"
+                  >
+                    <span class="scenario-title">{{ summary.title }}</span>
+                    <span class="scenario-meta"
+                      >{{ outcomeClassLabel(summary.outcomeClass) }} ·
+                      {{ summary.seedLabel }}</span
+                    >
                   </button>
                 }
               </div>
-              <div class="session-actions" aria-label="Combat session controls">
-                <button class="control-button" type="button" (click)="previousSessionStep()">Previous</button>
-                <button class="control-button" type="button" (click)="nextSessionStep()">Next</button>
-              </div>
+            }
+            @case ("loading") {
+              <p class="catalog-status">Loading scenario catalog</p>
+            }
+            @case ("error") {
+              <p class="catalog-status">{{ catalog().error.message }}</p>
+            }
+            @case ("idle") {
+              <p class="catalog-status">Scenario catalog idle</p>
             }
           }
-          @case ('loading') {
-            <p class="session-status">Loading combat session</p>
-          }
-          @case ('error') {
-            <p class="session-status">{{ sessionCatalog().error.message }}</p>
-          }
-          @case ('idle') {
-            <p class="session-status">Combat session idle</p>
-          }
-        }
-
-        @switch (sessionStep().kind) {
-          @case ('data') {
-            <section class="session-detail" aria-label="Combat session step">
-              <h3>{{ sessionStep().value.step.indexLabel }} · {{ sessionStep().value.step.title }}</h3>
-              <p class="command-line">
-                {{ sessionStep().value.command.actorId }} · {{ sessionStep().value.command.actionId }} →
-                {{ sessionStep().value.command.targetId }} · rolls {{ sessionStep().value.command.rollStreamLabel }} ·
-                {{ sessionStep().value.command.outcomeLabel }}
-              </p>
-              <ul class="log-list" aria-label="Combat log">
-                @for (entry of sessionStep().value.combatLog; track entry.id) {
-                  <li>
-                    <strong>{{ entry.logIndexLabel }} · {{ entry.title }}</strong>
-                    <p>{{ entry.summary }}</p>
-                    <p class="log-event-types">{{ entry.eventTypeLabels.join(', ') || 'No accepted DomainEvents' }}</p>
-                  </li>
-                }
-              </ul>
-              <div class="state-pair" aria-label="Step state review">
-                <div class="state-card">
-                  <h4>Before</h4>
-                  <p>{{ sessionStep().value.stateBefore.summary }}</p>
-                  <ul class="state-list">
-                    @for (combatant of sessionStep().value.stateBefore.combatants; track combatant.id) {
-                      <li>{{ combatant.name }} · {{ combatant.hitPointLabel }} · {{ combatant.conditionLabels.join(', ') }}</li>
-                    }
-                  </ul>
-                </div>
-                <div class="state-card">
-                  <h4>After</h4>
-                  <p>{{ sessionStep().value.stateAfter.summary }}</p>
-                  <ul class="state-list">
-                    @for (combatant of sessionStep().value.stateAfter.combatants; track combatant.id) {
-                      <li>{{ combatant.name }} · {{ combatant.hitPointLabel }} · {{ combatant.conditionLabels.join(', ') }}</li>
-                    }
-                  </ul>
-                </div>
-              </div>
-            </section>
-          }
-          @case ('loading') {
-            <p class="session-status">Loading combat session step</p>
-          }
-          @case ('error') {
-            <p class="session-status">{{ sessionStep().error.message }}</p>
-          }
-          @case ('idle') {
-            <p class="session-status">Combat session step idle</p>
-          }
-        }
-      </section>
-
-      <section class="catalog" aria-label="Scenario catalog">
-        <h2>Scenario Cases</h2>
-        @switch (catalog().kind) {
-          @case ('data') {
-            <div class="catalog-row">
-              @for (summary of catalog().value; track summary.id) {
-                <button
-                  class="scenario-button"
-                  type="button"
-                  [attr.aria-pressed]="viewerMode() === 'scenario' && selectedScenarioId() === summary.id"
-                  (click)="selectScenario(summary.id)"
-                >
-                  <span class="scenario-title">{{ summary.title }}</span>
-                  <span class="scenario-meta">{{ outcomeClassLabel(summary.outcomeClass) }} · {{ summary.seedLabel }}</span>
-                </button>
-              }
-            </div>
-          }
-          @case ('loading') {
-            <p class="catalog-status">Loading scenario catalog</p>
-          }
-          @case ('error') {
-            <p class="catalog-status">{{ catalog().error.message }}</p>
-          }
-          @case ('idle') {
-            <p class="catalog-status">Scenario catalog idle</p>
-          }
-        }
-      </section>
+        </section>
       </arb-application-dialog>
 
       @switch (activeScenario().kind) {
-        @case ('idle') {
+        @case ("idle") {
           <section class="state" aria-label="Scenario status">
             <div class="state-inner">
               <h1>ASHA Rulebench</h1>
@@ -339,7 +410,7 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
             </div>
           </section>
         }
-        @case ('loading') {
+        @case ("loading") {
           <section class="state" aria-label="Scenario status">
             <div class="state-inner">
               <h1>ASHA Rulebench</h1>
@@ -347,10 +418,12 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
             </div>
           </section>
         }
-        @case ('data') {
-          <arb-rulebench-scenario-renderer [scenario]="activeScenario().value" />
+        @case ("data") {
+          <arb-rulebench-scenario-renderer
+            [scenario]="activeScenario().value"
+          />
         }
-        @case ('error') {
+        @case ("error") {
           <section class="state" aria-label="Scenario status">
             <div class="state-inner">
               <h1>ASHA Rulebench</h1>
@@ -364,43 +437,57 @@ import { WorkbenchShellComponent } from './workbench-shell.component';
 })
 export class ScenarioViewerFeatureComponent implements OnInit {
   private readonly sessionStore = inject(SessionStore);
-  protected readonly activeDialog = signal<'content' | 'scenario' | 'live' | null>(null);
+  protected readonly activeDialog = signal<
+    "content" | "scenario" | "live" | null
+  >(null);
   protected readonly applicationMenuGroups: readonly ApplicationMenuGroup[] = [
     {
-      id: 'file',
-      label: 'File',
-      items: [{ id: 'open-content-packs', label: 'Content packs' }],
+      id: "file",
+      label: "File",
+      items: [{ id: "open-content-packs", label: "Content packs" }],
     },
     {
-      id: 'scenario',
-      label: 'Scenario',
+      id: "scenario",
+      label: "Scenario",
       items: [
-        { id: 'open-scenario-cases', label: 'Scenario cases' },
-        { id: 'open-live-combat', label: 'Live combat setup' },
+        { id: "open-scenario-cases", label: "Scenario cases" },
+        { id: "open-live-combat", label: "Live combat setup" },
       ],
     },
   ];
-  protected readonly viewerMode = signal<'session' | 'scenario'>('session');
+  protected readonly viewerMode = signal<"session" | "scenario">("session");
   protected readonly catalog = computed(() => this.sessionStore.catalog());
-  protected readonly selectedScenarioId = computed(() => this.sessionStore.selectedScenarioId());
+  protected readonly selectedScenarioId = computed(() =>
+    this.sessionStore.selectedScenarioId(),
+  );
   protected readonly scenario = computed(() => this.sessionStore.scenario());
-  protected readonly sessionCatalog = computed(() => this.sessionStore.sessionCatalog());
-  protected readonly selectedSessionId = computed(() => this.sessionStore.selectedSessionId());
-  protected readonly selectedSessionStepId = computed(() => this.sessionStore.selectedSessionStepId());
-  protected readonly sessionStep = computed(() => this.sessionStore.sessionStep());
+  protected readonly sessionCatalog = computed(() =>
+    this.sessionStore.sessionCatalog(),
+  );
+  protected readonly selectedSessionId = computed(() =>
+    this.sessionStore.selectedSessionId(),
+  );
+  protected readonly selectedSessionStepId = computed(() =>
+    this.sessionStore.selectedSessionStepId(),
+  );
+  protected readonly sessionStep = computed(() =>
+    this.sessionStore.sessionStep(),
+  );
   protected readonly activeScenario = computed(() => {
-    if (this.viewerMode() === 'scenario') {
+    if (this.viewerMode() === "scenario") {
       return this.scenario();
     }
 
     const step = this.sessionStep();
-    if (step.kind === 'data') {
-      return { kind: 'data' as const, value: step.value.scenario };
+    if (step.kind === "data") {
+      return { kind: "data" as const, value: step.value.scenario };
     }
-    if (step.kind === 'error') {
-      return { kind: 'error' as const, error: step.error };
+    if (step.kind === "error") {
+      return { kind: "error" as const, error: step.error };
     }
-    return step.kind === 'loading' ? { kind: 'loading' as const } : { kind: 'idle' as const };
+    return step.kind === "loading"
+      ? { kind: "loading" as const }
+      : { kind: "idle" as const };
   });
 
   ngOnInit(): void {
@@ -409,14 +496,14 @@ export class ScenarioViewerFeatureComponent implements OnInit {
 
   protected handleApplicationCommand(item: ApplicationMenuItem): void {
     switch (item.id) {
-      case 'open-content-packs':
-        this.activeDialog.set('content');
+      case "open-content-packs":
+        this.activeDialog.set("content");
         return;
-      case 'open-scenario-cases':
-        this.activeDialog.set('scenario');
+      case "open-scenario-cases":
+        this.activeDialog.set("scenario");
         return;
-      case 'open-live-combat':
-        this.activeDialog.set('live');
+      case "open-live-combat":
+        this.activeDialog.set("live");
         return;
     }
   }
@@ -426,46 +513,50 @@ export class ScenarioViewerFeatureComponent implements OnInit {
   }
 
   protected selectScenario(scenarioId: string): void {
-    this.viewerMode.set('scenario');
+    this.viewerMode.set("scenario");
     void this.sessionStore.selectScenario(scenarioId);
   }
 
   protected selectSessionStep(sessionId: string, stepId: string): void {
-    this.viewerMode.set('session');
+    this.viewerMode.set("session");
     void this.sessionStore.selectSessionStep(sessionId, stepId);
   }
 
   protected nextSessionStep(): void {
-    this.viewerMode.set('session');
+    this.viewerMode.set("session");
     void this.sessionStore.nextSessionStep();
   }
 
   protected previousSessionStep(): void {
-    this.viewerMode.set('session');
+    this.viewerMode.set("session");
     void this.sessionStore.previousSessionStep();
   }
 
-  protected outcomeClassLabel(outcomeClass: RulebenchScenarioOutcomeClassDto): string {
+  protected outcomeClassLabel(
+    outcomeClass: RulebenchScenarioOutcomeClassDto,
+  ): string {
     switch (outcomeClass) {
-      case 'acceptedHit':
-        return 'Accepted hit';
-      case 'acceptedMiss':
-        return 'Accepted miss';
-      case 'rejectedTargetLegality':
-        return 'Rejected target';
+      case "acceptedHit":
+        return "Accepted hit";
+      case "acceptedMiss":
+        return "Accepted miss";
+      case "rejectedTargetLegality":
+        return "Rejected target";
     }
   }
 
-  protected sessionOutcomeClassLabel(outcomeClass: RulebenchCommandOutcomeClassDto): string {
+  protected sessionOutcomeClassLabel(
+    outcomeClass: RulebenchCommandOutcomeClassDto,
+  ): string {
     switch (outcomeClass) {
-      case 'acceptedHit':
-        return 'Accepted hit';
-      case 'acceptedMiss':
-        return 'Accepted miss';
-      case 'rejectedTargetLegality':
-        return 'Rejected target';
-      case 'rejectedInvalidCommand':
-        return 'Rejected invalid command';
+      case "acceptedHit":
+        return "Accepted hit";
+      case "acceptedMiss":
+        return "Accepted miss";
+      case "rejectedTargetLegality":
+        return "Rejected target";
+      case "rejectedInvalidCommand":
+        return "Rejected invalid command";
     }
   }
 

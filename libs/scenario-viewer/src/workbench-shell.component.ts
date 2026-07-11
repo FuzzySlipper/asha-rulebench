@@ -52,8 +52,8 @@ export class WorkbenchShellComponent {
   private readonly commandFeedback =
     viewChild<ElementRef<HTMLElement>>("commandFeedback");
 
-  protected readonly gridCells = Array.from({ length: 96 });
   readonly additionalMenuGroups = input<readonly ApplicationMenuGroup[]>([]);
+  readonly deterministicMode = input<"session" | "scenario">("session");
   readonly applicationCommand = output<ApplicationMenuItem>();
 
   protected readonly menuStatus = signal("");
@@ -67,6 +67,19 @@ export class WorkbenchShellComponent {
   protected readonly deterministicStep = computed(() =>
     this.sessionStore.sessionStep(),
   );
+  protected readonly deterministicScenario = computed(() => {
+    if (this.deterministicMode() === "scenario") {
+      return this.sessionStore.scenario();
+    }
+    const step = this.deterministicStep();
+    if (step.kind === "data")
+      return { kind: "data" as const, value: step.value.scenario };
+    if (step.kind === "error")
+      return { kind: "error" as const, error: step.error };
+    return step.kind === "loading"
+      ? { kind: "loading" as const }
+      : { kind: "idle" as const };
+  });
   protected readonly intent = computed(() => this.liveStore.intent());
   protected readonly attackRollInput = signal("17");
   protected readonly damageRollInput = signal("5");
@@ -260,6 +273,41 @@ export class WorkbenchShellComponent {
           (participant) => participant.id === participantId,
         ) ?? null)
       : null;
+  }
+
+  protected combatantById(combatantId: string) {
+    const scenario = this.deterministicScenario();
+    return scenario.kind === "data"
+      ? (scenario.value.combatants.find(
+          (combatant) => combatant.id === combatantId,
+        ) ?? null)
+      : null;
+  }
+
+  protected gridCellLabel(
+    x: number,
+    y: number,
+    terrainLabel: string,
+    occupantIds: readonly string[],
+  ): string {
+    const occupantNames = occupantIds
+      .map((occupantId) => this.combatantById(occupantId)?.name)
+      .filter((name) => name !== undefined);
+    const occupants =
+      occupantNames.length === 0
+        ? "unoccupied"
+        : `occupied by ${occupantNames.join(", ")}`;
+    return `Coordinate ${x}, ${y}; ${terrainLabel}; ${occupants}`;
+  }
+
+  protected occupantStateLabel(combatantId: string): string {
+    const scenario = this.deterministicScenario();
+    const combatant = this.combatantById(combatantId);
+    if (scenario.kind !== "data" || combatant === null) return "Occupant";
+    if (combatant.isActor) return "Selected actor";
+    if (combatant.name === scenario.value.selectedTarget.targetLabel)
+      return "Selected target";
+    return "Occupant";
   }
 
   protected setAttackRoll(value: string): void {

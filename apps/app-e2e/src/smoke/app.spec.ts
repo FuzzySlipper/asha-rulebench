@@ -15,6 +15,25 @@ test("boots the rulebench shell", async ({ page }) => {
   ]) {
     await expect(page.getByRole("region", { name: label })).toBeVisible();
   }
+  const scenarioGrid = page.getByRole("grid", {
+    name: "Scenario board for Adept hits Raider",
+  });
+  await expect(scenarioGrid).toBeVisible();
+  await expect(
+    scenarioGrid.getByRole("gridcell", {
+      name: /Coordinate 1, 1; clear; occupied by Adept/,
+    }),
+  ).toContainText("Selected actor");
+  await expect(
+    scenarioGrid.getByRole("gridcell", {
+      name: /Coordinate 4, 1; clear; occupied by Raider/,
+    }),
+  ).toContainText("Selected target");
+  await expect(
+    scenarioGrid.getByRole("gridcell", {
+      name: /Coordinate 2, 2; cover; unoccupied/,
+    }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "DomainEvents" }).click();
   await expect(page.getByRole("tabpanel")).toContainText(
     "Accepted DomainEvents",
