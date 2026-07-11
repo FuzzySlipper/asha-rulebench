@@ -384,40 +384,44 @@ test("shows Rust automatic step and bounded-run decisions", async ({
     .getByLabel("Session", { exact: true })
     .fill("e2e-visible-automatic-session");
   await workspace.getByRole("button", { name: "Create session" }).click();
-  await workspace.getByRole("button", { name: "Start", exact: true }).click();
-
-  await workspace
-    .getByRole("button", { name: "Run step", exact: true })
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
     .click();
-  await expect(
-    workspace.getByRole("region", { name: "Automatic next decision" }),
-  ).toContainText("Submit Candidate");
+  await invokeApplicationCommand(page, "Run", "Start combat");
+  await invokeApplicationCommand(page, "Run", "Configure automatic run");
+  const configuration = page.getByRole("dialog", {
+    name: "Automatic run configuration",
+  });
+  await expect(configuration).toContainText("not AI");
+  await configuration.getByLabel("Max steps").fill("1");
+  await configuration.getByLabel("Roll stream").fill("17,5,2,5");
+  await configuration.getByRole("radio", { name: "Advance turn" }).check();
+  await configuration.getByLabel("Close", { exact: true }).click();
+
+  await invokeApplicationCommand(page, "Run", "Run one policy step");
+  const evidencePanel = page.getByRole("region", { name: "5. Evidence log" });
+  await evidencePanel.getByRole("tab", { name: "Audit" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Submit Candidate",
+  );
   await expect(
     page
       .getByRole("region", { name: "7. Active units" })
       .getByRole("listitem", { name: /Raider, Active/ }),
   ).toContainText("9/18 HP");
 
-  await workspace.getByLabel("Max steps").fill("1");
-  await workspace
-    .getByRole("button", { name: "Run bounded", exact: true })
-    .click();
-  const runStatus = workspace.getByRole("region", {
-    name: "Automatic run status",
-  });
-  await expect(runStatus).toContainText("Stopped At Max Steps");
-  await expect(runStatus).toContainText("1/1 steps");
-  await expect(
-    workspace.getByText(
-      "Replay verification: the current live session run is not archived",
-    ),
-  ).toBeVisible();
+  await invokeApplicationCommand(page, "Run", "Run bounded combat");
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Stopped At Max Steps",
+  );
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText("1/1 steps");
 
-  await workspace.getByRole("button", { name: "End", exact: true }).click();
-  await workspace.getByRole("button", { name: "Close", exact: true }).click();
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await invokeApplicationCommand(page, "Run", "Close session");
   await expect(
-    workspace.getByRole("region", { name: "Live session state" }),
-  ).toHaveCount(0);
+    page.getByRole("region", { name: "4. Turn status" }),
+  ).toContainText("Not selected");
 });
 
 test("configures participants from Rust scenario readbacks", async ({

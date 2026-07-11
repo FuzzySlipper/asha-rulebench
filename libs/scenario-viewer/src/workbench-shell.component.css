@@ -423,6 +423,47 @@ nav,
   background: var(--arb-surface);
 }
 
+.automation-config {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.automation-config p {
+  margin: 0;
+}
+
+.automation-config fieldset {
+  border: 1px solid var(--arb-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0.65rem;
+}
+
+.automation-config > label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.automation-config > label input {
+  background: var(--arb-surface);
+  border: 1px solid var(--arb-border);
+  color: var(--arb-text);
+  min-height: 2.25rem;
+  padding: 0 0.5rem;
+}
+
+.automation-config > span,
+.automation-config > p:not(:first-child) {
+  color: var(--arb-muted);
+  font-size: 0.8rem;
+}
+
+.automation-config [role="alert"] {
+  color: var(--arb-danger);
+}
+
 @media (max-width: 1100px) {
   .workbench {
     grid-template-columns: 15rem minmax(25rem, 1fr) 21rem;

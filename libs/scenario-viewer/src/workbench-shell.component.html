@@ -452,6 +452,78 @@
         @case ("audit") {
           <ol class="evidence-list">
             @if (snapshot().kind === "data") {
+              <li>
+                <strong
+                  >Policy configuration · firstAcceptedCandidate v1</strong
+                >
+                <span
+                  >No candidate:
+                  {{
+                    noCandidateBehavior() === "advanceTurn"
+                      ? "Advance turn"
+                      : "Stop run"
+                  }}
+                  · guard {{ maxStepsInput() }} steps</span
+                >
+                <span>Rust-selected deterministic policy; not AI.</span>
+              </li>
+              @switch (automaticStep().kind) {
+                @case ("data") {
+                  <li>
+                    <strong
+                      >Next decision ·
+                      {{ automaticStep().value.decisionLabel }}</strong
+                    ><span
+                      >{{
+                        automaticStep().value.operationLabel ?? "No operation"
+                      }}
+                      ·
+                      {{
+                        automaticStep().value.selectedActionId ?? "No action"
+                      }}
+                      →
+                      {{
+                        automaticStep().value.selectedTargetId ?? "No target"
+                      }}</span
+                    ><span>{{ automaticStep().value.reason }}</span>
+                  </li>
+                }
+                @case ("loading") {
+                  <li aria-busy="true">
+                    Rust is selecting one policy operation
+                  </li>
+                }
+                @case ("error") {
+                  <li role="alert">{{ automaticStep().error.message }}</li>
+                }
+              }
+              @switch (automaticRun().kind) {
+                @case ("data") {
+                  <li>
+                    <strong
+                      >Bounded run ·
+                      {{ automaticRun().value.decisionLabel }}</strong
+                    ><span
+                      >{{ automaticRun().value.executedStepCount }}/{{
+                        automaticRun().value.maxSteps
+                      }}
+                      steps ·
+                      {{ automaticRun().value.finalLifecycleLabel }}</span
+                    ><span>{{ automaticRun().value.reason }}</span
+                    ><span>{{
+                      automaticRun().value.finalFingerprintLabel
+                    }}</span>
+                  </li>
+                }
+                @case ("loading") {
+                  <li aria-busy="true">
+                    Rust is running within the configured step guard
+                  </li>
+                }
+                @case ("error") {
+                  <li role="alert">{{ automaticRun().error.message }}</li>
+                }
+              }
               @for (entry of snapshot().value.auditLog; track entry.id) {
                 <li>
                   <strong
@@ -874,3 +946,76 @@
     }
   </arb-workbench-panel>
 </section>
+
+<arb-application-dialog
+  dialogId="automatic-run-dialog"
+  dialogTitle="Automatic run configuration"
+  dialogDescription="Configure the deterministic Rust policy and bounded execution guard."
+  [open]="automationConfigOpen()"
+  (closeRequested)="closeAutomationConfig()"
+>
+  <section
+    class="automation-config"
+    aria-label="Automatic run configuration fields"
+  >
+    <p><strong>firstAcceptedCandidate v1</strong></p>
+    <p>
+      Rust selects deterministic operations from accepted candidates. This is
+      not AI.
+    </p>
+    <fieldset>
+      <legend>No candidate behavior</legend>
+      <label
+        ><input
+          type="radio"
+          name="no-candidate"
+          value="advanceTurn"
+          [checked]="noCandidateBehavior() === 'advanceTurn'"
+          (change)="noCandidateBehavior.set('advanceTurn')"
+        />
+        Advance turn</label
+      >
+      <label
+        ><input
+          type="radio"
+          name="no-candidate"
+          value="stopRun"
+          [checked]="noCandidateBehavior() === 'stopRun'"
+          (change)="noCandidateBehavior.set('stopRun')"
+        />
+        Stop run</label
+      >
+    </fieldset>
+    <label>
+      Max steps
+      <input
+        #maxSteps
+        type="number"
+        min="1"
+        [value]="maxStepsInput()"
+        aria-describedby="automation-validation"
+        (input)="setMaxSteps(maxSteps.value)"
+      />
+    </label>
+    <label>
+      Roll stream
+      <input
+        #automaticRolls
+        [value]="automaticRollInput()"
+        aria-describedby="automation-roll-help automation-validation"
+        (input)="setAutomaticRolls(automaticRolls.value)"
+      />
+    </label>
+    <span id="automation-roll-help"
+      >Comma-separated deterministic integers supplied to Rust authority.</span
+    >
+    @if (automationValidation(); as error) {
+      <p id="automation-validation" role="alert">{{ error }}</p>
+    }
+    <p role="status" [attr.aria-busy]="automationBusy()">
+      {{
+        automationBusy() ? "Automatic run in progress" : "Automatic runner idle"
+      }}
+    </p>
+  </section>
+</arb-application-dialog>

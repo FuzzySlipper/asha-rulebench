@@ -58,7 +58,7 @@ test("operates the application menubar entirely by keyboard", async ({
   ).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(
-    runMenu.getByRole("menuitem", { name: "Turn status" }),
+    runMenu.getByRole("menuitem", { name: "Configure automatic run" }),
   ).toBeFocused();
 
   await page.keyboard.press("Escape");

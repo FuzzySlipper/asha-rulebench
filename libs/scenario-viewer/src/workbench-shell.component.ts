@@ -10,6 +10,7 @@ import {
 } from "@angular/core";
 import type { ElementRef } from "@angular/core";
 import {
+  ApplicationDialogComponent,
   ApplicationMenubarComponent,
   type ApplicationMenuGroup,
   type ApplicationMenuItem,
@@ -22,7 +23,11 @@ type InitiativePosition = "Current" | "Next" | "Queued" | "Complete";
 
 @Component({
   selector: "arb-workbench-shell",
-  imports: [ApplicationMenubarComponent, WorkbenchPanelComponent],
+  imports: [
+    ApplicationDialogComponent,
+    ApplicationMenubarComponent,
+    WorkbenchPanelComponent,
+  ],
   templateUrl: "./workbench-shell.component.html",
   styleUrl: "./workbench-shell.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,6 +69,12 @@ export class WorkbenchShellComponent {
   protected readonly candidates = computed(() => this.liveStore.candidates());
   protected readonly preflight = computed(() => this.liveStore.preflight());
   protected readonly submission = computed(() => this.liveStore.submission());
+  protected readonly automaticStep = computed(() =>
+    this.liveStore.automaticStep(),
+  );
+  protected readonly automaticRun = computed(() =>
+    this.liveStore.automaticRun(),
+  );
   protected readonly deterministicStep = computed(() =>
     this.sessionStore.sessionStep(),
   );
@@ -83,6 +94,12 @@ export class WorkbenchShellComponent {
   protected readonly intent = computed(() => this.liveStore.intent());
   protected readonly attackRollInput = signal("17");
   protected readonly damageRollInput = signal("5");
+  protected readonly automationConfigOpen = signal(false);
+  protected readonly automaticRollInput = signal("17,5,2,5,17,5");
+  protected readonly maxStepsInput = signal("8");
+  protected readonly noCandidateBehavior = signal<"advanceTurn" | "stopRun">(
+    "advanceTurn",
+  );
   private commandSequence = 0;
   protected readonly commandBusy = computed(() =>
     [
@@ -105,6 +122,28 @@ export class WorkbenchShellComponent {
       this.rollStream() !== null &&
       !this.commandBusy(),
   );
+  protected readonly automationBusy = computed(
+    () =>
+      this.automaticStep().kind === "loading" ||
+      this.automaticRun().kind === "loading",
+  );
+  protected readonly canRunAutomatic = computed(() => {
+    const snapshot = this.snapshot();
+    return (
+      snapshot.kind === "data" &&
+      snapshot.value.lifecycleLabel === "In Progress" &&
+      !this.automationBusy() &&
+      this.automaticRollStream() !== null &&
+      this.maxSteps() !== null
+    );
+  });
+  protected readonly automationValidation = computed(() => {
+    if (this.maxSteps() === null)
+      return "Max steps must be a positive integer.";
+    if (this.automaticRollStream() === null)
+      return "Roll stream must be a comma-separated list of integers.";
+    return null;
+  });
   protected readonly currentParticipantIndex = computed(() => {
     const snapshot = this.snapshot();
     return snapshot.kind === "data"
@@ -169,6 +208,22 @@ export class WorkbenchShellComponent {
               id: "close-session",
               label: "Close session",
               disabled: busy || lifecycle !== "Ended",
+            },
+            { id: "configure-automation", label: "Configure automatic run" },
+            {
+              id: "run-policy-step",
+              label: "Run one policy step",
+              disabled: !this.canRunAutomatic(),
+            },
+            {
+              id: "run-bounded-combat",
+              label: "Run bounded combat",
+              disabled: !this.canRunAutomatic(),
+            },
+            {
+              id: "stop-automatic-run",
+              label: "Stop current run",
+              disabled: !this.automationBusy(),
             },
             { id: "focus-status", label: "Turn status" },
             { id: "focus-actions", label: "Available actions" },
@@ -255,6 +310,7 @@ export class WorkbenchShellComponent {
   }
 
   protected invokeMenuItem(item: ApplicationMenuItem): void {
+    if (this.invokeAutomationCommand(item.id)) return;
     if (this.invokeLifecycleCommand(item.id)) return;
     const target = this.panelForCommand(item.id);
     if (target !== null) {
@@ -357,6 +413,18 @@ export class WorkbenchShellComponent {
       });
   }
 
+  protected setAutomaticRolls(value: string): void {
+    this.automaticRollInput.set(value);
+  }
+
+  protected setMaxSteps(value: string): void {
+    this.maxStepsInput.set(value);
+  }
+
+  protected closeAutomationConfig(): void {
+    this.automationConfigOpen.set(false);
+  }
+
   protected initiativePositionLabel(index: number): InitiativePosition {
     const snapshot = this.snapshot();
     if (snapshot.kind !== "data") return "Queued";
@@ -388,6 +456,58 @@ export class WorkbenchShellComponent {
     }
   }
 
+  private invokeAutomationCommand(commandId: string): boolean {
+    switch (commandId) {
+      case "configure-automation":
+        this.automationConfigOpen.set(true);
+        this.menuStatus.set("Opened automatic run configuration");
+        return true;
+      case "run-policy-step":
+        void this.runAutomaticStep();
+        return true;
+      case "run-bounded-combat":
+        void this.runAutomaticCombat();
+        return true;
+      case "stop-automatic-run":
+        this.liveStore.cancelAutomation();
+        this.menuStatus.set("Stopped current automatic run");
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private async runAutomaticStep(): Promise<void> {
+    const rollStream = this.automaticRollStream();
+    if (rollStream === null) return;
+    this.commandSequence += 1;
+    await this.liveStore.runAutomaticStep({
+      id: `panel-automatic-step-${this.commandSequence}`,
+      title: "Automatic policy step",
+      summary: "One Rust-selected deterministic policy operation.",
+      rollStream,
+      policy: this.automationPolicy(),
+    });
+    await this.refreshEvidence();
+  }
+
+  private async runAutomaticCombat(): Promise<void> {
+    const rollStream = this.automaticRollStream();
+    const maxSteps = this.maxSteps();
+    if (rollStream === null || maxSteps === null) return;
+    this.commandSequence += 1;
+    await this.liveStore.runAutomaticCombat({
+      id: `panel-automatic-run-${this.commandSequence}`,
+      title: "Bounded automatic policy run",
+      summary:
+        "Rust-selected deterministic operations within the configured guard.",
+      maxSteps,
+      rollStream,
+      policy: this.automationPolicy(),
+    });
+    await this.refreshEvidence();
+  }
+
   private async runLifecycleCommand(
     kind: "explicitStart" | "advanceTurn" | "explicitEnd",
   ): Promise<void> {
@@ -408,6 +528,30 @@ export class WorkbenchShellComponent {
     return Number.isInteger(attack) && Number.isInteger(damage)
       ? [attack, damage]
       : null;
+  }
+
+  private automaticRollStream(): readonly number[] | null {
+    const values = this.automaticRollInput()
+      .split(",")
+      .map((value) => Number(value.trim()));
+    return values.length > 0 && values.every(Number.isInteger) ? values : null;
+  }
+
+  private maxSteps(): number | null {
+    const value = Number(this.maxStepsInput());
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+
+  private automationPolicy(): {
+    readonly id: string;
+    readonly version: number;
+    readonly noCandidateBehavior: "advanceTurn" | "stopRun";
+  } {
+    return {
+      id: "firstAcceptedCandidate",
+      version: 1,
+      noCandidateBehavior: this.noCandidateBehavior(),
+    };
   }
 
   private focusCommandFeedback(): void {
