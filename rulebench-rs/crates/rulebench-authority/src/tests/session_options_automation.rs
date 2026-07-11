@@ -27,7 +27,7 @@ fn session_runtime_current_actor_options_read_initial_action_and_target() {
     assert!(!options.current_actor_defeated);
     assert!(options.available);
     assert_eq!(options.unavailable_reason, None);
-    assert_eq!(options.actions.len(), 1);
+    assert_eq!(options.actions.len(), 2);
     assert_eq!(options.actions[0].action_id, "hexing_bolt");
     assert_eq!(options.actions[0].ability_id, "ability.hexing-bolt");
     assert_eq!(options.actions[0].action_name, "Hexing Bolt");
@@ -44,17 +44,218 @@ fn session_runtime_current_actor_options_read_initial_action_and_target() {
 }
 
 #[test]
+fn session_runtime_moves_across_multiple_commands_and_refreshes_on_next_turn() {
+    let mut session = CombatSessionState::new("runtime-movement", hexing_bolt_fixture_scenario());
+
+    let first = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "move-one",
+        "Move one",
+        "Move one cell.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 2, y: 1 },
+        ),
+        Vec::new(),
+    ));
+    let second = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "move-two",
+        "Move two",
+        "Move a second cell.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 3, y: 1 },
+        ),
+        Vec::new(),
+    ));
+
+    assert!(first.receipt.accepted);
+    let stale = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "move-stale",
+        "Move stale",
+        "Reject a destination selected before the actor moved.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 3, y: 1 },
+        )
+        .with_observed_origin(GridPosition { x: 1, y: 1 }),
+        Vec::new(),
+    ));
+    assert_eq!(
+        stale.receipt.rejection,
+        Some(RulebenchRejection::MovementStaleDestination)
+    );
+    assert!(second.receipt.accepted);
+    assert_eq!(
+        second.state_after.combatants[0].position,
+        GridPosition { x: 3, y: 1 }
+    );
+    assert_eq!(second.state_after.combatants[0].movement_remaining, 4);
+    assert!(second
+        .receipt
+        .events
+        .iter()
+        .any(|event| matches!(event, DomainEvent::PositionChanged { .. })));
+    assert_ne!(
+        second.audit_entry.state_before_fingerprint,
+        second.audit_entry.state_after_fingerprint
+    );
+
+    let exhausted = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "move-exhausted",
+        "Move exhausted",
+        "Movement budget is insufficient.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 0, y: 3 },
+        ),
+        Vec::new(),
+    ));
+    assert_eq!(
+        exhausted.receipt.rejection,
+        Some(RulebenchRejection::MovementBudgetExhausted)
+    );
+
+    session.advance_turn();
+    session.advance_turn();
+    assert_eq!(
+        session.snapshot().current_state.combatants[0].movement_remaining,
+        6
+    );
+}
+
+#[test]
+fn session_runtime_rejects_blocked_occupied_out_of_bounds_and_exhausted_movement() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.grid.cells.push(GridCell {
+        position: GridPosition { x: 2, y: 1 },
+        terrain_tags: vec!["wall".to_string()],
+    });
+    let mut session = CombatSessionState::new("runtime-movement-rejections", scenario);
+
+    let blocked = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "blocked",
+        "Blocked",
+        "Blocked destination.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 2, y: 1 },
+        ),
+        Vec::new(),
+    ));
+    let occupied = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "occupied",
+        "Occupied",
+        "Occupied destination.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 4, y: 1 },
+        ),
+        Vec::new(),
+    ));
+    let outside = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+        "outside",
+        "Outside",
+        "Outside destination.",
+        UseActionIntent::for_cell(
+            "entity-adept",
+            "move.entity-adept",
+            GridPosition { x: 99, y: 99 },
+        ),
+        Vec::new(),
+    ));
+
+    assert_eq!(
+        blocked.receipt.rejection,
+        Some(RulebenchRejection::MovementDestinationBlocked)
+    );
+    assert_eq!(
+        occupied.receipt.rejection,
+        Some(RulebenchRejection::MovementDestinationOccupied)
+    );
+    assert_eq!(
+        outside.receipt.rejection,
+        Some(RulebenchRejection::MovementOutOfBounds)
+    );
+    assert_eq!(
+        session.snapshot().current_state.combatants[0].position,
+        GridPosition { x: 1, y: 1 }
+    );
+}
+
+#[test]
+fn replay_reproduces_accepted_and_rejected_movement_positions() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    scenario.content_pack_set = Some(
+        content_import_examples()
+            .into_iter()
+            .find_map(|example| match example.outcome {
+                ContentImportExampleOutcome::Accepted(imported) => {
+                    Some(imported.resolved_set.reference)
+                }
+                ContentImportExampleOutcome::Rejected { .. } => None,
+            })
+            .expect("fixture content import includes an accepted pack set"),
+    );
+    let ruleset = scenario
+        .selected_ruleset()
+        .expect("fixture selects a ruleset")
+        .artifact_provenance();
+    let move_command = |id: &str, destination: GridPosition| {
+        ReplayCommandRecordingSpec::new(
+            id,
+            ReplayCommand::Intent(CombatSessionIntentCommandSpec::new(
+                id,
+                "Replay movement",
+                "Replay movement authority evidence.",
+                UseActionIntent::for_cell("entity-adept", "move.entity-adept", destination),
+                Vec::new(),
+            )),
+        )
+    };
+    let package = record_replay_package(
+        "movement-replay",
+        CombatSessionCreateRequest::new("movement-replay-session", scenario),
+        ruleset,
+        vec![
+            move_command("move-accepted", GridPosition { x: 2, y: 1 }),
+            move_command("move-rejected", GridPosition { x: 4, y: 1 }),
+        ],
+    );
+
+    let verification = verify_replay_package(&package);
+    let inspection = inspect_replay_package(&package);
+
+    assert!(verification.accepted, "{verification:?}");
+    assert_eq!(
+        inspection.commands[0].expected,
+        inspection.commands[0].actual
+    );
+    assert_eq!(
+        inspection.commands[1].expected,
+        inspection.commands[1].actual
+    );
+    assert_eq!(
+        inspection.commands[1].snapshot.current_state.combatants[0].position,
+        GridPosition { x: 2, y: 1 }
+    );
+}
+
+#[test]
 fn session_runtime_projects_authoritative_legal_cell_affordances() {
     let mut scenario = hexing_bolt_fixture_scenario();
-    scenario.actions[0].targeting.target_kind = TargetKind::Area;
-    scenario.selected_action.targeting.target_kind = TargetKind::Area;
     scenario.grid.cells.push(GridCell {
         position: GridPosition { x: 2, y: 1 },
         terrain_tags: vec!["wall".to_string()],
     });
     let session = CombatSessionState::new("runtime-cell-options", scenario);
 
-    let action = &session.current_actor_options().actions[0];
+    let action = &session.current_actor_options().actions[1];
 
     assert_eq!(action.target_mode, ActionTargetMode::Cell);
     assert_eq!(action.destination_options.len(), 21);
@@ -88,16 +289,13 @@ fn session_runtime_current_actor_options_snapshot_readback_uses_current_state() 
 
     let snapshot = session.snapshot();
 
-    assert!(!snapshot.current_actor_options.available);
-    assert_eq!(
-        snapshot.current_actor_options.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
-    );
+    assert!(snapshot.current_actor_options.available);
+    assert_eq!(snapshot.current_actor_options.unavailable_reason, None);
     assert_eq!(
         snapshot.current_actor_options.current_actor_id,
         Some("entity-adept".to_string())
     );
-    assert_eq!(snapshot.current_actor_options.actions.len(), 1);
+    assert_eq!(snapshot.current_actor_options.actions.len(), 2);
     assert_eq!(
         snapshot.current_actor_options.actions[0].target_options[0].target_id,
         "entity-raider"
@@ -182,18 +380,12 @@ fn session_runtime_current_actor_options_filter_defeated_visible_targets() {
 
     assert_eq!(options.current_actor_id, Some("entity-adept".to_string()));
     assert!(!options.current_actor_defeated);
-    assert!(!options.available);
-    assert_eq!(
-        options.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoVisibleActiveTargets)
-    );
-    assert_eq!(
-        options.unavailable_reason.map(|reason| reason.code()),
-        Some("noVisibleActiveTargets")
-    );
-    assert_eq!(options.actions.len(), 1);
+    assert!(options.available);
+    assert_eq!(options.unavailable_reason, None);
+    assert_eq!(options.actions.len(), 2);
     assert_eq!(options.actions[0].action_id, "hexing_bolt");
     assert!(options.actions[0].target_options.is_empty());
+    assert!(!options.actions[1].destination_options.is_empty());
 }
 
 #[test]
@@ -262,10 +454,7 @@ fn session_runtime_command_candidates_read_current_state_after_hit() {
 
     assert!(!candidates.available);
     assert!(candidates.candidates.is_empty());
-    assert_eq!(
-        candidates.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
-    );
+    assert_eq!(candidates.unavailable_reason, None);
 }
 
 #[test]
@@ -688,14 +877,8 @@ fn session_runtime_auto_candidate_rejects_when_no_candidate_is_accepted() {
     assert_eq!(plan.selected_action_id, None);
     assert_eq!(plan.selected_target_id, None);
     assert_eq!(plan.selection, None);
-    assert_eq!(
-        plan.unavailable_reason,
-        Some(CurrentActorOptionsUnavailableReason::NoAvailableResources)
-    );
-    assert_eq!(
-        plan.reason,
-        "No command candidates are available because the current actor cannot cover any action resource costs."
-    );
+    assert_eq!(plan.unavailable_reason, None);
+    assert_eq!(plan.reason, "No command candidates are available.");
     assert_eq!(after_plan, before_plan);
     assert_eq!(session.combat_log().len(), 1);
     assert_eq!(session.audit_log().len(), 1);

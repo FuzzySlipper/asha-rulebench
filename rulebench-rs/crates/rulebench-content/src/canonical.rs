@@ -438,6 +438,18 @@ fn feed_action(encoder: &mut FingerprintEncoder, action: &ActionDefinition) {
         encoder.feed_str(&cost.resource_id);
         encoder.feed_u32(cost.amount);
     }
+    match &action.movement {
+        Some(movement) => {
+            encoder.feed_str("movement");
+            encoder.feed_u32(movement.allowance);
+            encoder.feed_str(match movement.topology {
+                rulebench_ruleset::MovementTopology::OrthogonalManhattan => "orthogonalManhattan",
+            });
+            encoder.feed_strings(&movement.blocking_terrain_tags);
+            encoder.feed_strings(&movement.difficult_terrain_tags);
+        }
+        None => encoder.feed_str("noMovement"),
+    }
     encoder.feed_str(&action.action_text);
     encoder.feed_str(&action.effect_text);
 }

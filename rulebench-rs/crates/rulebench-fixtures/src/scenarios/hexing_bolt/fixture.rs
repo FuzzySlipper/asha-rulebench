@@ -46,7 +46,7 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
         modifiers: hexing_bolt_modifiers(),
         items: hexing_bolt_items(),
         selected_item_id: Some("item.hex-focus".to_string()),
-        actions: vec![selected_action.clone()],
+        actions: vec![selected_action.clone(), move_action("entity-adept")],
         selected_action,
     }
 }
@@ -280,24 +280,63 @@ fn hexing_bolt_action() -> ActionDefinition {
             ],
         },
         resource_costs: vec![ActionResourceCost::standard_action()],
+        movement: None,
         action_text: "Mind vs Nerve at range 10".to_string(),
         effect_text: "1d8 + Mind psychic damage and rattled until end of next turn on hit"
             .to_string(),
     }
 }
 
+fn move_action(actor_id: &str) -> ActionDefinition {
+    let mut action = hexing_bolt_action();
+    action.id = format!("move.{actor_id}");
+    action.ability_id = "ability.move".to_string();
+    action.name = "Move".to_string();
+    action.actor_id = actor_id.to_string();
+    action.targeting = TargetingDeclaration {
+        target_kind: TargetKind::Area,
+        selection: TargetSelection::Single,
+        team_constraint: TargetTeamConstraint::Any,
+        maximum_range: 6,
+        visibility_requirement: VisibilityRequirement::Ignored,
+        target_ids: Vec::new(),
+        visible_target_ids: Vec::new(),
+    };
+    action.resource_costs = Vec::new();
+    action.movement = Some(MovementActionDeclaration {
+        allowance: 6,
+        topology: MovementTopology::OrthogonalManhattan,
+        blocking_terrain_tags: vec!["wall".to_string(), "blocked".to_string()],
+        difficult_terrain_tags: vec!["difficult".to_string()],
+    });
+    action.action_text = "Move to a legal orthogonal destination.".to_string();
+    action.effect_text =
+        "Spend movement equal to direct Manhattan distance plus destination terrain cost."
+            .to_string();
+    action
+}
+
 fn hexing_bolt_abilities() -> Vec<AbilityDefinition> {
-    vec![AbilityDefinition {
-        id: "ability.hexing-bolt".to_string(),
-        name: "Hexing Bolt".to_string(),
-        kind: AbilityDefinitionKind::Spell,
-        summary: "A focused spell entry that owns the Hexing Bolt action content.".to_string(),
-        tags: vec![
-            "spell".to_string(),
-            "attack".to_string(),
-            "psychic".to_string(),
-        ],
-    }]
+    vec![
+        AbilityDefinition {
+            id: "ability.hexing-bolt".to_string(),
+            name: "Hexing Bolt".to_string(),
+            kind: AbilityDefinitionKind::Spell,
+            summary: "A focused spell entry that owns the Hexing Bolt action content.".to_string(),
+            tags: vec![
+                "spell".to_string(),
+                "attack".to_string(),
+                "psychic".to_string(),
+            ],
+        },
+        AbilityDefinition {
+            id: "ability.move".to_string(),
+            name: "Move".to_string(),
+            kind: AbilityDefinitionKind::Ability,
+            summary: "Content-declared movement behavior.".to_string(),
+            tags: vec!["movement".to_string()],
+        },
+    ]
 }
 
 fn hexing_bolt_entities() -> Vec<EntityDefinition> {
@@ -519,7 +558,7 @@ fn adept_initial() -> Combatant {
         resource_pools: vec![ActionResourcePool::standard_action()],
         inventory_item_ids: vec!["item.hex-focus".to_string()],
         equipped_item_ids: vec!["item.hex-focus".to_string()],
-        base_ability_ids: Vec::new(),
+        base_ability_ids: vec!["ability.move".to_string()],
         active_modifiers: Vec::new(),
         conditions: Vec::new(),
         is_actor: true,

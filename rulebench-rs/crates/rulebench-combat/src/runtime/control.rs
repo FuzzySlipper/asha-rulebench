@@ -95,6 +95,7 @@ impl CombatSessionState {
         );
         self.turn_transition_log.push(transition.clone());
         if let Some(current_actor_id) = self.turn_order.current_actor_id.clone() {
+            self.state.refresh_movement_for(&current_actor_id);
             let refreshes = self
                 .state
                 .advance_action_resources_for_turn_start(&current_actor_id);
@@ -135,6 +136,9 @@ impl CombatSessionState {
         self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
         if should_refresh_combat_start_resources {
             self.state.refresh_action_resources_for_combat_start();
+            if let Some(current_actor_id) = self.turn_order.current_actor_id.clone() {
+                self.state.refresh_movement_for(&current_actor_id);
+            }
         }
     }
 

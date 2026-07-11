@@ -61,6 +61,7 @@ fn scenario() -> RulebenchScenario {
             ],
         },
         resource_costs: vec![ActionResourceCost::standard_action()],
+        movement: None,
         action_text: "Mind vs Nerve.".to_string(),
         effect_text: "Psychic damage and rattled.".to_string(),
     };

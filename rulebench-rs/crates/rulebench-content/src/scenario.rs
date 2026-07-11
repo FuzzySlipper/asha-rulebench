@@ -119,6 +119,7 @@ pub struct UseActionIntent {
     pub action_id: String,
     pub target_id: String,
     pub destination_cell: Option<GridPosition>,
+    pub observed_origin: Option<GridPosition>,
 }
 
 impl UseActionIntent {
@@ -132,6 +133,7 @@ impl UseActionIntent {
             action_id: action_id.into(),
             target_id: target_id.into(),
             destination_cell: None,
+            observed_origin: None,
         }
     }
 
@@ -145,7 +147,13 @@ impl UseActionIntent {
             action_id: action_id.into(),
             target_id: String::new(),
             destination_cell: Some(destination_cell),
+            observed_origin: None,
         }
+    }
+
+    pub fn with_observed_origin(mut self, observed_origin: GridPosition) -> Self {
+        self.observed_origin = Some(observed_origin);
+        self
     }
 }
 

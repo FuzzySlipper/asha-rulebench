@@ -191,7 +191,10 @@ fn session_runtime_control_command_starts_combat_with_readout() {
     assert_eq!(history.lifecycle_transition_sequence, Some(0));
     assert_eq!(history.turn_transition_sequence, None);
     assert_eq!(history.state_before_fingerprint, before_state_fingerprint);
-    assert_eq!(history.state_after_fingerprint, before_state_fingerprint);
+    assert_eq!(
+        history.state_after_fingerprint,
+        readout.state_after_fingerprint
+    );
     assert_eq!(history.reason, "Combat explicitly started.");
 }
 
@@ -404,7 +407,11 @@ fn session_runtime_control_command_ends_combat_and_rejects_repeated_end() {
     );
     assert_eq!(accepted.turn_advance, None);
     assert_eq!(accepted.state_before_fingerprint, before_state_fingerprint);
-    assert_eq!(accepted.state_after_fingerprint, before_state_fingerprint);
+    assert_eq!(
+        accepted.state_after_fingerprint,
+        fingerprint_projected_state(&after_end.current_state)
+    );
+    assert_ne!(accepted.state_after_fingerprint, before_state_fingerprint);
     assert_eq!(accepted.reason, "Combat explicitly ended.");
     assert_eq!(after_end.lifecycle.phase, CombatLifecyclePhase::Ended);
     assert_eq!(after_end.lifecycle.started_at_step, Some(0));
@@ -483,7 +490,11 @@ fn session_runtime_control_command_conditionally_ends_when_end_condition_is_met(
     );
     assert_eq!(readout.turn_advance, None);
     assert_eq!(readout.state_before_fingerprint, before_state_fingerprint);
-    assert_eq!(readout.state_after_fingerprint, before_state_fingerprint);
+    assert_eq!(
+        readout.state_after_fingerprint,
+        fingerprint_projected_state(&after_end.current_state)
+    );
+    assert_ne!(readout.state_after_fingerprint, before_state_fingerprint);
     assert_eq!(
         readout.reason,
         "Combat conditionally ended. Combat should end because no active enemies remain."
@@ -511,7 +522,10 @@ fn session_runtime_control_command_conditionally_ends_when_end_condition_is_met(
     assert_eq!(history.lifecycle_transition_sequence, Some(1));
     assert_eq!(history.turn_transition_sequence, None);
     assert_eq!(history.state_before_fingerprint, before_state_fingerprint);
-    assert_eq!(history.state_after_fingerprint, before_state_fingerprint);
+    assert_eq!(
+        history.state_after_fingerprint,
+        readout.state_after_fingerprint
+    );
 }
 
 #[test]

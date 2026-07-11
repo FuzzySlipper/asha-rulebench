@@ -69,11 +69,13 @@ pub struct UseActionIntentDto {
     pub target_id: String,
     #[serde(default)]
     pub destination_cell: Option<crate::LiveGridPositionDto>,
+    #[serde(default)]
+    pub observed_origin: Option<crate::LiveGridPositionDto>,
 }
 
 impl UseActionIntentDto {
     pub fn to_authority(&self) -> UseActionIntent {
-        match &self.destination_cell {
+        let intent = match &self.destination_cell {
             Some(cell) => UseActionIntent::for_cell(
                 &self.actor_id,
                 &self.action_id,
@@ -83,6 +85,13 @@ impl UseActionIntentDto {
                 },
             ),
             None => UseActionIntent::new(&self.actor_id, &self.action_id, &self.target_id),
+        };
+        match &self.observed_origin {
+            Some(cell) => intent.with_observed_origin(GridPosition {
+                x: cell.x,
+                y: cell.y,
+            }),
+            None => intent,
         }
     }
 }
@@ -95,6 +104,12 @@ impl From<&UseActionIntent> for UseActionIntentDto {
             target_id: value.target_id.clone(),
             destination_cell: value
                 .destination_cell
+                .map(|cell| crate::LiveGridPositionDto {
+                    x: cell.x,
+                    y: cell.y,
+                }),
+            observed_origin: value
+                .observed_origin
                 .map(|cell| crate::LiveGridPositionDto {
                     x: cell.x,
                     y: cell.y,
@@ -248,6 +263,7 @@ mod tests {
                 action_id: "action".to_string(),
                 target_id: "target".to_string(),
                 destination_cell: None,
+                observed_origin: None,
             },
             roll_stream: vec![17, 5],
         };
@@ -266,6 +282,7 @@ mod tests {
             action_id: "move".to_string(),
             target_id: String::new(),
             destination_cell: Some(crate::LiveGridPositionDto { x: 3, y: 4 }),
+            observed_origin: None,
         };
 
         let json = serde_json::to_string(&dto).expect("cell intent serializes");

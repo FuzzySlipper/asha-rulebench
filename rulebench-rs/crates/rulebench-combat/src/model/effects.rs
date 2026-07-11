@@ -16,6 +16,14 @@ pub enum RulebenchRejection {
     MissingAttackRoll,
     MissingCheckRoll,
     MissingDamageRoll,
+    MovementDestinationMissing,
+    MovementActorDefeated,
+    MovementOutOfBounds,
+    MovementDestinationOccupied,
+    MovementDestinationBlocked,
+    MovementStaleDestination,
+    MovementOutOfRange,
+    MovementBudgetExhausted,
 }
 
 impl RulebenchRejection {
@@ -34,6 +42,14 @@ impl RulebenchRejection {
             RulebenchRejection::MissingAttackRoll => "missingAttackRoll",
             RulebenchRejection::MissingCheckRoll => "missingCheckRoll",
             RulebenchRejection::MissingDamageRoll => "missingDamageRoll",
+            RulebenchRejection::MovementDestinationMissing => "movementDestinationMissing",
+            RulebenchRejection::MovementActorDefeated => "movementActorDefeated",
+            RulebenchRejection::MovementOutOfBounds => "movementOutOfBounds",
+            RulebenchRejection::MovementDestinationOccupied => "movementDestinationOccupied",
+            RulebenchRejection::MovementDestinationBlocked => "movementDestinationBlocked",
+            RulebenchRejection::MovementStaleDestination => "movementStaleDestination",
+            RulebenchRejection::MovementOutOfRange => "movementOutOfRange",
+            RulebenchRejection::MovementBudgetExhausted => "movementBudgetExhausted",
         }
     }
 }
@@ -211,5 +227,15 @@ pub enum DomainEvent {
         target_id: String,
         modifier_id: String,
         duration: String,
+    },
+    PositionChanged {
+        actor_id: String,
+        from: super::GridPosition,
+        to: super::GridPosition,
+    },
+    MovementSpent {
+        actor_id: String,
+        amount: u32,
+        remaining: u32,
     },
 }

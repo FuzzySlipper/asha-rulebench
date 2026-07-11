@@ -55,6 +55,7 @@ impl CombatSessionState {
         self.record_lifecycle_transition(trigger, self.next_step_index, previous_lifecycle);
         let expirations = self.state.expire_all_modifiers_for_event("combatEnd");
         self.record_modifier_event_expiration_transitions("combatEnd", &expirations);
+        self.state.clear_all_movement();
 
         if explicit {
             end_condition.combat_should_end = true;

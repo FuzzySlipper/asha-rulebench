@@ -1320,6 +1320,7 @@ mod tests {
                 ],
             },
             resource_costs: vec![ActionResourceCost::standard_action()],
+            movement: None,
             action_text: "Mind versus Nerve.".to_string(),
             effect_text: "Minimal hit effect.".to_string(),
         }

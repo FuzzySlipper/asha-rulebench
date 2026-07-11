@@ -10,6 +10,7 @@ mod automation;
 mod control;
 mod equipment;
 mod finalization;
+mod movement;
 mod reactions;
 mod script;
 mod status;
@@ -229,52 +230,63 @@ impl CombatSessionState {
             None
         };
         let rejected_preflight = preflight.as_ref().filter(|readout| !readout.accepted);
-        let (receipt, mut state_after, should_apply_state, decision_kind) = if let Some(preflight) =
-            rejected_preflight
-        {
-            let state_after = self
-                .state
-                .project("No authority state changed; command preflight rejected.");
-            (
-                preflight_rejected_receipt(preflight, state_after.clone()),
-                state_after,
-                false,
-                command_decision_kind_for_preflight(preflight.decision_kind),
-            )
-        } else {
-            match self.turn_order.current_actor_id.as_deref() {
-                Some(current_actor_id) if intent.actor_id != current_actor_id => {
-                    let state_after = self.state.project(
-                        "No authority state changed; actor is not the current turn actor.",
-                    );
-                    (
-                        non_current_actor_receipt(
-                            intent.clone(),
-                            current_actor_id,
-                            state_after.clone(),
-                        ),
-                        state_after,
-                        false,
-                        CommandDecisionKind::RejectedByTurnOrder,
-                    )
-                }
-                _ => {
-                    self.start_lifecycle(LifecycleTransitionTrigger::CommandStart);
-                    let receipt = resolve_use_action(&self.scenario, intent.clone(), &roll_stream);
-                    let state_after = receipt
-                        .projection
-                        .clone()
-                        .expect("session runtime resolver always produces projection");
-                    let decision_kind = if receipt.accepted {
-                        CommandDecisionKind::AcceptedByResolver
-                    } else {
-                        CommandDecisionKind::RejectedByResolver
-                    };
+        let (receipt, mut state_after, should_apply_state, decision_kind) =
+            if let Some(preflight) = rejected_preflight {
+                let state_after = self
+                    .state
+                    .project("No authority state changed; command preflight rejected.");
+                (
+                    preflight_rejected_receipt(preflight, state_after.clone()),
+                    state_after,
+                    false,
+                    command_decision_kind_for_preflight(preflight.decision_kind),
+                )
+            } else {
+                match self.turn_order.current_actor_id.as_deref() {
+                    Some(current_actor_id) if intent.actor_id != current_actor_id => {
+                        let state_after = self.state.project(
+                            "No authority state changed; actor is not the current turn actor.",
+                        );
+                        (
+                            non_current_actor_receipt(
+                                intent.clone(),
+                                current_actor_id,
+                                state_after.clone(),
+                            ),
+                            state_after,
+                            false,
+                            CommandDecisionKind::RejectedByTurnOrder,
+                        )
+                    }
+                    _ => {
+                        self.start_lifecycle(LifecycleTransitionTrigger::CommandStart);
+                        let receipt = if self
+                            .scenario
+                            .action_by_id(&intent.action_id)
+                            .is_some_and(|action| action.movement.is_some())
+                        {
+                            movement::resolve_movement_command(
+                                &self.state,
+                                &self.scenario,
+                                intent.clone(),
+                            )
+                        } else {
+                            resolve_use_action(&self.scenario, intent.clone(), &roll_stream)
+                        };
+                        let state_after = receipt
+                            .projection
+                            .clone()
+                            .expect("session runtime resolver always produces projection");
+                        let decision_kind = if receipt.accepted {
+                            CommandDecisionKind::AcceptedByResolver
+                        } else {
+                            CommandDecisionKind::RejectedByResolver
+                        };
 
-                    (receipt, state_after, true, decision_kind)
+                        (receipt, state_after, true, decision_kind)
+                    }
                 }
-            }
-        };
+            };
         let outcome_class = outcome_class.unwrap_or_else(|| derive_command_outcome_class(&receipt));
         let preflight_decision_kind = preflight.as_ref().map(|readout| readout.decision_kind);
 
@@ -446,6 +458,17 @@ impl CombatSessionState {
 
     fn apply_receipt_effects_to_state(&mut self, receipt: &RulebenchReceipt) {
         if !receipt.accepted {
+            return;
+        }
+
+        if receipt
+            .events
+            .iter()
+            .any(|event| matches!(event, DomainEvent::PositionChanged { .. }))
+        {
+            if let Some(projection) = &receipt.projection {
+                self.state.apply_projection(projection);
+            }
             return;
         }
 
@@ -944,7 +967,7 @@ fn command_preflight_readout(
             "Action id is empty.",
         );
     }
-    if intent.target_id.is_empty() {
+    if intent.target_id.is_empty() && intent.destination_cell.is_none() {
         return rejected_command_preflight(
             intent,
             CommandPreflightDecisionKind::RejectedByShape,
@@ -1050,6 +1073,51 @@ fn command_preflight_readout(
             None,
             "Actor does not currently have the action ability.",
         );
+    }
+
+    if action.movement.is_some() {
+        if intent.destination_cell.is_none() {
+            return rejected_command_preflight(
+                intent,
+                CommandPreflightDecisionKind::RejectedByShape,
+                Some(RulebenchRejection::MovementDestinationMissing),
+                current_actor_id,
+                None,
+                None,
+                "Movement destination is missing.",
+            );
+        }
+        let action_resources_for_costs = match action_resource_costs_available(
+            action_resources,
+            &intent.actor_id,
+            &action.resource_costs,
+        ) {
+            Ok(resources) => resources,
+            Err((action_resource, reason)) => {
+                let mut readout = rejected_command_preflight(
+                    intent,
+                    CommandPreflightDecisionKind::RejectedByActionResource,
+                    Some(RulebenchRejection::InvalidAction),
+                    current_actor_id,
+                    None,
+                    action_resource,
+                    reason,
+                );
+                readout.resource_costs = action.resource_costs.clone();
+                return readout;
+            }
+        };
+        return CommandPreflightReadout {
+            intent,
+            accepted: true,
+            decision_kind: CommandPreflightDecisionKind::Accepted,
+            rejection: None,
+            current_actor_id,
+            target_legality: None,
+            resource_costs: action.resource_costs.clone(),
+            action_resource: action_resources_for_costs.first().cloned(),
+            reason: "Movement command is structurally admissible; destination legality remains Rust-resolved.".to_string(),
+        };
     }
 
     let Some(target) = scenario
@@ -1405,6 +1473,8 @@ fn domain_event_type(event: &DomainEvent) -> String {
         DomainEvent::HealingApplied { .. } => "HealingApplied",
         DomainEvent::TemporaryVitalityGranted { .. } => "TemporaryVitalityGranted",
         DomainEvent::ModifierApplied { .. } => "ModifierApplied",
+        DomainEvent::PositionChanged { .. } => "PositionChanged",
+        DomainEvent::MovementSpent { .. } => "MovementSpent",
     }
     .to_string()
 }

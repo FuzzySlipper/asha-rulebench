@@ -389,6 +389,27 @@ fn render_event(sequence: u32, event: &DomainEvent, indent: &str) -> String {
             &[target_id.as_str()],
             indent,
         ),
+        DomainEvent::PositionChanged { actor_id, from, to } => event_block(
+            sequence,
+            "PositionChanged",
+            &format!(
+                "{actor_id} moved from {},{} to {},{}.",
+                from.x, from.y, to.x, to.y
+            ),
+            &[actor_id.as_str()],
+            indent,
+        ),
+        DomainEvent::MovementSpent {
+            actor_id,
+            amount,
+            remaining,
+        } => event_block(
+            sequence,
+            "MovementSpent",
+            &format!("{actor_id} spent {amount} movement; {remaining} remains."),
+            &[actor_id.as_str()],
+            indent,
+        ),
         DomainEvent::IntentShapeAccepted { .. } => String::new(),
     }
 }

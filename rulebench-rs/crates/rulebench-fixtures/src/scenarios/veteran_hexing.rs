@@ -211,6 +211,8 @@ fn scenario_with_metadata(
     scenario.combatants[0].hit_points.current = 30;
     scenario.combatants[0].hit_points.max = 30;
     scenario.actions[0].actor_id = "entity-veteran-adept".to_string();
+    scenario.actions[1].actor_id = "entity-veteran-adept".to_string();
+    scenario.actions[1].id = "move.entity-veteran-adept".to_string();
     scenario.selected_action.actor_id = "entity-veteran-adept".to_string();
     scenario
 }

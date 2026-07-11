@@ -625,8 +625,24 @@ pub struct ActionDefinition {
     pub check: CheckDeclaration,
     pub hit: HitEffect,
     pub resource_costs: Vec<ActionResourceCost>,
+    pub movement: Option<MovementActionDeclaration>,
     pub action_text: String,
     pub effect_text: String,
+}
+
+/// A content-declared movement behavior. The initial implementation uses
+/// direct orthogonal Manhattan cost and does not claim route finding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MovementActionDeclaration {
+    pub allowance: u32,
+    pub topology: MovementTopology,
+    pub blocking_terrain_tags: Vec<String>,
+    pub difficult_terrain_tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovementTopology {
+    OrthogonalManhattan,
 }
 
 impl ActionDefinition {

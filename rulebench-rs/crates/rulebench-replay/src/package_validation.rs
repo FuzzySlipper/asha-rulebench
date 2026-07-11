@@ -410,6 +410,7 @@ pub(crate) mod tests {
                 operations: Vec::new(),
             },
             resource_costs: vec![ActionResourceCost::standard_action()],
+            movement: None,
             action_text: "Placeholder action.".to_string(),
             effect_text: "Placeholder effect.".to_string(),
         }

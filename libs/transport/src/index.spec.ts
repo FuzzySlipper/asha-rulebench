@@ -25,7 +25,8 @@ import {
 describe("RulebenchTransport fixtures", () => {
   it("delivers generated Rust content import outcomes without TS validation", async () => {
     expect(defaultContentImportCatalog).toBe(rustBackedContentImportCatalog);
-    const result = await createFakeRulebenchTransport().loadContentImportExamples();
+    const result =
+      await createFakeRulebenchTransport().loadContentImportExamples();
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -423,7 +424,7 @@ describe("RulebenchTransport fixtures", () => {
           combatantId: "entity-adept",
           inventoryItemIds: ["item.hex-focus"],
           equippedItemIds: ["item.hex-focus"],
-          availableAbilityIds: ["ability.hexing-bolt"],
+          availableAbilityIds: ["ability.move", "ability.hexing-bolt"],
         },
         {
           combatantId: "entity-raider",
@@ -579,11 +580,11 @@ describe("RulebenchTransport fixtures", () => {
           ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "698b5a1bcdda87e7",
+            value: "f5c1f29004af40c7",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "698b5a1bcdda87e7",
+            value: "f5c1f29004af40c7",
           },
         },
         {
@@ -615,11 +616,11 @@ describe("RulebenchTransport fixtures", () => {
           ],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "698b5a1bcdda87e7",
+            value: "f5c1f29004af40c7",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "4fbace9b57d9dc4c",
+            value: "8957f17dccd071ac",
           },
         },
         {
@@ -636,11 +637,11 @@ describe("RulebenchTransport fixtures", () => {
           rollConsumption: [],
           stateBeforeFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "4fbace9b57d9dc4c",
+            value: "8957f17dccd071ac",
           },
           stateAfterFingerprint: {
             algorithm: "fnv1a64.rulebench-state.v0",
-            value: "4fbace9b57d9dc4c",
+            value: "8957f17dccd071ac",
           },
         },
       ]);
@@ -816,9 +817,7 @@ describe("RulebenchTransport fixtures", () => {
       });
       expect(result.value.executedStepCount).toBe(4);
       expect(
-        result.value.stepDecisions.map(
-          (step) => step.policyValidation.code,
-        ),
+        result.value.stepDecisions.map((step) => step.policyValidation.code),
       ).toEqual(["accepted", "accepted", "accepted", "accepted"]);
       expect(result.value.policyDecisions).toHaveLength(4);
       expect(
@@ -913,9 +912,9 @@ describe("RulebenchTransport fixtures", () => {
       expect(result.value.auditEntryCount).toBe(2);
       expect(result.value.combatLog).toHaveLength(2);
       expect(result.value.commandAuditLog).toHaveLength(2);
-      expect(
-        result.value.combatLog.map((entry) => entry.outcomeClass),
-      ).toEqual(["acceptedHit", "acceptedHit"]);
+      expect(result.value.combatLog.map((entry) => entry.outcomeClass)).toEqual(
+        ["acceptedHit", "acceptedHit"],
+      );
       expect(result.value.combatLog[0]?.eventTypes).toEqual([
         "ActionUsed",
         "AttackRolled",
@@ -931,9 +930,9 @@ describe("RulebenchTransport fixtures", () => {
       expect(
         result.value.commandAuditLog.map((entry) => entry.decisionKind),
       ).toEqual(["acceptedByResolver", "acceptedByResolver"]);
-      expect(result.value.commandAuditLog.map((entry) => entry.accepted)).toEqual(
-        [true, true],
-      );
+      expect(
+        result.value.commandAuditLog.map((entry) => entry.accepted),
+      ).toEqual([true, true]);
       expect(result.value.commandAuditLog[0]?.rollConsumption).toEqual([
         {
           sequence: 0,
@@ -980,9 +979,7 @@ describe("RulebenchTransport fixtures", () => {
       expect(
         result.value.turnTransitionLog.map((entry) => entry.wrappedRound),
       ).toEqual([false, true]);
-      expect(
-        result.value.actionUsageLog.map((entry) => entry.stepId),
-      ).toEqual([
+      expect(result.value.actionUsageLog.map((entry) => entry.stepId)).toEqual([
         "hexing-bolt-bounded-automatic-run-step-0",
         "hexing-bolt-bounded-automatic-run-step-3",
       ]);
@@ -1047,24 +1044,20 @@ describe("RulebenchTransport fixtures", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toBe(defaultCombatAutomaticRunReplayReadout);
-      expect(result.value.id).toBe(
-        "hexing-bolt-bounded-automatic-run-replay",
-      );
+      expect(result.value.id).toBe("hexing-bolt-bounded-automatic-run-replay");
       expect(result.value.accepted).toBe(true);
       expect(result.value.decisionKind).toBe("verified");
       expect(result.value.expectedFinalStateFingerprint).toEqual({
         algorithm: "fnv1a64.rulebench-projection.v0",
-        value: "e4f96047f9dafa36",
+        value: "f726f2f026a5ae34",
       });
       expect(result.value.actualFinalStateFingerprint).toEqual({
         algorithm: "fnv1a64.rulebench-projection.v0",
-        value: "e4f96047f9dafa36",
+        value: "f726f2f026a5ae34",
       });
       expect(result.value.finalStateFingerprintMatches).toBe(true);
       expect(result.value.finalizationMatches).toBe(true);
-      expect(result.value.expectedRunDecisionKind).toBe(
-        "completedCombatEnded",
-      );
+      expect(result.value.expectedRunDecisionKind).toBe("completedCombatEnded");
       expect(result.value.actualRunDecisionKind).toBe("completedCombatEnded");
       expect(result.value.runDecisionKindMatches).toBe(true);
       expect(result.value.expectedExecutedStepCount).toBe(4);

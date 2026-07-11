@@ -185,6 +185,7 @@ fn action_definition() -> ActionDefinition {
             ],
         },
         resource_costs: vec![ActionResourceCost::standard_action()],
+        movement: None,
         action_text: "Mind versus Nerve.".to_string(),
         effect_text: "Minimal hit effect.".to_string(),
     }
@@ -259,6 +260,7 @@ fn bridge_calls_real_authority_through_a_complete_manual_lifecycle() {
                     action_id: candidate.intent.action_id,
                     target_id: candidate.intent.target_id,
                     destination_cell: None,
+                    observed_origin: None,
                 },
                 roll_stream: vec![17, 5],
             },
@@ -345,6 +347,7 @@ fn bridge_fails_closed_for_versions_handles_commands_and_lifecycle() {
                     action_id: "hexing_bolt".to_string(),
                     target_id: "entity-raider".to_string(),
                     destination_cell: None,
+                    observed_origin: None,
                 },
                 roll_stream: vec![17, 5],
             },

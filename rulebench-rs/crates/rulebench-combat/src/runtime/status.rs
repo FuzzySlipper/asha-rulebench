@@ -466,9 +466,10 @@ fn current_actor_option_summary(
         );
     }
 
-    let available = actions
-        .iter()
-        .any(|action| action.available && !action.target_options.is_empty());
+    let available = actions.iter().any(|action| {
+        action.available
+            && (!action.target_options.is_empty() || !action.destination_options.is_empty())
+    });
     let unavailable_reason = if available {
         None
     } else if actions.iter().any(|action| action.available) {
@@ -648,15 +649,17 @@ fn current_actor_action_option(
             reason: "Target is legal for the current authoritative state.".to_string(),
         })
         .collect();
-    let destination_options = if target_mode == ActionTargetMode::Cell {
+    let destination_options = if let Some(movement) = &action.movement {
         projection
             .board
             .cells
             .iter()
-            .filter(|cell| !cell.blocks_movement && cell.occupant_ids.is_empty())
-            .map(|cell| CurrentActorCellOption {
-                position: cell.position,
-                reason: "Cell is in bounds, unblocked, and unoccupied.".to_string(),
+            .filter_map(|cell| {
+                let decision = evaluate_movement(projection, actor_id, movement, cell.position);
+                decision.accepted.then_some(CurrentActorCellOption {
+                    position: cell.position,
+                    reason: decision.reason,
+                })
             })
             .collect()
     } else {

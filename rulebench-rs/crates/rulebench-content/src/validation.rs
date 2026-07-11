@@ -1096,9 +1096,13 @@ fn validate_action_references(
         ));
     }
 
-    if action.targeting.target_kind != TargetKind::Combatant
-        || action.targeting.selection != TargetSelection::Single
-    {
+    let supported_entity_target = action.movement.is_none()
+        && action.targeting.target_kind == TargetKind::Combatant
+        && action.targeting.selection == TargetSelection::Single;
+    let supported_movement_target = action.movement.is_some()
+        && action.targeting.target_kind == TargetKind::Area
+        && action.targeting.selection == TargetSelection::Single;
+    if !supported_entity_target && !supported_movement_target {
         diagnostics.push(ContentDiagnostic::error(
             ContentDiagnosticCode::UnsupportedTargetingDeclaration,
             Some(action.id.clone()),

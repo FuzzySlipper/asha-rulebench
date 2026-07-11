@@ -52,6 +52,7 @@ fn replay_package(package_id: &str, session_id: &str, explicit_start: bool) -> R
                 action_id: "hexing_bolt".to_string(),
                 target_id: "entity-raider".to_string(),
                 destination_cell: None,
+                observed_origin: None,
             },
             vec![17, 5],
         )),

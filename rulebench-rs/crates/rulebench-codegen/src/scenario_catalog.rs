@@ -561,6 +561,25 @@ fn render_event(sequence: u32, event: &DomainEvent) -> String {
             "Raider became rattled until end of next turn.",
             &[target_id.as_str()],
         ),
+        DomainEvent::PositionChanged { actor_id, from, to } => event_block(
+            sequence,
+            "PositionChanged",
+            &format!(
+                "{actor_id} moved from {},{} to {},{}.",
+                from.x, from.y, to.x, to.y
+            ),
+            &[actor_id.as_str()],
+        ),
+        DomainEvent::MovementSpent {
+            actor_id,
+            amount,
+            remaining,
+        } => event_block(
+            sequence,
+            "MovementSpent",
+            &format!("{actor_id} spent {amount} movement; {remaining} remains."),
+            &[actor_id.as_str()],
+        ),
         DomainEvent::IntentShapeAccepted { .. } => String::new(),
     }
 }

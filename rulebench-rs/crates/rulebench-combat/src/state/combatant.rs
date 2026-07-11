@@ -259,6 +259,9 @@ impl CombatantState {
         self.temporary_vitality = combatant.temporary_vitality;
         self.active_modifiers = Vec::new();
         self.conditions = combatant.conditions.clone();
+        self.position = combatant.position;
+        self.movement_remaining = combatant.movement_remaining;
+        self.movement_maximum = combatant.movement_maximum;
     }
 
     pub(super) fn condition_labels(&self) -> Vec<String> {

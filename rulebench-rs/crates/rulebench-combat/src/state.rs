@@ -22,20 +22,33 @@ pub struct CombatState {
 
 impl CombatState {
     pub fn from_scenario(scenario: &RulebenchScenario) -> Self {
+        let mut combatants = scenario
+            .combatants
+            .iter()
+            .map(|combatant| {
+                CombatantState::from_combatant(
+                    combatant,
+                    &scenario.items,
+                    &scenario.classes,
+                    &scenario.modifiers,
+                )
+            })
+            .collect::<Vec<_>>();
+        for combatant in &mut combatants {
+            let allowance = scenario
+                .actions
+                .iter()
+                .filter(|action| action.actor_id == combatant.id)
+                .filter_map(|action| action.movement.as_ref())
+                .map(|movement| movement.allowance)
+                .max()
+                .unwrap_or_default();
+            combatant.movement_maximum = allowance;
+            combatant.movement_remaining = allowance;
+        }
         Self {
             board: board_from_scenario(scenario),
-            combatants: scenario
-                .combatants
-                .iter()
-                .map(|combatant| {
-                    CombatantState::from_combatant(
-                        combatant,
-                        &scenario.items,
-                        &scenario.classes,
-                        &scenario.modifiers,
-                    )
-                })
-                .collect(),
+            combatants,
         }
     }
 
@@ -78,6 +91,43 @@ impl CombatState {
             .filter(|combatant| combatant.hit_points.current > 0)
             .map(|combatant| combatant.id.clone())
             .collect()
+    }
+
+    pub fn refresh_movement_for(&mut self, combatant_id: &str) {
+        if let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|item| item.id == combatant_id)
+        {
+            combatant.movement_remaining = combatant.movement_maximum;
+        }
+    }
+
+    pub fn clear_all_movement(&mut self) {
+        for combatant in &mut self.combatants {
+            combatant.movement_remaining = 0;
+        }
+    }
+
+    pub fn apply_movement(
+        &mut self,
+        combatant_id: &str,
+        destination: GridPosition,
+        cost: u32,
+    ) -> bool {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|item| item.id == combatant_id)
+        else {
+            return false;
+        };
+        if cost > combatant.movement_remaining {
+            return false;
+        }
+        combatant.position = destination;
+        combatant.movement_remaining -= cost;
+        true
     }
 
     pub fn apply_hit(&mut self, damage: &DamageOutcome, modifier: &ModifierOutcome) {
@@ -511,6 +561,7 @@ mod tests {
                 operations: Vec::new(),
             },
             resource_costs: vec![ActionResourceCost::standard_action()],
+            movement: None,
             action_text: "Test action.".to_string(),
             effect_text: "Test effect.".to_string(),
         }

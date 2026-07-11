@@ -6,6 +6,7 @@ mod combat_flow;
 mod control;
 mod effects;
 mod equipment;
+mod movement;
 mod projection;
 mod reactions;
 mod session;
@@ -16,6 +17,7 @@ pub use combat_flow::*;
 pub use control::*;
 pub use effects::*;
 pub use equipment::*;
+pub use movement::*;
 pub use projection::*;
 pub use reactions::*;
 pub use rulebench_content::*;
@@ -25,10 +27,10 @@ pub use rulebench_ruleset::{
     ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, AttackCheckDeclaration,
     CheckDeclaration, CheckHandlerKind, ContestedCheckDeclaration, DamageEffectOperation,
     DefenseReference, EffectOperationId, HealingEffectOperation, HitEffect, HitEffectOperation,
-    ModifierEffectOperation, ModifierTenure, MovementEffectOperation, MovementKind,
-    ReactionHookEffectOperation, ReactionOptionDeclaration, ReactionWindow,
-    ResourceChangeEffectOperation, RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
-    RuleModuleValidationError, RulesetArtifactProvenance, RulesetCompatibilityError,
+    ModifierEffectOperation, ModifierTenure, MovementActionDeclaration, MovementEffectOperation,
+    MovementKind, MovementTopology, ReactionHookEffectOperation, ReactionOptionDeclaration,
+    ReactionWindow, ResourceChangeEffectOperation, RuleModuleConfiguration, RuleModuleDeclaration,
+    RuleModuleId, RuleModuleValidationError, RulesetArtifactProvenance, RulesetCompatibilityError,
     RulesetMetadata, RulesetModuleProvenance, SavingThrowCheckDeclaration, TargetKind,
     TargetSelection, TargetTeamConstraint, TargetingDeclaration, TemporaryVitalityEffectOperation,
     TurnControlModuleConfiguration, TurnOrderPolicy, ValidatedRuleModuleDeclaration,

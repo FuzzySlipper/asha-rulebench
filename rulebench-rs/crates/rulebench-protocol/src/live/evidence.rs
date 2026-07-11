@@ -425,5 +425,13 @@ fn domain_event(value: &DomainEvent) -> (&'static str, String) {
             "modifierApplied",
             format!("{target_id} gained {modifier_id} for {duration}."),
         ),
+        DomainEvent::PositionChanged { actor_id, from, to } => (
+            "positionChanged",
+            format!("{actor_id} moved from {},{} to {},{}.", from.x, from.y, to.x, to.y),
+        ),
+        DomainEvent::MovementSpent { actor_id, amount, remaining } => (
+            "movementSpent",
+            format!("{actor_id} spent {amount} movement and has {remaining} remaining."),
+        ),
     }
 }

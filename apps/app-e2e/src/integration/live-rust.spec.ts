@@ -113,13 +113,20 @@ test("invokes live Rust authority through the Angular origin", async ({
     expect(options.ok).toBe(true);
     if (!options.ok) return;
     expect(options.value.currentActorId).toBe("entity-adept");
-    expect(options.value.actions).toEqual([
-      expect.objectContaining({
-        actionId: "hexing_bolt",
-        available: true,
-        targets: [expect.objectContaining({ targetId: "entity-raider" })],
-      }),
-    ]);
+    expect(options.value.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "hexing_bolt",
+          available: true,
+          targets: [expect.objectContaining({ targetId: "entity-raider" })],
+        }),
+        expect.objectContaining({
+          actionId: "move.entity-adept",
+          available: true,
+          targetMode: "cell",
+        }),
+      ]),
+    );
 
     const executed = await transport.submitIntent(sessionId, {
       id: "e2e-hexing-bolt-hit",

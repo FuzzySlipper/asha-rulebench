@@ -178,6 +178,7 @@ mod tests {
                 operations: Vec::new(),
             },
             resource_costs: vec![ActionResourceCost::standard_action()],
+            movement: None,
             action_text: "Test action.".to_string(),
             effect_text: "Test effect.".to_string(),
         }

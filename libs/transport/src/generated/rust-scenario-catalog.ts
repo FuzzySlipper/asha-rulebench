@@ -95,10 +95,11 @@ export const rustBackedContentValidationCatalog: RulebenchContentValidationCatal
       scenarioId: 'turn-control-hit',
       scenarioTitle: 'Turn Control Ruleset Hit',
       report: {
-        accepted: true,
-        errorCount: 0,
+        accepted: false,
+        errorCount: 1,
         warningCount: 0,
         diagnostics: [
+          { severity: 'error', code: 'crossRulesetActionReference', contentId: 'move.entity-adept', message: 'Action move.entity-adept belongs to ruleset asha-rulebench.hexing-bolt.v0 but scenario selected ruleset is asha-rulebench.turn-control.v0.' },
         ],
       },
     },
