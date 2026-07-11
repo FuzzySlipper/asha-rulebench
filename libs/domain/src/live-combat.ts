@@ -40,6 +40,7 @@ export interface RulebenchLiveSessionView {
   readonly turnLabel: string;
   readonly currentActorId: string | null;
   readonly fingerprintLabel: string;
+  readonly participantOrderIds: readonly string[];
   readonly participants: readonly RulebenchLiveParticipantView[];
   readonly options: RulebenchLiveOptionsView;
   readonly combatEndLabel: string;
@@ -155,6 +156,7 @@ export function projectLiveSessionSnapshot(
     turnLabel: String(snapshot.turnIndex + 1),
     currentActorId: snapshot.currentActorId,
     fingerprintLabel: `${snapshot.stateFingerprint.algorithm}:${snapshot.stateFingerprint.value}`,
+    participantOrderIds: snapshot.participantOrder,
     participants: snapshot.participants.map((participant) => ({
       id: participant.id,
       name: participant.name,

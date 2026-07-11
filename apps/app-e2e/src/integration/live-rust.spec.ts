@@ -5,12 +5,32 @@ import { createLiveRulebenchTransport } from "@asha-rulebench/transport";
 test.describe.configure({ mode: "serial" });
 
 async function openLiveCombatWorkspace(page: Page) {
-  const menubar = page.getByRole("menubar", { name: "Rulebench application menu" });
+  const menubar = page.getByRole("menubar", {
+    name: "Rulebench application menu",
+  });
   await menubar.getByRole("menuitem", { name: "Scenario" }).click();
-  await page.getByRole("menu", { name: "Scenario" }).getByRole("menuitem", { name: "Live combat setup" }).click();
+  await page
+    .getByRole("menu", { name: "Scenario" })
+    .getByRole("menuitem", { name: "Live combat setup" })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Live combat setup" });
   await expect(dialog).toBeVisible();
   return dialog.getByRole("region", { name: "Live combat controls" });
+}
+
+async function invokeApplicationCommand(
+  page: Page,
+  group: string,
+  command: string,
+): Promise<void> {
+  const menubar = page.getByRole("menubar", {
+    name: "Rulebench application menu",
+  });
+  await menubar.getByRole("menuitem", { name: group }).click();
+  await page
+    .getByRole("menu", { name: group })
+    .getByRole("menuitem", { name: command })
+    .click();
 }
 
 test("invokes live Rust authority through the Angular origin", async ({
@@ -232,66 +252,151 @@ test("invokes live Rust authority through the Angular origin", async ({
   }
 });
 
-test("completes a supported scenario through the visible manual workspace", async ({ page }) => {
+test("completes a supported scenario through the visible panel workbench", async ({
+  page,
+}) => {
   await page.goto("/");
-  const workspace = await openLiveCombatWorkspace(page);
+  let workspace = await openLiveCombatWorkspace(page);
 
-  await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
-  await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
-  await workspace.getByLabel("Session").fill("e2e-visible-manual-session");
+  await expect(
+    workspace.getByText("asha-rulebench.local-authority.v0"),
+  ).toBeVisible();
+  await workspace
+    .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+    .click();
+  await workspace
+    .getByLabel("Session", { exact: true })
+    .fill("e2e-visible-panel-session");
   await workspace.getByRole("button", { name: "Create session" }).click();
 
-  const sessionState = workspace.getByRole("region", { name: "Live session state" });
-  await expect(sessionState).toContainText("e2e-visible-manual-session · Ready");
-  await workspace.getByRole("button", { name: "Start", exact: true }).click();
-  await expect(sessionState).toContainText("In Progress");
+  const sessionState = workspace.getByRole("region", {
+    name: "Live session state",
+  });
+  await expect(sessionState).toContainText("e2e-visible-panel-session · Ready");
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
 
-  await workspace.getByRole("button", { name: "Hexing Bolt", exact: true }).click();
+  const statusPanel = page.getByRole("region", { name: "4. Turn status" });
+  const initiativePanel = page.getByRole("region", { name: "2. Initiative" });
+  await expect(statusPanel).toContainText("e2e-visible-panel-session");
+  await expect(statusPanel).toContainText("Ready");
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Adept, Current" }),
+  ).toBeVisible();
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Raider, Next" }),
+  ).toBeVisible();
+
+  await invokeApplicationCommand(page, "Run", "Start combat");
+  await expect(statusPanel).toContainText("In Progress");
+  workspace = await openLiveCombatWorkspace(page);
+
+  await workspace
+    .getByRole("button", { name: "Hexing Bolt", exact: true })
+    .click();
   await workspace.getByRole("button", { name: /Raider · 18\/18 HP/ }).click();
-  await workspace.getByRole("button", { name: "Preflight", exact: true }).click();
-  await expect(workspace.getByRole("region", { name: "Live preflight evidence" })).toContainText("Accepted");
+  await workspace
+    .getByRole("button", { name: "Preflight", exact: true })
+    .click();
+  await expect(
+    workspace.getByRole("region", { name: "Live preflight evidence" }),
+  ).toContainText("Accepted");
 
   await workspace.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(sessionState).toContainText("Raider9/18 HP · Active");
-  await expect(workspace.getByRole("region", { name: "Live combat log" })).toContainText("Damage Applied");
-  await expect(workspace.getByRole("region", { name: "Live command audit" })).toContainText("state changed");
+  await expect(
+    workspace.getByRole("region", { name: "Live combat log" }),
+  ).toContainText("Damage Applied");
+  await expect(
+    workspace.getByRole("region", { name: "Live command audit" }),
+  ).toContainText("state changed");
 
-  await workspace.getByRole("button", { name: "End", exact: true }).click();
-  await expect(sessionState).toContainText("Ended");
-  await workspace.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(workspace.getByText("e2e-visible-manual-session · Ended")).toHaveCount(0);
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
+  await invokeApplicationCommand(page, "Run", "Advance turn");
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Raider, Current" }),
+  ).toBeVisible();
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Adept, Next" }),
+  ).toBeVisible();
+  await expect(statusPanel).toContainText("entity-raider");
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await expect(statusPanel).toContainText("Ended");
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Adept, Complete" }),
+  ).toBeVisible();
+  await expect(
+    initiativePanel.getByRole("listitem", { name: "Raider, Complete" }),
+  ).toBeVisible();
+  await invokeApplicationCommand(page, "Run", "Close session");
+  await expect(statusPanel).toContainText("Not selected");
 });
 
-test("shows Rust automatic step and bounded-run decisions", async ({ page }) => {
+test("shows Rust automatic step and bounded-run decisions", async ({
+  page,
+}) => {
   await page.goto("/");
   const workspace = await openLiveCombatWorkspace(page);
-  await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
-  await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
-  await workspace.getByLabel("Session").fill("e2e-visible-automatic-session");
+  await expect(
+    workspace.getByText("asha-rulebench.local-authority.v0"),
+  ).toBeVisible();
+  await workspace
+    .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+    .click();
+  await workspace
+    .getByLabel("Session", { exact: true })
+    .fill("e2e-visible-automatic-session");
   await workspace.getByRole("button", { name: "Create session" }).click();
   await workspace.getByRole("button", { name: "Start", exact: true }).click();
 
-  await workspace.getByRole("button", { name: "Run step", exact: true }).click();
-  await expect(workspace.getByRole("region", { name: "Automatic next decision" })).toContainText("Submit Candidate");
-  await expect(workspace.getByRole("region", { name: "Live session state" })).toContainText("Raider9/18 HP · Active");
+  await workspace
+    .getByRole("button", { name: "Run step", exact: true })
+    .click();
+  await expect(
+    workspace.getByRole("region", { name: "Automatic next decision" }),
+  ).toContainText("Submit Candidate");
+  await expect(
+    workspace.getByRole("region", { name: "Live session state" }),
+  ).toContainText("Raider9/18 HP · Active");
 
   await workspace.getByLabel("Max steps").fill("1");
-  await workspace.getByRole("button", { name: "Run bounded", exact: true }).click();
-  const runStatus = workspace.getByRole("region", { name: "Automatic run status" });
+  await workspace
+    .getByRole("button", { name: "Run bounded", exact: true })
+    .click();
+  const runStatus = workspace.getByRole("region", {
+    name: "Automatic run status",
+  });
   await expect(runStatus).toContainText("Stopped At Max Steps");
   await expect(runStatus).toContainText("1/1 steps");
-  await expect(workspace.getByText("Replay verification: the current live session run is not archived")).toBeVisible();
+  await expect(
+    workspace.getByText(
+      "Replay verification: the current live session run is not archived",
+    ),
+  ).toBeVisible();
 
   await workspace.getByRole("button", { name: "End", exact: true }).click();
   await workspace.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(workspace.getByRole("region", { name: "Live session state" })).toHaveCount(0);
+  await expect(
+    workspace.getByRole("region", { name: "Live session state" }),
+  ).toHaveCount(0);
 });
 
-test("configures participants from Rust scenario readbacks", async ({ page }) => {
+test("configures participants from Rust scenario readbacks", async ({
+  page,
+}) => {
   await page.goto("/");
   const workspace = await openLiveCombatWorkspace(page);
-  await expect(workspace.getByText("asha-rulebench.local-authority.v0")).toBeVisible();
-  await workspace.getByRole("button", { name: "Hexing Bolt Hit", exact: true }).click();
+  await expect(
+    workspace.getByText("asha-rulebench.local-authority.v0"),
+  ).toBeVisible();
+  await workspace
+    .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+    .click();
 
   const setup = workspace.getByRole("region", { name: "Scenario setup" });
   await expect(setup).toContainText("asha-rulebench.hexing-bolt.v0");
@@ -299,9 +404,13 @@ test("configures participants from Rust scenario readbacks", async ({ page }) =>
   await expect(setup).toContainText("Raider · enemy · initiative 10");
 
   await setup.getByRole("button", { name: "Later" }).first().click();
-  await workspace.getByLabel("Session").fill("e2e-reordered-setup-session");
+  await workspace
+    .getByLabel("Session", { exact: true })
+    .fill("e2e-reordered-setup-session");
   await workspace.getByRole("button", { name: "Create session" }).click();
-  const sessionState = workspace.getByRole("region", { name: "Live session state" });
+  const sessionState = workspace.getByRole("region", {
+    name: "Live session state",
+  });
   await expect(sessionState).toContainText("actor entity-raider");
   await workspace.getByRole("button", { name: "End", exact: true }).click();
   await workspace.getByRole("button", { name: "Close", exact: true }).click();
@@ -336,7 +445,9 @@ test("configures participants from Rust scenario readbacks", async ({ page }) =>
 
 test("reviews and compares archived Rust replay evidence", async ({ page }) => {
   await page.goto("/");
-  const workspace = page.getByRole("region", { name: "Replay review workspace" });
+  const workspace = page.getByRole("region", {
+    name: "Replay review workspace",
+  });
   const packages = workspace.getByLabel("Archived replay packages");
   await expect(packages.getByRole("button")).toHaveCount(2);
   await packages
@@ -344,31 +455,45 @@ test("reviews and compares archived Rust replay evidence", async ({ page }) => {
     .first()
     .click();
 
-  const detail = workspace.getByRole("region", { name: "Replay package detail" });
+  const detail = workspace.getByRole("region", {
+    name: "Replay package detail",
+  });
   await expect(detail).toContainText("Hexing Bolt Replay");
   await expect(detail.getByRole("button")).toHaveCount(2);
-  await expect(workspace.getByRole("region", { name: "Replay verification" })).toContainText(
-    "Verified · Finalized",
-  );
-  const comparison = workspace.getByRole("region", { name: "Replay comparison" });
+  await expect(
+    workspace.getByRole("region", { name: "Replay verification" }),
+  ).toContainText("Verified · Finalized");
+  const comparison = workspace.getByRole("region", {
+    name: "Replay comparison",
+  });
   await expect(comparison).toContainText("Differences found");
-  await expect(comparison).toContainText("First difference · Replay Command Count Mismatch");
+  await expect(comparison).toContainText(
+    "First difference · Replay Command Count Mismatch",
+  );
   await expect(comparison).toContainText("commands.length");
 
-  const command = workspace.getByRole("region", { name: "Replay command evidence" });
+  const command = workspace.getByRole("region", {
+    name: "Replay command evidence",
+  });
   await expect(command).toContainText("Supplied rolls · 17, 5");
-  await expect(command.getByRole("region", { name: "Expected replay evidence" })).toContainText(
-    "Damage Applied",
-  );
-  const actual = command.getByRole("region", { name: "Actual replay evidence" });
+  await expect(
+    command.getByRole("region", { name: "Expected replay evidence" }),
+  ).toContainText("Damage Applied");
+  const actual = command.getByRole("region", {
+    name: "Actual replay evidence",
+  });
   await expect(actual).toContainText("Attack Roll");
   await expect(actual).toContainText("Resolution");
   const state = command.getByRole("region", { name: "Replay resulting state" });
   await expect(state).toContainText("Raider · 9/18 HP · Active");
   await expect(state).toContainText("Adept hits Raider");
-  await expect(state).toContainText("Accepted By Resolver · 4 events · 5 trace entries");
+  await expect(state).toContainText(
+    "Accepted By Resolver · 4 events · 5 trace entries",
+  );
 
-  await detail.getByRole("button", { name: /2 · Control · explicit-end/ }).click();
+  await detail
+    .getByRole("button", { name: /2 · Control · explicit-end/ })
+    .click();
   await expect(command).toContainText("No supplied rolls");
   await expect(state).toContainText("Ended");
 });

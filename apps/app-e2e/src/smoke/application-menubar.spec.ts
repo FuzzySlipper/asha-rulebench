@@ -32,7 +32,9 @@ test('operates the application menubar entirely by keyboard', async ({ page }) =
   await expect(initiative).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('region', { name: '2. Initiative' })).toBeFocused();
-  await expect(page.getByRole('status')).toHaveText('Focused Initiative');
+  await expect(
+    page.getByRole('region', { name: '3. Application menu' }).getByRole('status'),
+  ).toHaveText('Focused Initiative');
 
   await run.focus();
   await page.keyboard.press('ArrowDown');

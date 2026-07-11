@@ -116,10 +116,10 @@ nav,
 
 .status-readout {
   align-items: stretch;
-  display: grid;
+  display: flex;
   gap: 1px;
-  grid-template-columns: minmax(0, 1fr) 5rem minmax(0, 1fr);
   height: 100%;
+  overflow-x: auto;
 }
 
 .status-readout div {
@@ -127,6 +127,7 @@ nav,
   background: #171c21;
   display: grid;
   gap: 0.2rem;
+  flex: 0 0 8.5rem;
   min-width: 0;
   padding: 0.65rem;
 }
@@ -140,6 +141,29 @@ nav,
 
 .status-offline {
   color: var(--arb-warning);
+}
+
+.panel-state {
+  align-content: center;
+  color: var(--arb-muted);
+  display: grid;
+  height: 100%;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+.panel-state--error {
+  color: var(--arb-danger);
+}
+
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 .grid-stage {

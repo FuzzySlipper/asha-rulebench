@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   output,
   signal,
@@ -13,8 +14,10 @@ import {
   type ApplicationMenuItem,
   WorkbenchPanelComponent,
 } from "@asha-rulebench/components";
+import { LiveCombatStore } from "@asha-rulebench/store";
 
 type EvidenceTab = "combat" | "events" | "trace" | "audit";
+type InitiativePosition = "Current" | "Next" | "Queued" | "Complete";
 
 @Component({
   selector: "arb-workbench-shell",
@@ -24,44 +27,121 @@ type EvidenceTab = "combat" | "events" | "trace" | "audit";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WorkbenchShellComponent {
-  private readonly gridPanel = viewChild.required<WorkbenchPanelComponent>("gridPanel");
-  private readonly initiativePanel = viewChild.required<WorkbenchPanelComponent>("initiativePanel");
-  private readonly statusPanel = viewChild.required<WorkbenchPanelComponent>("statusPanel");
-  private readonly logPanel = viewChild.required<WorkbenchPanelComponent>("logPanel");
-  private readonly actionsPanel = viewChild.required<WorkbenchPanelComponent>("actionsPanel");
-  private readonly unitsPanel = viewChild.required<WorkbenchPanelComponent>("unitsPanel");
+  private readonly liveStore = inject(LiveCombatStore);
+  private readonly gridPanel =
+    viewChild.required<WorkbenchPanelComponent>("gridPanel");
+  private readonly initiativePanel =
+    viewChild.required<WorkbenchPanelComponent>("initiativePanel");
+  private readonly statusPanel =
+    viewChild.required<WorkbenchPanelComponent>("statusPanel");
+  private readonly logPanel =
+    viewChild.required<WorkbenchPanelComponent>("logPanel");
+  private readonly actionsPanel =
+    viewChild.required<WorkbenchPanelComponent>("actionsPanel");
+  private readonly unitsPanel =
+    viewChild.required<WorkbenchPanelComponent>("unitsPanel");
 
   protected readonly gridCells = Array.from({ length: 96 });
   readonly additionalMenuGroups = input<readonly ApplicationMenuGroup[]>([]);
   readonly applicationCommand = output<ApplicationMenuItem>();
 
   protected readonly menuStatus = signal("");
-  private readonly panelMenuGroups: readonly ApplicationMenuGroup[] = [
-    { id: "file", label: "File", items: [] },
-    {
-      id: "scenario",
-      label: "Scenario",
-      items: [
-        { id: "focus-grid", label: "Combat grid" },
-        { id: "focus-initiative", label: "Initiative" },
-      ],
+  protected readonly connection = computed(() => this.liveStore.connection());
+  protected readonly snapshot = computed(() => this.liveStore.snapshot());
+  protected readonly control = computed(() => this.liveStore.control());
+  protected readonly currentParticipantIndex = computed(() => {
+    const snapshot = this.snapshot();
+    return snapshot.kind === "data"
+      ? snapshot.value.participantOrderIds.findIndex(
+          (id) => id === snapshot.value.currentActorId,
+        )
+      : -1;
+  });
+  protected readonly globalAnnouncement = computed(() => {
+    const connection = this.connection();
+    const snapshot = this.snapshot();
+    const control = this.control();
+    if (connection.kind === "error")
+      return `Authority error: ${connection.error.message}`;
+    if (snapshot.kind === "error")
+      return `Session error: ${snapshot.error.message}`;
+    if (control.kind === "error")
+      return `Lifecycle command error: ${control.error.message}`;
+    if (snapshot.kind === "data") {
+      return `${snapshot.value.sessionId}, ${snapshot.value.lifecycleLabel}, round ${snapshot.value.roundLabel}, turn ${snapshot.value.turnLabel}, combat end ${snapshot.value.combatEndLabel}, finalization ${snapshot.value.finalizationLabel ?? "not finalized"}`;
+    }
+    return connection.kind === "data"
+      ? "Authority connected; no session selected"
+      : "Authority disconnected";
+  });
+  private readonly panelMenuGroups = computed<readonly ApplicationMenuGroup[]>(
+    () => {
+      const snapshot = this.snapshot();
+      const lifecycle =
+        snapshot.kind === "data" ? snapshot.value.lifecycleLabel : null;
+      const busy = this.control().kind === "loading";
+      return [
+        { id: "file", label: "File", items: [] },
+        {
+          id: "scenario",
+          label: "Scenario",
+          items: [
+            { id: "focus-grid", label: "Combat grid" },
+            { id: "focus-initiative", label: "Initiative" },
+          ],
+        },
+        {
+          id: "run",
+          label: "Run",
+          items: [
+            {
+              id: "start-combat",
+              label: "Start combat",
+              disabled: busy || lifecycle !== "Ready",
+            },
+            {
+              id: "advance-turn",
+              label: "Advance turn",
+              disabled: busy || lifecycle !== "In Progress",
+            },
+            {
+              id: "end-combat",
+              label: "End combat",
+              disabled: busy || lifecycle === null || lifecycle === "Ended",
+            },
+            {
+              id: "close-session",
+              label: "Close session",
+              disabled: busy || lifecycle !== "Ended",
+            },
+            { id: "focus-status", label: "Turn status" },
+            { id: "focus-actions", label: "Available actions" },
+            {
+              id: "focus-current-actor",
+              label: "Current actor",
+              disabled: true,
+            },
+          ],
+        },
+        {
+          id: "replay",
+          label: "Replay",
+          items: [{ id: "focus-log", label: "Evidence log" }],
+        },
+        {
+          id: "view",
+          label: "View",
+          items: [{ id: "focus-units", label: "Active units" }],
+        },
+        { id: "preferences", label: "Preferences", items: [] },
+      ];
     },
-    {
-      id: "run",
-      label: "Run",
-      items: [
-        { id: "focus-status", label: "Turn status" },
-        { id: "focus-actions", label: "Available actions" },
-        { id: "focus-current-actor", label: "Current actor", disabled: true },
-      ],
-    },
-    { id: "replay", label: "Replay", items: [{ id: "focus-log", label: "Evidence log" }] },
-    { id: "view", label: "View", items: [{ id: "focus-units", label: "Active units" }] },
-    { id: "preferences", label: "Preferences", items: [] },
-  ];
+  );
   protected readonly menuGroups = computed(() =>
-    this.panelMenuGroups.map((panelGroup) => {
-      const additionalGroup = this.additionalMenuGroups().find((group) => group.id === panelGroup.id);
+    this.panelMenuGroups().map((panelGroup) => {
+      const additionalGroup = this.additionalMenuGroups().find(
+        (group) => group.id === panelGroup.id,
+      );
       return {
         ...panelGroup,
         items: [...(additionalGroup?.items ?? []), ...panelGroup.items],
@@ -87,6 +167,7 @@ export class WorkbenchShellComponent {
   }
 
   protected invokeMenuItem(item: ApplicationMenuItem): void {
+    if (this.invokeLifecycleCommand(item.id)) return;
     const target = this.panelForCommand(item.id);
     if (target !== null) {
       target.focus();
@@ -95,6 +176,46 @@ export class WorkbenchShellComponent {
     }
     this.applicationCommand.emit(item);
     this.menuStatus.set(`Opened ${item.label}`);
+  }
+
+  protected participantById(participantId: string) {
+    const snapshot = this.snapshot();
+    return snapshot.kind === "data"
+      ? (snapshot.value.participants.find(
+          (participant) => participant.id === participantId,
+        ) ?? null)
+      : null;
+  }
+
+  protected initiativePositionLabel(index: number): InitiativePosition {
+    const snapshot = this.snapshot();
+    if (snapshot.kind !== "data") return "Queued";
+    if (snapshot.value.lifecycleLabel === "Ended") return "Complete";
+    if (index === this.currentParticipantIndex()) return "Current";
+    if (this.currentParticipantIndex() < 0) return "Queued";
+    const nextIndex =
+      (this.currentParticipantIndex() + 1) %
+      snapshot.value.participantOrderIds.length;
+    return index === nextIndex ? "Next" : "Queued";
+  }
+
+  private invokeLifecycleCommand(commandId: string): boolean {
+    switch (commandId) {
+      case "start-combat":
+        void this.liveStore.submitControl("explicitStart");
+        return true;
+      case "advance-turn":
+        void this.liveStore.submitControl("advanceTurn");
+        return true;
+      case "end-combat":
+        void this.liveStore.submitControl("explicitEnd");
+        return true;
+      case "close-session":
+        void this.liveStore.closeSession();
+        return true;
+      default:
+        return false;
+    }
   }
 
   private panelForCommand(commandId: string): WorkbenchPanelComponent | null {

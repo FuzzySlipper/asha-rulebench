@@ -20,13 +20,50 @@
     [panelNumber]="2"
     panelTitle="Initiative"
   >
-    <ol class="initiative-track">
-      <li class="initiative-slot initiative-slot--current">
-        <strong>Current</strong><span>--</span>
-      </li>
-      <li class="initiative-slot"><strong>Next</strong><span>--</span></li>
-      <li class="initiative-slot"><strong>Queue</strong><span>--</span></li>
-    </ol>
+    @switch (snapshot().kind) {
+      @case ("data") {
+        <ol class="initiative-track" aria-label="Participant turn order">
+          @for (
+            participantId of snapshot().value.participantOrderIds;
+            track participantId;
+            let index = $index
+          ) {
+            @if (participantById(participantId); as participant) {
+              <li
+                class="initiative-slot"
+                [class.initiative-slot--current]="
+                  initiativePositionLabel(index) === 'Current'
+                "
+                [attr.aria-label]="
+                  participant.name + ', ' + initiativePositionLabel(index)
+                "
+              >
+                <strong>{{ participant.name }}</strong>
+                <span>
+                  {{ initiativePositionLabel(index) }} ·
+                  {{ participant.statusLabel }}
+                  @if (initiativePositionLabel(index) === "Current") {
+                    · round {{ snapshot().value.roundLabel }}, turn
+                    {{ snapshot().value.turnLabel }}
+                  }
+                </span>
+              </li>
+            }
+          }
+        </ol>
+      }
+      @case ("loading") {
+        <p class="panel-state">Loading turn order</p>
+      }
+      @case ("error") {
+        <p class="panel-state panel-state--error" role="alert">
+          {{ snapshot().error.message }}
+        </p>
+      }
+      @case ("idle") {
+        <p class="panel-state">No session selected</p>
+      }
+    }
   </arb-workbench-panel>
 
   <arb-workbench-panel
@@ -35,16 +72,98 @@
     [panelNumber]="4"
     panelTitle="Turn status"
   >
-    <div class="status-readout">
-      <div><span>Encounter</span><strong>Not selected</strong></div>
-      <div><span>Round</span><strong>--</strong></div>
+    <div class="status-readout" [attr.aria-busy]="control().kind === 'loading'">
+      @switch (connection().kind) {
+        @case ("data") {
+          <div>
+            <span>Authority</span
+            ><strong>{{ connection().value.authoritySurface }}</strong>
+          </div>
+          <div>
+            <span>Protocol</span
+            ><strong>{{ connection().value.protocolVersion }}</strong>
+          </div>
+        }
+        @case ("loading") {
+          <div><span>Authority</span><strong>Connecting</strong></div>
+        }
+        @case ("error") {
+          <div role="alert">
+            <span>Authority error</span
+            ><strong>{{ connection().error.code }}</strong>
+          </div>
+        }
+        @case ("idle") {
+          <div>
+            <span>Authority</span
+            ><strong class="status-offline">Offline</strong>
+          </div>
+        }
+      }
+      @switch (snapshot().kind) {
+        @case ("data") {
+          <div>
+            <span>Encounter</span
+            ><strong>{{ snapshot().value.sessionId }}</strong>
+          </div>
+          <div>
+            <span>Lifecycle</span
+            ><strong>{{ snapshot().value.lifecycleLabel }}</strong>
+          </div>
+          <div>
+            <span>Round</span><strong>{{ snapshot().value.roundLabel }}</strong>
+          </div>
+          <div>
+            <span>Turn</span><strong>{{ snapshot().value.turnLabel }}</strong>
+          </div>
+          <div>
+            <span>Actor</span
+            ><strong>{{ snapshot().value.currentActorId ?? "None" }}</strong>
+          </div>
+          <div>
+            <span>State</span
+            ><strong>{{ snapshot().value.fingerprintLabel }}</strong>
+          </div>
+          <div>
+            <span>Combat end</span
+            ><strong>{{ snapshot().value.combatEndLabel }}</strong>
+          </div>
+          <div>
+            <span>Finalization</span
+            ><strong>{{
+              snapshot().value.finalizationLabel ?? "Not finalized"
+            }}</strong>
+          </div>
+        }
+        @case ("loading") {
+          <div><span>Encounter</span><strong>Loading</strong></div>
+        }
+        @case ("error") {
+          <div role="alert">
+            <span>Session error</span
+            ><strong>{{ snapshot().error.code }}</strong>
+          </div>
+        }
+        @case ("idle") {
+          <div><span>Encounter</span><strong>Not selected</strong></div>
+        }
+      }
       <div>
-        <span>Authority</span><strong class="status-offline">Offline</strong>
+        <span>Command</span
+        ><strong>{{ control().kind === "loading" ? "Busy" : "Idle" }}</strong>
       </div>
     </div>
+    <span class="visually-hidden" role="status" aria-live="polite">{{
+      globalAnnouncement()
+    }}</span>
   </arb-workbench-panel>
 
-  <arb-workbench-panel #gridPanel class="grid" [panelNumber]="1" panelTitle="Combat grid">
+  <arb-workbench-panel
+    #gridPanel
+    class="grid"
+    [panelNumber]="1"
+    panelTitle="Combat grid"
+  >
     <div class="grid-stage" aria-label="Empty combat grid">
       @for (cell of gridCells; track $index) {
         <span class="grid-cell" aria-hidden="true"></span>
@@ -53,7 +172,12 @@
     </div>
   </arb-workbench-panel>
 
-  <arb-workbench-panel #logPanel class="log" [panelNumber]="5" panelTitle="Evidence log">
+  <arb-workbench-panel
+    #logPanel
+    class="log"
+    [panelNumber]="5"
+    panelTitle="Evidence log"
+  >
     <div panelTools class="tabs" role="tablist" aria-label="Evidence log views">
       <button
         type="button"
