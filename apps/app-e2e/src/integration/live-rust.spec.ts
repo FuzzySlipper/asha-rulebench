@@ -308,6 +308,11 @@ test("completes a supported scenario through the visible panel workbench", async
   await invokeApplicationCommand(page, "Run", "Start combat");
   await expect(statusPanel).toContainText("In Progress");
   await expect(gridPanel.getByRole("grid", { name: /Live combat board/ })).toBeVisible();
+  await actionsPanel.getByRole("radio", { name: "Automatic" }).check();
+  await expect(actionsPanel.getByLabel("Attack roll")).toHaveCount(0);
+  await expect(actionsPanel).toContainText("records the concrete results");
+  await actionsPanel.getByRole("radio", { name: "Manual" }).check();
+  await expect(actionsPanel.getByLabel("Attack roll")).toBeVisible();
   await actionsPanel.getByRole("button", { name: "Select Move" }).click();
   const destinations = gridPanel.getByRole("gridcell", { name: /^Move to / });
   await expect(destinations.first()).toBeVisible();
@@ -422,7 +427,9 @@ test("shows Rust automatic step and bounded-run decisions", async ({
   });
   await expect(configuration).toContainText("not AI");
   await configuration.getByLabel("Max steps").fill("1");
-  await configuration.getByLabel("Roll stream").fill("17,5,2,5");
+  await configuration.getByRole("radio", { name: /Authority-generated rolls/ }).check();
+  await expect(configuration.getByLabel("Roll stream")).toHaveCount(0);
+  await expect(configuration).toContainText("generates rolls lazily");
   await configuration.getByRole("radio", { name: "Advance turn" }).check();
   await configuration.getByLabel("Close", { exact: true }).click();
 
@@ -432,11 +439,6 @@ test("shows Rust automatic step and bounded-run decisions", async ({
   await expect(evidencePanel.getByRole("tabpanel")).toContainText(
     "Submit Candidate",
   );
-  await expect(
-    page
-      .getByRole("region", { name: "7. Active units" })
-      .getByRole("listitem", { name: /Raider, Active/ }),
-  ).toContainText("9/18 HP");
 
   await invokeApplicationCommand(page, "Run", "Run bounded combat");
   await expect(evidencePanel.getByRole("tabpanel")).toContainText(

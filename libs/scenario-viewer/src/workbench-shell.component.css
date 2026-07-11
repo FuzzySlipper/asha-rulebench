@@ -283,7 +283,7 @@ nav,
 }
 
 .grid-cell--operable:focus-visible {
-  outline: 3px solid var(--arb-focus);
+  outline: 3px solid var(--arb-accent-strong);
   outline-offset: -3px;
   z-index: 2;
 }
@@ -430,6 +430,44 @@ nav,
 
 .roll-fields > span {
   flex-basis: 100%;
+}
+
+.roll-mode {
+  border: 0;
+  display: flex;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+}
+
+.roll-mode legend {
+  font-size: 0.75rem;
+  margin-bottom: 0.2rem;
+}
+
+.roll-mode label {
+  border: 1px solid var(--arb-border);
+  cursor: pointer;
+  display: block;
+  min-height: 2rem;
+  padding: 0.4rem 0.65rem;
+}
+
+.roll-mode input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.roll-mode--selected {
+  background: #183432;
+  border-color: var(--arb-accent) !important;
+}
+
+.roll-mode label:has(input:focus-visible) {
+  outline: 2px solid var(--arb-accent-strong);
+  outline-offset: 2px;
 }
 
 .roll-fields [role="alert"],

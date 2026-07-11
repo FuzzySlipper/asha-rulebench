@@ -137,7 +137,7 @@ export class WorkbenchShellComponent {
     ].some((state) => state.kind === "loading"),
   );
   protected readonly rollInputError = computed(() =>
-    this.rollStream() === null
+    this.defaultRollMode() === "supplied" && this.rollStream() === null
       ? "Attack and damage rolls must be integers."
       : null,
   );
@@ -473,6 +473,10 @@ export class WorkbenchShellComponent {
 
   protected setDamageRoll(value: string): void {
     this.damageRollInput.set(value);
+  }
+
+  protected setRollMode(mode: "supplied" | "authorityGenerated"): void {
+    this.liveStore.setDefaultRollMode(mode);
   }
 
   protected selectAction(actorId: string | null, actionId: string): void {

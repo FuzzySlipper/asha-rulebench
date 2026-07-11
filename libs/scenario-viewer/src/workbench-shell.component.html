@@ -1006,6 +1006,10 @@
                     {{ action.name }}
                   </button>
                   <span>{{ action.abilityId }}</span>
+                  <span>
+                    {{ action.targetMode === "cell" ? "Grid destination" : action.targetMode === "entity" ? "Entity target" : "Self" }}
+                    · {{ action.targetMode === "cell" ? action.destinations.length : action.targets.length }} legal option(s)
+                  </span>
                   <span>{{
                     action.resourceCostLabels.join(", ") || "No resource cost"
                   }}</span>
@@ -1050,6 +1054,18 @@
         }
       }
       <div class="roll-fields">
+        <fieldset class="roll-mode">
+          <legend>Roll source</legend>
+          <label [class.roll-mode--selected]="defaultRollMode() === 'supplied'">
+            <input type="radio" name="panel-roll-mode" value="supplied" [checked]="defaultRollMode() === 'supplied'" (change)="setRollMode('supplied')" />
+            Manual
+          </label>
+          <label [class.roll-mode--selected]="defaultRollMode() === 'authorityGenerated'">
+            <input type="radio" name="panel-roll-mode" value="authorityGenerated" [checked]="defaultRollMode() === 'authorityGenerated'" (change)="setRollMode('authorityGenerated')" />
+            Automatic
+          </label>
+        </fieldset>
+        @if (defaultRollMode() === "supplied") {
         <label>
           Attack roll
           <input
@@ -1075,6 +1091,9 @@
         >
         @if (rollInputError(); as error) {
           <span id="roll-input-error" role="alert">{{ error }}</span>
+        }
+        } @else {
+          <span id="roll-input-help">Rust generates each required roll at the command boundary and records the concrete results for replay.</span>
         }
         <button
           type="button"
@@ -1157,6 +1176,10 @@
                   submission().value.rejectionLabel
               }}</span>
               <span>{{ submission().value.traceLabels.join(" · ") }}</span>
+              <span>Roll source: {{ submission().value.rollModeLabel }}</span>
+              @for (roll of submission().value.generatedRolls; track roll.sequenceLabel) {
+                <span>{{ roll.sequenceLabel }} · {{ roll.purposeLabel }} · {{ roll.dieExpression }} = {{ roll.valueLabel }} · {{ roll.sourceLabel }}</span>
+              }
             }
             @case ("loading") {
               <span>Submitting command</span>
@@ -1314,7 +1337,8 @@
         (input)="setMaxSteps(maxSteps.value)"
       />
     </label>
-    <label [hidden]="defaultRollMode() === 'authorityGenerated'">
+    @if (defaultRollMode() === "supplied") {
+    <label>
       Roll stream
       <input
         #automaticRolls
@@ -1323,11 +1347,12 @@
         (input)="setAutomaticRolls(automaticRolls.value)"
       />
     </label>
-    <span
-      id="automation-roll-help"
-      [hidden]="defaultRollMode() === 'authorityGenerated'"
-      >Comma-separated deterministic integers supplied to Rust authority.</span
-    >
+    }
+    @if (defaultRollMode() === "authorityGenerated") {
+      <span id="automation-roll-help">Rust generates rolls lazily at each command boundary and records the concrete results.</span>
+    } @else {
+      <span id="automation-roll-help">Comma-separated deterministic integers supplied to Rust authority.</span>
+    }
     @if (automationValidation(); as error) {
       <p id="automation-validation" role="alert">{{ error }}</p>
     }
