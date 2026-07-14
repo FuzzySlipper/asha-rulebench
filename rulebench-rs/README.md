@@ -117,7 +117,7 @@ and tests. Do not add a path dependency simply to preserve an old import path.
 
 ## Migration Posture
 
-- Empty crates are intentional reservation boundaries, not implemented feature claims.
+- Every current workspace crate is an active owner, adapter, fixture, generator, harness, or host surface with focused tests; new empty reservation crates are forbidden as implementation claims.
 - Move behavior by concern, preserving portable compatibility through `rulebench-rules`; migrate Rulebench callers directly to fixture, protocol, bridge, or codegen owners rather than adding authority forwards.
 - Do not create circular dependencies to preserve an old import path.
 - Keep scenario-specific assumptions in `rulebench-fixtures` or the Rulebench harness.

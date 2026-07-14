@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-07-14",
+  "denDocuments": [
+    "basic-design",
+    "north-star-systems-map",
+    "known-limitations"
+  ],
+  "requiredClaims": [
+    {
+      "file": "README.md",
+      "text": "governed public ASHA facades through one exact Git revision"
+    },
+    {
+      "file": "README.md",
+      "text": "composed RuntimeSession seam added by ASHA #5797"
+    },
+    {
+      "file": "rulebench-rs/README.md",
+      "text": "pnpm run generated:check"
+    },
+    {
+      "file": "rulebench-rs/README.md",
+      "text": "pnpm run regression:check"
+    },
+    {
+      "file": "docs/rust-authority-reconciliation.md",
+      "text": "StaticRuntimeSessionBuilder::with_gameplay_owner"
+    },
+    {
+      "file": "docs/gameplay-fabric-integration.md",
+      "text": "one concrete owner through `StaticRuntimeSessionBuilder`"
+    }
+  ],
+  "requiredNonClaims": [
+    {
+      "file": "README.md",
+      "text": "ASHA Rulebench is not:"
+    },
+    {
+      "file": "rulebench-rs/README.md",
+      "text": "authenticated, internet-facing, multi-user"
+    },
+    {
+      "file": "docs/gameplay-fabric-integration.md",
+      "text": "does not claim that ordered or nested RPG reactions belong upstream"
+    }
+  ],
+  "forbiddenClaims": [
+    {
+      "file": "rulebench-rs/README.md",
+      "text": "Empty crates are intentional reservation boundaries"
+    },
+    {
+      "file": "README.md",
+      "text": "no live bridge"
+    },
+    {
+      "file": "README.md",
+      "text": "requires a sibling ASHA checkout"
+    }
+  ],
+  "activeLimitations": [
+    {
+      "id": "trusted-local-process-host",
+      "denHeading": "Trusted-local in-memory process host"
+    },
+    {
+      "id": "single-ruleset-identity",
+      "denHeading": "One current ruleset identity"
+    },
+    {
+      "id": "checked-viewer-artifacts",
+      "denHeading": "Checked-artifact viewer remains alongside live control"
+    }
+  ]
+}
