@@ -85,6 +85,12 @@ authority, adapter, protocol, fixture, and codegen owner while retaining the
 `rulebench-authority/src/tests` suite as cross-crate product evidence. Cargo
 dev-dependencies remain subject to the same one-way boundary policy.
 
+`pnpm run generated:check` is the canonical generated-artifact gate. It emits
+the protocol, scenario catalog, and combat session projections to a temporary
+directory and compares all three with their committed outputs. Failures name
+the Rust emitter and artifact; `pnpm run generated:write` is the only supported
+update path. Every generated header records its emitter and protocol schema.
+
 To approve a real boundary change, update the owning north-star task and
 systems map, revise this dependency direction, change the checker policy and
 its focused failure coverage, then land the crate migration with its callers

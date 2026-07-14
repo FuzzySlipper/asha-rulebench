@@ -25,7 +25,6 @@ for (const file of requiredFiles) {
 }
 
 runCheck('node', ['tools/scripts/gen-eslint-boundaries.mjs', '--check']);
-runCheck('node', ['libs/protocol/scripts/check-generated.mjs']);
 
 const libs = readdirSync(join(root, 'libs')).filter((entry) => statSync(join(root, 'libs', entry)).isDirectory());
 for (const lib of libs) {
