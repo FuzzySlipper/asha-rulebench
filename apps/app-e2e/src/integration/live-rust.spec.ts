@@ -475,7 +475,7 @@ test("completes and archives a Rust-owned gameplay-fabric reaction", async ({
     "gameplay-fabric-evidence",
   );
   await expect(gameplayEvidence).toContainText("1 decisions");
-  await expect(gameplayEvidence).toContainText("1 state frames");
+  await expect(gameplayEvidence).toContainText("0 state frames");
   await expect(gameplayEvidence).toContainText("1 pending");
   await expect(evidencePanel.getByRole("tabpanel")).toContainText(
     "Gameplay decision · panel-command-1",
@@ -502,6 +502,7 @@ test("completes and archives a Rust-owned gameplay-fabric reaction", async ({
     }),
   ).toContainText("11/18 HP");
   await expect(gameplayEvidence).toContainText("2 decisions");
+  await expect(gameplayEvidence).toContainText("1 state frames");
   await expect(gameplayEvidence).toContainText("0 pending");
   await expect(evidencePanel.getByRole("tabpanel")).toContainText("Accepted");
   await page.screenshot({

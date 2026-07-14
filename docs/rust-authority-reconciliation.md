@@ -14,7 +14,7 @@ ASHA. The governing split remains:
 | `rulebench-core` | Keep local and portable | RPG-facing identifiers, bounded values, event/trace primitives, and deterministic fingerprints. It has no ASHA or Rulebench product dependency. |
 | `rulebench-ruleset` | Keep local and portable | Declarative RPG ruleset/module vocabulary and compatibility checks. This configures local Rust behavior; it is not an alternate ASHA module registry. |
 | `rulebench-content` | Keep local and portable | RPG catalogs, canonicalization, references, validation, diagnostics, import, and storage. Its canonicalization remains incubation evidence until a non-RPG ASHA consumer needs the same contract. |
-| `rulebench-gameplay-module` | Keep as a downstream module adapter | Implements the Rulebench pre-effect module through `asha-gameplay-module-sdk`. It uses canonical codecs, derived schemas and build provenance, declared reads, the closed registry, and ASHA-owned continuation/routing evidence. Its direct `asha-gameplay-runtime-host` use is quarantined pending ASHA #5797. |
+| `rulebench-gameplay-module` | Keep as a downstream module adapter | Implements the Rulebench pre-effect module through `asha-gameplay-module-sdk` and installs its concrete combat-owner adapter through `asha-runtime-session-composition`. It uses canonical codecs, derived schemas and build provenance, declared reads, the closed registry, and ASHA-owned continuation/routing/checkpoint evidence. |
 | `rulebench-combat` | Keep local and portable | Authoritative RPG state, targeting, resources, effect interpretation, reaction ordering, duration expiry, and accepted DomainEvents. It calls the gameplay adapter for a bounded pre-effect decision; it does not copy ASHA fabric internals. |
 | `rulebench-replay` | Keep local and portable | RPG command packages, archive/review/comparison, randomness provenance, and first-mismatch diagnostics. Gameplay module-state and decision-receipt hashes come from ASHA-owned readouts and are compared as evidence rather than reimplemented. |
 | `rulebench-rules` | Supported public Rulebench facade | The one-crate local `v0` consumer root for portable RPG authority. It re-exports the supported core/ruleset/content/combat/replay contract and excludes product fixtures, protocol, bridge, codegen, and hosts. |
@@ -55,18 +55,20 @@ The gameplay-module slice uses ASHA's public owners for:
 
 Rulebench keeps only the product adaptation: opening and ordering RPG reaction
 windows, selecting an authored response, validating the local combat owner
-revision, and committing the transformed damage workspace. The adapter stages
-the host snapshot and publishes it only after ASHA accepts the owner route, so a
-stale or consumed continuation cannot partially mutate live fabric state.
+revision, and applying the exact accepted damage workspace. The composed owner
+checkpoint stages the response and workspace; stale or consumed continuations
+cannot retain owner-adapter, module, frame, receipt, or continuation mutation.
 
-The current direct `asha-gameplay-runtime-host` dependency is not the final
-preferred topology. ASHA now marks that facade quarantined and names #5715 as
-its Rulebench deletion owner. The preferred `asha-runtime-session-composition`
-cell does not yet expose a governed way for Rulebench's independent Rust combat
-owner to publish its typed opened/resolved facts and atomically bind its local
-commit to the composed checkpoint. ASHA #5797 owns that real upstream gap.
-Rulebench will not replace it with a TypeScript ferry, arbitrary JSON bridge,
-or private engine import.
+ASHA #5797 closed the composed-owner gap. Rulebench now installs one concrete
+Rust owner through `StaticRuntimeSessionBuilder::with_gameplay_owner`. The
+composed transaction validates the continuation and expected revision, retains
+the typed response and committed workspace in the owner checkpoint, routes one
+accepted commit, emits opened/resolved facts through the closed registry, and
+rolls owner adapter state, module state, frames, receipts, and continuations
+back together on rejection. The product combat mutation is validated before
+entering that transaction and applied infallibly from the exact accepted
+workspace afterward; there is no TypeScript ferry, arbitrary JSON bridge,
+mutable owner registry, or private engine import.
 
 ## Upstream candidate evaluation
 
@@ -76,15 +78,21 @@ or private engine import.
 | Content canonicalization | Incubate locally. The implementation is RPG catalog-shaped and has no demonstrated second non-RPG consumer. |
 | Gameplay-module conformance fixture | Already owned upstream by `asha-gameplay-module-conformance` and ASHA's downstream-module fixtures. Rulebench adds product behavior tests, not a competing generic harness. |
 | Scheduler and duration behavior | Split. ASHA owns generic gameplay scheduling and recovery; Rulebench's turn/round modifier expiry is RPG semantics and remains local. No new generic scheduler primitive is required. |
-| Composed downstream combat owner | Missing upstream. ASHA #5797 records the narrow one-cell owner/fact/continuation transaction required to remove the quarantined standalone host. |
-| Versioned Rust distribution | Missing upstream. ASHA #5796 records the release boundary required by Rulebench #5680. |
+| Composed downstream combat owner | Adopted from ASHA #5797. The standalone host declaration is gone; the preferred composed cell owns the typed adapter checkpoint, continuation transaction, accepted routing evidence, and owner facts. |
+| Versioned Rust distribution | Adopted from ASHA #5796. Rulebench consumes the governed public Git workspace at exact revision `67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148` with compatible `^0.1` facade versions. |
 
 ## Distribution status
 
-At ASHA commit `5545ae9ab76253ac6bde91937c6cb906af99760b`, the approved public Rust
-facades are `publish = false`, the engine repository has no root Cargo
-workspace for git dependency discovery, and the compatibility guide still
-documents sibling `public-rust/*` path dependencies. Rulebench therefore keeps
-its current development-only paths until ASHA #5796 supplies a supported,
-versioned distribution. Copying or forking engine crates here is forbidden.
+ASHA #5796 added the governed `public-rust/Cargo.toml` Git workspace. Rulebench
+pins every ASHA facade to the same reviewed 40-character revision and declares
+the compatible `^0.1` version range. `check:rust-boundaries` rejects path
+dependencies, unknown ASHA crates, noncanonical repositories, mixed or stale
+revisions, and incompatible versions. The ordinary GitHub `pnpm run verify`
+job runs the portable Rust consumer from a clean Rulebench checkout with no
+sibling ASHA tree, so the release boundary is exercised rather than inferred.
 
+To upgrade, select one reviewed ASHA commit from the public compatibility log,
+change the shared revision in the gameplay-module manifest and boundary gate,
+regenerate both Cargo lockfiles through the normal checks, then require the
+full local and clean GitHub gates. Copying or forking engine crates here remains
+forbidden.

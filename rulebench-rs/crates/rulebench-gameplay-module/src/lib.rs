@@ -3,14 +3,16 @@
 #![forbid(unsafe_code)]
 
 use asha_gameplay_module_sdk::*;
-use asha_gameplay_runtime_host::{
-    BundleArtifacts, GameplayBindingEntityTargets, GameplayDecisionContinuation,
-    GameplayDecisionMoment, GameplayDecisionReceipt, GameplayDecisionStatus,
-    GameplayOperationWorkspace, GameplayRuntimeDecisionOwner, GameplayRuntimeDecisionOwnerOutput,
-    GameplayRuntimeDeclaredReadPlan, GameplayRuntimeHost, GameplayRuntimeProjectInput,
-    GameplayRuntimeSchedulerDefinition, LoadPlan, LoadStep, RuntimeSessionId, SceneId,
+use asha_runtime_session_composition::{
+    BundleArtifacts, ComposedGameplayOwner, ComposedGameplayOwnerCheckpoint,
+    ComposedGameplayOwnerOutput, ComposedGameplayRuntime, ComposedRuntimeSessionCheckpoint,
+    GameplayBindingEntityTargets, GameplayDecisionMoment, GameplayDecisionReceipt,
+    GameplayDecisionStatus, GameplayOperationWorkspace, GameplayRuntimeDeclaredReadPlan,
+    GameplayRuntimeProjectInput, GameplayRuntimeSchedulerDefinition, LoadPlan, LoadStep,
+    RuntimeSessionId, SceneId, StaticRuntimeSessionBuilder,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 const MODULE_ID: &str = "rulebench.pre-effect-reaction";
 const PROVIDER_ID: &str = "provider.rulebench.pre-effect-reaction";
@@ -110,18 +112,11 @@ impl GameplayModuleBehavior for PreEffectReactionBehavior {
             );
         }
 
-        let state: ReactionFabricState = context.named_view(STATE_READ_ID)?;
-        let mut workspace: PreEffectWorkspace = context.decision_workspace()?;
+        let _state: ReactionFabricState = context.named_view(STATE_READ_ID)?;
+        let workspace: PreEffectWorkspace = context.decision_workspace()?;
         let mut actions = context.actions();
         match context.invocation_id() {
             "rulebench.pre-effect.transform" => {
-                if state.last_decision_id.as_deref() == Some(workspace.decision_id.as_str())
-                    && state.last_resolution_accepted
-                {
-                    workspace.damage_amount = workspace
-                        .damage_amount
-                        .saturating_sub(state.accepted_reaction_damage_reduction);
-                }
                 actions.transform_workspace_json(
                     contract("pre-effect-workspace"),
                     context
@@ -138,18 +133,8 @@ impl GameplayModuleBehavior for PreEffectReactionBehavior {
                     None,
                 );
             }
-            "rulebench.pre-effect.react"
-                if state.last_decision_id.as_deref() == Some(workspace.decision_id.as_str()) =>
-            {
-                actions.react(GameplayReactionDisposition::Continue, None);
-            }
             "rulebench.pre-effect.react" => {
-                actions.react(
-                    GameplayReactionDisposition::Cancel {
-                        reason: "reaction window has not recorded a matching resolution".to_owned(),
-                    },
-                    None,
-                );
+                actions.react(GameplayReactionDisposition::Continue, None);
             }
             _ => {
                 return Err(GameplayModuleError {
@@ -249,6 +234,7 @@ impl GameplayTypedModuleStateAdapter for ReactionStateAdapter {
                 accepted,
                 option_id,
             } => {
+                next.opened_windows = next.opened_windows.saturating_add(1);
                 next.resolved_windows = next.resolved_windows.saturating_add(1);
                 next.accepted_reactions =
                     next.accepted_reactions.saturating_add(u64::from(*accepted));
@@ -283,7 +269,8 @@ pub struct RulebenchGameplayContinuation {
     pub decision_id: String,
     pub operation: GameplayProposalEnvelope,
     pub expected_owner_revision: String,
-    pub continuation: GameplayDecisionContinuation,
+    pub workspace: GameplayOperationWorkspace,
+    pub resume_token: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -312,11 +299,42 @@ pub struct RulebenchGameplayFabricReadout {
 
 pub trait RulebenchPreEffectOwner {
     fn revision_hash(&self) -> String;
-    fn commit(&mut self, workspace: &PreEffectWorkspace) -> Result<Vec<String>, Vec<String>>;
+    fn validate_commit(&self, workspace: &PreEffectWorkspace) -> Result<(), Vec<String>>;
+    fn commit(&mut self, workspace: &PreEffectWorkspace) -> Vec<String>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ComposedOwnerState {
+    revision: String,
+    accepted_reaction_damage_reduction: u32,
+    response_accepted: Option<bool>,
+    response_option_id: Option<String>,
+    committed_workspace: Option<PreEffectWorkspace>,
+}
+
+impl Default for ComposedOwnerState {
+    fn default() -> Self {
+        Self {
+            revision: "unbound".to_owned(),
+            accepted_reaction_damage_reduction: ReactionFabricConfig::default()
+                .accepted_reaction_damage_reduction,
+            response_accepted: None,
+            response_option_id: None,
+            committed_workspace: None,
+        }
+    }
+}
+
+struct RulebenchComposedOwner {
+    owner: GameplayOwnerRef,
+    state: Arc<Mutex<ComposedOwnerState>>,
 }
 
 pub struct RulebenchGameplayFabric {
-    host: GameplayRuntimeHost,
+    runtime: ComposedGameplayRuntime<RulebenchComposedOwner>,
+    owner_state: Arc<Mutex<ComposedOwnerState>>,
+    readout: RulebenchGameplayFabricReadout,
 }
 
 impl core::fmt::Debug for RulebenchGameplayFabric {
@@ -330,23 +348,58 @@ impl core::fmt::Debug for RulebenchGameplayFabric {
 
 impl RulebenchGameplayFabric {
     pub fn new() -> Self {
-        Self {
-            host: GameplayRuntimeHost::activate_project(project_input())
-                .expect("static Rulebench gameplay composition is valid"),
+        let owner_state = Arc::new(Mutex::new(ComposedOwnerState::default()));
+        let owner = RulebenchComposedOwner {
+            owner: combat_owner(),
+            state: Arc::clone(&owner_state),
+        };
+        let runtime = StaticRuntimeSessionBuilder::activate_project(project_input())
+            .expect("static Rulebench gameplay composition is valid")
+            .with_gameplay_owner(owner)
+            .expect("static Rulebench combat owner is valid")
+            .build()
+            .expect("static Rulebench RuntimeSession composition is valid");
+        let mut fabric = Self {
+            runtime,
+            owner_state,
+            readout: empty_fabric_readout(),
+        };
+        fabric
+            .refresh_readout()
+            .expect("composed Rulebench readout");
+        fabric
+    }
+
+    pub fn restore(snapshot: &RulebenchGameplayFabricSnapshot) -> Result<Self, String> {
+        let owner_state = Arc::new(Mutex::new(ComposedOwnerState::default()));
+        let owner = RulebenchComposedOwner {
+            owner: combat_owner(),
+            state: Arc::clone(&owner_state),
+        };
+        let runtime =
+            StaticRuntimeSessionBuilder::restore_project(project_input(), &snapshot.checkpoint)
+                .map_err(|error| error.to_string())?
+                .with_gameplay_owner(owner)
+                .map_err(|error| error.to_string())?
+                .build()
+                .map_err(|error| error.to_string())?;
+        let mut fabric = Self {
+            runtime,
+            owner_state,
+            readout: snapshot.readout.clone(),
+        };
+        fabric.refresh_readout()?;
+        Ok(fabric)
+    }
+
+    pub fn snapshot(&mut self) -> RulebenchGameplayFabricSnapshot {
+        RulebenchGameplayFabricSnapshot {
+            checkpoint: self
+                .runtime
+                .checkpoint_composed_runtime_session()
+                .expect("Rulebench composed RuntimeSession checkpoint"),
+            readout: self.readout.clone(),
         }
-    }
-
-    pub fn restore(snapshot: &str) -> Result<Self, String> {
-        GameplayRuntimeHost::restore_project(project_input(), snapshot)
-            .map(|host| Self { host })
-            .map_err(|error| error.to_string())
-    }
-
-    pub fn snapshot(&self) -> String {
-        self.host
-            .compose_snapshot()
-            .expect("Rulebench gameplay host snapshot")
-            .text
     }
 
     pub fn begin_before_effect(
@@ -356,25 +409,49 @@ impl RulebenchGameplayFabric {
     ) -> Result<RulebenchGameplayContinuation, String> {
         let moment = decision_moment(workspace, expected_owner_revision.clone());
         let operation = moment.operation.clone();
-        let mut owner = SuspensionOnlyOwner {
-            revision: expected_owner_revision.clone(),
+        let owner_state_before = {
+            let mut state = self.lock_owner_state()?;
+            let owner_state_before = state.clone();
+            state.revision.clone_from(&expected_owner_revision);
+            state.response_accepted = None;
+            state.response_option_id = None;
+            state.committed_workspace = None;
+            owner_state_before
         };
-        let receipt = self.host.decide(moment, &mut owner);
+        let transaction = match self.runtime.transact_composed_gameplay_owner(moment) {
+            Ok(transaction) => transaction,
+            Err(error) => {
+                *self.lock_owner_state()? = owner_state_before;
+                self.refresh_readout()?;
+                return Err(error.to_string());
+            }
+        };
+        let reaction_frame_hashes = transaction.reaction_frame_hashes;
+        let receipt = transaction.decision;
         if receipt.status != GameplayDecisionStatus::Suspended {
+            *self.lock_owner_state()? = owner_state_before;
+            self.refresh_readout()?;
             return Err(format!(
                 "decision did not suspend: {:?}",
                 receipt.diagnostics
             ));
         }
+        let evidence = decision_evidence(&receipt);
+        let decision_id = receipt.decision_id.clone();
         let continuation = receipt
             .continuation
             .ok_or_else(|| "suspended decision omitted continuation".to_owned())?;
-        self.observe_opened(&receipt.decision_id)?;
+        self.readout.decisions.push(evidence);
+        self.readout
+            .reaction_frame_hashes
+            .extend(reaction_frame_hashes);
+        self.refresh_readout()?;
         Ok(RulebenchGameplayContinuation {
-            decision_id: receipt.decision_id,
+            decision_id,
             operation,
             expected_owner_revision,
-            continuation,
+            workspace: continuation.workspace,
+            resume_token: continuation.token,
         })
     }
 
@@ -392,130 +469,102 @@ impl RulebenchGameplayFabric {
                 pending.expected_owner_revision
             ));
         }
-        let snapshot = self
-            .host
-            .compose_snapshot()
-            .map_err(|error| error.to_string())?;
-        let mut staged_host = GameplayRuntimeHost::restore_project(project_input(), &snapshot.text)
-            .map_err(|error| error.to_string())?;
-        observe_resolved(&mut staged_host, &pending.decision_id, accepted, option_id)?;
+        let mut predicted_workspace: PreEffectWorkspace =
+            serde_json::from_slice(&pending.workspace.canonical_payload)
+                .map_err(|error| error.to_string())?;
+        if accepted {
+            predicted_workspace.damage_amount = predicted_workspace
+                .damage_amount
+                .saturating_sub(self.lock_owner_state()?.accepted_reaction_damage_reduction);
+        }
+        owner
+            .validate_commit(&predicted_workspace)
+            .map_err(|diagnostics| diagnostics.join(", "))?;
+        let owner_state_before = {
+            let mut state = self.lock_owner_state()?;
+            let owner_state_before = state.clone();
+            state.response_accepted = Some(accepted);
+            state.response_option_id.clone_from(&option_id);
+            state.committed_workspace = None;
+            owner_state_before
+        };
         let moment = GameplayDecisionMoment {
             decision_id: pending.decision_id.clone(),
             operation: pending.operation.clone(),
             expected_owner_revision: pending.expected_owner_revision.clone(),
-            workspace: pending.continuation.workspace.clone(),
-            resume_token: Some(pending.continuation.token.clone()),
+            workspace: pending.workspace.clone(),
+            resume_token: Some(pending.resume_token.clone()),
         };
-        let mut adapter = RulebenchOwnerAdapter { owner };
-        let receipt = staged_host.decide(moment, &mut adapter);
+        let transaction = match self.runtime.transact_composed_gameplay_owner(moment) {
+            Ok(transaction) => transaction,
+            Err(error) => {
+                *self.lock_owner_state()? = owner_state_before;
+                self.refresh_readout()?;
+                return Err(error.to_string());
+            }
+        };
+        let reaction_frame_hashes = transaction.reaction_frame_hashes;
+        let receipt = transaction.decision;
         if receipt.accepted() {
-            self.host = staged_host;
+            let committed_workspace = self
+                .lock_owner_state()?
+                .committed_workspace
+                .clone()
+                .expect("accepted composed owner retains its workspace");
+            assert_eq!(
+                committed_workspace, predicted_workspace,
+                "composed owner must commit the prevalidated Rulebench workspace"
+            );
+            let _fact_hashes = owner.commit(&committed_workspace);
+            self.readout.decisions.push(decision_evidence(&receipt));
+            self.readout
+                .reaction_frame_hashes
+                .extend(reaction_frame_hashes);
+        } else {
+            *self.lock_owner_state()? = owner_state_before;
         }
+        self.refresh_readout()?;
         Ok(receipt)
     }
 
     pub fn readout(&self) -> RulebenchGameplayFabricReadout {
-        let host = self.host.readout();
-        RulebenchGameplayFabricReadout {
-            registry_digest: host.gameplay_registry_digest,
-            binding_registry_hash: host.binding_registry_hash,
-            module_state_hash: host.module_state_hash,
-            runtime_host_hash: host.runtime_host_hash,
-            reaction_frame_hashes: self
-                .host
-                .reaction_frames()
-                .iter()
-                .map(|frame| frame.frame_hash.clone())
-                .collect(),
-            decisions: self
-                .host
-                .decision_receipts()
-                .iter()
-                .map(decision_evidence)
-                .collect(),
-            pending_decision_count: host.pending_decision_count,
-        }
+        self.readout.clone()
     }
 
-    fn observe_opened(&mut self, decision_id: &str) -> Result<(), String> {
-        self.observe(
-            contract("reaction-opened"),
-            decision_id,
-            &ReactionOpenedEvent {
-                decision_id: decision_id.to_owned(),
-            },
-        )
+    fn lock_owner_state(&self) -> Result<std::sync::MutexGuard<'_, ComposedOwnerState>, String> {
+        self.owner_state
+            .lock()
+            .map_err(|_| "Rulebench composed owner state lock poisoned".to_owned())
     }
 
-    fn observe<T: Serialize>(
-        &mut self,
-        event_contract: GameplayContractRef,
-        decision_id: &str,
-        payload: &T,
-    ) -> Result<(), String> {
-        observe(&mut self.host, event_contract, decision_id, payload)
-    }
-}
-
-fn observe_resolved(
-    host: &mut GameplayRuntimeHost,
-    decision_id: &str,
-    accepted: bool,
-    option_id: Option<String>,
-) -> Result<(), String> {
-    observe(
-        host,
-        contract("reaction-resolved"),
-        decision_id,
-        &ReactionResolvedEvent {
-            decision_id: decision_id.to_owned(),
-            accepted,
-            option_id,
-        },
-    )
-}
-
-fn observe<T: Serialize>(
-    host: &mut GameplayRuntimeHost,
-    event_contract: GameplayContractRef,
-    decision_id: &str,
-    payload: &T,
-) -> Result<(), String> {
-    let canonical_payload = serde_json::to_vec(payload).map_err(|error| error.to_string())?;
-    let sequence = u64::from(host.readout().reaction_frame_count);
-    let event_id = format!("{decision_id}/state/{sequence}");
-    let event = GameplayEventEnvelope {
-        event_id: event_id.clone(),
-        event: event_contract,
-        tick: sequence,
-        root_sequence: sequence,
-        wave: 0,
-        event_sequence: 0,
-        phase: GameplayEventPhase::PostCommit,
-        emitter: GameplayEmitterRef::Owner {
-            owner_id: OWNER_ID.to_owned(),
-        },
-        causation: GameplayCausationRef {
-            root_id: event_id,
-            parent_event_id: None,
-            decision_id: Some(decision_id.to_owned()),
-        },
-        source: None,
-        subjects: Vec::new(),
-        targets: Vec::new(),
-        scope: Some("rulebench.reaction-window".to_owned()),
-        tags: vec!["pre-effect".to_owned()],
-        payload_hash: gameplay_canonical_payload_hash(&canonical_payload),
-        canonical_payload,
-    };
-    let receipt = host.observe(event).map_err(|error| error.to_string())?;
-    if receipt.observe.accepted() {
+    fn refresh_readout(&mut self) -> Result<(), String> {
+        let composed = self
+            .runtime
+            .read_composed_runtime_session()
+            .map_err(|error| error.to_string())?;
+        self.readout.registry_digest = composed.gameplay.gameplay_registry_digest;
+        self.readout.binding_registry_hash = composed.gameplay.binding_registry_hash;
+        self.readout.module_state_hash = composed.gameplay.module_state_hash;
+        self.readout.runtime_host_hash = composed.gameplay.runtime_host_hash;
+        self.readout.pending_decision_count = composed.gameplay.pending_decision_count;
         Ok(())
-    } else {
-        Err(format!(
-            "reaction state event rejected: {:?}",
-            receipt.observe.diagnostics
-        ))
+    }
+}
+
+pub struct RulebenchGameplayFabricSnapshot {
+    checkpoint: ComposedRuntimeSessionCheckpoint,
+    readout: RulebenchGameplayFabricReadout,
+}
+
+fn empty_fabric_readout() -> RulebenchGameplayFabricReadout {
+    RulebenchGameplayFabricReadout {
+        registry_digest: String::new(),
+        binding_registry_hash: String::new(),
+        module_state_hash: String::new(),
+        runtime_host_hash: String::new(),
+        reaction_frame_hashes: Vec::new(),
+        decisions: Vec::new(),
+        pending_decision_count: 0,
     }
 }
 
@@ -525,66 +574,159 @@ impl Default for RulebenchGameplayFabric {
     }
 }
 
-struct SuspensionOnlyOwner {
-    revision: String,
-}
-
-impl GameplayRuntimeDecisionOwner for SuspensionOnlyOwner {
-    fn revision_hash(&self, _owner: &GameplayOwnerRef) -> String {
-        self.revision.clone()
+impl ComposedGameplayOwner for RulebenchComposedOwner {
+    fn owner(&self) -> &GameplayOwnerRef {
+        &self.owner
     }
 
-    fn route_precommit(
-        &mut self,
-        _owner: &GameplayOwnerRef,
-        _operation: &GameplayProposalEnvelope,
-    ) -> GameplayRuntimeDecisionOwnerOutput {
-        GameplayRuntimeDecisionOwnerOutput {
-            accepted: false,
-            diagnostic_codes: vec!["unexpectedCommitBeforeReactionResolution".to_owned()],
-            ..GameplayRuntimeDecisionOwnerOutput::default()
+    fn revision_hash(&self) -> String {
+        self.state
+            .lock()
+            .map(|state| state.revision.clone())
+            .unwrap_or_else(|_| "rulebench-owner-lock-poisoned".to_owned())
+    }
+
+    fn checkpoint(&self) -> Result<ComposedGameplayOwnerCheckpoint, String> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| "Rulebench composed owner state lock poisoned".to_owned())?;
+        let canonical_state = serde_json::to_vec(&*state).map_err(|error| error.to_string())?;
+        let replay_hash = gameplay_module_payload_hash(&canonical_state);
+        ComposedGameplayOwnerCheckpoint::new(self.owner.clone(), canonical_state, replay_hash)
+    }
+
+    fn restore(&mut self, checkpoint: &ComposedGameplayOwnerCheckpoint) -> Result<(), String> {
+        if checkpoint.owner() != &self.owner {
+            return Err("Rulebench composed owner identity mismatch".to_owned());
         }
-    }
-}
-
-struct RulebenchOwnerAdapter<'a> {
-    owner: &'a mut dyn RulebenchPreEffectOwner,
-}
-
-impl GameplayRuntimeDecisionOwner for RulebenchOwnerAdapter<'_> {
-    fn revision_hash(&self, _owner: &GameplayOwnerRef) -> String {
-        self.owner.revision_hash()
+        let restored: ComposedOwnerState = serde_json::from_slice(checkpoint.canonical_state())
+            .map_err(|error| error.to_string())?;
+        *self
+            .state
+            .lock()
+            .map_err(|_| "Rulebench composed owner state lock poisoned".to_owned())? = restored;
+        Ok(())
     }
 
     fn route_precommit(
         &mut self,
-        _owner: &GameplayOwnerRef,
         operation: &GameplayProposalEnvelope,
-    ) -> GameplayRuntimeDecisionOwnerOutput {
-        let workspace: PreEffectWorkspace =
+    ) -> ComposedGameplayOwnerOutput {
+        let mut workspace: PreEffectWorkspace =
             match serde_json::from_slice(&operation.canonical_payload) {
                 Ok(workspace) => workspace,
                 Err(_) => {
-                    return GameplayRuntimeDecisionOwnerOutput {
-                        accepted: false,
+                    return ComposedGameplayOwnerOutput {
                         diagnostic_codes: vec!["rulebenchWorkspaceDecodeFailed".to_owned()],
-                        ..GameplayRuntimeDecisionOwnerOutput::default()
+                        ..ComposedGameplayOwnerOutput::default()
                     };
                 }
             };
-        match self.owner.commit(&workspace) {
-            Ok(fact_hashes) => GameplayRuntimeDecisionOwnerOutput {
-                accepted: true,
-                fact_hashes,
-                ..GameplayRuntimeDecisionOwnerOutput::default()
-            },
-            Err(diagnostic_codes) => GameplayRuntimeDecisionOwnerOutput {
-                accepted: false,
-                diagnostic_codes,
-                ..GameplayRuntimeDecisionOwnerOutput::default()
-            },
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
+            Err(_) => {
+                return ComposedGameplayOwnerOutput {
+                    diagnostic_codes: vec!["rulebenchOwnerLockPoisoned".to_owned()],
+                    ..ComposedGameplayOwnerOutput::default()
+                };
+            }
+        };
+        let Some(accepted) = state.response_accepted else {
+            return ComposedGameplayOwnerOutput {
+                diagnostic_codes: vec!["missingRulebenchReactionResponse".to_owned()],
+                ..ComposedGameplayOwnerOutput::default()
+            };
+        };
+        if accepted {
+            workspace.damage_amount = workspace
+                .damage_amount
+                .saturating_sub(state.accepted_reaction_damage_reduction);
+        }
+        state.committed_workspace = Some(workspace.clone());
+        let option_id = state.response_option_id.clone();
+        let committed_payload = match serde_json::to_vec(&workspace) {
+            Ok(payload) => payload,
+            Err(_) => {
+                return ComposedGameplayOwnerOutput {
+                    diagnostic_codes: vec!["rulebenchWorkspaceEncodeFailed".to_owned()],
+                    ..ComposedGameplayOwnerOutput::default()
+                };
+            }
+        };
+        let events = match reaction_events(operation, &workspace.decision_id, accepted, option_id) {
+            Ok(events) => events,
+            Err(code) => {
+                return ComposedGameplayOwnerOutput {
+                    diagnostic_codes: vec![code],
+                    ..ComposedGameplayOwnerOutput::default()
+                };
+            }
+        };
+        ComposedGameplayOwnerOutput {
+            accepted: true,
+            fact_hashes: vec![gameplay_module_payload_hash(&committed_payload)],
+            diagnostic_codes: Vec::new(),
+            events,
         }
     }
+}
+
+fn reaction_events(
+    operation: &GameplayProposalEnvelope,
+    decision_id: &str,
+    accepted: bool,
+    option_id: Option<String>,
+) -> Result<Vec<GameplayEventEnvelope>, String> {
+    Ok(vec![
+        owner_event(
+            operation,
+            0,
+            contract("reaction-opened"),
+            &ReactionOpenedEvent {
+                decision_id: decision_id.to_owned(),
+            },
+        )?,
+        owner_event(
+            operation,
+            1,
+            contract("reaction-resolved"),
+            &ReactionResolvedEvent {
+                decision_id: decision_id.to_owned(),
+                accepted,
+                option_id,
+            },
+        )?,
+    ])
+}
+
+fn owner_event<T: Serialize>(
+    operation: &GameplayProposalEnvelope,
+    event_sequence: u32,
+    event: GameplayContractRef,
+    payload: &T,
+) -> Result<GameplayEventEnvelope, String> {
+    let canonical_payload = serde_json::to_vec(payload).map_err(|error| error.to_string())?;
+    Ok(GameplayEventEnvelope {
+        event_id: format!("{}/reaction/{event_sequence}", operation.proposal_id),
+        event,
+        tick: operation.tick,
+        root_sequence: operation.root_sequence,
+        wave: operation.wave.saturating_add(1),
+        event_sequence,
+        phase: GameplayEventPhase::PostCommit,
+        emitter: GameplayEmitterRef::Owner {
+            owner_id: OWNER_ID.to_owned(),
+        },
+        causation: operation.causation.clone(),
+        source: operation.source.clone(),
+        subjects: Vec::new(),
+        targets: operation.targets.clone(),
+        scope: Some("rulebench.reaction-window".to_owned()),
+        tags: vec!["pre-effect".to_owned()],
+        payload_hash: gameplay_canonical_payload_hash(&canonical_payload),
+        canonical_payload,
+    })
 }
 
 fn provider() -> GameplayStaticModuleProvider {
@@ -607,12 +749,8 @@ fn provider() -> GameplayStaticModuleProvider {
             event_schema("reaction-opened"),
             event_schema("reaction-resolved"),
         ],
-        subscriptions: vec![
-            subscription("reaction-opened"),
-            subscription("reaction-resolved"),
-        ],
+        subscriptions: vec![subscription("reaction-resolved")],
         invocations: vec![
-            observe_invocation("reaction-opened"),
             observe_invocation("reaction-resolved"),
             GameplayInvocationDescriptor {
                 invocation_id: "rulebench.pre-effect.transform".to_owned(),
@@ -792,7 +930,7 @@ fn binding_registry(module: GameplayModuleRef) -> GameplayModuleBindingRegistry 
             selector_capabilities: vec![GameplayReadSelectorCapability::ModuleStateScope],
             max_items: 1,
         }],
-        output_contracts: vec![contract("reaction-opened"), contract("reaction-resolved")],
+        output_contracts: vec![contract("reaction-resolved")],
         enabled: true,
     };
     let mut builder = GameplayModuleBindingRegistryBuilder::new();
@@ -1037,12 +1175,16 @@ mod tests {
             format!("rulebench:{:016x}", self.revision)
         }
 
-        fn commit(&mut self, workspace: &PreEffectWorkspace) -> Result<Vec<String>, Vec<String>> {
+        fn validate_commit(&self, _workspace: &PreEffectWorkspace) -> Result<(), Vec<String>> {
+            Ok(())
+        }
+
+        fn commit(&mut self, workspace: &PreEffectWorkspace) -> Vec<String> {
             self.commits.push(workspace.clone());
             self.revision = self.revision.saturating_add(1);
-            Ok(vec![gameplay_module_payload_hash(
+            vec![gameplay_module_payload_hash(
                 &serde_json::to_vec(workspace).unwrap(),
-            )])
+            )]
         }
     }
 
@@ -1064,7 +1206,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(fabric.readout().pending_decision_count, 1);
-        assert_eq!(fabric.readout().reaction_frame_hashes.len(), 1);
+        assert!(fabric.readout().reaction_frame_hashes.is_empty());
 
         let snapshot = fabric.snapshot();
         let mut restored = RulebenchGameplayFabric::restore(&snapshot).unwrap();
@@ -1075,7 +1217,7 @@ mod tests {
         assert_eq!(owner.commits.len(), 1);
         assert_eq!(owner.commits[0].damage_amount, 7);
         assert_eq!(restored.readout().pending_decision_count, 0);
-        assert_eq!(restored.readout().reaction_frame_hashes.len(), 2);
+        assert_eq!(restored.readout().reaction_frame_hashes.len(), 1);
         assert!(restored.readout().decisions[1].routing_hash.is_some());
 
         let final_snapshot = restored.snapshot();
@@ -1145,6 +1287,10 @@ mod tests {
         assert!(!replay.accepted());
         assert_eq!(owner.commits.len(), 1);
         assert_eq!(fabric.readout(), before_readout);
-        assert_eq!(fabric.snapshot(), before_snapshot);
+        let after_snapshot = fabric.snapshot();
+        assert_eq!(
+            after_snapshot.checkpoint.readout().runtime_session_hash,
+            before_snapshot.checkpoint.readout().runtime_session_hash,
+        );
     }
 }

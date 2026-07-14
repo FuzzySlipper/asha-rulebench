@@ -4,6 +4,9 @@ import { join, relative, resolve } from 'node:path';
 const root = process.cwd();
 const cratesRoot = join(root, 'rulebench-rs', 'crates');
 const hostsRoot = join(root, 'rulebench-rs', 'hosts');
+const ashaRepository = 'https://github.com/FuzzySlipper/asha-engine.git';
+const ashaRevision = '67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148';
+const ashaVersionRequirement = '^0.1';
 
 const allowedDependencies = new Map([
   ['rulebench-core', new Set()],
@@ -11,7 +14,7 @@ const allowedDependencies = new Map([
   ['rulebench-content', new Set(['rulebench-core', 'rulebench-ruleset'])],
   [
     'rulebench-gameplay-module',
-    new Set(['asha-gameplay-module-sdk', 'asha-gameplay-runtime-host']),
+    new Set(['asha-gameplay-module-sdk', 'asha-runtime-session-composition']),
   ],
   [
     'rulebench-combat',
@@ -45,15 +48,9 @@ const portableCrates = new Set([
   'rulebench-rules',
 ]);
 
-const publicAshaDependencies = new Map([
-  [
-    'asha-gameplay-module-sdk',
-    resolve(root, '..', 'asha-engine', 'public-rust', 'gameplay-module-sdk'),
-  ],
-  [
-    'asha-gameplay-runtime-host',
-    resolve(root, '..', 'asha-engine', 'public-rust', 'gameplay-runtime-host'),
-  ],
+const publicAshaDependencies = new Set([
+  'asha-gameplay-module-sdk',
+  'asha-runtime-session-composition',
 ]);
 
 const manifests = readWorkspaceManifests();
@@ -103,13 +100,18 @@ function parseLocalDependencies(manifest) {
     const dependencyMatch = /^([A-Za-z0-9_-]+)\s*=\s*(.*)$/.exec(line);
     if (dependencyMatch === null) continue;
 
-    const pathMatch = /\bpath\s*=\s*"([^"]+)"/.exec(dependencyMatch[2]);
+    const specification = dependencyMatch[2];
+    const pathMatch = /\bpath\s*=\s*"([^"]+)"/.exec(specification);
     const isRulebenchDependency = dependencyMatch[1].startsWith('rulebench-');
-    if (!isRulebenchDependency && pathMatch === null) continue;
+    const isAshaDependency = dependencyMatch[1].startsWith('asha-');
+    if (!isRulebenchDependency && !isAshaDependency && pathMatch === null) continue;
 
     dependencies.push({
       name: dependencyMatch[1],
       path: pathMatch?.[1] ?? null,
+      git: /\bgit\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null,
+      revision: /\brev\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null,
+      version: /\bversion\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null,
       line: index + 1,
     });
   }
@@ -136,12 +138,26 @@ function validateWorkspace(manifests) {
   for (const [crateName, manifest] of manifests) {
     for (const dependency of manifest.dependencies) {
       failures.push(...validateDependency(crateName, dependency.name, `${relative(root, manifest.manifestPath)}:${dependency.line}`));
+      failures.push(...validateAshaDistribution(crateName, dependency, `${relative(root, manifest.manifestPath)}:${dependency.line}`));
       if (dependency.path !== null) {
         failures.push(...validatePortablePath(crateName, dependency.name, manifest.manifestPath, dependency.path, `${relative(root, manifest.manifestPath)}:${dependency.line}`));
       }
     }
   }
 
+  return failures;
+}
+
+function validateAshaDistribution(crateName, dependency, location) {
+  if (!dependency.name.startsWith('asha-')) return [];
+  if (!publicAshaDependencies.has(dependency.name)) {
+    return [`${location}: ${crateName} imports unapproved ASHA crate ${dependency.name}.`];
+  }
+  const failures = [];
+  if (dependency.path !== null) failures.push(`${location}: shipping ASHA dependencies must not use sibling paths.`);
+  if (dependency.git !== ashaRepository) failures.push(`${location}: ASHA dependency must use the governed repository.`);
+  if (dependency.revision !== ashaRevision) failures.push(`${location}: ASHA dependency must use the reviewed exact revision ${ashaRevision}.`);
+  if (dependency.version !== ashaVersionRequirement) failures.push(`${location}: ASHA dependency must use compatible version ${ashaVersionRequirement}.`);
   return failures;
 }
 
@@ -173,10 +189,7 @@ function validatePortablePath(crateName, dependencyName, manifestPath, dependenc
 
   if (staysInsideCrates) return [];
 
-  const approvedAshaPath = publicAshaDependencies.get(dependencyName);
-  if (approvedAshaPath === resolvedPath) return [];
-
-  return [`${location}: portable crate ${crateName} may only path-depend inside rulebench-rs/crates or on an explicitly approved ASHA public root (${dependencyPath}).`];
+  return [`${location}: portable crate ${crateName} may only path-depend inside rulebench-rs/crates; ASHA facades use the governed Git distribution (${dependencyPath}).`];
 }
 
 function runFocusedFailureTests() {
@@ -199,5 +212,20 @@ function runFocusedFailureTests() {
   );
   if (frontendPathErrors.length === 0) {
     throw new Error('Boundary self-test failed: a portable crate may path-depend on a frontend surface.');
+  }
+
+  const staleAshaErrors = validateAshaDistribution(
+    'rulebench-gameplay-module',
+    {
+      name: 'asha-gameplay-module-sdk',
+      path: null,
+      git: ashaRepository,
+      revision: '0'.repeat(40),
+      version: ashaVersionRequirement,
+    },
+    'self-test:stale-asha-revision',
+  );
+  if (staleAshaErrors.length === 0) {
+    throw new Error('Boundary self-test failed: a stale ASHA revision was accepted.');
   }
 }

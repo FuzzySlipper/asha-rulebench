@@ -31,10 +31,11 @@ The implemented crates have explicit portable-authority, product-adapter, and
 repository-harness owners. See `rulebench-rs/README.md` and
 `docs/rust-authority-reconciliation.md` for the supported consumer surface and
 dependency direction. The `rulebench-gameplay-module` crate consumes only
-governed public ASHA facades through development-only sibling paths; it does
-not reach into upstream internal crates. ASHA #5796 owns the missing versioned
-Rust distribution, and ASHA #5797 owns the composed downstream-combat-owner
-seam needed to retire the quarantined standalone gameplay host.
+governed public ASHA facades through one exact Git revision and compatible
+facade versions; it does not reach into upstream internal crates or require a
+sibling checkout. Its concrete combat owner is installed through the preferred
+composed RuntimeSession seam added by ASHA #5797, so Rulebench no longer
+declares the quarantined standalone gameplay host.
 Planner-approved `serde` protocol DTOs and the `serde_json` process host
 provide the live local bridge.
 

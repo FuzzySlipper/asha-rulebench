@@ -459,8 +459,8 @@ impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
         format!("{}:{}", fingerprint.algorithm, fingerprint.value)
     }
 
-    fn commit(&mut self, workspace: &PreEffectWorkspace) -> Result<Vec<String>, Vec<String>> {
-        let Some(damage) = self.receipt.damage.as_mut() else {
+    fn validate_commit(&self, workspace: &PreEffectWorkspace) -> Result<(), Vec<String>> {
+        let Some(damage) = self.receipt.damage.as_ref() else {
             return Err(vec!["missingPendingDamage".to_owned()]);
         };
         if workspace.actor_id != self.actor_id
@@ -475,6 +475,17 @@ impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
         if amount > damage.amount {
             return Err(vec!["preEffectDamageIncreaseRejected".to_owned()]);
         }
+        Ok(())
+    }
+
+    fn commit(&mut self, workspace: &PreEffectWorkspace) -> Vec<String> {
+        let damage = self
+            .receipt
+            .damage
+            .as_mut()
+            .expect("validated pre-effect commit retains damage evidence");
+        let amount = i32::try_from(workspace.damage_amount)
+            .expect("validated pre-effect damage remains in range");
         damage.amount = amount;
         damage.after.current = damage
             .before
@@ -484,9 +495,6 @@ impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
         self.state.apply_hit(damage, self.receipt.modifier.as_ref());
         let fingerprint =
             fingerprint_projected_state(&self.state.project("Gameplay pre-effect owner commit."));
-        Ok(vec![format!(
-            "{}:{}",
-            fingerprint.algorithm, fingerprint.value
-        )])
+        vec![format!("{}:{}", fingerprint.algorithm, fingerprint.value)]
     }
 }

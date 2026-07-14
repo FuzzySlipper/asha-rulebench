@@ -84,12 +84,16 @@ as a distinct machine-readable dimension.
 - The `RulebenchPreEffectOwner` adapter is intentionally narrow and local. It
   is evidence for future owner-query ergonomics, not a new generic ASHA owner
   interface.
-- The module and host dependencies remain development-only sibling paths. ASHA
-  #5796 owns a real versioned Rust distribution boundary; Rulebench will not
-  invent one downstream.
-- The standalone gameplay host is quarantined upstream. ASHA #5797 owns the
-  composed downstream-combat-owner seam required before Rulebench can remove
-  that dependency without splitting authority or fabricating owner facts.
+- The module and host dependencies use ASHA's governed public Git workspace at
+  one reviewed 40-character revision and the compatible `^0.1` facade series.
+  Rulebench's boundary gate rejects sibling paths, private crates, mixed or
+  stale revisions, and incompatible versions. GitHub CI is the clean-checkout
+  proof: the portable consumer builds without an ASHA sibling tree.
+- ASHA #5797 supplied the composed downstream-combat-owner seam. Rulebench now
+  installs one concrete owner through `StaticRuntimeSessionBuilder`, uses the
+  composed transaction for continuation validation, routing, typed opened and
+  resolved facts, module state, checkpoints, and rollback, and no longer
+  declares the quarantined standalone host.
 
 See [rust-authority-reconciliation.md](rust-authority-reconciliation.md) for
 the complete crate disposition and upstream candidate audit.
