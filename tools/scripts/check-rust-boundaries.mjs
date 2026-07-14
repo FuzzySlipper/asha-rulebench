@@ -228,4 +228,78 @@ function runFocusedFailureTests() {
   if (staleAshaErrors.length === 0) {
     throw new Error('Boundary self-test failed: a stale ASHA revision was accepted.');
   }
+
+  assertRejected(
+    validateAshaDistribution(
+      'rulebench-gameplay-module',
+      ashaDependency({ git: 'https://github.com/example/asha-fork.git' }),
+      'self-test:forked-asha-repository',
+    ),
+    'a forked ASHA repository was accepted',
+  );
+  assertRejected(
+    validateAshaDistribution(
+      'rulebench-gameplay-module',
+      ashaDependency({ version: '*' }),
+      'self-test:unbounded-asha-version',
+    ),
+    'an unbounded ASHA version was accepted',
+  );
+  assertRejected(
+    validateAshaDistribution(
+      'rulebench-gameplay-module',
+      ashaDependency({ path: '../../../asha' }),
+      'self-test:sibling-asha-path',
+    ),
+    'a sibling ASHA path was accepted',
+  );
+  assertRejected(
+    validateAshaDistribution(
+      'rulebench-gameplay-module',
+      ashaDependency({ name: 'asha-gameplay-runtime-host' }),
+      'self-test:private-asha-crate',
+    ),
+    'an unapproved ASHA crate was accepted',
+  );
+  assertRejected(
+    validateDependency(
+      'rulebench-replay',
+      'rulebench-fixtures',
+      'self-test:replay-to-fixtures',
+    ),
+    'a portable owner was allowed to import product fixtures',
+  );
+  assertRejected(
+    validateDependency(
+      'rulebench-core',
+      'rulebench-unknown',
+      'self-test:unknown-rulebench-crate',
+    ),
+    'an unknown Rulebench crate was accepted',
+  );
+  assertRejected(
+    validateDependency(
+      'rulebench-replay',
+      'asha-gameplay-module-sdk',
+      'self-test:asha-owner-bypass',
+    ),
+    'an ASHA public crate was imported outside its approved downstream adapter',
+  );
+}
+
+function ashaDependency(overrides) {
+  return {
+    name: 'asha-gameplay-module-sdk',
+    path: null,
+    git: ashaRepository,
+    revision: ashaRevision,
+    version: ashaVersionRequirement,
+    ...overrides,
+  };
+}
+
+function assertRejected(failures, message) {
+  if (failures.length === 0) {
+    throw new Error(`Boundary self-test failed: ${message}.`);
+  }
 }

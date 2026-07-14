@@ -73,8 +73,12 @@ portable layers must never depend on bridge, codegen, fixtures, authority, or UI
 
 `pnpm run check:rust-boundaries` enforces this workspace graph and is part of
 `pnpm run verify`. It also runs focused invalid-dependency checks so the guard
-fails closed for a portable-to-Rulebench edge and a portable path dependency on
-a frontend surface.
+fails closed for reverse or unknown Rulebench edges, product fixtures imported
+by portable owners, ASHA imports outside the downstream module adapter, sibling
+ASHA paths, unapproved ASHA crates, forked repositories, stale revisions, and
+unbounded compatibility requirements. `pnpm run check:portable-consumer`
+separately compiles the supported `rulebench-rules` facade from an independent
+Cargo workspace and rejects product-only crates in its transitive tree.
 
 To approve a real boundary change, update the owning north-star task and
 systems map, revise this dependency direction, change the checker policy and
