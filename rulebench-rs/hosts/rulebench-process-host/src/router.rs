@@ -4,8 +4,9 @@ use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
     LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
-    LiveControlExecutionDto, LivePreflightDto, LiveSessionSnapshotDto, LiveTransportErrorDto,
-    ProtocolRequestContextDto, ReplayComparisonRequestDto, UseActionIntentDto,
+    LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
+    LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
+    ReplayComparisonRequestDto, UseActionIntentDto,
 };
 
 use crate::{HttpMethod, HttpRequest, HttpResponse};
@@ -139,6 +140,21 @@ impl ProcessHostRouter {
                 };
                 match self.bridge.get_session(&context, &handle) {
                     Ok(snapshot) => json_ok(LiveControlExecutionDto::new(&control, &snapshot)),
+                    Err(error) => bridge_error(error),
+                }
+            }
+            (HttpMethod::Post, ["sessions", session_id, "reactions"]) => {
+                let command = match decode_body::<ReactionCommandSpecDto>(request) {
+                    Ok(command) => command,
+                    Err(response) => return response,
+                };
+                let handle = session_handle(session_id);
+                let reaction = match self.bridge.submit_reaction(&context, &handle, &command) {
+                    Ok(reaction) => reaction,
+                    Err(error) => return bridge_error(error),
+                };
+                match self.bridge.get_session(&context, &handle) {
+                    Ok(snapshot) => json_ok(LiveReactionExecutionDto::new(&reaction, &snapshot)),
                     Err(error) => bridge_error(error),
                 }
             }

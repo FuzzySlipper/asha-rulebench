@@ -332,6 +332,8 @@ pub(crate) mod tests {
                     command_audit: Vec::new(),
                     rolls: Vec::new(),
                     trace: Vec::new(),
+                    gameplay_module_state_hash: String::new(),
+                    gameplay_decision_receipt_hashes: Vec::new(),
                 },
             }],
             ReplayEvidence::default(),

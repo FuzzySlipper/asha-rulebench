@@ -54,8 +54,8 @@ pub fn aliases() -> &'static [super::ProtocolAlias] {
         "export type RulebenchTurnOrderPolicyDto = 'explicit';",
         "export type RulebenchRuleModuleConfigurationDto = RulebenchActionResolutionModuleConfigurationDto | RulebenchTurnControlModuleConfigurationDto;",
         "export type RulebenchReplayVerificationDecisionKindDto = 'verified' | 'invalidPackage' | 'mismatchedEvidence';",
-        "export type RulebenchReplayMismatchDimensionDto = 'decision' | 'stateBeforeFingerprint' | 'acceptedEvents' | 'commandAudit' | 'rolls' | 'trace' | 'stateAfterFingerprint' | 'finalStateFingerprint';",
-        "export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMismatch' | 'replayContentMismatch' | 'replayRulesetMismatch' | 'replayCommandCountMismatch' | 'replayCommandMismatch' | 'replayDecisionMismatch' | 'replayAcceptedEventsMismatch' | 'replayCommandAuditMismatch' | 'replayRollsMismatch' | 'replayTraceMismatch' | 'replayStateBeforeFingerprintMismatch' | 'replayStateAfterFingerprintMismatch' | 'replayFinalStateFingerprintMismatch';",
+        "export type RulebenchReplayMismatchDimensionDto = 'decision' | 'stateBeforeFingerprint' | 'acceptedEvents' | 'commandAudit' | 'rolls' | 'trace' | 'stateAfterFingerprint' | 'gameplayFabricEvidence' | 'finalStateFingerprint';",
+        "export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMismatch' | 'replayContentMismatch' | 'replayRulesetMismatch' | 'replayCommandCountMismatch' | 'replayCommandMismatch' | 'replayDecisionMismatch' | 'replayAcceptedEventsMismatch' | 'replayCommandAuditMismatch' | 'replayRollsMismatch' | 'replayTraceMismatch' | 'replayStateBeforeFingerprintMismatch' | 'replayStateAfterFingerprintMismatch' | 'replayGameplayFabricEvidenceMismatch' | 'replayFinalStateFingerprintMismatch';",
         "export type RulebenchReplayArchiveErrorKindDto = 'invalidPackage' | 'storage' | 'notFound' | 'corrupt' | 'unsupportedVersion';",
     ]
 }

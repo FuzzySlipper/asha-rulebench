@@ -40,8 +40,8 @@ mod tests {
         assert!(package.validate().is_ok());
         assert_eq!(package.identity.id, "asha-rulebench.hexing-bolt");
         assert_eq!(package.scripts.len(), 1);
-        assert_eq!(package.expected_evidence.len(), 10);
-        assert_eq!(package.golden_manifest.artifacts.len(), 10);
+        assert_eq!(package.expected_evidence.len(), 11);
+        assert_eq!(package.golden_manifest.artifacts.len(), 11);
     }
 
     #[test]
@@ -51,7 +51,7 @@ mod tests {
 
         assert!(accepted_receipt.accepted);
         assert!(!rejected_receipt.accepted);
-        assert_eq!(scenario_catalog_cases().len(), 4);
+        assert_eq!(scenario_catalog_cases().len(), 5);
         assert_eq!(combat_session_transcripts().len(), 1);
     }
 

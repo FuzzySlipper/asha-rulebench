@@ -70,6 +70,17 @@ export const rustBackedContentValidationCatalog: RulebenchContentValidationCatal
       },
     },
     {
+      scenarioId: 'hexing-bolt-reaction',
+      scenarioTitle: 'Hexing Bolt Reaction',
+      report: {
+        accepted: true,
+        errorCount: 0,
+        warningCount: 0,
+        diagnostics: [
+        ],
+      },
+    },
+    {
       scenarioId: 'hexing-bolt-miss',
       scenarioTitle: 'Hexing Bolt Miss',
       report: {
@@ -166,6 +177,7 @@ export const rustBackedContentValidationCatalog: RulebenchContentValidationCatal
 export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
   summaries: [
     { id: 'hexing-bolt-hit', title: 'Hexing Bolt Hit', summary: 'Adept hits Raider, applying psychic damage and rattled.', seedLabel: 'roll-stream:17,5', outcomeClass: 'acceptedHit' },
+    { id: 'hexing-bolt-reaction', title: 'Hexing Bolt Reaction', summary: 'Adept hits Raider, suspending before effects while the authored reaction window is open.', seedLabel: 'roll-stream:17,5', outcomeClass: 'acceptedHit' },
     { id: 'hexing-bolt-miss', title: 'Hexing Bolt Miss', summary: 'Adept targets Raider but the attack misses, leaving state unchanged.', seedLabel: 'roll-stream:2,5', outcomeClass: 'acceptedMiss' },
     { id: 'hexing-bolt-self-target-rejected', title: 'Hexing Bolt Self Target Rejected', summary: 'Adept attempts to target themself and target legality rejects the intent.', seedLabel: 'roll-stream:17,5', outcomeClass: 'rejectedTargetLegality' },
     { id: 'turn-control-hit', title: 'Turn Control Ruleset Hit', summary: 'The second ruleset resolves the same minimal action with turn control selected.', seedLabel: 'roll-stream:17,5', outcomeClass: 'acceptedHit' },
@@ -177,6 +189,159 @@ export const rustBackedScenarioCatalog: RulebenchScenarioCatalogDto = {
       id: 'hexing-bolt-hit',
       title: 'Hexing Bolt Hit',
       summary: 'Adept hits Raider, applying psychic damage and rattled.',
+      seedLabel: 'roll-stream:17,5',
+      grid: {
+        width: 6,
+        height: 4,
+        cells: [
+          { x: 1, y: 1, terrainTags: ['clear'] },
+          { x: 4, y: 1, terrainTags: ['clear'] },
+          { x: 2, y: 2, terrainTags: ['cover'] },
+        ],
+      },
+      combatants: [
+        {
+          id: 'entity-adept',
+          name: 'Adept',
+          team: 'ally',
+          sideId: 'ally',
+          position: { x: 1, y: 1 },
+          hitPoints: { current: 24, max: 24 },
+          defenses: [
+            { id: 'guard', label: 'Guard', value: 16 },
+            { id: 'nerve', label: 'Nerve', value: 15 },
+          ],
+          conditions: [],
+          isActor: true,
+        },
+        {
+          id: 'entity-raider',
+          name: 'Raider',
+          team: 'enemy',
+          sideId: 'enemy',
+          position: { x: 4, y: 1 },
+          hitPoints: { current: 9, max: 18 },
+          defenses: [
+            { id: 'guard', label: 'Guard', value: 14 },
+            { id: 'nerve', label: 'Nerve', value: 13 },
+          ],
+          conditions: ['rattled'],
+          isActor: false,
+        },
+      ],
+      selectedAction: {
+        id: 'hexing_bolt',
+        name: 'Hexing Bolt',
+        actorId: 'entity-adept',
+        targetIds: ['entity-raider'],
+        range: 10,
+        lineOfSightRequired: true,
+        visibleTargetIds: ['entity-raider'],
+        attack: {
+          modifier: 4,
+          defenseId: 'nerve',
+          defenseLabel: 'Nerve',
+        },
+        hit: {
+          damageBonus: 4,
+          damageType: 'psychic',
+          modifierId: 'rattled',
+          modifierLabel: 'rattled',
+          modifierDuration: 'until end of next turn',
+        },
+        actionText: 'Mind vs Nerve at range 10',
+        effectText: '1d8 + Mind psychic damage and rattled until end of next turn on hit',
+      },
+      selectedTarget: {
+        targetId: 'entity-raider',
+        legality: 'accepted',
+        reason: 'Target is hostile, within range, and line of sight is clear.',
+      },
+      domainEvents: [
+        {
+          sequence: 1,
+          type: 'ActionUsed',
+          summary: 'Adept used Hexing Bolt against Raider.',
+          entityIds: ['entity-adept', 'entity-raider'],
+        },
+        {
+          sequence: 2,
+          type: 'AttackRolled',
+          summary: 'Attack rolled 17 + 4 vs Nerve 13: hit.',
+          entityIds: ['entity-adept', 'entity-raider'],
+        },
+        {
+          sequence: 3,
+          type: 'DamageApplied',
+          summary: 'Raider took 9 psychic damage.',
+          entityIds: ['entity-raider'],
+        },
+        {
+          sequence: 4,
+          type: 'ModifierApplied',
+          summary: 'Raider became rattled until end of next turn.',
+          entityIds: ['entity-raider'],
+        },
+      ],
+      trace: [
+        {
+          sequence: 1,
+          phase: 'proposal',
+          status: 'info',
+          message: 'UseActionIntent received.',
+          detail: 'Actor entity-adept proposed action hexing_bolt against entity-raider.',
+        },
+        {
+          sequence: 2,
+          phase: 'validation',
+          status: 'accepted',
+          message: 'Target legality accepted.',
+          detail: 'Target is hostile, within range, and line of sight is clear.',
+        },
+        {
+          sequence: 3,
+          phase: 'resolution',
+          status: 'accepted',
+          message: 'Hit branch selected.',
+          detail: 'Roll stream supplied 17; total 21 beats Nerve 13.',
+        },
+        {
+          sequence: 4,
+          phase: 'resolution',
+          status: 'accepted',
+          message: 'Damage vitality resolved.',
+          detail: 'Requested 9 psychic; 9 applied after mitigation, with 0 absorbed by temporary vitality.',
+        },
+        {
+          sequence: 4,
+          phase: 'commit',
+          status: 'accepted',
+          message: 'DomainEvents committed.',
+          detail: 'ActionUsed, AttackRolled, vitality effects, and ModifierApplied became accepted facts.',
+        },
+      ],
+      finalState: {
+        summary: 'Raider is damaged and rattled; Adept is unchanged.',
+        combatants: [
+          {
+            id: 'entity-adept',
+            name: 'Adept',
+            hitPoints: { current: 24, max: 24 },
+            conditions: [],
+          },
+          {
+            id: 'entity-raider',
+            name: 'Raider',
+            hitPoints: { current: 9, max: 18 },
+            conditions: ['rattled'],
+          },
+        ],
+      },
+    },
+    {
+      id: 'hexing-bolt-reaction',
+      title: 'Hexing Bolt Reaction',
+      summary: 'Adept hits Raider, suspending before effects while the authored reaction window is open.',
       seedLabel: 'roll-stream:17,5',
       grid: {
         width: 6,

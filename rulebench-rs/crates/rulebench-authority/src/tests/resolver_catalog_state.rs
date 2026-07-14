@@ -975,6 +975,7 @@ fn catalog_enumerates_stable_scenario_summaries() {
             .collect::<Vec<_>>(),
         vec![
             "hexing-bolt-hit",
+            "hexing-bolt-reaction",
             "hexing-bolt-miss",
             "hexing-bolt-self-target-rejected",
             "turn-control-hit",
@@ -988,6 +989,7 @@ fn catalog_enumerates_stable_scenario_summaries() {
             .map(|summary| summary.outcome_class.code())
             .collect::<Vec<_>>(),
         vec![
+            "acceptedHit",
             "acceptedHit",
             "acceptedMiss",
             "rejectedTargetLegality",

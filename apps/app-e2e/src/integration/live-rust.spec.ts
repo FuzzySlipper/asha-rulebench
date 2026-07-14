@@ -59,6 +59,9 @@ test("invokes live Rust authority through the Angular origin", async ({
     expect(scenarios.value.map((scenario) => scenario.id)).toContain(
       "hexing-bolt-hit",
     );
+    expect(scenarios.value.map((scenario) => scenario.id)).toContain(
+      "hexing-bolt-reaction",
+    );
     expect(
       scenarios.value.find((scenario) => scenario.id === "hexing-bolt-hit"),
     ).toEqual(
@@ -99,6 +102,13 @@ test("invokes live Rust authority through the Angular origin", async ({
     expect(created.value.lifecyclePhase).toBe("ready");
     expect(created.value.combatLog).toEqual([]);
     expect(created.value.auditLog).toEqual([]);
+    expect(created.value.gameplayFabric).toEqual(
+      expect.objectContaining({
+        decisions: [],
+        pendingDecisionCount: 0,
+        reactionFrameHashes: [],
+      }),
+    );
     const initialFingerprint = created.value.stateFingerprint;
 
     const started = await transport.submitControl(sessionId, {
@@ -419,6 +429,104 @@ test("completes a supported scenario through the visible panel workbench", async
     .click();
   await expect(replayWorkspace.getByRole("region", { name: "Replay command evidence" })).toContainText("Move");
   await replayDialog.getByLabel("Close", { exact: true }).click();
+});
+
+test("completes and archives a Rust-owned gameplay-fabric reaction", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const workspace = await openLiveCombatWorkspace(page);
+  await workspace
+    .getByRole("button", { name: "Hexing Bolt Reaction", exact: true })
+    .click();
+  await workspace
+    .getByLabel("Session", { exact: true })
+    .fill("e2e-visible-gameplay-fabric-session");
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
+
+  await invokeApplicationCommand(page, "Run", "Start combat");
+  const actionsPanel = page.getByRole("region", {
+    name: "6. Available actions",
+  });
+  const gridPanel = page.getByRole("region", { name: "1. Combat grid" });
+  const unitsPanel = page.getByRole("region", { name: "7. Active units" });
+  await actionsPanel
+    .getByRole("button", { name: "Select Hexing Bolt" })
+    .click();
+  await gridPanel
+    .getByRole("gridcell", { name: /^Target at .*occupied by Raider/ })
+    .click();
+  await actionsPanel
+    .getByRole("button", { name: "Submit", exact: true })
+    .click();
+
+  await expect(
+    unitsPanel.getByRole("listitem", {
+      name: /Raider, Active, selected target/,
+    }),
+  ).toContainText("18/18 HP");
+  const evidencePanel = page.getByRole("region", { name: "5. Evidence log" });
+  await evidencePanel.getByRole("tab", { name: "Audit" }).click();
+  const gameplayEvidence = evidencePanel.getByTestId(
+    "gameplay-fabric-evidence",
+  );
+  await expect(gameplayEvidence).toContainText("1 decisions");
+  await expect(gameplayEvidence).toContainText("1 state frames");
+  await expect(gameplayEvidence).toContainText("1 pending");
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Gameplay decision · panel-command-1",
+  );
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText("Suspended");
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "2 declared reads",
+  );
+  const reaction = actionsPanel.getByRole("region", {
+    name: "Reaction response",
+  });
+  await expect(reaction).toContainText("entity-adept must pass");
+  await reaction.getByRole("button", { name: "Pass reaction" }).click();
+  await expect(reaction).toContainText("entity-raider must pass");
+  await page.screenshot({
+    path: "dist/.playwright/gameplay-fabric-reaction-open.png",
+    fullPage: true,
+  });
+  await reaction.getByRole("button", { name: /Use Raider Ward/ }).click();
+  await expect(reaction).toHaveCount(0);
+  await expect(
+    unitsPanel.getByRole("listitem", {
+      name: /Raider, Active/,
+    }),
+  ).toContainText("11/18 HP");
+  await expect(gameplayEvidence).toContainText("2 decisions");
+  await expect(gameplayEvidence).toContainText("0 pending");
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText("Accepted");
+  await page.screenshot({
+    path: "dist/.playwright/gameplay-fabric-reaction-resolved.png",
+    fullPage: true,
+  });
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await invokeApplicationCommand(page, "Run", "Close session");
+  await invokeApplicationCommand(page, "Replay", "Replay archive");
+  const replayDialog = page.getByRole("dialog", { name: "Replay archive" });
+  const replayWorkspace = replayDialog.getByRole("region", {
+    name: "Replay archive controls",
+  });
+  const liveReplay = replayWorkspace
+    .getByLabel("Archived replay packages")
+    .getByRole("button", { name: /live-e2e-visible-gameplay-fabric-session ·/ });
+  await expect(liveReplay).toBeVisible();
+  await liveReplay.click();
+  await expect(
+    replayWorkspace.getByRole("region", { name: "Replay verification" }),
+  ).toContainText("Verified · Finalized");
+  await page.screenshot({
+    path: "dist/.playwright/gameplay-fabric-evidence.png",
+    fullPage: true,
+  });
 });
 
 test("shows Rust automatic step and bounded-run decisions", async ({

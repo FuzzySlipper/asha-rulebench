@@ -7,6 +7,8 @@ use rulebench_rules::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::{ReactionAuditEntryDto, ReactionWindowDto, ReactionWindowLifecycleEntryDto};
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LiveStateFingerprintDto {
@@ -368,6 +370,32 @@ pub struct LiveFinalizationDto {
     pub reason: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveGameplayDecisionEvidenceDto {
+    pub decision_id: String,
+    pub status: String,
+    pub receipt_hash: String,
+    pub initial_workspace_hash: String,
+    pub final_workspace_hash: String,
+    pub declared_read_hashes: Vec<String>,
+    pub invocation_output_hashes: Vec<String>,
+    pub routing_hash: Option<String>,
+    pub diagnostic_codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveGameplayFabricDto {
+    pub registry_digest: String,
+    pub binding_registry_hash: String,
+    pub module_state_hash: String,
+    pub runtime_host_hash: String,
+    pub reaction_frame_hashes: Vec<String>,
+    pub decisions: Vec<LiveGameplayDecisionEvidenceDto>,
+    pub pending_decision_count: u32,
+}
+
 impl From<&CombatFinalizationReadout> for LiveFinalizationDto {
     fn from(value: &CombatFinalizationReadout) -> Self {
         Self {
@@ -398,6 +426,10 @@ pub struct LiveSessionSnapshotDto {
     pub board: LiveBoardDto,
     pub options: LiveCurrentActorOptionsDto,
     pub combat_end: LiveCombatEndDto,
+    pub gameplay_fabric: LiveGameplayFabricDto,
+    pub current_reaction_window: Option<ReactionWindowDto>,
+    pub reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntryDto>,
+    pub reaction_audit_log: Vec<ReactionAuditEntryDto>,
     pub finalization: Option<LiveFinalizationDto>,
     pub combat_log: Vec<LiveCombatLogEntryDto>,
     pub audit_log: Vec<LiveAuditEntryDto>,
@@ -425,6 +457,44 @@ impl From<&CombatSessionSnapshot> for LiveSessionSnapshotDto {
             board: LiveBoardDto::from(&value.current_state.board),
             options: LiveCurrentActorOptionsDto::from(&value.current_actor_options),
             combat_end: LiveCombatEndDto::from(&value.combat_end_condition),
+            gameplay_fabric: LiveGameplayFabricDto {
+                registry_digest: value.gameplay_fabric.registry_digest.clone(),
+                binding_registry_hash: value.gameplay_fabric.binding_registry_hash.clone(),
+                module_state_hash: value.gameplay_fabric.module_state_hash.clone(),
+                runtime_host_hash: value.gameplay_fabric.runtime_host_hash.clone(),
+                reaction_frame_hashes: value.gameplay_fabric.reaction_frame_hashes.clone(),
+                decisions: value
+                    .gameplay_fabric
+                    .decisions
+                    .iter()
+                    .map(|decision| LiveGameplayDecisionEvidenceDto {
+                        decision_id: decision.decision_id.clone(),
+                        status: decision.status.clone(),
+                        receipt_hash: decision.receipt_hash.clone(),
+                        initial_workspace_hash: decision.initial_workspace_hash.clone(),
+                        final_workspace_hash: decision.final_workspace_hash.clone(),
+                        declared_read_hashes: decision.declared_read_hashes.clone(),
+                        invocation_output_hashes: decision.invocation_output_hashes.clone(),
+                        routing_hash: decision.routing_hash.clone(),
+                        diagnostic_codes: decision.diagnostic_codes.clone(),
+                    })
+                    .collect(),
+                pending_decision_count: value.gameplay_fabric.pending_decision_count,
+            },
+            current_reaction_window: value
+                .current_reaction_window
+                .as_ref()
+                .map(ReactionWindowDto::from),
+            reaction_window_lifecycle_log: value
+                .reaction_window_lifecycle_log
+                .iter()
+                .map(ReactionWindowLifecycleEntryDto::from)
+                .collect(),
+            reaction_audit_log: value
+                .reaction_audit_log
+                .iter()
+                .map(ReactionAuditEntryDto::from)
+                .collect(),
             finalization: value.finalization.as_ref().map(LiveFinalizationDto::from),
             combat_log: value
                 .combat_log

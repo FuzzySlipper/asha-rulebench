@@ -7,6 +7,7 @@ import {
   projectLiveCommandExecution,
   projectLiveOptions,
   projectLivePreflight,
+  projectLiveReactionExecution,
   projectLiveSessionSnapshot,
   type RulebenchLiveAutomaticRunView,
   type RulebenchLiveAutomaticStepView,
@@ -14,6 +15,7 @@ import {
   type RulebenchLiveCommandExecutionView,
   type RulebenchLiveOptionsView,
   type RulebenchLivePreflightView,
+  type RulebenchLiveReactionExecutionView,
   type RulebenchLiveSessionView,
 } from "@asha-rulebench/domain";
 import { browserClock, type ClockPort } from "@asha-rulebench/platform";
@@ -97,6 +99,10 @@ export class LiveCombatStore {
   });
   readonly control: Signal<LiveState<RulebenchLiveSessionView>> =
     this._control.asReadonly();
+  private readonly _reaction = signal<
+    LiveState<RulebenchLiveReactionExecutionView>
+  >({ kind: "idle" });
+  readonly reaction = this._reaction.asReadonly();
   private readonly _automaticStep = signal<
     LiveState<RulebenchLiveAutomaticStepView>
   >({ kind: "idle" });
@@ -369,6 +375,31 @@ export class LiveCombatStore {
     this.clock.now();
   }
 
+  async submitReaction(command: {
+    readonly windowId: string;
+    readonly reactorId: string;
+    readonly responseKind: "pass" | "accept";
+    readonly optionId: string | null;
+  }): Promise<void> {
+    const request = this.currentRequest();
+    if (request === null) return;
+    this._reaction.set({ kind: "loading" });
+    const result = await this.transport.submitReaction(request.sessionId, command);
+    if (!this.isCurrent(request.sessionId, request.generation)) return;
+    if (result.ok) {
+      const snapshot = projectLiveSessionSnapshot(result.value.snapshot);
+      this._reaction.set({
+        kind: "data",
+        value: projectLiveReactionExecution(result.value),
+      });
+      this._snapshot.set({ kind: "data", value: snapshot });
+      this.reconcileIntent(snapshot);
+    } else {
+      this._reaction.set({ kind: "error", error: result.error });
+    }
+    this.clock.now();
+  }
+
   async runAutomaticStep(spec: RulebenchAutomaticStepSpecDto): Promise<void> {
     const request = this.currentRequest();
     if (request === null) return;
@@ -478,6 +509,7 @@ export class LiveCombatStore {
     this._preflight.set({ kind: "idle" });
     this._submission.set({ kind: "idle" });
     this._control.set({ kind: "idle" });
+    this._reaction.set({ kind: "idle" });
   }
 
   private clearSessionState(): void {
@@ -490,6 +522,7 @@ export class LiveCombatStore {
     this._preflight.set({ kind: "idle" });
     this._submission.set({ kind: "idle" });
     this._control.set({ kind: "idle" });
+    this._reaction.set({ kind: "idle" });
     this._intent.set({ actorId: "", actionId: "", targetId: "" });
   }
 

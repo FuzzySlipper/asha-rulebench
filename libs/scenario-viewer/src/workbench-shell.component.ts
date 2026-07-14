@@ -77,6 +77,11 @@ export class WorkbenchShellComponent {
   protected readonly candidates = computed(() => this.liveStore.candidates());
   protected readonly preflight = computed(() => this.liveStore.preflight());
   protected readonly submission = computed(() => this.liveStore.submission());
+  protected readonly reaction = computed(() => this.liveStore.reaction());
+  protected readonly reactionWindow = computed(() => {
+    const snapshot = this.snapshot();
+    return snapshot.kind === "data" ? snapshot.value.reactionWindow : null;
+  });
   protected readonly automaticStep = computed(() =>
     this.liveStore.automaticStep(),
   );
@@ -134,6 +139,7 @@ export class WorkbenchShellComponent {
       this.candidates(),
       this.preflight(),
       this.submission(),
+      this.reaction(),
     ].some((state) => state.kind === "loading"),
   );
   protected readonly rollInputError = computed(() =>
@@ -508,6 +514,27 @@ export class WorkbenchShellComponent {
         title: "Manual command",
         summary: "Submitted from the Rulebench available actions panel.",
         rollStream: rollStream ?? [],
+      })
+      .then(async () => {
+        await this.refreshEvidence();
+        this.focusCommandFeedback();
+      });
+  }
+
+  protected respondToReaction(
+    responseKind: "pass" | "accept",
+    optionId: string | null,
+  ): void {
+    const snapshot = this.snapshot();
+    if (snapshot.kind !== "data") return;
+    const window = snapshot.value.reactionWindow;
+    if (window === null || window.currentReactorId === null) return;
+    void this.liveStore
+      .submitReaction({
+        windowId: window.id,
+        reactorId: window.currentReactorId,
+        responseKind,
+        optionId,
       })
       .then(async () => {
         await this.refreshEvidence();

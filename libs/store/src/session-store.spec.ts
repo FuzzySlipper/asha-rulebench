@@ -32,6 +32,7 @@ describe('SessionStore', () => {
     if (catalog.kind === 'data') {
       expect(catalog.value.map((summary) => summary.id)).toEqual([
         'hexing-bolt-hit',
+        'hexing-bolt-reaction',
         'hexing-bolt-miss',
         'hexing-bolt-self-target-rejected',
         'turn-control-hit',

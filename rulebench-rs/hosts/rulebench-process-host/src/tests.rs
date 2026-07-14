@@ -7,9 +7,12 @@ use std::time::Duration;
 
 use rulebench_protocol::{
     CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
-    LiveControlExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto,
+    CombatSessionIntentCommandDto, CommandRollModeDto, LiveCommandExecutionDto,
+    LiveControlExecutionDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
+    ProtocolHandshakeDto, ReactionCommandSpecDto, ReactionResponseKindDto,
     ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayComparisonRequestDto,
-    ReplayPackageReviewDto, ReplayVerificationReadoutDto, ScenarioOptionDto, PROTOCOL_VERSION,
+    ReplayPackageReviewDto, ReplayVerificationReadoutDto, ScenarioOptionDto, UseActionIntentDto,
+    PROTOCOL_VERSION,
 };
 
 use crate::{build_rulebench_bridge, serve_until, HttpMethod, HttpRequest, ProcessHostRouter};
@@ -190,6 +193,174 @@ fn router_exposes_rust_replay_review_verification_and_comparison() {
         "/api/rulebench/v1/replays/missing",
     ));
     assert_eq!(missing.status, 404);
+}
+
+#[test]
+fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
+    let mut router = router();
+    let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario_id = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "hexing-bolt-reaction")
+        .expect("reaction scenario exists")
+        .id
+        .clone();
+    let session_id = "reaction-route";
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/sessions",
+                &CombatSessionCreateRequestDto {
+                    session_id: session_id.to_owned(),
+                    scenario_id,
+                    participant_order: Vec::new(),
+                },
+            ))
+            .status,
+        200
+    );
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                &CombatControlCommandDto {
+                    kind: CombatControlCommandKindDto::ExplicitStart,
+                },
+            ))
+            .status,
+        200
+    );
+    let submitted = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/intents"),
+        &CombatSessionIntentCommandDto {
+            id: "reaction-action".to_owned(),
+            title: "Hexing Bolt".to_owned(),
+            summary: "Open the authored reaction window.".to_owned(),
+            intent: UseActionIntentDto {
+                actor_id: "entity-adept".to_owned(),
+                action_id: "hexing_bolt".to_owned(),
+                target_id: "entity-raider".to_owned(),
+                destination_cell: None,
+                observed_origin: None,
+            },
+            roll_stream: vec![17, 5],
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
+        },
+    ));
+    let submitted: LiveCommandExecutionDto =
+        serde_json::from_slice(&submitted.body).expect("intent execution is JSON");
+    let opened = submitted
+        .snapshot
+        .current_reaction_window
+        .expect("reaction window is open");
+    assert_eq!(opened.current_reactor_id.as_deref(), Some("entity-adept"));
+
+    let pass = ReactionCommandSpecDto {
+        window_id: opened.id.clone(),
+        reactor_id: "entity-adept".to_owned(),
+        response_kind: ReactionResponseKindDto::Pass,
+        option_id: None,
+    };
+    let passed = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/reactions"),
+        &pass,
+    ));
+    let passed: LiveReactionExecutionDto =
+        serde_json::from_slice(&passed.body).expect("reaction execution is JSON");
+    assert!(passed.reaction.accepted);
+    assert_eq!(
+        passed
+            .snapshot
+            .current_reaction_window
+            .as_ref()
+            .and_then(|window| window.current_reactor_id.as_deref()),
+        Some("entity-raider")
+    );
+
+    let fingerprint_before_stale = passed.snapshot.state_fingerprint.clone();
+    let stale = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/reactions"),
+        &pass,
+    ));
+    let stale: LiveReactionExecutionDto =
+        serde_json::from_slice(&stale.body).expect("stale reaction execution is JSON");
+    assert!(!stale.reaction.accepted);
+    assert_eq!(stale.reaction.decision_kind, "rejectedOutOfOrder");
+    assert_eq!(stale.snapshot.state_fingerprint, fingerprint_before_stale);
+
+    let accepted = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/reactions"),
+        &ReactionCommandSpecDto {
+            window_id: opened.id,
+            reactor_id: "entity-raider".to_owned(),
+            response_kind: ReactionResponseKindDto::Accept,
+            option_id: Some("raider-ward".to_owned()),
+        },
+    ));
+    let accepted: LiveReactionExecutionDto =
+        serde_json::from_slice(&accepted.body).expect("accepted reaction execution is JSON");
+    assert!(accepted.reaction.accepted);
+    assert!(accepted.reaction.resumed_pending_resolution);
+    assert!(accepted.snapshot.current_reaction_window.is_none());
+    assert_eq!(accepted.snapshot.gameplay_fabric.pending_decision_count, 0);
+    assert_eq!(
+        accepted
+            .snapshot
+            .participants
+            .iter()
+            .find(|participant| participant.id == "entity-raider")
+            .expect("Raider remains in snapshot")
+            .current_hit_points,
+        11
+    );
+
+    router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+        &CombatControlCommandDto {
+            kind: CombatControlCommandKindDto::ExplicitEnd,
+        },
+    ));
+    assert_eq!(
+        router
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/sessions/{session_id}"),
+            ))
+            .status,
+        200
+    );
+    let loaded = router.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/live-{session_id}"),
+    ));
+    let replay: ReplayPackageReviewDto =
+        serde_json::from_slice(&loaded.body).expect("live reaction replay is JSON");
+    assert_eq!(
+        replay
+            .commands
+            .iter()
+            .filter(|command| command.command_kind == "reaction")
+            .count(),
+        3
+    );
+    let verified = router.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/live-{session_id}/verify"),
+    ));
+    let verified: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&verified.body).expect("live reaction replay verification is JSON");
+    assert!(verified.accepted);
+    assert!(verified.finalized);
 }
 
 #[test]

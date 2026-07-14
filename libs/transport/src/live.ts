@@ -11,6 +11,7 @@ import type {
   RulebenchLiveControlExecutionDto,
   RulebenchLiveCurrentActorOptionsDto,
   RulebenchLivePreflightDto,
+  RulebenchLiveReactionExecutionDto,
   RulebenchLiveSessionSnapshotDto,
   RulebenchLiveTransportErrorDto,
   RulebenchProtocolHandshakeDto,
@@ -19,6 +20,7 @@ import type {
   RulebenchReplayComparisonReadoutDto,
   RulebenchReplayPackageReviewDto,
   RulebenchReplayVerificationReadoutDto,
+  RulebenchReactionCommandSpecDto,
   RulebenchScenarioOptionDto,
   RulebenchUseActionIntentDto,
 } from "@asha-rulebench/protocol";
@@ -102,6 +104,11 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
     command: RulebenchCombatControlCommandDto,
     options?: RulebenchLiveRequestOptions,
   ) => Promise<RulebenchLiveTransportResult<RulebenchLiveControlExecutionDto>>;
+  readonly submitReaction: (
+    sessionId: string,
+    command: RulebenchReactionCommandSpecDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchLiveReactionExecutionDto>>;
   readonly runAutomaticStep: (
     sessionId: string,
     request: RulebenchAutomaticStepSpecDto,
@@ -307,6 +314,13 @@ export function createLiveRulebenchTransport(
       request(
         "POST",
         `${sessionPath(sessionId)}/controls`,
+        command,
+        requestOptions,
+      ),
+    submitReaction: (sessionId, command, requestOptions) =>
+      request(
+        "POST",
+        `${sessionPath(sessionId)}/reactions`,
         command,
         requestOptions,
       ),

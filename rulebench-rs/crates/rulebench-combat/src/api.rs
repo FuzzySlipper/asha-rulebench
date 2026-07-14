@@ -975,6 +975,10 @@ mod tests {
             0
         );
         let pending = api.snapshot(&session).expect("pending reaction snapshot");
+        assert_eq!(pending.gameplay_fabric.pending_decision_count, 1);
+        assert_eq!(pending.gameplay_fabric.decisions.len(), 1);
+        assert_eq!(pending.gameplay_fabric.decisions[0].status, "Suspended");
+        assert_eq!(pending.gameplay_fabric.reaction_frame_hashes.len(), 1);
         assert_eq!(pending.current_state.combatants[1].hit_points.current, 10);
         assert_eq!(
             resource_current(
@@ -1065,6 +1069,11 @@ mod tests {
         assert!(resumed.resumed_pending_resolution);
 
         let resolved = api.snapshot(&session).expect("resolved reaction snapshot");
+        assert_eq!(resolved.gameplay_fabric.pending_decision_count, 0);
+        assert_eq!(resolved.gameplay_fabric.decisions.len(), 2);
+        assert_eq!(resolved.gameplay_fabric.decisions[1].status, "Accepted");
+        assert!(resolved.gameplay_fabric.decisions[1].routing_hash.is_some());
+        assert_eq!(resolved.gameplay_fabric.reaction_frame_hashes.len(), 2);
         assert!(resolved.current_reaction_window.is_none());
         assert_eq!(resolved.current_state.combatants[1].hit_points.current, 0);
         assert_eq!(resolved.lifecycle.phase, CombatLifecyclePhase::Ended);

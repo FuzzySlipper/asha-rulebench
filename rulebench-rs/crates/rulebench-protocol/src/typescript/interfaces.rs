@@ -709,7 +709,7 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "trace",
-                    ty: "readonly RulebenchTraceEntryDto[]",
+                    ty: "readonly RulebenchLiveTraceEntryDto[]",
                 },
                 Field {
                     name: "reason",
@@ -787,7 +787,7 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "trace",
-                    ty: "readonly RulebenchTraceEntryDto[]",
+                    ty: "readonly RulebenchLiveTraceEntryDto[]",
                 },
                 Field {
                     name: "reason",
@@ -3151,6 +3151,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "trace",
                     ty: "readonly RulebenchLiveTraceEntryDto[]",
+                },
+                Field {
+                    name: "gameplayModuleStateHash",
+                    ty: "string",
+                },
+                Field {
+                    name: "gameplayDecisionReceiptHashes",
+                    ty: "readonly string[]",
                 },
             ],
         },

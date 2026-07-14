@@ -4,6 +4,10 @@ use crate::model::*;
 use crate::resolver::{resolve_use_action, target_legality_rejection, validate_target_legality};
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
+use rulebench_gameplay_module::{
+    PreEffectWorkspace, RulebenchGameplayContinuation, RulebenchGameplayFabric,
+    RulebenchPreEffectOwner,
+};
 use rulebench_ruleset::ActionResourceCost;
 
 mod automation;
@@ -52,6 +56,7 @@ struct PendingReactionResolution {
     step: CombatSessionStepSummary,
     actor_id: String,
     resource_costs: Vec<ActionResourceCost>,
+    gameplay_continuation: RulebenchGameplayContinuation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,7 +124,7 @@ impl CombatSessionIntentCommandSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct CombatSessionState {
     session_id: String,
     scenario: RulebenchScenario,
@@ -133,6 +138,7 @@ pub struct CombatSessionState {
     reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
     reaction_audit_log: Vec<ReactionAuditEntry>,
     pending_reaction_resolution: Option<PendingReactionResolution>,
+    gameplay_fabric: RulebenchGameplayFabric,
     modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
@@ -160,6 +166,7 @@ impl CombatSessionState {
             reaction_window_lifecycle_log: Vec::new(),
             reaction_audit_log: Vec::new(),
             pending_reaction_resolution: None,
+            gameplay_fabric: RulebenchGameplayFabric::new(),
             modifier_duration_expiration_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
@@ -389,6 +396,33 @@ impl CombatSessionState {
                 .state
                 .project("Authority state is paused until the reaction window resolves.");
         }
+        let gameplay_continuation = if pauses_before_effect {
+            let damage = receipt
+                .damage
+                .as_ref()
+                .expect("BeforeEffect hit reaction has damage evidence");
+            let owner_revision = format!(
+                "{}:{}",
+                state_before_fingerprint.algorithm, state_before_fingerprint.value
+            );
+            Some(
+                self.gameplay_fabric
+                    .begin_before_effect(
+                        PreEffectWorkspace {
+                            decision_id: step.id.clone(),
+                            actor_id: command.actor_id.clone(),
+                            target_id: command.target_id.clone(),
+                            action_id: command.action_id.clone(),
+                            damage_amount: u32::try_from(damage.amount.max(0)).unwrap_or(0),
+                            damage_type: damage.damage_type.clone(),
+                        },
+                        owner_revision,
+                    )
+                    .expect("static gameplay module suspends the authored BeforeEffect window"),
+            )
+        } else {
+            None
+        };
         let state_after_fingerprint = fingerprint_projected_state(&state_after);
         let audit_entry = command_audit_entry(
             &step,
@@ -411,6 +445,8 @@ impl CombatSessionState {
                     step: step.clone(),
                     actor_id: command.actor_id.clone(),
                     resource_costs,
+                    gameplay_continuation: gameplay_continuation
+                        .expect("paused BeforeEffect has a gameplay continuation"),
                 });
             } else {
                 for cost in &resource_costs {

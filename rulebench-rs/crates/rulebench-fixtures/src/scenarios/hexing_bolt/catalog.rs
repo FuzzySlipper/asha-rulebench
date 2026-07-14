@@ -4,16 +4,59 @@ use crate::{
     ScenarioOutcomeClass,
 };
 use rulebench_rules::{
-    validate_scenario_content_report, RulebenchScenario, ScenarioMetadata, UseActionIntent,
+    validate_scenario_content_report, HitEffectOperation, ReactionHookEffectOperation,
+    ReactionOptionDeclaration, ReactionWindow, RulebenchScenario, ScenarioMetadata,
+    UseActionIntent,
 };
 
 pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
     vec![
         accepted_hit_catalog_case(),
+        reaction_window_catalog_case(),
         accepted_miss_catalog_case(),
         rejected_target_legality_catalog_case(),
         turn_control_catalog_case(),
     ]
+}
+
+fn reaction_window_catalog_case() -> ScenarioCatalogCase {
+    let mut case = catalog_case(
+        "hexing-bolt-reaction",
+        "Hexing Bolt Reaction",
+        "Adept hits Raider, suspending before effects while the authored reaction window is open.",
+        "roll-stream:17,5",
+        ScenarioOutcomeClass::AcceptedHit,
+        UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        vec![17, 5],
+    );
+    let hook = ReactionHookEffectOperation {
+        hook_id: "hexing-bolt.pre-effect".to_string(),
+        window: ReactionWindow::BeforeEffect,
+        eligible_reactor_ids: vec!["entity-adept".to_string(), "entity-raider".to_string()],
+        options: vec![
+            ReactionOptionDeclaration {
+                id: "adept-counter".to_string(),
+                reactor_id: "entity-adept".to_string(),
+                opens_nested_window: true,
+            },
+            ReactionOptionDeclaration {
+                id: "raider-ward".to_string(),
+                reactor_id: "entity-raider".to_string(),
+                opens_nested_window: false,
+            },
+        ],
+        maximum_nested_depth: 1,
+    };
+    case.scenario.actions[0]
+        .hit
+        .operations
+        .push(HitEffectOperation::OpenReactionWindow(hook.clone()));
+    case.scenario
+        .selected_action
+        .hit
+        .operations
+        .push(HitEffectOperation::OpenReactionWindow(hook));
+    case
 }
 
 fn turn_control_catalog_case() -> ScenarioCatalogCase {

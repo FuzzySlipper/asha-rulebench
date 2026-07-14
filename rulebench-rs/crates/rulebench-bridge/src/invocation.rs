@@ -3,18 +3,19 @@ use std::collections::BTreeMap;
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
-    ProtocolHandshakeDto, ProtocolRequestContextDto, ReplayArchiveMetadataDto,
-    ReplayComparisonReadoutDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
-    ScenarioOptionDto, ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID,
-    PROTOCOL_VERSION,
+    ProtocolHandshakeDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
+    ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayPackageReviewDto,
+    ReplayVerificationReadoutDto, ScenarioOptionDto, ScenarioParticipantOptionDto,
+    UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 use rulebench_rules::{
     compare_replay_packages, record_replay_package, verify_replay_package, CombatControlReadout,
     CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    CurrentActorOptionSummary, InMemoryReplayArchiveStorage, ReplayArchive, ReplayArchiveQuery,
-    ReplayCommand, ReplayCommandRecordingSpec, ReplayPackage, RulebenchScenario, AUTHORITY_SURFACE,
+    CurrentActorOptionSummary, InMemoryReplayArchiveStorage, ReactionCommandReadout, ReplayArchive,
+    ReplayArchiveQuery, ReplayCommand, ReplayCommandRecordingSpec, ReplayPackage,
+    RulebenchScenario, AUTHORITY_SURFACE,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -289,6 +290,23 @@ impl RulebenchBridge {
             .map_err(BridgeError::from_session_error)?;
         let id = format!("control-{}", self.recording_command_count(&session.id)?);
         self.record_command(&session.id, id, ReplayCommand::Control(authority))?;
+        Ok(readout)
+    }
+
+    pub fn submit_reaction(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        session: &CombatSessionHandleDto,
+        command: &ReactionCommandSpecDto,
+    ) -> Result<ReactionCommandReadout, BridgeError> {
+        self.check_version(context)?;
+        let authority = command.to_authority();
+        let readout = self
+            .sessions
+            .submit_reaction(&session.to_combat_session_handle(), authority.clone())
+            .map_err(BridgeError::from_session_error)?;
+        let id = format!("reaction-{}", self.recording_command_count(&session.id)?);
+        self.record_command(&session.id, id, ReplayCommand::Reaction(authority))?;
         Ok(readout)
     }
 

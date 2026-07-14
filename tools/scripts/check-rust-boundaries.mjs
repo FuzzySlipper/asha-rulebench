@@ -9,7 +9,19 @@ const allowedDependencies = new Map([
   ['rulebench-core', new Set()],
   ['rulebench-ruleset', new Set(['rulebench-core'])],
   ['rulebench-content', new Set(['rulebench-core', 'rulebench-ruleset'])],
-  ['rulebench-combat', new Set(['rulebench-core', 'rulebench-content', 'rulebench-ruleset'])],
+  [
+    'rulebench-gameplay-module',
+    new Set(['asha-gameplay-module-sdk', 'asha-gameplay-runtime-host']),
+  ],
+  [
+    'rulebench-combat',
+    new Set([
+      'rulebench-core',
+      'rulebench-content',
+      'rulebench-gameplay-module',
+      'rulebench-ruleset',
+    ]),
+  ],
   ['rulebench-replay', new Set(['rulebench-core', 'rulebench-combat'])],
   [
     'rulebench-rules',
@@ -28,8 +40,20 @@ const portableCrates = new Set([
   'rulebench-ruleset',
   'rulebench-content',
   'rulebench-combat',
+  'rulebench-gameplay-module',
   'rulebench-replay',
   'rulebench-rules',
+]);
+
+const publicAshaDependencies = new Map([
+  [
+    'asha-gameplay-module-sdk',
+    resolve(root, '..', 'asha-engine', 'public-rust', 'gameplay-module-sdk'),
+  ],
+  [
+    'asha-gameplay-runtime-host',
+    resolve(root, '..', 'asha-engine', 'public-rust', 'gameplay-runtime-host'),
+  ],
 ]);
 
 const manifests = readWorkspaceManifests();
@@ -113,7 +137,7 @@ function validateWorkspace(manifests) {
     for (const dependency of manifest.dependencies) {
       failures.push(...validateDependency(crateName, dependency.name, `${relative(root, manifest.manifestPath)}:${dependency.line}`));
       if (dependency.path !== null) {
-        failures.push(...validatePortablePath(crateName, manifest.manifestPath, dependency.path, `${relative(root, manifest.manifestPath)}:${dependency.line}`));
+        failures.push(...validatePortablePath(crateName, dependency.name, manifest.manifestPath, dependency.path, `${relative(root, manifest.manifestPath)}:${dependency.line}`));
       }
     }
   }
@@ -125,6 +149,12 @@ function validateDependency(crateName, dependencyName, location) {
   const allowed = allowedDependencies.get(crateName);
   if (allowed === undefined) return [];
 
+  if (publicAshaDependencies.has(dependencyName)) {
+    return allowed.has(dependencyName)
+      ? []
+      : [`${location}: ${crateName} may not consume ASHA public crate ${dependencyName}.`];
+  }
+
   if (!allowedDependencies.has(dependencyName)) {
     return [`${location}: ${crateName} depends on unknown local crate ${dependencyName}. Add an explicit boundary policy first.`];
   }
@@ -134,7 +164,7 @@ function validateDependency(crateName, dependencyName, location) {
   return [`${location}: ${crateName} must not depend on ${dependencyName}. This violates the Rulebench crate dependency direction.`];
 }
 
-function validatePortablePath(crateName, manifestPath, dependencyPath, location) {
+function validatePortablePath(crateName, dependencyName, manifestPath, dependencyPath, location) {
   if (!portableCrates.has(crateName)) return [];
 
   const resolvedPath = resolve(join(manifestPath, '..'), dependencyPath);
@@ -143,7 +173,10 @@ function validatePortablePath(crateName, manifestPath, dependencyPath, location)
 
   if (staysInsideCrates) return [];
 
-  return [`${location}: portable crate ${crateName} may not path-depend outside rulebench-rs/crates (${dependencyPath}).`];
+  const approvedAshaPath = publicAshaDependencies.get(dependencyName);
+  if (approvedAshaPath === resolvedPath) return [];
+
+  return [`${location}: portable crate ${crateName} may only path-depend inside rulebench-rs/crates or on an explicitly approved ASHA public root (${dependencyPath}).`];
 }
 
 function runFocusedFailureTests() {
@@ -159,6 +192,7 @@ function runFocusedFailureTests() {
 
   const frontendPathErrors = validatePortablePath(
     'rulebench-core',
+    'rulebench-store',
     join(cratesRoot, 'rulebench-core', 'Cargo.toml'),
     '../../../libs/store',
     'self-test:frontend-path',

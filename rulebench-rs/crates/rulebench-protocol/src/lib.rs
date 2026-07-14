@@ -10,6 +10,7 @@ mod authoring;
 mod bridge;
 mod content;
 mod live;
+mod reaction;
 mod replay;
 mod session;
 mod typescript;
@@ -35,9 +36,14 @@ pub use live::{
     LiveCandidateSummaryDto, LiveCellOptionDto, LiveCombatEndDto, LiveCombatLogEntryDto,
     LiveCommandExecutionDto, LiveCommandStepDto, LiveControlExecutionDto,
     LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto, LiveGeneratedRollDto,
-    LiveGridPositionDto, LiveParticipantDto, LivePreflightDto, LiveRollEvidenceDto,
-    LiveSessionSnapshotDto, LiveStateFingerprintDto, LiveTargetOptionDto, LiveTraceEntryDto,
-    LiveTransportErrorDto,
+    LiveGridPositionDto, LiveParticipantDto, LivePreflightDto, LiveReactionExecutionDto,
+    LiveRollEvidenceDto, LiveSessionSnapshotDto, LiveStateFingerprintDto, LiveTargetOptionDto,
+    LiveTraceEntryDto, LiveTransportErrorDto,
+};
+pub use reaction::{
+    ReactionAuditEntryDto, ReactionCommandReadoutDto, ReactionCommandSpecDto, ReactionOptionDto,
+    ReactionResponseEntryDto, ReactionResponseKindDto, ReactionWindowDto,
+    ReactionWindowLifecycleEntryDto,
 };
 pub use replay::{
     ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayCommandReviewDto,

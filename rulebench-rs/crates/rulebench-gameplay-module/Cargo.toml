@@ -1,0 +1,15 @@
+[package]
+name = "rulebench-gameplay-module"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Public-ASHA-backed pre-commit reaction module for ASHA Rulebench."
+
+[lints]
+workspace = true
+
+[dependencies]
+asha-gameplay-module-sdk = { path = "../../../../asha-engine/public-rust/gameplay-module-sdk" }
+asha-gameplay-runtime-host = { path = "../../../../asha-engine/public-rust/gameplay-runtime-host" }
+serde.workspace = true
+serde_json.workspace = true

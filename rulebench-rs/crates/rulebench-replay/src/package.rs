@@ -133,6 +133,8 @@ pub struct ReplayStepEvidence {
     pub command_audit: Vec<CommandAuditEntry>,
     pub rolls: Vec<RollConsumptionEntry>,
     pub trace: Vec<TraceEntry>,
+    pub gameplay_module_state_hash: String,
+    pub gameplay_decision_receipt_hashes: Vec<String>,
 }
 
 /// Optional presentation copy. None of these fields are replay inputs.

@@ -7,6 +7,7 @@ const forbiddenCrates = [
   'rulebench-bridge',
   'rulebench-codegen',
   'rulebench-fixtures',
+  'rulebench-process-host',
   'rulebench-protocol',
 ];
 

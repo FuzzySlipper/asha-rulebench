@@ -52,7 +52,8 @@
       "defaultConfiguration": "development",
       "configurations": {
         "production": { "buildTarget": "app:build:production" },
-        "development": { "buildTarget": "app:build:development" }
+        "development": { "buildTarget": "app:build:development" },
+        "e2e": { "buildTarget": "app:build:development" }
       }
     },
     "serve-static": {

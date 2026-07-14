@@ -108,9 +108,9 @@ export type RulebenchRuleModuleConfigurationDto = RulebenchActionResolutionModul
 
 export type RulebenchReplayVerificationDecisionKindDto = 'verified' | 'invalidPackage' | 'mismatchedEvidence';
 
-export type RulebenchReplayMismatchDimensionDto = 'decision' | 'stateBeforeFingerprint' | 'acceptedEvents' | 'commandAudit' | 'rolls' | 'trace' | 'stateAfterFingerprint' | 'finalStateFingerprint';
+export type RulebenchReplayMismatchDimensionDto = 'decision' | 'stateBeforeFingerprint' | 'acceptedEvents' | 'commandAudit' | 'rolls' | 'trace' | 'stateAfterFingerprint' | 'gameplayFabricEvidence' | 'finalStateFingerprint';
 
-export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMismatch' | 'replayContentMismatch' | 'replayRulesetMismatch' | 'replayCommandCountMismatch' | 'replayCommandMismatch' | 'replayDecisionMismatch' | 'replayAcceptedEventsMismatch' | 'replayCommandAuditMismatch' | 'replayRollsMismatch' | 'replayTraceMismatch' | 'replayStateBeforeFingerprintMismatch' | 'replayStateAfterFingerprintMismatch' | 'replayFinalStateFingerprintMismatch';
+export type RulebenchReplayComparisonDifferenceCodeDto = 'replayPackageVersionMismatch' | 'replayContentMismatch' | 'replayRulesetMismatch' | 'replayCommandCountMismatch' | 'replayCommandMismatch' | 'replayDecisionMismatch' | 'replayAcceptedEventsMismatch' | 'replayCommandAuditMismatch' | 'replayRollsMismatch' | 'replayTraceMismatch' | 'replayStateBeforeFingerprintMismatch' | 'replayStateAfterFingerprintMismatch' | 'replayGameplayFabricEvidenceMismatch' | 'replayFinalStateFingerprintMismatch';
 
 export type RulebenchReplayArchiveErrorKindDto = 'invalidPackage' | 'storage' | 'notFound' | 'corrupt' | 'unsupportedVersion';
 
@@ -266,6 +266,28 @@ export interface RulebenchLiveFinalizationDto {
   readonly reason: string;
 }
 
+export interface RulebenchLiveGameplayDecisionEvidenceDto {
+  readonly decisionId: string;
+  readonly status: string;
+  readonly receiptHash: string;
+  readonly initialWorkspaceHash: string;
+  readonly finalWorkspaceHash: string;
+  readonly declaredReadHashes: readonly string[];
+  readonly invocationOutputHashes: readonly string[];
+  readonly routingHash: string | null;
+  readonly diagnosticCodes: readonly string[];
+}
+
+export interface RulebenchLiveGameplayFabricDto {
+  readonly registryDigest: string;
+  readonly bindingRegistryHash: string;
+  readonly moduleStateHash: string;
+  readonly runtimeHostHash: string;
+  readonly reactionFrameHashes: readonly string[];
+  readonly decisions: readonly RulebenchLiveGameplayDecisionEvidenceDto[];
+  readonly pendingDecisionCount: number;
+}
+
 export interface RulebenchLiveSessionSnapshotDto {
   readonly sessionId: string;
   readonly nextStepIndex: number;
@@ -280,6 +302,10 @@ export interface RulebenchLiveSessionSnapshotDto {
   readonly board: RulebenchLiveBoardDto;
   readonly options: RulebenchLiveCurrentActorOptionsDto;
   readonly combatEnd: RulebenchLiveCombatEndDto;
+  readonly gameplayFabric: RulebenchLiveGameplayFabricDto;
+  readonly currentReactionWindow: RulebenchReactionWindowDto | null;
+  readonly reactionWindowLifecycleLog: readonly RulebenchReactionWindowLifecycleEntryDto[];
+  readonly reactionAuditLog: readonly RulebenchReactionAuditEntryDto[];
   readonly finalization: RulebenchLiveFinalizationDto | null;
   readonly combatLog: readonly RulebenchLiveCombatLogEntryDto[];
   readonly auditLog: readonly RulebenchLiveAuditEntryDto[];
@@ -365,6 +391,11 @@ export interface RulebenchLiveCommandStepDto {
 
 export interface RulebenchLiveCommandExecutionDto {
   readonly step: RulebenchLiveCommandStepDto;
+  readonly snapshot: RulebenchLiveSessionSnapshotDto;
+}
+
+export interface RulebenchLiveReactionExecutionDto {
+  readonly reaction: RulebenchReactionCommandReadoutDto;
   readonly snapshot: RulebenchLiveSessionSnapshotDto;
 }
 
@@ -633,7 +664,7 @@ export interface RulebenchReactionCommandReadoutDto {
   readonly nextWindow: RulebenchReactionWindowDto | null;
   readonly openedNestedWindow: RulebenchReactionWindowDto | null;
   readonly resumedPendingResolution: boolean;
-  readonly trace: readonly RulebenchTraceEntryDto[];
+  readonly trace: readonly RulebenchLiveTraceEntryDto[];
   readonly reason: string;
 }
 
@@ -656,7 +687,7 @@ export interface RulebenchReactionAuditEntryDto {
   readonly optionId: string | null;
   readonly accepted: boolean;
   readonly decisionKind: RulebenchReactionDecisionKindDto;
-  readonly trace: readonly RulebenchTraceEntryDto[];
+  readonly trace: readonly RulebenchLiveTraceEntryDto[];
   readonly reason: string;
 }
 
@@ -1385,6 +1416,8 @@ export interface RulebenchReplayStepEvidenceDto {
   readonly commandAudit: readonly RulebenchLiveAuditEntryDto[];
   readonly rolls: readonly RulebenchLiveRollEvidenceDto[];
   readonly trace: readonly RulebenchLiveTraceEntryDto[];
+  readonly gameplayModuleStateHash: string;
+  readonly gameplayDecisionReceiptHashes: readonly string[];
 }
 
 export interface RulebenchReplayMismatchDto {

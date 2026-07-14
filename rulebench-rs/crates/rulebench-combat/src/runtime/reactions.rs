@@ -336,17 +336,43 @@ impl CombatSessionState {
     }
 
     fn resume_pending_reaction_resolution(&mut self, resolved_root: &ReactionWindowReadout) {
-        let pending = self
+        let mut pending = self
             .pending_reaction_resolution
             .take()
             .expect("pending reaction resolution");
+        let accepted_response = resolved_root
+            .responses
+            .iter()
+            .find(|response| response.response_kind == ReactionResponseKind::Accept);
+        let accepted = accepted_response.is_some();
+        let option_id = accepted_response.and_then(|response| response.option_id.clone());
+        let decision_receipt = {
+            let mut owner = CombatPreEffectOwner {
+                state: &mut self.state,
+                receipt: &mut pending.receipt,
+                actor_id: &pending.actor_id,
+                action_id: &resolved_root.trigger_action_id,
+            };
+            self.gameplay_fabric
+                .resolve_before_effect(
+                    &pending.gameplay_continuation,
+                    accepted,
+                    option_id,
+                    &mut owner,
+                )
+                .expect("static gameplay continuation resolves")
+        };
+        assert!(
+            decision_receipt.accepted(),
+            "gameplay pre-effect owner route must accept the current Rulebench revision: {:?}",
+            decision_receipt.diagnostics
+        );
         for cost in &pending.resource_costs {
             let spend =
                 self.state
                     .spend_action_resource(&pending.actor_id, &cost.resource_id, cost.amount);
             self.record_action_resource_spend_transition(&pending.step, &spend);
         }
-        self.apply_receipt_effects_to_state(&pending.receipt);
         self.record_reaction_lifecycle(
             ReactionWindowLifecycleKind::ResolutionResumed,
             resolved_root,
@@ -416,5 +442,51 @@ impl CombatSessionState {
                 option_id,
                 reason: reason.to_string(),
             });
+    }
+}
+
+struct CombatPreEffectOwner<'a> {
+    state: &'a mut CombatState,
+    receipt: &'a mut RulebenchReceipt,
+    actor_id: &'a str,
+    action_id: &'a str,
+}
+
+impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
+    fn revision_hash(&self) -> String {
+        let projection = self.state.project("Gameplay pre-effect owner revision.");
+        let fingerprint = fingerprint_projected_state(&projection);
+        format!("{}:{}", fingerprint.algorithm, fingerprint.value)
+    }
+
+    fn commit(&mut self, workspace: &PreEffectWorkspace) -> Result<Vec<String>, Vec<String>> {
+        let Some(damage) = self.receipt.damage.as_mut() else {
+            return Err(vec!["missingPendingDamage".to_owned()]);
+        };
+        if workspace.actor_id != self.actor_id
+            || workspace.action_id != self.action_id
+            || workspace.target_id != damage.target_id
+            || workspace.damage_type != damage.damage_type
+        {
+            return Err(vec!["preEffectWorkspaceIdentityMismatch".to_owned()]);
+        }
+        let amount = i32::try_from(workspace.damage_amount)
+            .map_err(|_| vec!["preEffectDamageOutOfRange".to_owned()])?;
+        if amount > damage.amount {
+            return Err(vec!["preEffectDamageIncreaseRejected".to_owned()]);
+        }
+        damage.amount = amount;
+        damage.after.current = damage
+            .before
+            .current
+            .saturating_sub(amount)
+            .clamp(0, damage.before.max);
+        self.state.apply_hit(damage, self.receipt.modifier.as_ref());
+        let fingerprint =
+            fingerprint_projected_state(&self.state.project("Gameplay pre-effect owner commit."));
+        Ok(vec![format!(
+            "{}:{}",
+            fingerprint.algorithm, fingerprint.value
+        )])
     }
 }

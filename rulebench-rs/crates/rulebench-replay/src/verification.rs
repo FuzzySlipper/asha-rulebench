@@ -33,6 +33,7 @@ pub enum ReplayMismatchDimension {
     Rolls,
     Trace,
     StateAfterFingerprint,
+    GameplayFabricEvidence,
     FinalStateFingerprint,
 }
 
@@ -46,6 +47,7 @@ impl ReplayMismatchDimension {
             Rolls => "rolls",
             Trace => "trace",
             StateAfterFingerprint => "stateAfterFingerprint",
+            GameplayFabricEvidence => "gameplayFabricEvidence",
             FinalStateFingerprint => "finalStateFingerprint",
         }
     }
@@ -252,6 +254,13 @@ pub(crate) fn execute_command(
         command_audit: after.audit_log[audit_start..].to_vec(),
         rolls,
         trace,
+        gameplay_module_state_hash: after.gameplay_fabric.module_state_hash,
+        gameplay_decision_receipt_hashes: after
+            .gameplay_fabric
+            .decisions
+            .iter()
+            .map(|decision| decision.receipt_hash.clone())
+            .collect(),
     }
 }
 
@@ -290,6 +299,10 @@ fn first_step_mismatch(
         Some(Trace)
     } else if expected.state_after_fingerprint != actual.state_after_fingerprint {
         Some(StateAfterFingerprint)
+    } else if expected.gameplay_module_state_hash != actual.gameplay_module_state_hash
+        || expected.gameplay_decision_receipt_hashes != actual.gameplay_decision_receipt_hashes
+    {
+        Some(GameplayFabricEvidence)
     } else {
         None
     }
@@ -353,6 +366,19 @@ pub(crate) mod tests {
         assert_eq!(
             readout.mismatch.as_ref().map(|value| value.dimension),
             Some(ReplayMismatchDimension::Rolls)
+        );
+    }
+
+    #[test]
+    fn replay_rejects_changed_gameplay_fabric_evidence() {
+        let mut package = recorded_control_package();
+        package.commands[1].expected.gameplay_module_state_hash = "changed".to_string();
+
+        let readout = verify_replay_package(&package);
+
+        assert_eq!(
+            readout.mismatch.as_ref().map(|value| value.dimension),
+            Some(ReplayMismatchDimension::GameplayFabricEvidence)
         );
     }
 

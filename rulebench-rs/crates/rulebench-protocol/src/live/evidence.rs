@@ -9,7 +9,7 @@ use super::{
     LiveActionResourceCostDto, LiveActionResourceStateDto, LiveSessionSnapshotDto,
     LiveStateFingerprintDto,
 };
-use crate::UseActionIntentDto;
+use crate::{ReactionCommandReadoutDto, UseActionIntentDto};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -18,6 +18,25 @@ pub struct LiveTransportErrorDto {
     pub code: String,
     pub message: String,
     pub retryable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveReactionExecutionDto {
+    pub reaction: ReactionCommandReadoutDto,
+    pub snapshot: LiveSessionSnapshotDto,
+}
+
+impl LiveReactionExecutionDto {
+    pub fn new(
+        reaction: &rulebench_rules::ReactionCommandReadout,
+        snapshot: &CombatSessionSnapshot,
+    ) -> Self {
+        Self {
+            reaction: ReactionCommandReadoutDto::from(reaction),
+            snapshot: LiveSessionSnapshotDto::from(snapshot),
+        }
+    }
 }
 
 impl LiveTransportErrorDto {

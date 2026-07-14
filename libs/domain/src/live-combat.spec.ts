@@ -146,6 +146,18 @@ function snapshot(
     finalization: null,
     combatLog: [],
     auditLog: [],
+    gameplayFabric: {
+      registryDigest: "sha256:registry",
+      bindingRegistryHash: "sha256:bindings",
+      moduleStateHash: "sha256:module-state",
+      runtimeHostHash: "sha256:runtime-host",
+      reactionFrameHashes: [],
+      decisions: [],
+      pendingDecisionCount: 0,
+    },
+    currentReactionWindow: null,
+    reactionWindowLifecycleLog: [],
+    reactionAuditLog: [],
     stateFingerprint: { algorithm: "test", value: fingerprint },
   };
 }

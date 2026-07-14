@@ -119,12 +119,17 @@ authenticated, internet-facing, multi-user, or durable-session service.
 
 ## Dependency Posture
 
-The workspace has no path dependency on `/home/dev/asha-engine`.
+`rulebench-gameplay-module` has development-only sibling path dependencies on
+the governed ASHA public Rust facades. No crate imports
+`asha-engine/engine-rs/crates/*`. ASHA #5796 owns the versioned distribution
+boundary that will remove the sibling-checkout requirement; ASHA #5797 owns
+the composed RuntimeSession seam that will replace the quarantined standalone
+gameplay host.
 
 Planner approval in task #5560 authorizes `serde` with derive support for
 protocol DTOs and `serde_json` for the concrete process host. Portable authority
-crates remain serialization-free. Further external or ASHA path dependencies
-still require planner approval.
+crates remain serialization-free. Further external or ASHA dependencies still
+require planner approval.
 
 ## Non-Claims
 

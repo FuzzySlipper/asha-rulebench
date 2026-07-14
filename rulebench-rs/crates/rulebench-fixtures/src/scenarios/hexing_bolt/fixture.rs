@@ -136,6 +136,10 @@ pub fn hexing_bolt_scenario_package() -> ScenarioPackage {
         }],
         expected_evidence: vec![
             evidence("hexing-bolt-hit", ScenarioPackageEvidenceKind::CatalogCase),
+            evidence(
+                "hexing-bolt-reaction",
+                ScenarioPackageEvidenceKind::CatalogCase,
+            ),
             evidence("hexing-bolt-miss", ScenarioPackageEvidenceKind::CatalogCase),
             evidence(
                 "hexing-bolt-self-target-rejected",
@@ -181,6 +185,11 @@ fn hexing_bolt_golden_artifacts() -> Vec<FixtureGoldenArtifact> {
     vec![
         golden(
             "hexing-bolt-hit",
+            FixtureGoldenArtifactKind::ScenarioCatalog,
+            "pnpm run catalog:check",
+        ),
+        golden(
+            "hexing-bolt-reaction",
             FixtureGoldenArtifactKind::ScenarioCatalog,
             "pnpm run catalog:check",
         ),

@@ -14,6 +14,7 @@ pub enum ReplayComparisonDifferenceCode {
     Trace,
     StateBeforeFingerprint,
     StateAfterFingerprint,
+    GameplayFabricEvidence,
     FinalStateFingerprint,
 }
 
@@ -32,6 +33,7 @@ impl ReplayComparisonDifferenceCode {
             Self::Trace => "replayTraceMismatch",
             Self::StateBeforeFingerprint => "replayStateBeforeFingerprintMismatch",
             Self::StateAfterFingerprint => "replayStateAfterFingerprintMismatch",
+            Self::GameplayFabricEvidence => "replayGameplayFabricEvidenceMismatch",
             Self::FinalStateFingerprint => "replayFinalStateFingerprintMismatch",
         }
     }
@@ -185,9 +187,24 @@ pub fn compare_replay_packages(
             ReplayComparisonDifferenceCode::StateAfterFingerprint,
             &format!("commands[{index}].expected.stateAfterFingerprint"),
             sequence,
-            command_id,
+            command_id.clone(),
             &expected_command.expected.state_after_fingerprint,
             &actual_command.expected.state_after_fingerprint,
+        );
+        compare(
+            &mut differences,
+            ReplayComparisonDifferenceCode::GameplayFabricEvidence,
+            &format!("commands[{index}].expected.gameplayFabricEvidence"),
+            sequence,
+            command_id,
+            &(
+                &expected_command.expected.gameplay_module_state_hash,
+                &expected_command.expected.gameplay_decision_receipt_hashes,
+            ),
+            &(
+                &actual_command.expected.gameplay_module_state_hash,
+                &actual_command.expected.gameplay_decision_receipt_hashes,
+            ),
         );
     }
 
@@ -293,6 +310,9 @@ mod tests {
                 package.commands[0].expected.state_after_fingerprint.value = "changed".to_string()
             }),
             changed(&expected, |package| {
+                package.commands[0].expected.gameplay_module_state_hash = "changed".to_string()
+            }),
+            changed(&expected, |package| {
                 package.final_state_fingerprint.value = "changed".to_string()
             }),
         ];
@@ -303,6 +323,7 @@ mod tests {
             ReplayComparisonDifferenceCode::Rolls,
             ReplayComparisonDifferenceCode::Trace,
             ReplayComparisonDifferenceCode::StateAfterFingerprint,
+            ReplayComparisonDifferenceCode::GameplayFabricEvidence,
             ReplayComparisonDifferenceCode::FinalStateFingerprint,
         ];
 

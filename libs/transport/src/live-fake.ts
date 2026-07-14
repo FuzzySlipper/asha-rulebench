@@ -88,6 +88,9 @@ export function createFakeRulebenchLiveTransport(
     submitControl: (sessionId, command, requestOptions) =>
       handlers.submitControl?.(sessionId, command, requestOptions) ??
       unavailable("submitControl"),
+    submitReaction: (sessionId, command, requestOptions) =>
+      handlers.submitReaction?.(sessionId, command, requestOptions) ??
+      unavailable("submitReaction"),
     runAutomaticStep: (sessionId, request, requestOptions) =>
       handlers.runAutomaticStep?.(sessionId, request, requestOptions) ??
       unavailable("runAutomaticStep"),

@@ -11,6 +11,7 @@ import type {
 } from "@asha-rulebench/protocol";
 import {
   createFakeRulebenchLiveTransport,
+  type RulebenchLiveTransport,
   type RulebenchLiveTransportResult,
 } from "@asha-rulebench/transport";
 import { LiveCombatStore } from "./live-combat-store";
@@ -140,6 +141,66 @@ describe("LiveCombatStore", () => {
     expect(store.snapshot()).toMatchObject({
       kind: "data",
       value: { participants: [{}, { hitPointLabel: "18/18 HP" }] },
+    });
+  });
+
+  it("submits the current authored reaction command and projects the resumed snapshot", async () => {
+    let submitted:
+      | Parameters<RulebenchLiveTransport["submitReaction"]>[1]
+      | undefined;
+    const transport = createFakeRulebenchLiveTransport({
+      getSession: async () => ({
+        ok: true,
+        value: makeLiveSessionSnapshot({ reactionWindow: true }),
+      }),
+      submitReaction: async (_sessionId, command) => {
+        submitted = command;
+        return {
+          ok: true,
+          value: {
+            reaction: {
+              command,
+              accepted: true,
+              decisionKind: "accepted",
+              previousWindow: makeLiveSessionSnapshot({ reactionWindow: true })
+                .currentReactionWindow,
+              nextWindow: null,
+              openedNestedWindow: null,
+              resumedPendingResolution: true,
+              trace: [],
+              reason: "Reaction accepted and pending resolution resumed.",
+            },
+            snapshot: makeLiveSessionSnapshot({
+              raiderHitPoints: 11,
+              fingerprint: "state-reaction-resolved",
+            }),
+          },
+        };
+      },
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+    await store.selectSession("live-session");
+
+    await store.submitReaction({
+      windowId: "window-1",
+      reactorId: "entity-raider",
+      responseKind: "accept",
+      optionId: "raider-ward",
+    });
+
+    expect(submitted).toEqual({
+      windowId: "window-1",
+      reactorId: "entity-raider",
+      responseKind: "accept",
+      optionId: "raider-ward",
+    });
+    expect(store.reaction()).toMatchObject({
+      kind: "data",
+      value: { accepted: true, resumedPendingResolution: true },
+    });
+    expect(store.snapshot()).toMatchObject({
+      kind: "data",
+      value: { reactionWindow: null, participants: [{}, { hitPointLabel: "11/18 HP" }] },
     });
   });
 
@@ -518,6 +579,7 @@ function makeLiveSessionSnapshot(
     readonly lifecyclePhase?: RulebenchLiveSessionSnapshotDto["lifecyclePhase"];
     readonly raiderHitPoints?: number;
     readonly fingerprint?: string;
+    readonly reactionWindow?: boolean;
   } = {},
 ): RulebenchLiveSessionSnapshotDto {
   const sessionId = options.sessionId ?? "live-session";
@@ -610,6 +672,41 @@ function makeLiveSessionSnapshot(
       winningSides: [],
       reason: "Authority lifecycle readout.",
     },
+    gameplayFabric: {
+      registryDigest: "registry",
+      bindingRegistryHash: "bindings",
+      moduleStateHash: "module-state",
+      runtimeHostHash: "runtime-host",
+      reactionFrameHashes: [],
+      decisions: [],
+      pendingDecisionCount: options.reactionWindow === true ? 1 : 0,
+    },
+    currentReactionWindow:
+      options.reactionWindow === true
+        ? {
+            id: "window-1",
+            hookId: "hexing-bolt.pre-effect",
+            timing: "beforeEffect",
+            depth: 0,
+            maximumNestedDepth: 1,
+            parentWindowId: null,
+            triggerStepId: "step-1",
+            triggerActionId: "hexing_bolt",
+            eligibleReactorIds: ["entity-adept", "entity-raider"],
+            currentReactorId: "entity-raider",
+            options: [
+              {
+                optionId: "raider-ward",
+                reactorId: "entity-raider",
+                opensNestedWindow: false,
+              },
+            ],
+            responses: [],
+            status: "open",
+          }
+        : null,
+    reactionWindowLifecycleLog: [],
+    reactionAuditLog: [],
     finalization: null,
     combatLog: [],
     auditLog: [],

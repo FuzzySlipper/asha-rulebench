@@ -531,6 +531,45 @@
         @case ("audit") {
           <ol class="evidence-list">
             @if (snapshot().kind === "data") {
+              <li data-testid="gameplay-fabric-evidence">
+                <strong
+                  >Gameplay fabric ·
+                  {{ snapshot().value.gameplayFabric.decisions.length }}
+                  decisions</strong
+                >
+                <span
+                  >{{
+                    snapshot().value.gameplayFabric.reactionFrameHashes.length
+                  }}
+                  state frames ·
+                  {{
+                    snapshot().value.gameplayFabric.pendingDecisionCount
+                  }}
+                  pending</span
+                >
+                <span
+                  >Registry
+                  {{ snapshot().value.gameplayFabric.registryDigest }} · state
+                  {{ snapshot().value.gameplayFabric.moduleStateHash }}</span
+                >
+              </li>
+              @for (
+                decision of snapshot().value.gameplayFabric.decisions;
+                track decision.receiptHash
+              ) {
+                <li>
+                  <strong
+                    >Gameplay decision · {{ decision.decisionId }} ·
+                    {{ decision.status }}</strong
+                  >
+                  <span
+                    >{{ decision.declaredReadHashes.length }} declared reads ·
+                    {{ decision.invocationOutputHashes.length }} invocations ·
+                    route {{ decision.routingHash ?? "not committed" }}</span
+                  >
+                  <span>{{ decision.receiptHash }}</span>
+                </li>
+              }
               <li>
                 <strong
                   >Policy configuration · firstAcceptedCandidate v1</strong
@@ -1052,6 +1091,50 @@
         @case ("idle") {
           <p class="panel-state">Actions are not loaded</p>
         }
+      }
+      @if (reactionWindow(); as reactionWindow) {
+        <section class="reaction-response" aria-label="Reaction response">
+          <div>
+            <strong>Reaction required</strong>
+            <span>{{ reactionWindow.timingLabel }} · depth {{ reactionWindow.depthLabel }}</span>
+          </div>
+          <p>
+            {{ reactionWindow.currentReactorId }} must pass or select an authored option.
+          </p>
+          <div class="target-options">
+            <button
+              type="button"
+              [disabled]="reaction().kind === 'loading'"
+              (click)="respondToReaction('pass', null)"
+            >
+              Pass reaction
+            </button>
+            @for (option of reactionWindow.options; track option.id) {
+              @if (option.reactorId === reactionWindow.currentReactorId) {
+                <button
+                  type="button"
+                  [disabled]="reaction().kind === 'loading'"
+                  (click)="respondToReaction('accept', option.id)"
+                >
+                  Use {{ option.label }}
+                </button>
+              }
+            }
+          </div>
+          @switch (reaction().kind) {
+            @case ("data") {
+              <p role="status">
+                {{ reaction().value.decisionLabel }} · {{ reaction().value.reason }}
+              </p>
+            }
+            @case ("error") {
+              <p role="alert">{{ reaction().error.message }}</p>
+            }
+            @case ("loading") {
+              <p role="status">Resolving reaction in Rust authority</p>
+            }
+          }
+        </section>
       }
       <div class="roll-fields">
         <fieldset class="roll-mode">

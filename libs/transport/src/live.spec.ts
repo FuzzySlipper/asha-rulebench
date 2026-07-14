@@ -112,6 +112,13 @@ describe("live Rulebench transport", () => {
     await transport.submitControl(createRequest.sessionId, {
       kind: "advanceTurn",
     });
+    const reactionCommand = {
+      windowId: "window-1",
+      reactorId: "entity-adept",
+      responseKind: "pass" as const,
+      optionId: null,
+    };
+    await transport.submitReaction(createRequest.sessionId, reactionCommand);
     await transport.runAutomaticStep(createRequest.sessionId, automaticStep);
     await transport.runAutomaticCombat(createRequest.sessionId, automaticRun);
     await transport.listReplayPackages();
@@ -131,6 +138,7 @@ describe("live Rulebench transport", () => {
       "GET http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/candidates",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/intents",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/controls",
+      "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/reactions",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-step",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-run",
       "GET http://rulebench.test/api/rulebench/v1/replays",
@@ -142,9 +150,10 @@ describe("live Rulebench transport", () => {
     expect(calls[3]?.body).toBe(JSON.stringify(createRequest));
     expect(calls[7]?.body).toBe(JSON.stringify(intent));
     expect(calls[9]?.body).toBe(JSON.stringify(intentCommand));
-    expect(calls[11]?.body).toBe(JSON.stringify(automaticStep));
-    expect(calls[12]?.body).toBe(JSON.stringify(automaticRun));
-    expect(calls[16]?.body).toBe(
+    expect(calls[11]?.body).toBe(JSON.stringify(reactionCommand));
+    expect(calls[12]?.body).toBe(JSON.stringify(automaticStep));
+    expect(calls[13]?.body).toBe(JSON.stringify(automaticRun));
+    expect(calls[17]?.body).toBe(
       JSON.stringify({
         expectedPackageId: "expected",
         actualPackageId: "actual",

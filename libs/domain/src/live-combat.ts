@@ -4,7 +4,9 @@ import type {
   RulebenchLiveCandidateSummaryDto,
   RulebenchLiveCommandExecutionDto,
   RulebenchLiveCurrentActorOptionsDto,
+  RulebenchLiveGameplayFabricDto,
   RulebenchLivePreflightDto,
+  RulebenchLiveReactionExecutionDto,
   RulebenchLiveSessionSnapshotDto,
 } from "@asha-rulebench/protocol";
 
@@ -48,6 +50,35 @@ export interface RulebenchLiveSessionView {
   readonly finalizationLabel: string | null;
   readonly combatLog: readonly RulebenchLiveLogEntryView[];
   readonly auditLog: readonly RulebenchLiveAuditEntryView[];
+  readonly gameplayFabric: RulebenchLiveGameplayFabricDto;
+  readonly reactionWindow: RulebenchLiveReactionWindowView | null;
+  readonly reactionLifecycleLabels: readonly string[];
+  readonly reactionAuditLabels: readonly string[];
+}
+
+export interface RulebenchLiveReactionWindowView {
+  readonly id: string;
+  readonly hookId: string;
+  readonly timingLabel: string;
+  readonly depthLabel: string;
+  readonly currentReactorId: string | null;
+  readonly options: readonly RulebenchLiveReactionOptionView[];
+  readonly responseLabels: readonly string[];
+}
+
+export interface RulebenchLiveReactionOptionView {
+  readonly id: string;
+  readonly reactorId: string;
+  readonly opensNestedWindow: boolean;
+  readonly label: string;
+}
+
+export interface RulebenchLiveReactionExecutionView {
+  readonly accepted: boolean;
+  readonly decisionLabel: string;
+  readonly resumedPendingResolution: boolean;
+  readonly reason: string;
+  readonly traceLabels: readonly string[];
 }
 
 export interface RulebenchLiveParticipantView {
@@ -252,6 +283,45 @@ export function projectLiveSessionSnapshot(
         entry.stateBeforeFingerprint.value !==
         entry.stateAfterFingerprint.value,
     })),
+    gameplayFabric: snapshot.gameplayFabric,
+    reactionWindow:
+      snapshot.currentReactionWindow === null
+        ? null
+        : {
+            id: snapshot.currentReactionWindow.id,
+            hookId: snapshot.currentReactionWindow.hookId,
+            timingLabel: labelCode(snapshot.currentReactionWindow.timing),
+            depthLabel: `${snapshot.currentReactionWindow.depth}/${snapshot.currentReactionWindow.maximumNestedDepth}`,
+            currentReactorId: snapshot.currentReactionWindow.currentReactorId,
+            options: snapshot.currentReactionWindow.options.map((option) => ({
+              id: option.optionId,
+              reactorId: option.reactorId,
+              opensNestedWindow: option.opensNestedWindow,
+              label: `${labelCode(option.optionId)}${option.opensNestedWindow ? " (opens nested window)" : ""}`,
+            })),
+            responseLabels: snapshot.currentReactionWindow.responses.map(
+              (response) =>
+                `${response.reactorId}: ${labelCode(response.responseKind)}${response.optionId === null ? "" : ` ${labelCode(response.optionId)}`}`,
+            ),
+          },
+    reactionLifecycleLabels: snapshot.reactionWindowLifecycleLog.map(
+      (entry) => `${labelCode(entry.lifecycleKind)}: ${entry.reason}`,
+    ),
+    reactionAuditLabels: snapshot.reactionAuditLog.map(
+      (entry) => `${entry.reactorId}: ${labelCode(entry.decisionKind)} · ${entry.reason}`,
+    ),
+  };
+}
+
+export function projectLiveReactionExecution(
+  execution: RulebenchLiveReactionExecutionDto,
+): RulebenchLiveReactionExecutionView {
+  return {
+    accepted: execution.reaction.accepted,
+    decisionLabel: labelCode(execution.reaction.decisionKind),
+    resumedPendingResolution: execution.reaction.resumedPendingResolution,
+    reason: execution.reaction.reason,
+    traceLabels: execution.reaction.trace.map((entry) => entry.message),
   };
 }
 
@@ -399,6 +469,9 @@ export function projectLiveAutomaticRun(
 
 function labelCode(value: string): string {
   return value
+    .replace(/[-_.]+/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/^./, (letter) => letter.toUpperCase());
+    .split(" ")
+    .map((word) => word.replace(/^./, (letter) => letter.toUpperCase()))
+    .join(" ");
 }

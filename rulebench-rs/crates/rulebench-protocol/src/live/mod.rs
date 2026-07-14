@@ -6,7 +6,7 @@ pub use automation::{LiveAutomaticRunDto, LiveAutomaticStepDto};
 pub use evidence::{
     LiveCandidateDto, LiveCandidateSummaryDto, LiveCommandExecutionDto, LiveCommandStepDto,
     LiveControlExecutionDto, LiveDomainEventDto, LiveGeneratedRollDto, LivePreflightDto,
-    LiveRollEvidenceDto, LiveTraceEntryDto, LiveTransportErrorDto,
+    LiveReactionExecutionDto, LiveRollEvidenceDto, LiveTraceEntryDto, LiveTransportErrorDto,
 };
 pub use snapshot::{
     LiveActionOptionDto, LiveActionResourceCostDto, LiveActionResourceStateDto, LiveAuditEntryDto,

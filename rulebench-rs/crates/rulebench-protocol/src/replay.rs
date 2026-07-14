@@ -129,6 +129,8 @@ pub struct ReplayStepEvidenceDto {
     pub command_audit: Vec<LiveAuditEntryDto>,
     pub rolls: Vec<LiveRollEvidenceDto>,
     pub trace: Vec<LiveTraceEntryDto>,
+    pub gameplay_module_state_hash: String,
+    pub gameplay_decision_receipt_hashes: Vec<String>,
 }
 
 impl From<&ReplayStepEvidence> for ReplayStepEvidenceDto {
@@ -154,6 +156,8 @@ impl From<&ReplayStepEvidence> for ReplayStepEvidenceDto {
                 .collect(),
             rolls: value.rolls.iter().map(LiveRollEvidenceDto::from).collect(),
             trace: value.trace.iter().map(LiveTraceEntryDto::from).collect(),
+            gameplay_module_state_hash: value.gameplay_module_state_hash.clone(),
+            gameplay_decision_receipt_hashes: value.gameplay_decision_receipt_hashes.clone(),
         }
     }
 }

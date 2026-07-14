@@ -133,6 +133,7 @@ impl CombatSessionState {
             equipment_transition_log: self.equipment_transition_log.clone(),
             reaction_window_lifecycle_log: self.reaction_window_lifecycle_log.clone(),
             reaction_audit_log: self.reaction_audit_log.clone(),
+            gameplay_fabric: self.gameplay_fabric.readout(),
             current_reaction_window: self.current_reaction_window().cloned(),
             modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),

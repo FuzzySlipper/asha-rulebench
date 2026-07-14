@@ -27,16 +27,20 @@ Local Rust authority work lives under `rulebench-rs/`. It is an incubation
 workspace with explicit portable-authority, protocol/adapter, and
 Rulebench-local crate boundaries, not an upstream ASHA crate set.
 
-The complete destination crate skeleton is present so new work has a durable
-owner from the start. `rulebench-rules` and `rulebench-authority` currently hold
-the substantial implementation; focused tasks will move concerns into the
-reserved `core`, `ruleset`, `content`, `combat`, `replay`, `protocol`, `bridge`,
-`codegen`, and `fixtures` crates. See `rulebench-rs/README.md` for ownership and
-dependency direction. The workspace has no path dependency on
-`/home/dev/asha-engine`. Planner-approved `serde` protocol DTOs and the
-`serde_json` process host provide the first live local bridge; further
-serialization/codegen crates or ASHA path dependencies remain a
-planner-approval moment.
+The implemented crates have explicit portable-authority, product-adapter, and
+repository-harness owners. See `rulebench-rs/README.md` and
+`docs/rust-authority-reconciliation.md` for the supported consumer surface and
+dependency direction. The `rulebench-gameplay-module` crate consumes only
+governed public ASHA facades through development-only sibling paths; it does
+not reach into upstream internal crates. ASHA #5796 owns the missing versioned
+Rust distribution, and ASHA #5797 owns the composed downstream-combat-owner
+seam needed to retire the quarantined standalone gameplay host.
+Planner-approved `serde` protocol DTOs and the `serde_json` process host
+provide the live local bridge.
+
+The current gameplay-fabric slice and its explicit local/upstream ownership
+boundary are documented in
+[docs/gameplay-fabric-integration.md](docs/gameplay-fabric-integration.md).
 
 Run the focused Rust gates with:
 

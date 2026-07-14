@@ -198,6 +198,35 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 ]),
             },
             Interface {
+                name: "RulebenchLiveGameplayDecisionEvidenceDto",
+                fields: fields(vec![
+                    field("decisionId", "string"),
+                    field("status", "string"),
+                    field("receiptHash", "string"),
+                    field("initialWorkspaceHash", "string"),
+                    field("finalWorkspaceHash", "string"),
+                    field("declaredReadHashes", "readonly string[]"),
+                    field("invocationOutputHashes", "readonly string[]"),
+                    field("routingHash", "string | null"),
+                    field("diagnosticCodes", "readonly string[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchLiveGameplayFabricDto",
+                fields: fields(vec![
+                    field("registryDigest", "string"),
+                    field("bindingRegistryHash", "string"),
+                    field("moduleStateHash", "string"),
+                    field("runtimeHostHash", "string"),
+                    field("reactionFrameHashes", "readonly string[]"),
+                    field(
+                        "decisions",
+                        "readonly RulebenchLiveGameplayDecisionEvidenceDto[]",
+                    ),
+                    field("pendingDecisionCount", "number"),
+                ]),
+            },
+            Interface {
                 name: "RulebenchLiveSessionSnapshotDto",
                 fields: fields(vec![
                     field("sessionId", "string"),
@@ -213,6 +242,16 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("board", "RulebenchLiveBoardDto"),
                     field("options", "RulebenchLiveCurrentActorOptionsDto"),
                     field("combatEnd", "RulebenchLiveCombatEndDto"),
+                    field("gameplayFabric", "RulebenchLiveGameplayFabricDto"),
+                    field("currentReactionWindow", "RulebenchReactionWindowDto | null"),
+                    field(
+                        "reactionWindowLifecycleLog",
+                        "readonly RulebenchReactionWindowLifecycleEntryDto[]",
+                    ),
+                    field(
+                        "reactionAuditLog",
+                        "readonly RulebenchReactionAuditEntryDto[]",
+                    ),
                     field("finalization", "RulebenchLiveFinalizationDto | null"),
                     field("combatLog", "readonly RulebenchLiveCombatLogEntryDto[]"),
                     field("auditLog", "readonly RulebenchLiveAuditEntryDto[]"),
@@ -317,6 +356,13 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 name: "RulebenchLiveCommandExecutionDto",
                 fields: fields(vec![
                     field("step", "RulebenchLiveCommandStepDto"),
+                    field("snapshot", "RulebenchLiveSessionSnapshotDto"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchLiveReactionExecutionDto",
+                fields: fields(vec![
+                    field("reaction", "RulebenchReactionCommandReadoutDto"),
                     field("snapshot", "RulebenchLiveSessionSnapshotDto"),
                 ]),
             },

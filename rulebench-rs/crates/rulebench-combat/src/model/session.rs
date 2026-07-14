@@ -9,6 +9,7 @@ use super::{
     RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint, TargetKind,
     TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
+use rulebench_gameplay_module::RulebenchGameplayFabricReadout;
 use rulebench_ruleset::{ActionResourceCost, CombatEndPolicy};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -456,6 +457,7 @@ pub struct CombatSessionSnapshot {
     pub equipment_transition_log: Vec<EquipmentTransitionEntry>,
     pub reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
     pub reaction_audit_log: Vec<ReactionAuditEntry>,
+    pub gameplay_fabric: RulebenchGameplayFabricReadout,
     pub current_reaction_window: Option<ReactionWindowReadout>,
     pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
