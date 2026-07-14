@@ -91,6 +91,14 @@ directory and compares all three with their committed outputs. Failures name
 the Rust emitter and artifact; `pnpm run generated:write` is the only supported
 update path. Every generated header records its emitter and protocol schema.
 
+`pnpm run regression:check` executes every package-owned catalog case twice
+through Rust authority, checks its declared outcome plus deterministic
+decisions/events/rolls/trace/final state, and reports the first mismatch with a
+replay-compatible path. Exact package, package-version, ruleset,
+ruleset-version, and scenario filters are accepted by the underlying binary;
+`pnpm run regression:list` prints the registered identities before an
+intentional package expectation or generated-artifact update.
+
 To approve a real boundary change, update the owning north-star task and
 systems map, revise this dependency direction, change the checker policy and
 its focused failure coverage, then land the crate migration with its callers

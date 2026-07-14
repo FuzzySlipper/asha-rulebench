@@ -10,6 +10,7 @@ mod content_import;
 mod goldens;
 mod package;
 mod registry;
+mod regression;
 mod replay_review;
 pub mod scenarios;
 
@@ -30,6 +31,10 @@ pub use package::{
 pub use registry::{
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRegistry,
     ScenarioPackageRegistryError, ScenarioPackageSelectionError,
+};
+pub use regression::{
+    run_scenario_regressions, ScenarioRegressionCaseReadout, ScenarioRegressionDifference,
+    ScenarioRegressionFilter, ScenarioRegressionReport,
 };
 pub use replay_review::replay_review_packages;
 pub use rulebench_rules::*;

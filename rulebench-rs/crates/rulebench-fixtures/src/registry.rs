@@ -35,6 +35,10 @@ impl ScenarioPackageRegistration {
     pub fn new(package: ScenarioPackage, factories: ScenarioPackageReadbackFactories) -> Self {
         Self { package, factories }
     }
+
+    pub fn scenario_catalog_cases(&self) -> Vec<ScenarioCatalogCase> {
+        (self.factories.catalog_cases)()
+    }
 }
 
 #[derive(Clone)]
