@@ -80,6 +80,11 @@ unbounded compatibility requirements. `pnpm run check:portable-consumer`
 separately compiles the supported `rulebench-rules` facade from an independent
 Cargo workspace and rejects product-only crates in its transitive tree.
 
+`pnpm run check:rust-test-ownership` keeps focused tests beside every active
+authority, adapter, protocol, fixture, and codegen owner while retaining the
+`rulebench-authority/src/tests` suite as cross-crate product evidence. Cargo
+dev-dependencies remain subject to the same one-way boundary policy.
+
 To approve a real boundary change, update the owning north-star task and
 systems map, revise this dependency direction, change the checker policy and
 its focused failure coverage, then land the crate migration with its callers
