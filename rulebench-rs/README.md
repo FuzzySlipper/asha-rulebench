@@ -99,6 +99,11 @@ ruleset-version, and scenario filters are accepted by the underlying binary;
 `pnpm run regression:list` prints the registered identities before an
 intentional package expectation or generated-artifact update.
 
+`pnpm run rust:test` is part of `pnpm run verify`, so clean CI executes the
+focused owner suites, cross-crate authority harness, host-neutral bridge
+contracts, composed-owner reaction rollback checks, and real process-host
+lifecycle/TCP tests rather than relying on TypeScript or generated fixtures.
+
 To approve a real boundary change, update the owning north-star task and
 systems map, revise this dependency direction, change the checker policy and
 its focused failure coverage, then land the crate migration with its callers

@@ -364,6 +364,86 @@ fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
 }
 
 #[test]
+fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
+    let mut active_router = router();
+    let scenarios = active_router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario_id = scenarios[0].id.clone();
+    let session_id = "reusable-session";
+
+    for control in [
+        CombatControlCommandKindDto::ExplicitStart,
+        CombatControlCommandKindDto::ExplicitEnd,
+    ] {
+        if control == CombatControlCommandKindDto::ExplicitStart {
+            let created = active_router.handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/sessions",
+                &CombatSessionCreateRequestDto {
+                    session_id: session_id.to_string(),
+                    scenario_id: scenario_id.clone(),
+                    participant_order: Vec::new(),
+                },
+            ));
+            assert_eq!(created.status, 200);
+        }
+        let controlled = active_router.handle(&json_request(
+            HttpMethod::Post,
+            &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+            &CombatControlCommandDto { kind: control },
+        ));
+        assert_eq!(controlled.status, 200);
+    }
+
+    let closed = active_router.handle(&request(
+        HttpMethod::Delete,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    assert_eq!(closed.status, 200);
+    let active = active_router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/sessions"));
+    let active: Vec<LiveSessionSnapshotDto> =
+        serde_json::from_slice(&active.body).expect("active sessions are JSON");
+    assert!(active.is_empty());
+
+    let retained_archive = active_router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: session_id.to_string(),
+            scenario_id: scenario_id.clone(),
+            participant_order: Vec::new(),
+        },
+    ));
+    assert_eq!(retained_archive.status, 409);
+
+    let mut restarted_router = router();
+    let recreated = restarted_router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: session_id.to_string(),
+            scenario_id,
+            participant_order: Vec::new(),
+        },
+    ));
+    assert_eq!(recreated.status, 200);
+    let recreated: LiveSessionSnapshotDto =
+        serde_json::from_slice(&recreated.body).expect("restarted session is JSON");
+    assert_eq!(recreated.lifecycle_phase, "ready");
+    assert_eq!(recreated.next_step_index, 0);
+    assert!(recreated.combat_log.is_empty());
+    assert!(recreated.audit_log.is_empty());
+
+    let restarted =
+        restarted_router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/sessions"));
+    let restarted: Vec<LiveSessionSnapshotDto> =
+        serde_json::from_slice(&restarted.body).expect("restarted session list is JSON");
+    assert_eq!(restarted.len(), 1);
+    assert_eq!(restarted[0].session_id, session_id);
+}
+
+#[test]
 fn tcp_server_starts_serves_json_and_stops_cleanly() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("ephemeral listener binds");
     let address = listener.local_addr().expect("listener has address");

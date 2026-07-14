@@ -11,7 +11,7 @@
     "lint": "nx run-many -t lint --all",
     "typecheck": "nx run-many -t typecheck --all",
     "test": "vitest run --passWithNoTests",
-    "verify": "pnpm run check:pattern && pnpm run generated:check && pnpm run regression:check && pnpm run check:rust-boundaries && pnpm run check:rust-test-ownership && pnpm run check:portable-consumer && pnpm run check:docs && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
+    "verify": "pnpm run check:pattern && pnpm run generated:check && pnpm run regression:check && pnpm run check:rust-boundaries && pnpm run check:rust-test-ownership && pnpm run check:portable-consumer && pnpm run rust:test && pnpm run check:docs && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
     "check:pattern": "node tools/scripts/check-pattern.mjs",
     "check:rust-boundaries": "node tools/scripts/check-rust-boundaries.mjs",
     "check:rust-test-ownership": "node tools/scripts/check-rust-test-ownership.mjs",
