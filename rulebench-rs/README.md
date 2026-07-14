@@ -104,6 +104,12 @@ focused owner suites, cross-crate authority harness, host-neutral bridge
 contracts, composed-owner reaction rollback checks, and real process-host
 lifecycle/TCP tests rather than relying on TypeScript or generated fixtures.
 
+`pnpm run e2e` exercises the real local process host through the Angular
+same-origin proxy, including classified failure recovery and the full
+Rust-owned reaction response/archive path. `pnpm run e2e:live` includes that
+reaction path plus the artifact-collecting den-serve scenario; live evidence is
+still opt-in and must be inspected rather than inferred from the exit code.
+
 To approve a real boundary change, update the owning north-star task and
 systems map, revise this dependency direction, change the checker policy and
 its focused failure coverage, then land the crate migration with its callers
