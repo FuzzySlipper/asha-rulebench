@@ -525,6 +525,12 @@ test("completes and archives a Rust-owned gameplay-fabric reaction @live", async
     .getByRole("button", { name: new RegExp(`live-${sessionId} ·`) });
   await expect(liveReplay).toBeVisible();
   await liveReplay.click();
+  await expect(liveReplay).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    replayWorkspace
+      .getByRole("region", { name: "Replay package detail" })
+      .getByRole("heading", { name: `live-${sessionId}` }),
+  ).toBeVisible();
   await expect(
     replayWorkspace.getByRole("region", { name: "Replay verification" }),
   ).toContainText("Verified · Finalized");
