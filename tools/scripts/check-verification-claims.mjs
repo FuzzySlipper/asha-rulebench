@@ -33,7 +33,6 @@ for (const id of [
   "checked-viewer-artifacts",
   "active-session-recovery",
   "authored-content-v1-vocabulary",
-  "schema-coupled-replay-fingerprint",
 ]) {
   if (!limitationIds.has(id))
     failures.push(`verification review omits active limitation ${id}.`);

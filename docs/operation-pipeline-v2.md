@@ -63,21 +63,20 @@ exact multi-target intent, ordered events, rolls, trace, command audit, and
 final evidence. Changing a recorded area cell or target set produces a replay
 mismatch.
 
-Replay archive payload fingerprints written after this change use
-`fnv1a64.rulebench-replay-archive.v1`. The process host reads legacy v0 archive
-envelopes through their integrity-checked stored command payload, reconstructs
-them through current Rust authority, and returns a self-consistent v1 entry.
-This is a read migration; the host does not rewrite the source file during
-startup. Archive payload fingerprinting remains coupled to the Rust model's
-debug shape; a future canonical archive encoding must replace that internal
-integrity mechanism before archive files are treated as a long-lived interchange
-format.
+Replay archive payload identity is now the explicit portable encoding
+`asha-rulebench.replay-archive-payload.v2` hashed with `fnv1a64`. It covers the
+complete multi-target/action-resource scenario, command, randomness, and
+evidence contract without depending on Rust `Debug` or host JSON. The process
+host authority-verifies recognized legacy v0/v1 envelopes and atomically
+rewrites them to envelope v2 before exposure. See
+`replay-archive-identity.md` for compatibility and quarantine behavior.
 
 ## Consumer example
 
 `rulebench-rs/portable-consumer-smoke` authors an explicit two-target,
-per-target-roll action through `rulebench-rules` and executes it without
-fixtures, protocol, bridge, codegen, or host dependencies. The Watchtower
+per-target-roll action, records and fingerprints its replay through
+`rulebench-rules`, and executes it without fixtures, protocol, bridge, codegen,
+or host dependencies. The Watchtower
 `Storm Pulse` fixture supplies the product proof for a shared-roll area action
 with damage, push, target resource changes, actor cost, UI affordances, replay,
 and composed reaction behavior.

@@ -28,7 +28,8 @@ pub mod replay_storage {
         EquipmentCommandSpec, GridPosition, ReactionCommandSpec, ReactionResponseKind,
         ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage, ReplayArchiveStorageError,
         ReplayCommand, ReplayCommandRecord, ReplayCommandRecordingSpec, ReplayNarration,
-        RulesetArtifactProvenance, UseActionIntent,
+        RulesetArtifactProvenance, UseActionIntent, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
+        REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
     };
 }
 

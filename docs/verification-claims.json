@@ -38,6 +38,10 @@
     {
       "file": "README.md",
       "text": "2 compiled providers, 2 ruleset identities, 4 registered packages, 11 scenario cases, 1 automation policy"
+    },
+    {
+      "file": "docs/replay-archive-identity.md",
+      "text": "The encoding does not use Rust `Debug`"
     }
   ],
   "requiredNonClaims": [
@@ -84,10 +88,6 @@
     {
       "id": "authored-content-v1-vocabulary",
       "denHeading": "Authored content wire remains intentionally narrow"
-    },
-    {
-      "id": "schema-coupled-replay-fingerprint",
-      "denHeading": "Replay archive fingerprints are schema-coupled"
     }
   ]
 }

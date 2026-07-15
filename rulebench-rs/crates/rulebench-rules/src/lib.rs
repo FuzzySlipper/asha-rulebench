@@ -68,6 +68,7 @@ pub use rulebench_content::{
 };
 pub use rulebench_core::Team;
 pub use rulebench_replay::{
+    canonical_replay_archive_payload, canonical_replay_archive_payload_fingerprint,
     compare_replay_packages, inspect_replay_package, record_replay_package,
     verify_automatic_run_replay, verify_replay_package,
     CombatSessionAutomaticRunReplayDecisionKind, CombatSessionAutomaticRunReplayReadout,
@@ -79,6 +80,7 @@ pub use rulebench_replay::{
     ReplayMismatchDimension, ReplayNarration, ReplayPackage, ReplayPackageInspection,
     ReplayPackageValidationReport, ReplayRandomnessSource, ReplayStepEvidence,
     ReplayVerificationDecisionKind, ReplayVerificationReadout,
+    REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION, REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
 };
 pub use rulebench_ruleset::{
     CombatEndPolicy, EffectOperationId, OperationPipelineV2, RuleModuleId,

@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
-use crate::ReplayPackage;
+use crate::{canonical_replay_archive_payload_fingerprint, ReplayPackage};
 
-pub const REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM: &str =
-    "fnv1a64.rulebench-replay-archive.v1";
+pub const REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION: &str =
+    "asha-rulebench.replay-archive-payload.v2";
+pub const REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM: &str = "fnv1a64";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplayArchiveMetadata {
@@ -19,6 +20,7 @@ pub struct ReplayArchiveMetadata {
 pub struct ReplayArchiveEntry {
     pub metadata: ReplayArchiveMetadata,
     pub package: ReplayPackage,
+    pub payload_encoding_version: String,
     pub payload_fingerprint_algorithm: String,
     pub payload_fingerprint: String,
 }
@@ -36,16 +38,18 @@ impl ReplayArchiveEntry {
         let mut entry = Self {
             metadata,
             package,
+            payload_encoding_version: REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION.to_string(),
             payload_fingerprint_algorithm: REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM.to_string(),
             payload_fingerprint: String::new(),
         };
-        entry.payload_fingerprint = fingerprint_entry_payload(&entry);
+        entry.payload_fingerprint = canonical_replay_archive_payload_fingerprint(&entry);
         entry
     }
 
     pub fn is_self_consistent(&self) -> bool {
-        self.payload_fingerprint_algorithm == REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM
-            && self.payload_fingerprint == fingerprint_entry_payload(self)
+        self.payload_encoding_version == REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION
+            && self.payload_fingerprint_algorithm == REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM
+            && self.payload_fingerprint == canonical_replay_archive_payload_fingerprint(self)
     }
 }
 
@@ -145,14 +149,4 @@ impl ReplayArchiveStorage for InMemoryReplayArchiveStorage {
         self.entries.clear();
         Ok(())
     }
-}
-
-fn fingerprint_entry_payload(entry: &ReplayArchiveEntry) -> String {
-    let payload = format!("{:?}|{:?}", entry.metadata, entry.package);
-    let mut hash = 0xcbf29ce484222325_u64;
-    for byte in payload.bytes() {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("{hash:016x}")
 }

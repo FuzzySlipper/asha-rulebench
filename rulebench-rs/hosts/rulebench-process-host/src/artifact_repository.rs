@@ -10,15 +10,19 @@ use rulebench_bridge::replay_storage::{
     ContentPackSetReference, EquipmentCommandKind, EquipmentCommandSpec, GridPosition,
     ReactionCommandSpec, ReactionResponseKind, ReplayArchiveEntry, ReplayArchiveMetadata,
     ReplayArchiveStorage, ReplayArchiveStorageError, ReplayCommand, ReplayCommandRecordingSpec,
-    ReplayNarration, UseActionIntent,
+    ReplayNarration, UseActionIntent, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
+    REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
 };
 use rulebench_bridge::{prepare_replay_scenario, BridgeScenario};
 use serde::{Deserialize, Serialize};
 
-const REPLAY_STORAGE_FORMAT_VERSION: u32 = 1;
-const REPLAY_INDEX_FORMAT_VERSION: u32 = 1;
+const REPLAY_STORAGE_FORMAT_VERSION: u32 = 2;
+const LEGACY_REPLAY_STORAGE_FORMAT_VERSION: u32 = 1;
+const REPLAY_INDEX_FORMAT_VERSION: u32 = 2;
 const STORAGE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-artifact-store.v1";
 const LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-replay-archive.v0";
+const LEGACY_REPLAY_ARCHIVE_DEBUG_FINGERPRINT_ALGORITHM: &str =
+    "fnv1a64.rulebench-replay-archive.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactRepositoryIssue {
@@ -116,7 +120,20 @@ impl FileReplayArchiveStorage {
                 continue;
             }
             match self.decode_entry(&path) {
-                Ok(entry) => {
+                Ok(decoded) => {
+                    let entry = decoded.entry;
+                    if decoded.requires_migration
+                        && atomic_write_json(&path, &StoredReplayEnvelope::from_entry(&entry))
+                            .is_err()
+                    {
+                        issues.push(issue(
+                            "replay",
+                            "replayMigrationCommitFailedQuarantined",
+                            &path,
+                            "A legacy replay was authority-verified but its atomic canonical migration could not be committed.",
+                        ));
+                        continue;
+                    }
                     let package_id = entry.metadata.package_id.clone();
                     if self.entries.contains_key(&package_id) {
                         issues.push(issue(
@@ -137,7 +154,7 @@ impl FileReplayArchiveStorage {
         Ok(issues)
     }
 
-    fn decode_entry(&self, path: &Path) -> Result<ReplayArchiveEntry, ArtifactRepositoryIssue> {
+    fn decode_entry(&self, path: &Path) -> Result<DecodedReplayEntry, ArtifactRepositoryIssue> {
         let bytes = fs::read(path).map_err(|_| {
             issue(
                 "replay",
@@ -154,14 +171,18 @@ impl FileReplayArchiveStorage {
                 format!("The replay envelope was invalid and was ignored: {error}."),
             )
         })?;
-        if envelope.format_version != REPLAY_STORAGE_FORMAT_VERSION {
+        if envelope.format_version != REPLAY_STORAGE_FORMAT_VERSION
+            && envelope.format_version != LEGACY_REPLAY_STORAGE_FORMAT_VERSION
+        {
             return Err(issue(
                 "replay",
                 "unsupportedReplayStorageVersionQuarantined",
                 path,
                 format!(
-                    "Replay storage version {} is not supported; expected {}.",
-                    envelope.format_version, REPLAY_STORAGE_FORMAT_VERSION
+                    "Replay storage version {} is not supported; expected {} or migratable legacy {}.",
+                    envelope.format_version,
+                    REPLAY_STORAGE_FORMAT_VERSION,
+                    LEGACY_REPLAY_STORAGE_FORMAT_VERSION
                 ),
             ));
         }
@@ -186,20 +207,44 @@ impl FileReplayArchiveStorage {
                     message,
                 )
             })?;
-        let legacy_archive_fingerprint =
-            envelope.archive_fingerprint_algorithm == LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM;
-        if !legacy_archive_fingerprint
-            && (entry.payload_fingerprint_algorithm != envelope.archive_fingerprint_algorithm
-                || entry.payload_fingerprint != envelope.archive_payload_fingerprint)
+        let requires_migration = envelope.format_version == LEGACY_REPLAY_STORAGE_FORMAT_VERSION;
+        if requires_migration {
+            let recognized_legacy = matches!(
+                envelope.archive_fingerprint_algorithm.as_str(),
+                LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM
+                    | LEGACY_REPLAY_ARCHIVE_DEBUG_FINGERPRINT_ALGORITHM
+            );
+            if !recognized_legacy {
+                return Err(issue(
+                    "replay",
+                    "unsupportedReplayArchiveIdentityVersionQuarantined",
+                    path,
+                    "The legacy replay archive identity version is not supported for migration.",
+                ));
+            }
+        } else if envelope.archive_payload_encoding_version.as_deref()
+            != Some(REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION)
+            || envelope.archive_fingerprint_algorithm
+                != REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM
+            || entry.payload_encoding_version
+                != envelope
+                    .archive_payload_encoding_version
+                    .as_deref()
+                    .unwrap_or_default()
+            || entry.payload_fingerprint_algorithm != envelope.archive_fingerprint_algorithm
+            || entry.payload_fingerprint != envelope.archive_payload_fingerprint
         {
             return Err(issue(
                 "replay",
-                "replayAuthorityMismatchQuarantined",
+                "replayCanonicalIdentityMismatchQuarantined",
                 path,
-                "The replay no longer reconstructs to its recorded authority fingerprint.",
+                "The replay no longer reconstructs to its recorded canonical payload identity.",
             ));
         }
-        Ok(entry)
+        Ok(DecodedReplayEntry {
+            entry,
+            requires_migration,
+        })
     }
 
     fn validate_index(&self) -> Result<(), ArtifactRepositoryIssue> {
@@ -351,6 +396,8 @@ struct StoredReplayEnvelope {
     format_version: u32,
     fingerprint_algorithm: String,
     payload_fingerprint: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    archive_payload_encoding_version: Option<String>,
     archive_fingerprint_algorithm: String,
     archive_payload_fingerprint: String,
     payload: StoredReplayPayload,
@@ -363,11 +410,17 @@ impl StoredReplayEnvelope {
             format_version: REPLAY_STORAGE_FORMAT_VERSION,
             fingerprint_algorithm: STORAGE_FINGERPRINT_ALGORITHM.to_string(),
             payload_fingerprint: fingerprint_serializable(&payload),
+            archive_payload_encoding_version: Some(entry.payload_encoding_version.clone()),
             archive_fingerprint_algorithm: entry.payload_fingerprint_algorithm.clone(),
             archive_payload_fingerprint: entry.payload_fingerprint.clone(),
             payload,
         }
     }
+}
+
+struct DecodedReplayEntry {
+    entry: ReplayArchiveEntry,
+    requires_migration: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1060,6 +1113,7 @@ impl StoredReplayIndex {
                 ruleset_version: entry.metadata.ruleset_version.clone(),
                 completed_at: entry.metadata.completed_at.clone(),
                 archive_payload_fingerprint: entry.payload_fingerprint.clone(),
+                archive_payload_encoding_version: entry.payload_encoding_version.clone(),
             })
             .collect::<Vec<_>>();
         Self {
@@ -1081,6 +1135,7 @@ struct StoredReplayIndexEntry {
     ruleset_version: String,
     completed_at: String,
     archive_payload_fingerprint: String,
+    archive_payload_encoding_version: String,
 }
 
 fn apply_participant_configuration<T>(
@@ -1212,7 +1267,7 @@ mod tests {
         let directory = test_directory("v1-compatibility");
         fs::create_dir_all(&directory).expect("fixture repository creates");
         let path = directory.join(format!("{}.replay.json", hex_name("hexing-bolt-replay")));
-        fs::write(path, REPLAY_STORAGE_V1_FIXTURE).expect("v1 fixture copies");
+        fs::write(&path, REPLAY_STORAGE_V1_FIXTURE).expect("v1 fixture copies");
 
         let report =
             FileReplayArchiveStorage::open(&directory, scenarios()).expect("v1 repository opens");
@@ -1226,9 +1281,70 @@ mod tests {
         assert_eq!(entry.metadata.completed_at, "v1-compatibility-fixture");
         assert_eq!(
             entry.payload_fingerprint_algorithm,
-            "fnv1a64.rulebench-replay-archive.v1"
+            REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM
+        );
+        assert_eq!(
+            entry.payload_encoding_version,
+            REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION
         );
         assert!(entry.is_self_consistent());
+        let migrated = serde_json::from_slice::<serde_json::Value>(
+            &fs::read(&path).expect("migrated fixture reads"),
+        )
+        .expect("migrated fixture remains JSON");
+        assert_eq!(migrated["formatVersion"], REPLAY_STORAGE_FORMAT_VERSION);
+        assert_eq!(
+            migrated["archivePayloadEncodingVersion"],
+            REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION
+        );
+        drop(report.storage);
+
+        let reopened =
+            FileReplayArchiveStorage::open(&directory, scenarios()).expect("v2 repository reopens");
+        assert!(
+            reopened.issues.is_empty(),
+            "v2 issues: {:?}",
+            reopened.issues
+        );
+        assert!(reopened
+            .storage
+            .read("hexing-bolt-replay")
+            .expect("migrated repository reads")
+            .expect("migrated fixture remains visible")
+            .is_self_consistent());
+        cleanup(&directory);
+    }
+
+    #[test]
+    fn legacy_migration_is_atomic_and_quarantines_an_uncommitted_rewrite() {
+        let directory = test_directory("migration-commit-failure");
+        fs::create_dir_all(&directory).expect("fixture repository creates");
+        let path = directory.join(format!("{}.replay.json", hex_name("hexing-bolt-replay")));
+        fs::write(&path, REPLAY_STORAGE_V1_FIXTURE).expect("v1 fixture copies");
+        let temporary = path.with_extension("json.tmp");
+        fs::create_dir(&temporary).expect("migration fault fixture creates");
+
+        let report = FileReplayArchiveStorage::open(&directory, scenarios())
+            .expect("repository opens with migration issue");
+        assert_eq!(
+            report
+                .issues
+                .iter()
+                .map(|issue| issue.code.as_str())
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "partialCommitQuarantined",
+                "replayMigrationCommitFailedQuarantined",
+            ])
+        );
+        assert!(report.storage.list().expect("repository lists").is_empty());
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(
+                &fs::read(&path).expect("legacy file remains readable")
+            )
+            .expect("legacy file remains JSON")["formatVersion"],
+            LEGACY_REPLAY_STORAGE_FORMAT_VERSION
+        );
         cleanup(&directory);
     }
 
@@ -1382,6 +1498,74 @@ mod tests {
         assert!(codes.contains("unsupportedReplayStorageVersionQuarantined"));
         assert!(codes.contains("partialCommitQuarantined"));
         assert!(codes.contains("corruptIndexRebuilt"));
+        assert!(reopened
+            .storage
+            .list()
+            .expect("repository lists")
+            .is_empty());
+        cleanup(&directory);
+    }
+
+    #[test]
+    fn replay_repository_classifies_unknown_identity_partial_migration_and_payload_mismatch() {
+        let directory = test_directory("canonical-classification");
+        let package = replay_review_packages().remove(0);
+
+        let unknown_path = directory.join("unknown.replay.json");
+        let mut legacy = serde_json::from_str::<serde_json::Value>(REPLAY_STORAGE_V1_FIXTURE)
+            .expect("legacy fixture parses");
+        legacy["archiveFingerprintAlgorithm"] = serde_json::Value::from("unknown.v9");
+        fs::create_dir_all(&directory).expect("repository directory creates");
+        fs::write(
+            &unknown_path,
+            serde_json::to_vec_pretty(&legacy).expect("legacy fixture serializes"),
+        )
+        .expect("unknown identity fixture writes");
+
+        let mut storage = FileReplayArchiveStorage::open(&directory, scenarios())
+            .expect("repository opens with unknown identity")
+            .storage;
+        storage
+            .write(ReplayArchiveEntry::new(
+                package.clone(),
+                "partial-migration",
+            ))
+            .expect("partial migration source writes");
+        let partial_path = storage.entry_path(&package.id);
+        let mut partial = serde_json::from_slice::<serde_json::Value>(
+            &fs::read(&partial_path).expect("partial source reads"),
+        )
+        .expect("partial source parses");
+        partial
+            .as_object_mut()
+            .expect("envelope is object")
+            .remove("archivePayloadEncodingVersion");
+        fs::write(
+            &partial_path,
+            serde_json::to_vec_pretty(&partial).expect("partial fixture serializes"),
+        )
+        .expect("partial fixture writes");
+
+        let mismatch = ReplayArchiveEntry::new(package, "payload-mismatch");
+        let mismatch_path = directory.join("mismatch.replay.json");
+        let mut mismatch_envelope = StoredReplayEnvelope::from_entry(&mismatch);
+        mismatch_envelope.archive_payload_fingerprint = "changed".to_string();
+        fs::write(
+            &mismatch_path,
+            serde_json::to_vec_pretty(&mismatch_envelope).expect("mismatch fixture serializes"),
+        )
+        .expect("mismatch fixture writes");
+        drop(storage);
+
+        let reopened = FileReplayArchiveStorage::open(&directory, scenarios())
+            .expect("repository opens with canonical issues");
+        let codes = reopened
+            .issues
+            .iter()
+            .map(|issue| issue.code.as_str())
+            .collect::<BTreeSet<_>>();
+        assert!(codes.contains("unsupportedReplayArchiveIdentityVersionQuarantined"));
+        assert!(codes.contains("replayCanonicalIdentityMismatchQuarantined"));
         assert!(reopened
             .storage
             .list()

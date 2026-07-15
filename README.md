@@ -82,6 +82,9 @@ their exact activation can be used. A new session may select a compatible
 activated pack set; its exact references and set fingerprint are then retained
 in the finalized replay. See `docs/authored-content-format.md` for the v1 wire
 contract and migration posture.
+Finalized replay files use the portable, versioned canonical identity described
+in `docs/replay-archive-identity.md`; the process host atomically migrates only
+recognized legacy identities and quarantines unknown or mismatched records.
 
 ## Source Material
 

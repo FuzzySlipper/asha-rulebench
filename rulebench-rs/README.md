@@ -176,14 +176,17 @@ is configured with `--artifact-root PATH` or `RULEBENCH_ARTIFACT_ROOT`. In the
 configured mode it opens separate `content/` and `replays/` directories,
 commits replay envelopes and their deterministic index through temporary-file
 renames, and prints a repository summary plus classified startup issues.
-Unknown format versions, corrupt
-fingerprints, and interrupted temporary files are ignored with explicit issue
-codes rather than interpreted as current data. Replay envelopes reconstruct
-through the registered scenario and Rust authority. Current entries must
-reproduce their v1 archive fingerprint before becoming visible. Legacy v0
-archive fingerprints were coupled to Rust debug shape; their integrity-checked
-command payloads are read-migrated into a new self-consistent v1 entry without
-rewriting the source artifact.
+Unknown format or archive-identity versions, corrupt fingerprints, and
+interrupted temporary files are ignored with explicit issue codes rather than
+interpreted as current data. Replay envelopes reconstruct through the
+registered scenario and Rust authority. Current entries must reproduce the
+portable `asha-rulebench.replay-archive-payload.v2` canonical identity before
+becoming visible. Recognized legacy v0/v1 identities are authority-verified and
+atomically rewritten as envelope v2; a failed rewrite quarantines the entry and
+leaves its source unchanged. The encoder is owned by `rulebench-replay` and is
+independent of Rust `Debug`, private layout, and host JSON. See
+`docs/replay-archive-identity.md` for the version boundaries and migration
+policy.
 
 The authored content route accepts only `asha-rulebench.content-pack` version
 1 documents up to 512 KiB. The protocol DTO owns decoding; portable content

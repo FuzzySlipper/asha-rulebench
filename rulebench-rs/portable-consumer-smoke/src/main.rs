@@ -15,6 +15,48 @@ fn main() {
                 .expect("portable scenario selects a ruleset"),
         )
         .expect("portable provider accepts its exact ruleset definition");
+    let replay_ruleset = scenario
+        .selected_ruleset()
+        .expect("portable scenario selects a replay ruleset")
+        .artifact_provenance();
+    let replay_package = record_replay_package(
+        "portable-consumer-replay",
+        CombatSessionCreateRequest::new("consumer-replay-session", scenario.clone()),
+        replay_ruleset,
+        vec![
+            ReplayCommandRecordingSpec::new(
+                "start",
+                ReplayCommand::Control(CombatControlCommandSpec::explicit_start()),
+            ),
+            ReplayCommandRecordingSpec::new(
+                "multi-target-action",
+                ReplayCommand::Intent(CombatSessionIntentCommandSpec::new(
+                    "consumer-replay-command",
+                    "Consumer replay command",
+                    "Portable replay records a multi-target action.",
+                    UseActionIntent::for_targets(
+                        "actor",
+                        "bolt",
+                        vec!["target-2".to_string(), "target".to_string()],
+                    ),
+                    vec![17, 5, 18, 4],
+                )),
+            ),
+            ReplayCommandRecordingSpec::new(
+                "end",
+                ReplayCommand::Control(CombatControlCommandSpec::explicit_end()),
+            ),
+        ],
+    );
+    let replay_entry = ReplayArchiveEntry::new(replay_package, "portable-consumer");
+    let canonical_bytes = canonical_replay_archive_payload(&replay_entry);
+    assert!(!canonical_bytes.is_empty());
+    assert_eq!(
+        replay_entry.payload_encoding_version,
+        REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION
+    );
+    assert!(replay_entry.is_self_consistent());
+
     let mut api = CombatSessionApi::new();
     let created = api
         .create_session(CombatSessionCreateRequest::new("consumer-session", scenario))

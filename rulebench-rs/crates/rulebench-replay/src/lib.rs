@@ -34,10 +34,15 @@ pub use review::{
 };
 mod archive;
 mod archive_storage;
+mod canonical_archive;
 pub use archive::{ReplayArchive, ReplayArchiveError, ReplayArchiveQuery};
 pub use archive_storage::{
     InMemoryReplayArchiveStorage, ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage,
-    ReplayArchiveStorageError,
+    ReplayArchiveStorageError, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
+    REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
+};
+pub use canonical_archive::{
+    canonical_replay_archive_payload, canonical_replay_archive_payload_fingerprint,
 };
 mod randomness;
 pub use randomness::{
