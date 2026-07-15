@@ -63,7 +63,7 @@
   "activeLimitations": [
     {
       "id": "trusted-local-process-host",
-      "denHeading": "Trusted-local in-memory process host"
+      "denHeading": "Trusted-local single-writer process host"
     },
     {
       "id": "single-ruleset-identity",

@@ -1,3 +1,10 @@
+use std::path::{Path, PathBuf};
+
+use crate::{ArtifactRepositoryIssue, FileReplayArchiveStorage};
+use crate::{HttpMethod, HttpRequest, HttpResponse};
+use rulebench_bridge::replay_storage::{
+    ContentPackStorage, ReplayArchiveEntry, ReplayArchiveStorage,
+};
 use rulebench_bridge::{BridgeError, BridgeErrorKind, BridgeScenario, RulebenchBridge};
 use rulebench_fixtures::{aggregated_scenario_catalog_cases, replay_review_packages};
 use rulebench_protocol::{
@@ -9,33 +16,176 @@ use rulebench_protocol::{
     ReplayComparisonRequestDto, UseActionIntentDto,
 };
 
-use crate::{HttpMethod, HttpRequest, HttpResponse};
-
 const API_PREFIX: &str = "/api/rulebench/v1";
 const PROTOCOL_VERSION_HEADER: &str = "x-rulebench-protocol-version";
 
 pub fn build_rulebench_bridge() -> Result<RulebenchBridge, BridgeError> {
-    RulebenchBridge::new_with_replays(
-        aggregated_scenario_catalog_cases().into_iter().map(|case| {
+    RulebenchBridge::new_with_replays(bridge_scenarios(), replay_review_packages())
+}
+
+fn bridge_scenarios() -> Vec<BridgeScenario> {
+    aggregated_scenario_catalog_cases()
+        .into_iter()
+        .map(|case| {
             BridgeScenario::new(
                 case.summary.id,
                 case.summary.title,
                 case.summary.summary,
                 case.scenario,
             )
-        }),
-        replay_review_packages(),
-    )
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactRepositoryStatus {
+    pub mode: String,
+    pub root: Option<String>,
+    pub content_artifact_count: usize,
+    pub replay_artifact_count: usize,
+    pub issues: Vec<ArtifactRepositoryIssue>,
+}
+
+impl ArtifactRepositoryStatus {
+    fn in_memory(replay_artifact_count: usize) -> Self {
+        Self {
+            mode: "memory".to_string(),
+            root: None,
+            content_artifact_count: 0,
+            replay_artifact_count,
+            issues: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactRepositoryConfig {
+    root: PathBuf,
+}
+
+impl ArtifactRepositoryConfig {
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self { root: root.into() }
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub fn open(&self) -> Result<ProcessHostRouter, String> {
+        open_durable_rulebench_router(&self.root)
+    }
+}
+
+pub fn build_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, String> {
+    ArtifactRepositoryConfig::new(root).open()
+}
+
+fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, String> {
+    let scenarios = bridge_scenarios();
+    let replay_packages = replay_review_packages();
+    let mut storage_scenarios = scenarios.clone();
+    for (index, package) in replay_packages.iter().enumerate() {
+        let scenario = package.initial_session.scenario.clone();
+        if !storage_scenarios
+            .iter()
+            .any(|registered| registered.scenario.metadata.id == scenario.metadata.id)
+        {
+            let title = scenario.metadata.title.clone();
+            let summary = scenario.metadata.summary.clone();
+            storage_scenarios.push(BridgeScenario::new(
+                format!("replay-storage-fixture-{index:04}"),
+                title,
+                summary,
+                scenario,
+            ));
+        }
+    }
+    let replay_root = root.join("replays");
+    let report = FileReplayArchiveStorage::open(replay_root, storage_scenarios)
+        .map_err(|issue| issue.message)?;
+    let mut storage = report.storage;
+    for (index, package) in replay_packages.into_iter().enumerate() {
+        storage
+            .write(ReplayArchiveEntry::new(
+                package,
+                format!("fixture-{index:04}"),
+            ))
+            .map_err(|error| format!("Could not seed durable replay repository: {error:?}"))?;
+    }
+    let replay_artifact_count = storage
+        .list()
+        .map_err(|error| format!("Could not list durable replay repository: {error:?}"))?
+        .len();
+    let (content, content_issues) = ContentPackStorage::open_quarantining(root.join("content"))
+        .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
+    let content_artifact_count = content.list().len();
+    let mut issues = report.issues;
+    issues.extend(
+        content_issues
+            .into_iter()
+            .map(|issue| ArtifactRepositoryIssue {
+                artifact_kind: "content".to_string(),
+                code: issue.code,
+                path: issue.path.display().to_string(),
+                message: issue.reason,
+            }),
+    );
+    let status = ArtifactRepositoryStatus {
+        mode: "filesystem".to_string(),
+        root: Some(root.display().to_string()),
+        content_artifact_count,
+        replay_artifact_count,
+        issues,
+    };
+    let bridge = RulebenchBridge::new_with_replay_storage(scenarios, Box::new(storage))
+        .map_err(|error| error.to_string())?;
+    Ok(ProcessHostRouter::new_with_repository(
+        bridge, content, status,
+    ))
 }
 
 #[derive(Debug)]
 pub struct ProcessHostRouter {
     bridge: RulebenchBridge,
+    content_storage: Option<ContentPackStorage>,
+    repository_status: ArtifactRepositoryStatus,
 }
 
 impl ProcessHostRouter {
     pub fn new(bridge: RulebenchBridge) -> Self {
-        Self { bridge }
+        let replay_artifact_count = bridge
+            .list_replay_packages(&ProtocolRequestContextDto::current())
+            .map_or(0, |packages| packages.len());
+        Self {
+            bridge,
+            content_storage: None,
+            repository_status: ArtifactRepositoryStatus::in_memory(replay_artifact_count),
+        }
+    }
+
+    pub fn new_with_repository(
+        bridge: RulebenchBridge,
+        content_storage: ContentPackStorage,
+        repository_status: ArtifactRepositoryStatus,
+    ) -> Self {
+        Self {
+            bridge,
+            content_storage: Some(content_storage),
+            repository_status,
+        }
+    }
+
+    pub fn repository_status(&self) -> &ArtifactRepositoryStatus {
+        &self.repository_status
+    }
+
+    pub fn content_storage(&self) -> Option<&ContentPackStorage> {
+        self.content_storage.as_ref()
+    }
+
+    pub fn content_storage_mut(&mut self) -> Option<&mut ContentPackStorage> {
+        self.content_storage.as_mut()
     }
 
     pub fn handle(&mut self, request: &HttpRequest) -> HttpResponse {
@@ -82,7 +232,12 @@ impl ProcessHostRouter {
             (HttpMethod::Delete, ["sessions", session_id]) => {
                 let handle = session_handle(session_id);
                 match self.bridge.close_session(&context, &handle) {
-                    Ok(archive) => json_ok(LiveSessionSnapshotDto::from(&archive.snapshot)),
+                    Ok(archive) => {
+                        if let Ok(packages) = self.bridge.list_replay_packages(&context) {
+                            self.repository_status.replay_artifact_count = packages.len();
+                        }
+                        json_ok(LiveSessionSnapshotDto::from(&archive.snapshot))
+                    }
                     Err(error) => bridge_error(error),
                 }
             }

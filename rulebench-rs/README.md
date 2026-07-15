@@ -131,6 +131,7 @@ From the repo root:
 pnpm run rust:check
 pnpm run rust:test
 pnpm run rust:host -- --bind 127.0.0.1:4318
+pnpm run rust:host -- --artifact-root .rulebench-artifacts
 ```
 
 Or directly:
@@ -148,8 +149,34 @@ then starts Angular on `0.0.0.0`. The browser uses the same-origin
 `/api/rulebench/v1` path; the Rust listener is not exposed directly to the LAN.
 Stopping the development command terminates both child processes.
 
+The process host uses in-memory fixture/replay storage unless an artifact root
+is configured with `--artifact-root PATH` or `RULEBENCH_ARTIFACT_ROOT`. In the
+configured mode it opens separate `content/` and `replays/` directories,
+commits replay envelopes and their deterministic index through temporary-file
+renames, and prints a repository summary plus classified startup issues.
+Unknown format versions, corrupt
+fingerprints, and interrupted temporary files are ignored with explicit issue
+codes rather than interpreted as current data. Replay envelopes reconstruct
+through the registered scenario and Rust authority and must reproduce their
+recorded archive fingerprint before becoming visible.
+
+This filesystem repository is deliberately single-writer. Run only one host
+against an artifact root; it does not provide locking, multi-process conflict
+resolution, or a database migration service. Storage format changes require an
+explicit version reader or migration before the current version is advanced.
+Replay replacement keeps a temporary copy of the last committed file until the
+new envelope and index both commit, rolls back on an index failure, and removes
+the copy after success. Content replacement stages the old receipt and payload
+until the new pair commits. Startup reports leftover temporary files for manual
+cleanup. These guarantees assume same-filesystem local rename behavior; the
+adapter does not claim power-loss durability, `fsync`, or atomic replacement on
+network filesystems. Future database adapters belong behind the bridge storage
+composition seam. In-memory adapters remain the default for isolated tests.
+
 The process host is trusted local development infrastructure. It is not an
-authenticated, internet-facing, multi-user, or durable-session service.
+authenticated, internet-facing, multi-user, or durable active-session service.
+Configured content and finalized replay artifacts survive restart; active
+combat sessions do not.
 
 ## Dependency Posture
 

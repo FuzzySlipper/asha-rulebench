@@ -76,6 +76,47 @@ fn corrupted_payload_is_rejected_on_restart() {
 }
 
 #[test]
+fn quarantining_open_reports_corrupt_and_partial_content_without_hiding_good_records() {
+    let directory = test_directory("quarantine");
+    let good = imported_pack("pack.good", "entity.good");
+    let corrupt = imported_pack("pack.bad", "entity.bad");
+    let good_reference = good.pack.exact_reference();
+    let corrupt_reference = corrupt.pack.exact_reference();
+    let mut storage = ContentPackStorage::open(&directory).expect("storage should open");
+    storage
+        .store(&good, b"good", StorageReplacementPolicy::Reject)
+        .expect("good pack stores");
+    storage
+        .store(&corrupt, b"bad", StorageReplacementPolicy::Reject)
+        .expect("second pack stores");
+    let corrupt_stem = record_file_stem(&corrupt_reference);
+    fs::write(
+        directory.join(format!("{corrupt_stem}.payload")),
+        b"tampered",
+    )
+    .expect("payload corruption writes");
+    fs::write(directory.join("interrupted.record.tmp"), b"partial")
+        .expect("partial fixture writes");
+    drop(storage);
+
+    let (reopened, issues) =
+        ContentPackStorage::open_quarantining(&directory).expect("quarantining open succeeds");
+    assert_eq!(reopened.list().len(), 1);
+    assert!(reopened.retrieve(&good_reference).is_ok());
+    assert!(matches!(
+        reopened.retrieve(&corrupt_reference),
+        Err(ContentStorageError::NotFound { .. })
+    ));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.code == "corruptContentArtifactQuarantined"));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.code == "partialContentCommitQuarantined"));
+    cleanup(&directory);
+}
+
+#[test]
 fn replacement_is_explicit_and_drifted_reimport_cannot_activate() {
     let directory = test_directory("replacement");
     let original = imported_pack("pack.replace", "entity.original");
@@ -118,6 +159,49 @@ fn replacement_is_explicit_and_drifted_reimport_cannot_activate() {
         Err(ContentStorageError::NotFound { .. })
     ));
     assert!(storage.retrieve(&replacement_reference).is_ok());
+    cleanup(&directory);
+}
+
+#[test]
+fn failed_replacement_restores_the_last_known_good_content() {
+    let directory = test_directory("replacement-rollback");
+    let original = imported_pack("pack.rollback", "entity.original");
+    let original_reference = original.pack.exact_reference();
+    let replacement = imported_pack("pack.rollback", "entity.replacement");
+    let replacement_reference = replacement.pack.exact_reference();
+    let mut storage = ContentPackStorage::open(&directory).expect("storage should open");
+    storage
+        .store(&original, b"original", StorageReplacementPolicy::Reject)
+        .expect("original should store");
+    let replacement_stem = record_file_stem(&replacement_reference);
+    let blocked_temporary = directory.join(format!("{replacement_stem}.payload.tmp"));
+    fs::create_dir(&blocked_temporary).expect("fault fixture directory creates");
+
+    assert!(storage
+        .store(
+            &replacement,
+            b"replacement",
+            StorageReplacementPolicy::ReplaceSameIdentity,
+        )
+        .is_err());
+    assert_eq!(
+        storage
+            .retrieve(&original_reference)
+            .expect("original remains readable")
+            .bytes,
+        b"original"
+    );
+    fs::remove_dir(blocked_temporary).expect("fault fixture removes");
+    drop(storage);
+
+    let reopened = ContentPackStorage::open(&directory).expect("storage should reopen");
+    assert_eq!(
+        reopened
+            .retrieve(&original_reference)
+            .expect("original survives restart")
+            .bytes,
+        b"original"
+    );
     cleanup(&directory);
 }
 

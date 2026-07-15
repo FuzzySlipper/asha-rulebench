@@ -51,7 +51,9 @@ pub use rulebench_content::{
     ContentImportLimits, ContentImportReport, ContentPackCatalogs, ContentPackCollisionPolicy,
     ContentPackDefinition, ContentPackDiagnosticCode, ContentPackDiffReadout, ContentPackIdentity,
     ContentPackMetadataChangeKind, ContentPackProvenance, ContentPackReference,
-    ContentPackSetReference, ContentPackSourceKind, EntityDefinition, ImportedContentPack,
+    ContentPackSetReference, ContentPackSourceKind, ContentPackStorage, ContentStorageError,
+    ContentStorageRecord, ContentStorageStartupIssue, EntityDefinition, ImportedContentPack,
+    StorageReplacementPolicy, StoredContentPayload,
 };
 pub use rulebench_core::Team;
 pub use rulebench_replay::{
@@ -59,14 +61,17 @@ pub use rulebench_replay::{
     verify_automatic_run_replay, verify_replay_package,
     CombatSessionAutomaticRunReplayDecisionKind, CombatSessionAutomaticRunReplayReadout,
     CombatSessionAutomaticRunReplaySpec, InMemoryReplayArchiveStorage, ReplayArchive,
-    ReplayArchiveError, ReplayArchiveMetadata, ReplayArchiveQuery, ReplayArchiveStorageError,
-    ReplayCommand, ReplayCommandInspection, ReplayCommandRecord, ReplayCommandRecordingSpec,
-    ReplayComparisonDifference, ReplayComparisonDifferenceCode, ReplayComparisonReadout,
-    ReplayEvidence, ReplayMismatch, ReplayMismatchDimension, ReplayNarration, ReplayPackage,
-    ReplayPackageInspection, ReplayPackageValidationReport, ReplayRandomnessSource,
-    ReplayStepEvidence, ReplayVerificationDecisionKind, ReplayVerificationReadout,
+    ReplayArchiveEntry, ReplayArchiveError, ReplayArchiveMetadata, ReplayArchiveQuery,
+    ReplayArchiveStorage, ReplayArchiveStorageError, ReplayCommand, ReplayCommandInspection,
+    ReplayCommandRecord, ReplayCommandRecordingSpec, ReplayComparisonDifference,
+    ReplayComparisonDifferenceCode, ReplayComparisonReadout, ReplayEvidence, ReplayMismatch,
+    ReplayMismatchDimension, ReplayNarration, ReplayPackage, ReplayPackageInspection,
+    ReplayPackageValidationReport, ReplayRandomnessSource, ReplayStepEvidence,
+    ReplayVerificationDecisionKind, ReplayVerificationReadout,
 };
-pub use rulebench_ruleset::CombatEndPolicy;
+pub use rulebench_ruleset::{
+    CombatEndPolicy, RuleModuleId, RulesetArtifactProvenance, RulesetModuleProvenance,
+};
 
 #[cfg(test)]
 mod tests {

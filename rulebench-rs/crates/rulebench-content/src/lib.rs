@@ -51,8 +51,8 @@ pub use scenario::{
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
 pub use storage::{
-    ContentPackStorage, ContentStorageError, ContentStorageRecord, StorageReplacementPolicy,
-    StoredContentPayload,
+    ContentPackStorage, ContentStorageError, ContentStorageRecord, ContentStorageStartupIssue,
+    StorageReplacementPolicy, StoredContentPayload,
 };
 pub use validation::{validate_scenario_content, validate_scenario_content_report};
 

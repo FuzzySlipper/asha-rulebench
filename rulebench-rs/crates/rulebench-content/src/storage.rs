@@ -64,6 +64,14 @@ pub enum ContentStorageError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentStorageStartupIssue {
+    pub code: String,
+    pub path: PathBuf,
+    pub reason: String,
+}
+
+#[derive(Debug)]
 pub struct ContentPackStorage {
     root: PathBuf,
     records: BTreeMap<ContentPackReference, ContentStorageRecord>,
@@ -128,6 +136,87 @@ impl ContentPackStorage {
         })
     }
 
+    pub fn open_quarantining(
+        root: impl Into<PathBuf>,
+    ) -> Result<(Self, Vec<ContentStorageStartupIssue>), ContentStorageError> {
+        let root = root.into();
+        fs::create_dir_all(&root).map_err(|_| ContentStorageError::Io {
+            operation: "createStorageDirectory",
+            path: root.clone(),
+        })?;
+        let entries = fs::read_dir(&root).map_err(|_| ContentStorageError::Io {
+            operation: "readStorageDirectory",
+            path: root.clone(),
+        })?;
+        let mut paths = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>();
+        paths.sort();
+        let mut issues = paths
+            .iter()
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("tmp"))
+            .map(|path| ContentStorageStartupIssue {
+                code: "partialContentCommitQuarantined".to_string(),
+                path: path.clone(),
+                reason: "An uncommitted content temporary file was ignored.".to_string(),
+            })
+            .collect::<Vec<_>>();
+        let record_paths = paths
+            .into_iter()
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("record"))
+            .collect::<Vec<_>>();
+        let mut records = BTreeMap::new();
+        let mut identities = BTreeSet::new();
+        for path in record_paths {
+            let loaded = fs::read(&path)
+                .map_err(|_| "content record could not be read".to_string())
+                .and_then(|bytes| decode_record(&bytes))
+                .and_then(|record| {
+                    read_payload(&root, &record)
+                        .map_err(|error| format!("{error:?}"))
+                        .and_then(|payload| {
+                            validate_payload(&record, &payload)
+                                .map_err(|error| format!("{error:?}"))?;
+                            Ok(record)
+                        })
+                });
+            let record = match loaded {
+                Ok(record) => record,
+                Err(reason) => {
+                    issues.push(ContentStorageStartupIssue {
+                        code: "corruptContentArtifactQuarantined".to_string(),
+                        path,
+                        reason,
+                    });
+                    continue;
+                }
+            };
+            let identity = (
+                record.reference.id.clone(),
+                record.reference.version.clone(),
+            );
+            if !identities.insert(identity) || records.contains_key(&record.reference) {
+                issues.push(ContentStorageStartupIssue {
+                    code: "duplicateContentIdentityQuarantined".to_string(),
+                    path,
+                    reason: "A duplicate content identity was ignored.".to_string(),
+                });
+                continue;
+            }
+            records.insert(record.reference.clone(), record);
+        }
+        let definition_index = build_definition_index(records.values());
+        Ok((
+            Self {
+                root,
+                records,
+                definition_index,
+            },
+            issues,
+        ))
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }
@@ -172,9 +261,19 @@ impl ContentPackStorage {
         }
 
         let record = record_from_pack(&imported.pack, authored_payload);
-        write_record(&self.root, &record, authored_payload)?;
+        let staged_replacements = stage_replacements(&self.root, &same_identity)?;
+        if let Err(error) = write_record(&self.root, &record, authored_payload) {
+            discard_staged_replacements(&staged_replacements);
+            return Err(error);
+        }
+        if let Err(error) = remove_staged_originals(&staged_replacements) {
+            remove_committed_files(&self.root, &record.reference);
+            restore_staged_replacements(&staged_replacements);
+            discard_staged_replacements(&staged_replacements);
+            return Err(error);
+        }
+        discard_staged_replacements(&staged_replacements);
         for replaced in same_identity {
-            remove_files(&self.root, &replaced)?;
             self.records.remove(&replaced);
         }
         self.records
@@ -248,14 +347,23 @@ fn write_record(
         operation: "writeContentRecord",
         path: record_temporary.clone(),
     })?;
-    fs::rename(&payload_temporary, &payload_path).map_err(|_| ContentStorageError::Io {
-        operation: "commitContentPayload",
-        path: payload_path.clone(),
-    })?;
-    fs::rename(&record_temporary, &record_path).map_err(|_| ContentStorageError::Io {
-        operation: "commitContentRecord",
-        path: record_path,
-    })
+    if fs::rename(&payload_temporary, &payload_path).is_err() {
+        let _ = fs::remove_file(&payload_temporary);
+        let _ = fs::remove_file(&record_temporary);
+        return Err(ContentStorageError::Io {
+            operation: "commitContentPayload",
+            path: payload_path,
+        });
+    }
+    if fs::rename(&record_temporary, &record_path).is_err() {
+        let _ = fs::remove_file(&payload_path);
+        let _ = fs::remove_file(&record_temporary);
+        return Err(ContentStorageError::Io {
+            operation: "commitContentRecord",
+            path: record_path,
+        });
+    }
+    Ok(())
 }
 
 fn read_payload(
@@ -281,16 +389,93 @@ fn validate_payload(
     Ok(())
 }
 
-fn remove_files(root: &Path, reference: &ContentPackReference) -> Result<(), ContentStorageError> {
-    let stem = record_file_stem(reference);
-    for extension in ["record", "payload"] {
-        let path = root.join(format!("{stem}.{extension}"));
-        fs::remove_file(&path).map_err(|_| ContentStorageError::Io {
-            operation: "removeReplacedContent",
-            path,
-        })?;
+#[derive(Debug)]
+struct StagedContentReplacement {
+    original_paths: Vec<PathBuf>,
+    backup_paths: Vec<PathBuf>,
+}
+
+fn stage_replacements(
+    root: &Path,
+    references: &[ContentPackReference],
+) -> Result<Vec<StagedContentReplacement>, ContentStorageError> {
+    let mut staged = Vec::new();
+    for reference in references {
+        let stem = record_file_stem(reference);
+        let original_paths = ["record", "payload"]
+            .into_iter()
+            .map(|extension| root.join(format!("{stem}.{extension}")))
+            .collect::<Vec<_>>();
+        let backup_paths = original_paths
+            .iter()
+            .map(|path| {
+                path.with_extension(format!(
+                    "{}.replace-backup.tmp",
+                    path.extension()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or("artifact")
+                ))
+            })
+            .collect::<Vec<_>>();
+        for (original, backup) in original_paths.iter().zip(&backup_paths) {
+            if fs::copy(original, backup).is_err() {
+                for copied in &backup_paths {
+                    let _ = fs::remove_file(copied);
+                }
+                discard_staged_replacements(&staged);
+                return Err(ContentStorageError::Io {
+                    operation: "stageReplacedContent",
+                    path: original.clone(),
+                });
+            }
+        }
+        staged.push(StagedContentReplacement {
+            original_paths,
+            backup_paths,
+        });
+    }
+    Ok(staged)
+}
+
+fn restore_staged_replacements(replacements: &[StagedContentReplacement]) {
+    for replacement in replacements.iter().rev() {
+        for (original, backup) in replacement
+            .original_paths
+            .iter()
+            .zip(&replacement.backup_paths)
+        {
+            let _ = fs::copy(backup, original);
+        }
+    }
+}
+
+fn remove_staged_originals(
+    replacements: &[StagedContentReplacement],
+) -> Result<(), ContentStorageError> {
+    for replacement in replacements {
+        for original in &replacement.original_paths {
+            fs::remove_file(original).map_err(|_| ContentStorageError::Io {
+                operation: "removeReplacedContent",
+                path: original.clone(),
+            })?;
+        }
     }
     Ok(())
+}
+
+fn discard_staged_replacements(replacements: &[StagedContentReplacement]) {
+    for replacement in replacements {
+        for backup in &replacement.backup_paths {
+            let _ = fs::remove_file(backup);
+        }
+    }
+}
+
+fn remove_committed_files(root: &Path, reference: &ContentPackReference) {
+    let stem = record_file_stem(reference);
+    for extension in ["record", "payload"] {
+        let _ = fs::remove_file(root.join(format!("{stem}.{extension}")));
+    }
 }
 
 fn build_definition_index<'a>(

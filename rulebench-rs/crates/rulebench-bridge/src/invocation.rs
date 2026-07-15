@@ -14,8 +14,8 @@ use rulebench_rules::{
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
     CurrentActorOptionSummary, InMemoryReplayArchiveStorage, ReactionCommandReadout, ReplayArchive,
-    ReplayArchiveQuery, ReplayCommand, ReplayCommandRecordingSpec, ReplayPackage,
-    RulebenchScenario, AUTHORITY_SURFACE,
+    ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand, ReplayCommandRecordingSpec,
+    ReplayPackage, RulebenchScenario, AUTHORITY_SURFACE,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -71,12 +71,22 @@ impl BridgeScenario {
     }
 }
 
-#[derive(Debug)]
 pub struct RulebenchBridge {
     scenarios: BTreeMap<String, BridgeScenario>,
     sessions: CombatSessionApi,
-    replays: ReplayArchive<InMemoryReplayArchiveStorage>,
+    replays: ReplayArchive<Box<dyn ReplayArchiveStorage>>,
     recordings: BTreeMap<String, LiveReplayRecording>,
+}
+
+impl std::fmt::Debug for RulebenchBridge {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RulebenchBridge")
+            .field("scenarios", &self.scenarios)
+            .field("sessions", &self.sessions)
+            .field("recordings", &self.recordings)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug)]
@@ -90,7 +100,7 @@ impl Default for RulebenchBridge {
         Self {
             scenarios: BTreeMap::new(),
             sessions: CombatSessionApi::new(),
-            replays: ReplayArchive::new(InMemoryReplayArchiveStorage::new()),
+            replays: ReplayArchive::new(Box::new(InMemoryReplayArchiveStorage::new())),
             recordings: BTreeMap::new(),
         }
     }
@@ -123,7 +133,9 @@ impl RulebenchBridge {
                 ));
             }
         }
-        let mut replays = ReplayArchive::new(InMemoryReplayArchiveStorage::new());
+        let mut replays = ReplayArchive::new(
+            Box::new(InMemoryReplayArchiveStorage::new()) as Box<dyn ReplayArchiveStorage>
+        );
         for (index, replay) in replay_packages.into_iter().enumerate() {
             replays
                 .save(replay, format!("fixture-{index:04}"))
@@ -135,6 +147,15 @@ impl RulebenchBridge {
             replays,
             recordings: BTreeMap::new(),
         })
+    }
+
+    pub fn new_with_replay_storage(
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        replay_storage: Box<dyn ReplayArchiveStorage>,
+    ) -> Result<Self, BridgeError> {
+        let mut bridge = Self::new(scenarios)?;
+        bridge.replays = ReplayArchive::new(replay_storage);
+        Ok(bridge)
     }
 
     pub fn handshake(
@@ -183,7 +204,7 @@ impl RulebenchBridge {
             configure_participant_order(scenario.scenario.clone(), &request.participant_order)?;
         let initial_session = rulebench_rules::CombatSessionCreateRequest::new(
             &request.session_id,
-            replay_ready_scenario(configured_scenario.clone()),
+            prepare_replay_scenario(configured_scenario.clone()),
         );
         let readout = self
             .sessions
@@ -423,6 +444,7 @@ impl RulebenchBridge {
         Ok(self
             .replays
             .list(&ReplayArchiveQuery::default())
+            .map_err(BridgeError::from_replay_error)?
             .iter()
             .map(ReplayArchiveMetadataDto::from)
             .collect())
@@ -520,7 +542,7 @@ impl RulebenchBridge {
     }
 }
 
-fn replay_ready_scenario(mut scenario: RulebenchScenario) -> RulebenchScenario {
+pub fn prepare_replay_scenario(mut scenario: RulebenchScenario) -> RulebenchScenario {
     if scenario.content_pack_set.is_some() {
         return scenario;
     }

@@ -72,24 +72,30 @@ impl<S: ReplayArchiveStorage> ReplayArchive<S> {
         Ok(metadata)
     }
 
-    pub fn list(&self, query: &ReplayArchiveQuery) -> Vec<ReplayArchiveMetadata> {
-        self.storage
+    pub fn list(
+        &self,
+        query: &ReplayArchiveQuery,
+    ) -> Result<Vec<ReplayArchiveMetadata>, ReplayArchiveError> {
+        Ok(self
+            .storage
             .list()
+            .map_err(ReplayArchiveError::Storage)?
             .into_iter()
             .filter(|metadata| matches_query(metadata, query))
-            .collect()
+            .collect())
     }
 
     pub fn retrieve(&mut self, package_id: &str) -> Result<ReplayPackage, ReplayArchiveError> {
         if let Some(package) = self.cache.get(package_id) {
             return Ok(package.clone());
         }
-        let entry =
-            self.storage
-                .read(package_id)
-                .ok_or_else(|| ReplayArchiveError::UnknownPackage {
-                    package_id: package_id.to_string(),
-                })?;
+        let entry = self
+            .storage
+            .read(package_id)
+            .map_err(ReplayArchiveError::Storage)?
+            .ok_or_else(|| ReplayArchiveError::UnknownPackage {
+                package_id: package_id.to_string(),
+            })?;
         if !entry.is_self_consistent() {
             return Err(ReplayArchiveError::CorruptPackage {
                 package_id: package_id.to_string(),
@@ -114,9 +120,9 @@ impl<S: ReplayArchiveStorage> ReplayArchive<S> {
         self.cache.clear();
     }
 
-    pub fn clear_all(&mut self) {
+    pub fn clear_all(&mut self) -> Result<(), ReplayArchiveError> {
         self.cache.clear();
-        self.storage.clear();
+        self.storage.clear().map_err(ReplayArchiveError::Storage)
     }
 
     pub fn storage_mut(&mut self) -> &mut S {
@@ -166,6 +172,7 @@ mod tests {
                     scenario_id: Some(package.initial_session.scenario.metadata.id),
                     ..ReplayArchiveQuery::default()
                 })
+                .expect("storage lists")
                 .len(),
             1
         );
@@ -182,7 +189,10 @@ mod tests {
             archive.save(package, "test-completion-002"),
             Err(ReplayArchiveError::Storage(_))
         ));
-        assert!(archive.list(&ReplayArchiveQuery::default()).is_empty());
+        assert!(archive
+            .list(&ReplayArchiveQuery::default())
+            .expect("storage lists")
+            .is_empty());
     }
 
     #[test]

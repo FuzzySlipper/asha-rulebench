@@ -64,6 +64,12 @@ The canonical `pnpm run e2e` gate starts this combined stack and completes a
 real Rust-owned combat session through the transport, including cleanup and
 classified failure/version-mismatch checks.
 
+For restart-stable authored content and finalized replays, start the Rust host
+with `--artifact-root PATH` (or set `RULEBENCH_ARTIFACT_ROOT`). The concrete
+host owns that versioned, single-writer filesystem repository; portable Rust
+crates remain serialization-free and the bridge remains host-neutral. Active
+combat sessions are still process-local and are not recovered after restart.
+
 ## Source Material
 
 This repo starts from four planning references:

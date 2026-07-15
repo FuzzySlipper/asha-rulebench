@@ -6,12 +6,19 @@
 
 #![forbid(unsafe_code)]
 
+mod artifact_repository;
 mod http;
 mod router;
 mod server;
 
+pub use artifact_repository::{
+    ArtifactRepositoryIssue, FileReplayArchiveStorage, ReplayStorageOpenReport,
+};
 pub use http::{HttpMethod, HttpRequest, HttpResponse};
-pub use router::{build_rulebench_bridge, ProcessHostRouter};
+pub use router::{
+    build_durable_rulebench_router, build_rulebench_bridge, ArtifactRepositoryConfig,
+    ArtifactRepositoryStatus, ProcessHostRouter,
+};
 pub use server::{serve_until, ServerError};
 
 #[cfg(test)]

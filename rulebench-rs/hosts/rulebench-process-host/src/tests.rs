@@ -1,6 +1,7 @@
+use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -15,7 +16,12 @@ use rulebench_protocol::{
     PROTOCOL_VERSION,
 };
 
-use crate::{build_rulebench_bridge, serve_until, HttpMethod, HttpRequest, ProcessHostRouter};
+use crate::{
+    build_durable_rulebench_router, build_rulebench_bridge, serve_until, HttpMethod, HttpRequest,
+    ProcessHostRouter,
+};
+
+static TEST_DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 fn router() -> ProcessHostRouter {
     ProcessHostRouter::new(build_rulebench_bridge().expect("fixture catalog is valid"))
@@ -193,6 +199,96 @@ fn router_exposes_rust_replay_review_verification_and_comparison() {
         "/api/rulebench/v1/replays/missing",
     ));
     assert_eq!(missing.status, 404);
+}
+
+#[test]
+fn durable_router_reports_repository_state_and_reloads_a_finalized_live_replay() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-durable-host-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    assert_eq!(router.repository_status().mode, "filesystem");
+    assert_eq!(router.repository_status().replay_artifact_count, 2);
+    assert!(router.content_storage().is_some());
+
+    let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario_id = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "hexing-bolt-hit")
+        .expect("finalizable fixture exists")
+        .id
+        .clone();
+    let session_id = "durable-live-session";
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/sessions",
+                &CombatSessionCreateRequestDto {
+                    session_id: session_id.to_string(),
+                    scenario_id,
+                    participant_order: Vec::new(),
+                },
+            ))
+            .status,
+        200
+    );
+    for kind in [
+        CombatControlCommandKindDto::ExplicitStart,
+        CombatControlCommandKindDto::ExplicitEnd,
+    ] {
+        assert_eq!(
+            router
+                .handle(&json_request(
+                    HttpMethod::Post,
+                    &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                    &CombatControlCommandDto { kind },
+                ))
+                .status,
+            200
+        );
+    }
+    assert_eq!(
+        router
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/sessions/{session_id}"),
+            ))
+            .status,
+        200
+    );
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("durable router restarts");
+    let listed = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/replays"));
+    let packages: Vec<ReplayArchiveMetadataDto> =
+        serde_json::from_slice(&listed.body).expect("replay list is JSON");
+    assert!(
+        packages
+            .iter()
+            .any(|package| package.package_id == format!("live-{session_id}")),
+        "packages={packages:?} status={:?}",
+        restarted.repository_status()
+    );
+    let loaded = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/live-{session_id}"),
+    ));
+    assert_eq!(loaded.status, 200);
+    let verified = restarted.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/live-{session_id}/verify"),
+    ));
+    let verified: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&verified.body).expect("restarted replay verification is JSON");
+    assert!(verified.accepted);
+    assert!(verified.finalized);
+    fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 
 #[test]

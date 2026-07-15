@@ -52,13 +52,43 @@ impl ReplayArchiveEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReplayArchiveStorageError {
     WriteFailed { package_id: String },
+    ReadFailed { package_id: String },
+    ListFailed,
+    ClearFailed,
 }
 
 pub trait ReplayArchiveStorage {
     fn write(&mut self, entry: ReplayArchiveEntry) -> Result<(), ReplayArchiveStorageError>;
-    fn read(&self, package_id: &str) -> Option<ReplayArchiveEntry>;
-    fn list(&self) -> Vec<ReplayArchiveMetadata>;
-    fn clear(&mut self);
+    fn read(
+        &self,
+        package_id: &str,
+    ) -> Result<Option<ReplayArchiveEntry>, ReplayArchiveStorageError>;
+    fn list(&self) -> Result<Vec<ReplayArchiveMetadata>, ReplayArchiveStorageError>;
+    fn clear(&mut self) -> Result<(), ReplayArchiveStorageError>;
+}
+
+impl<T> ReplayArchiveStorage for Box<T>
+where
+    T: ReplayArchiveStorage + ?Sized,
+{
+    fn write(&mut self, entry: ReplayArchiveEntry) -> Result<(), ReplayArchiveStorageError> {
+        (**self).write(entry)
+    }
+
+    fn read(
+        &self,
+        package_id: &str,
+    ) -> Result<Option<ReplayArchiveEntry>, ReplayArchiveStorageError> {
+        (**self).read(package_id)
+    }
+
+    fn list(&self) -> Result<Vec<ReplayArchiveMetadata>, ReplayArchiveStorageError> {
+        (**self).list()
+    }
+
+    fn clear(&mut self) -> Result<(), ReplayArchiveStorageError> {
+        (**self).clear()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -96,19 +126,24 @@ impl ReplayArchiveStorage for InMemoryReplayArchiveStorage {
         Ok(())
     }
 
-    fn read(&self, package_id: &str) -> Option<ReplayArchiveEntry> {
-        self.entries.get(package_id).cloned()
+    fn read(
+        &self,
+        package_id: &str,
+    ) -> Result<Option<ReplayArchiveEntry>, ReplayArchiveStorageError> {
+        Ok(self.entries.get(package_id).cloned())
     }
 
-    fn list(&self) -> Vec<ReplayArchiveMetadata> {
-        self.entries
+    fn list(&self) -> Result<Vec<ReplayArchiveMetadata>, ReplayArchiveStorageError> {
+        Ok(self
+            .entries
             .values()
             .map(|entry| entry.metadata.clone())
-            .collect()
+            .collect())
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> Result<(), ReplayArchiveStorageError> {
         self.entries.clear();
+        Ok(())
     }
 }
 
