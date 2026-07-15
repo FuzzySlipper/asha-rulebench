@@ -3,6 +3,7 @@ import type { Provider, Signal } from "@angular/core";
 import {
   projectLiveAutomaticRun,
   projectLiveAutomaticStep,
+  projectCapabilityManifest,
   projectLiveCandidates,
   projectLiveCommandExecution,
   projectLiveOptions,
@@ -17,6 +18,7 @@ import {
   type RulebenchLivePreflightView,
   type RulebenchLiveReactionExecutionView,
   type RulebenchLiveSessionView,
+  type RulebenchCapabilityManifestView,
 } from "@asha-rulebench/domain";
 import { browserClock, type ClockPort } from "@asha-rulebench/platform";
 import type {
@@ -67,6 +69,11 @@ export class LiveCombatStore {
   >({ kind: "idle" });
   readonly scenarios: Signal<LiveState<readonly RulebenchScenarioOptionDto[]>> =
     this._scenarios.asReadonly();
+  private readonly _capabilities = signal<
+    LiveState<RulebenchCapabilityManifestView>
+  >({ kind: "idle" });
+  readonly capabilities: Signal<LiveState<RulebenchCapabilityManifestView>> =
+    this._capabilities.asReadonly();
   private readonly _sessions = signal<
     LiveState<readonly RulebenchLiveSessionView[]>
   >({ kind: "idle" });
@@ -162,6 +169,19 @@ export class LiveCombatStore {
     } else {
       this._scenarios.set({ kind: "error", error: result.error });
     }
+    this.clock.now();
+  }
+
+  async loadCapabilities(): Promise<void> {
+    const generation = this.lifecycleGeneration;
+    this._capabilities.set({ kind: "loading" });
+    const result = await this.transport.getCapabilities();
+    if (generation !== this.lifecycleGeneration) return;
+    this._capabilities.set(
+      result.ok
+        ? { kind: "data", value: projectCapabilityManifest(result.value) }
+        : { kind: "error", error: result.error },
+    );
     this.clock.now();
   }
 
@@ -512,6 +532,7 @@ export class LiveCombatStore {
     this.lifecycleGeneration += 1;
     this.sessionGeneration += 1;
     this._connection.set({ kind: "idle" });
+    this._capabilities.set({ kind: "idle" });
     this._scenarios.set({ kind: "idle" });
     this._sessions.set({ kind: "idle" });
     this._selectedScenarioId.set(null);

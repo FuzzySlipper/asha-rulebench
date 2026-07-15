@@ -4,6 +4,18 @@ pub const FIRST_ACCEPTED_CANDIDATE_POLICY_ID: &str = "firstAcceptedCandidate";
 pub const FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CombatAutomationPolicyRegistration {
+    pub id: &'static str,
+    pub version: u32,
+}
+
+pub const COMBAT_AUTOMATION_POLICY_REGISTRY: &[CombatAutomationPolicyRegistration] =
+    &[CombatAutomationPolicyRegistration {
+        id: FIRST_ACCEPTED_CANDIDATE_POLICY_ID,
+        version: FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
+    }];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatAutomationNoCandidateBehavior {
     AdvanceTurn,
     StopRun,
@@ -72,14 +84,17 @@ pub struct CombatAutomationPolicyValidationReadout {
 pub fn validate_combat_automation_policy(
     policy: &CombatAutomationPolicySpec,
 ) -> CombatAutomationPolicyValidationReadout {
-    if policy.id != FIRST_ACCEPTED_CANDIDATE_POLICY_ID {
+    let registration = COMBAT_AUTOMATION_POLICY_REGISTRY
+        .iter()
+        .find(|registration| registration.id == policy.id);
+    let Some(registration) = registration else {
         return CombatAutomationPolicyValidationReadout {
             accepted: false,
             code: CombatAutomationPolicyValidationCode::UnsupportedPolicyId,
             reason: format!("Unsupported combat automation policy id {}.", policy.id),
         };
-    }
-    if policy.version != FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION {
+    };
+    if policy.version != registration.version {
         return CombatAutomationPolicyValidationReadout {
             accepted: false,
             code: CombatAutomationPolicyValidationCode::UnsupportedPolicyVersion,

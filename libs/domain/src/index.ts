@@ -442,3 +442,4 @@ function labelTraceStatus(status: RulebenchTraceEntryDto['status']): string {
 function positionKey(x: number, y: number): string {
   return `${x}:${y}`;
 }
+export * from "./capabilities";

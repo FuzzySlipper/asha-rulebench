@@ -13,7 +13,7 @@ use rulebench_protocol::{
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
     ReactionResponseKindDto, ReplayArchiveMetadataDto, ReplayComparisonReadoutDto,
     ReplayComparisonRequestDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
-    ScenarioOptionDto, UseActionIntentDto, PROTOCOL_VERSION,
+    RulebenchCapabilityManifestDto, ScenarioOptionDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
 
 use crate::{
@@ -39,6 +39,32 @@ where
     request(method, path)
         .with_header("content-type", "application/json")
         .with_body(serde_json::to_vec(body).expect("test DTO serializes"))
+}
+
+#[test]
+fn capability_route_reports_registry_and_actual_host_composition() {
+    let mut memory_router = router();
+    let response =
+        memory_router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/capabilities"));
+    assert_eq!(response.status, 200);
+    let manifest: RulebenchCapabilityManifestDto =
+        serde_json::from_slice(&response.body).expect("capability manifest is JSON");
+
+    assert_eq!(manifest.host.storage_mode, "memory");
+    assert_eq!(manifest.host.session_recovery_mode, "none");
+    assert_eq!(manifest.rulesets.len(), 1);
+    assert_eq!(manifest.packages.len(), 3);
+    assert_eq!(manifest.scenarios.len(), 7);
+    assert!(manifest.capabilities.iter().any(|capability| {
+        capability.id == "targeting.multipleCombatants"
+            && capability.support.runtime_executable
+            && !capability.support.regression_covered
+    }));
+    assert!(manifest.capabilities.iter().any(|capability| {
+        capability.id == "content.authored-pack"
+            && !capability.support.runtime_executable
+            && !capability.support.live_host_exposed
+    }));
 }
 
 #[test]

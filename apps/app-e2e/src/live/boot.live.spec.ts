@@ -39,11 +39,41 @@ liveScenario(
       }
     });
     collector.addNonClaim(
-      "This scenario proves one Rulebench fixture can be controlled through the live Rust host; it does not prove arbitrary rulesets, durable sessions, broad accessibility coverage, or performance.",
+      "This scenario proves one Rulebench fixture and the current capability manifest can be read through the live Rust host; it does not prove arbitrary rulesets, durable sessions, broad accessibility coverage, or performance.",
     );
 
     await page.goto(liveBaseUrl);
     await expect(page.getByLabel("Rulebench panel layout")).toBeVisible();
+
+    await invokeApplicationCommand(page, "View", "Runtime capabilities");
+    const capabilityDialog = page.getByRole("dialog", {
+      name: "Runtime capabilities",
+    });
+    const capabilityMatrix = capabilityDialog.getByRole("table", {
+      name: "Executable support matrix",
+    });
+    await expect(
+      capabilityDialog.getByText("rulebench-process-host · filesystem"),
+    ).toBeVisible();
+    await expect(
+      capabilityMatrix.getByRole("row", { name: /session\.active-recovery/ }),
+    ).toContainText("Not declared");
+    await collector.milestone("live rust capability manifest desktop", {
+      screenshot: true,
+      layerSnapshot: {
+        manifest: await capabilityDialog.innerText(),
+      },
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await collector.milestone("live rust capability manifest mobile", {
+      screenshot: true,
+      layerSnapshot: {
+        viewport: "390x844",
+        manifest: await capabilityDialog.innerText(),
+      },
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await capabilityDialog.getByRole("button", { name: "Close" }).click();
 
     await invokeApplicationCommand(page, "File", "Content packs");
     const contentDialog = page.getByRole("dialog", { name: "Content packs" });
@@ -58,13 +88,21 @@ liveScenario(
       mimeType: "application/json",
       buffer: Buffer.from(authoredPack(livePackId, 1, "Live Evidence Pack")),
     });
-    await contentDialog.getByRole("button", { name: "Import", exact: true }).click();
-    await expect(contentDialog.getByText("Accepted", { exact: true })).toBeVisible();
-    await contentDialog.getByRole("button", { name: "Activate exact set" }).click();
+    await contentDialog
+      .getByRole("button", { name: "Import", exact: true })
+      .click();
+    await expect(
+      contentDialog.getByText("Accepted", { exact: true }),
+    ).toBeVisible();
+    await contentDialog
+      .getByRole("button", { name: "Activate exact set" })
+      .click();
     const selectedContent = contentDialog.getByRole("region", {
       name: "Selected authored pack review",
     });
-    await expect(selectedContent.getByText("Active", { exact: true })).toBeVisible();
+    await expect(
+      selectedContent.getByText("Active", { exact: true }),
+    ).toBeVisible();
     await collector.milestone("authored content active desktop", {
       screenshot: true,
       layerSnapshot: {
@@ -77,20 +115,31 @@ liveScenario(
     await contentDialog.locator('input[type="file"]').setInputFiles({
       name: "unsupported-live-pack.json",
       mimeType: "application/json",
-      buffer: Buffer.from(authoredPack(livePackId, 99, "Unsupported Live Pack")),
+      buffer: Buffer.from(
+        authoredPack(livePackId, 99, "Unsupported Live Pack"),
+      ),
     });
-    await contentDialog.getByRole("button", { name: "Import", exact: true }).click();
-    await expect(contentDialog.getByText("unsupportedAuthoredContentVersion")).toBeVisible();
-    await expect(selectedContent.getByText("Active", { exact: true })).toBeVisible();
-    await collector.milestone("authored content rejection preserves active pack", {
-      screenshot: true,
-      layerSnapshot: {
-        rejection: await contentDialog
-          .getByRole("region", { name: "Import authored content" })
-          .innerText(),
-        retainedPack: await selectedContent.innerText(),
+    await contentDialog
+      .getByRole("button", { name: "Import", exact: true })
+      .click();
+    await expect(
+      contentDialog.getByText("unsupportedAuthoredContentVersion"),
+    ).toBeVisible();
+    await expect(
+      selectedContent.getByText("Active", { exact: true }),
+    ).toBeVisible();
+    await collector.milestone(
+      "authored content rejection preserves active pack",
+      {
+        screenshot: true,
+        layerSnapshot: {
+          rejection: await contentDialog
+            .getByRole("region", { name: "Import authored content" })
+            .innerText(),
+          retainedPack: await selectedContent.innerText(),
+        },
       },
-    });
+    );
     await page.setViewportSize({ width: 390, height: 844 });
     await collector.milestone("authored content mobile", {
       screenshot: true,

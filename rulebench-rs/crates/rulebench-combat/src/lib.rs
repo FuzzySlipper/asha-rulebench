@@ -30,19 +30,39 @@ pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
     validate_combat_automation_policy, CombatAutomationCandidateEvidence,
     CombatAutomationNoCandidateBehavior, CombatAutomationPolicyDecisionEvidence,
-    CombatAutomationPolicySpec, CombatAutomationPolicyValidationCode,
-    CombatAutomationPolicyValidationReadout, CombatSessionAutoCandidateCommandSpec,
-    CombatSessionAutoCandidateDecisionKind, CombatSessionAutoCandidateExecutionReadout,
-    CombatSessionAutoCandidatePlanReadout, CombatSessionAutomaticRunDecisionKind,
-    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunSpec,
-    CombatSessionAutomaticStepDecisionKind, CombatSessionAutomaticStepExecutionReadout,
-    CombatSessionAutomaticStepOperationKind, CombatSessionAutomaticStepPlanReadout,
-    CombatSessionAutomaticStepSpec, CombatSessionCandidateExecutionReadout,
-    CombatSessionCandidateSelectionDecisionKind, CombatSessionCandidateSelectionReadout,
-    CombatSessionCandidateSelectionSpec, CombatSessionCommandSpec, CombatSessionIntentCommandSpec,
-    CombatSessionScriptCommandKind, CombatSessionScriptCommandSpec,
-    CombatSessionScriptDecisionKind, CombatSessionScriptReadout, CombatSessionScriptSpec,
-    CombatSessionScriptStepReadout, CombatSessionScriptStepSpec, CombatSessionState,
-    FIRST_ACCEPTED_CANDIDATE_POLICY_ID, FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
+    CombatAutomationPolicyRegistration, CombatAutomationPolicySpec,
+    CombatAutomationPolicyValidationCode, CombatAutomationPolicyValidationReadout,
+    CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
+    CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
+    CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepDecisionKind,
+    CombatSessionAutomaticStepExecutionReadout, CombatSessionAutomaticStepOperationKind,
+    CombatSessionAutomaticStepPlanReadout, CombatSessionAutomaticStepSpec,
+    CombatSessionCandidateExecutionReadout, CombatSessionCandidateSelectionDecisionKind,
+    CombatSessionCandidateSelectionReadout, CombatSessionCandidateSelectionSpec,
+    CombatSessionCommandSpec, CombatSessionIntentCommandSpec, CombatSessionScriptCommandKind,
+    CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
+    CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
+    CombatSessionState, COMBAT_AUTOMATION_POLICY_REGISTRY, FIRST_ACCEPTED_CANDIDATE_POLICY_ID,
+    FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
 };
 pub use state::CombatState;
+
+pub use rulebench_gameplay_module::GOVERNED_ASHA_REVISION;
+
+pub const RUNTIME_EFFECT_OPERATION_REGISTRY: &[model::EffectOperationId] = &[
+    model::EffectOperationId::Damage,
+    model::EffectOperationId::Heal,
+    model::EffectOperationId::GrantTemporaryVitality,
+    model::EffectOperationId::ApplyModifier,
+    model::EffectOperationId::Move,
+    model::EffectOperationId::ChangeResource,
+    model::EffectOperationId::OpenReactionWindow,
+];
+
+pub const RUNTIME_TARGETING_OPERATION_REGISTRY: &[model::TargetingOperationId] = &[
+    model::TargetingOperationId::SingleCombatant,
+    model::TargetingOperationId::MultipleCombatants,
+    model::TargetingOperationId::ManhattanBurstArea,
+    model::TargetingOperationId::CellMovement,
+];

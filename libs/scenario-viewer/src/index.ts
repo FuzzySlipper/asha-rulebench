@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import type { OnInit } from "@angular/core";
-import { SessionStore } from "@asha-rulebench/store";
+import { LiveCombatStore, SessionStore } from "@asha-rulebench/store";
 import type {
   RulebenchCommandOutcomeClassDto,
   RulebenchScenarioOutcomeClassDto,
@@ -11,6 +11,7 @@ import {
   type ApplicationMenuItem,
 } from "@asha-rulebench/components";
 import { ContentPacksDialogContentComponent } from "./content-packs-dialog-content";
+import { CapabilityManifestDialogContentComponent } from "./capability-manifest-dialog-content";
 import { LiveCombatSetupDialogContentComponent } from "./live-combat-setup-dialog-content";
 import { ReplayArchiveDialogContentComponent } from "./replay-archive-dialog-content";
 import { WorkbenchShellComponent } from "./workbench-shell.component";
@@ -18,6 +19,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
 @Component({
   imports: [
     ApplicationDialogComponent,
+    CapabilityManifestDialogContentComponent,
     ContentPacksDialogContentComponent,
     LiveCombatSetupDialogContentComponent,
     ReplayArchiveDialogContentComponent,
@@ -130,6 +132,16 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         [deterministicMode]="viewerMode()"
         (applicationCommand)="handleApplicationCommand($event)"
       />
+
+      <arb-application-dialog
+        dialogId="capability-manifest-dialog"
+        dialogTitle="Runtime capabilities"
+        dialogDescription="Inspect executable support derived from Rust registries and current host composition."
+        [open]="activeDialog() === 'capabilities'"
+        (closeRequested)="closeDialog()"
+      >
+        <arb-capability-manifest-dialog-content />
+      </arb-application-dialog>
 
       <arb-application-dialog
         dialogId="content-packs-dialog"
@@ -268,10 +280,16 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
 })
 export class ScenarioViewerFeatureComponent implements OnInit {
   private readonly sessionStore = inject(SessionStore);
+  private readonly liveStore = inject(LiveCombatStore);
   protected readonly activeDialog = signal<
-    "content" | "scenario" | "live" | "replay" | null
+    "capabilities" | "content" | "scenario" | "live" | "replay" | null
   >(null);
   protected readonly applicationMenuGroups: readonly ApplicationMenuGroup[] = [
+    {
+      id: "view",
+      label: "View",
+      items: [{ id: "open-runtime-capabilities", label: "Runtime capabilities" }],
+    },
     {
       id: "file",
       label: "File",
@@ -323,6 +341,10 @@ export class ScenarioViewerFeatureComponent implements OnInit {
         return;
       case "open-replay-review":
         this.activeDialog.set("replay");
+        return;
+      case "open-runtime-capabilities":
+        this.activeDialog.set("capabilities");
+        void this.liveStore.loadCapabilities();
         return;
     }
   }

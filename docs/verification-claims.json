@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-07-14",
+  "reviewedOn": "2026-07-15",
   "denDocuments": [
     "basic-design",
     "north-star-systems-map",
@@ -30,6 +30,14 @@
     {
       "file": "docs/gameplay-fabric-integration.md",
       "text": "one concrete owner through `StaticRuntimeSessionBuilder`"
+    },
+    {
+      "file": "docs/capability-manifest.md",
+      "text": "The Rulebench capability manifest is executable evidence"
+    },
+    {
+      "file": "README.md",
+      "text": "1 ruleset identity, 3 registered packages, 7 scenario cases, 1 automation policy"
     }
   ],
   "requiredNonClaims": [
@@ -72,6 +80,22 @@
     {
       "id": "checked-viewer-artifacts",
       "denHeading": "Checked-artifact viewer remains alongside live control"
+    },
+    {
+      "id": "active-session-recovery",
+      "denHeading": "Active sessions remain process-local"
+    },
+    {
+      "id": "authored-content-v1-vocabulary",
+      "denHeading": "Authored content wire remains intentionally narrow"
+    },
+    {
+      "id": "schema-coupled-replay-fingerprint",
+      "denHeading": "Replay archive fingerprints are schema-coupled"
+    },
+    {
+      "id": "executable-capability-regression-gaps",
+      "denHeading": "Executable capability regression gaps"
     }
   ]
 }

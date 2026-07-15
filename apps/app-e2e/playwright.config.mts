@@ -20,6 +20,10 @@ const localWebServer = process.env['BASE_URL']
 
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
+  // Every test project talks to one intentionally single-writer process host.
+  // Running stateful files concurrently makes content activation and session
+  // creation race through shared authority instead of testing isolated flows.
+  workers: 1,
   use: {
     baseURL,
     trace: 'on-first-retry',

@@ -1,6 +1,7 @@
 import type {
   RulebenchAutomaticRunSpecDto,
   RulebenchAutomaticStepSpecDto,
+  RulebenchCapabilityManifestDto,
   RulebenchCombatControlCommandDto,
   RulebenchCombatSessionCreateRequestDto,
   RulebenchCombatSessionIntentCommandDto,
@@ -63,6 +64,9 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
     options?: RulebenchLiveRequestOptions,
   ) => Promise<RulebenchLiveTransportResult<RulebenchProtocolHandshakeDto>>;
   readonly disconnect: () => void;
+  readonly getCapabilities: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchCapabilityManifestDto>>;
   readonly listScenarios: (
     options?: RulebenchLiveRequestOptions,
   ) => Promise<
@@ -306,6 +310,8 @@ export function createLiveRulebenchTransport(
       activeRequests.clear();
       connectionState = { kind: "disconnected", error: null };
     },
+    getCapabilities: (requestOptions) =>
+      request("GET", "/capabilities", undefined, requestOptions),
     listScenarios: (requestOptions) =>
       request("GET", "/scenarios", undefined, requestOptions),
     listSessions: (requestOptions) =>

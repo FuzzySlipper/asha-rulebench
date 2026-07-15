@@ -60,6 +60,10 @@ consume that public transport boundary rather than call the host directly.
 `LiveCombatStore` owns live connection/session selection, command inputs,
 preflight, submission, snapshot refresh, stale-response suppression, and
 cleanup; domain projections turn Rust evidence into display labels only.
+The same live boundary reads `/api/rulebench/v1/capabilities`, whose manifest
+is assembled from Rust owner registries plus the selected host composition.
+The workbench presents that evidence under **View → Runtime capabilities**;
+neither the generated artifact nor the UI grants runtime permission.
 `ContentWorkbenchStore` owns the live authored-pack lifecycle through the same
 transport: file text crosses a platform port, Rust decodes and semantically
 validates the versioned document, and TypeScript displays generic diagnostics,
@@ -255,3 +259,10 @@ authored packs and finalized replays survive host restart. Active sessions
 remain process-local. Live session snapshots do not yet expose authoritative
 positions, so panel 1 labels its board as selected scenario setup evidence
 rather than live movement state.
+
+The executable capability manifest currently reports 1 ruleset identity, 3
+registered packages, 7 scenario cases, 1 automation policy, and operation
+pipeline v2. Its checked TypeScript projection records the exact governed ASHA
+revision and the configured durable-host support matrix; the live workbench
+always reads the current process-host manifest instead. See
+`docs/capability-manifest.md` for its authority and evolution contract.

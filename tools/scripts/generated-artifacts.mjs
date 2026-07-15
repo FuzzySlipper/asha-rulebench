@@ -4,10 +4,16 @@ import { tmpdir } from 'node:os';
 import { renderApiTypes } from '../../libs/protocol/scripts/generate-api-types.mjs';
 import { renderScenarioCatalog } from '../../libs/transport/scripts/generate-rust-scenario-catalog.mjs';
 import { renderCombatSessionCatalog } from '../../libs/transport/scripts/generate-rust-combat-session.mjs';
+import { renderCapabilityManifest } from '../../libs/transport/scripts/generate-rust-capability-manifest.mjs';
 
 const root = process.cwd();
 const writeMode = process.argv.includes('--write');
 const artifacts = [
+  {
+    emitter: 'rulebench-process-host/emit_capability_manifest',
+    path: 'libs/transport/src/generated/rust-capability-manifest.ts',
+    render: renderCapabilityManifest,
+  },
   {
     emitter: 'rulebench-codegen/emit_protocol_types',
     path: 'libs/protocol/src/generated/api-types.ts',

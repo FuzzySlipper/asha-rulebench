@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod capabilities;
 mod catalog;
 mod content_import;
 mod goldens;
@@ -14,6 +15,7 @@ mod regression;
 mod replay_review;
 pub mod scenarios;
 
+pub use capabilities::capability_registry_input;
 pub use catalog::*;
 pub use content_import::{
     content_import_examples, ContentImportExample, ContentImportExampleOutcome,

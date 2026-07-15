@@ -8,6 +8,10 @@ use rulebench_bridge::replay_storage::{
 };
 use rulebench_bridge::{BridgeError, BridgeErrorKind, BridgeScenario, RulebenchBridge};
 use rulebench_fixtures::{aggregated_scenario_catalog_cases, replay_review_packages};
+use rulebench_fixtures::{
+    assemble_capability_manifest, capability_registry_input, scenario_package_registry,
+    HostCapabilityProfile,
+};
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
@@ -15,7 +19,7 @@ use rulebench_protocol::{
     LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
     LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
     LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
-    ReplayComparisonRequestDto, UseActionIntentDto,
+    ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, UseActionIntentDto,
 };
 
 const API_PREFIX: &str = "/api/rulebench/v1";
@@ -37,6 +41,47 @@ fn bridge_scenarios() -> Vec<BridgeScenario> {
             )
         })
         .collect()
+}
+
+fn process_host_capability_manifest(
+    repository_status: &ArtifactRepositoryStatus,
+    authored_content_enabled: bool,
+) -> RulebenchCapabilityManifestDto {
+    let mut registry = capability_registry_input(&scenario_package_registry());
+    registry
+        .regression_capability_ids
+        .push("content.authored-pack".to_string());
+    registry
+        .regression_capability_ids
+        .push("replay.finalized-archive".to_string());
+    let filesystem = repository_status.mode == "filesystem";
+    let manifest = assemble_capability_manifest(
+        registry,
+        HostCapabilityProfile {
+            adapter_id: "rulebench-process-host".to_string(),
+            storage_mode: repository_status.mode.clone(),
+            content_storage_adapter: if filesystem {
+                "versionedFilesystem".to_string()
+            } else {
+                "none".to_string()
+            },
+            replay_storage_adapter: if filesystem {
+                "versionedFilesystem".to_string()
+            } else {
+                "inMemory".to_string()
+            },
+            replay_recovery_mode: "finalizedArchive".to_string(),
+            session_recovery_mode: "none".to_string(),
+            authored_content_enabled,
+            exposes_capabilities_through_protocol: true,
+            exposes_capabilities_through_live_host: true,
+            exposes_capabilities_in_ui: true,
+            durable_content: filesystem && authored_content_enabled,
+            durable_finalized_replays: filesystem,
+        },
+    )
+    .expect("compiled owner registries form a valid capability manifest");
+    RulebenchCapabilityManifestDto::from(&manifest)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,6 +199,7 @@ pub struct ProcessHostRouter {
     bridge: RulebenchBridge,
     content_workspace: Option<ContentWorkspace>,
     repository_status: ArtifactRepositoryStatus,
+    capability_manifest: RulebenchCapabilityManifestDto,
 }
 
 impl ProcessHostRouter {
@@ -161,10 +207,12 @@ impl ProcessHostRouter {
         let replay_artifact_count = bridge
             .list_replay_packages(&ProtocolRequestContextDto::current())
             .map_or(0, |packages| packages.len());
+        let repository_status = ArtifactRepositoryStatus::in_memory(replay_artifact_count);
         Self {
             bridge,
             content_workspace: None,
-            repository_status: ArtifactRepositoryStatus::in_memory(replay_artifact_count),
+            capability_manifest: process_host_capability_manifest(&repository_status, false),
+            repository_status,
         }
     }
 
@@ -176,12 +224,17 @@ impl ProcessHostRouter {
         Self {
             bridge,
             content_workspace: Some(content_workspace),
+            capability_manifest: process_host_capability_manifest(&repository_status, true),
             repository_status,
         }
     }
 
     pub fn repository_status(&self) -> &ArtifactRepositoryStatus {
         &self.repository_status
+    }
+
+    pub fn capability_manifest(&self) -> &RulebenchCapabilityManifestDto {
+        &self.capability_manifest
     }
 
     pub fn content_storage(&self) -> Option<&ContentPackStorage> {
@@ -210,6 +263,7 @@ impl ProcessHostRouter {
 
         match (request.method, segments.as_slice()) {
             (HttpMethod::Get, ["handshake"]) => bridge_result(self.bridge.handshake(&context)),
+            (HttpMethod::Get, ["capabilities"]) => json_ok(&self.capability_manifest),
             (HttpMethod::Get, ["scenarios"]) => bridge_result(self.bridge.list_scenarios(&context)),
             (HttpMethod::Get, ["sessions"]) => match self.bridge.list_sessions(&context) {
                 Ok(snapshots) => json_ok(

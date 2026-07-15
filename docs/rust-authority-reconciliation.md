@@ -81,6 +81,24 @@ mutable owner registry, or private engine import.
 | Composed downstream combat owner | Adopted from ASHA #5797. The standalone host declaration is gone; the preferred composed cell owns the typed adapter checkpoint, continuation transaction, accepted routing evidence, and owner facts. |
 | Versioned Rust distribution | Adopted from ASHA #5796. Rulebench consumes the governed public Git workspace at exact revision `67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148` with compatible `^0.1` facade versions. |
 
+## Executable capability evidence
+
+Capability claims are generated from owner registries, not maintained as a
+second handwritten inventory. `rulebench-ruleset` declares the versioned
+operation and targeting vocabulary; `rulebench-combat` registers executable
+operations and closed automation policies; `rulebench-fixtures` contributes
+actual package, scenario, and regression identities; and the concrete host
+adds its selected storage and recovery composition. The manifest preserves
+separate declared, validated, executable, protocol, live-host, UI, regression,
+and restart-durability levels so a downstream projection cannot promote a
+weaker claim.
+
+`rulebench-process-host/emit_capability_manifest` emits the checked durable-host
+projection, while `GET /api/rulebench/v1/capabilities` reports the running
+host's actual composition through generated DTOs. The Angular store and view
+consume only that live route. See `capability-manifest.md` for the versioning,
+negative invariants, and extension procedure.
+
 ## Distribution status
 
 ASHA #5796 added the governed `public-rust/Cargo.toml` Git workspace. Rulebench

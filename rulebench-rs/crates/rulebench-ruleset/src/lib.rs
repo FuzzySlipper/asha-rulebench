@@ -686,6 +686,42 @@ pub struct OperationPipelineV2 {
     pub target_order: TargetOrderPolicy,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetingOperationId {
+    SingleCombatant,
+    MultipleCombatants,
+    ManhattanBurstArea,
+    CellMovement,
+}
+
+impl TargetingOperationId {
+    pub const ALL: &'static [Self] = &[
+        Self::SingleCombatant,
+        Self::MultipleCombatants,
+        Self::ManhattanBurstArea,
+        Self::CellMovement,
+    ];
+
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::SingleCombatant => "singleCombatant",
+            Self::MultipleCombatants => "multipleCombatants",
+            Self::ManhattanBurstArea => "manhattanBurstArea",
+            Self::CellMovement => "cellMovement",
+        }
+    }
+
+    pub const fn validation_supported(self) -> bool {
+        matches!(
+            self,
+            Self::SingleCombatant
+                | Self::MultipleCombatants
+                | Self::ManhattanBurstArea
+                | Self::CellMovement
+        )
+    }
+}
+
 impl OperationPipelineV2 {
     pub const VOCABULARY_VERSION: &'static str = "2";
     pub const MAXIMUM_TARGET_LIMIT: u32 = 8;
@@ -901,6 +937,15 @@ pub enum EffectOperationId {
 
 impl EffectOperationId {
     pub const VOCABULARY_VERSION: &'static str = "1";
+    pub const ALL: &'static [Self] = &[
+        Self::Damage,
+        Self::Heal,
+        Self::GrantTemporaryVitality,
+        Self::ApplyModifier,
+        Self::Move,
+        Self::ChangeResource,
+        Self::OpenReactionWindow,
+    ];
 
     pub const fn code(self) -> &'static str {
         match self {
@@ -912,6 +957,19 @@ impl EffectOperationId {
             EffectOperationId::ChangeResource => "changeResource",
             EffectOperationId::OpenReactionWindow => "openReactionWindow",
         }
+    }
+
+    pub const fn validation_supported(self) -> bool {
+        matches!(
+            self,
+            Self::Damage
+                | Self::Heal
+                | Self::GrantTemporaryVitality
+                | Self::ApplyModifier
+                | Self::Move
+                | Self::ChangeResource
+                | Self::OpenReactionWindow
+        )
     }
 }
 
@@ -944,7 +1002,7 @@ pub struct ModifierEffectOperation {
     pub modifier_duration: String,
 }
 
-/// A movement operation declaration. Runtime application is not implemented yet.
+/// A bounded movement operation declaration interpreted by Rust authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MovementEffectOperation {
     pub maximum_distance: u32,
@@ -968,7 +1026,7 @@ impl MovementKind {
     }
 }
 
-/// A resource mutation declaration. Runtime application is not implemented yet.
+/// A bounded resource mutation declaration interpreted by Rust authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceChangeEffectOperation {
     pub resource_id: String,

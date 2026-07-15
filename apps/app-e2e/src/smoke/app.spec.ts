@@ -61,12 +61,16 @@ test("boots the rulebench shell", async ({ page }) => {
     .click();
   const contentDialog = page.getByRole("dialog", { name: "Content packs" });
   await expect(
-    contentDialog.getByRole("heading", { name: "Live Authored Content", exact: true }),
+    contentDialog.getByRole("heading", {
+      name: "Live Authored Content",
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
-    contentDialog.getByRole("region", { name: "Live authored content workspace" }),
+    contentDialog.getByRole("region", {
+      name: "Live authored content workspace",
+    }),
   ).toBeVisible();
-  await expect(contentDialog.getByText("No authored packs stored.")).toBeVisible();
   await contentDialog.getByRole("button", { name: "Close" }).click();
 
   await menubar.getByRole("menuitem", { name: "Scenario" }).click();

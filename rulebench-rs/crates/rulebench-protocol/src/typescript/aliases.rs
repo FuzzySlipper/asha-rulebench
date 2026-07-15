@@ -1,6 +1,7 @@
 pub fn aliases() -> &'static [super::ProtocolAlias] {
     &[
         "export type RulebenchTeamDto = 'ally' | 'enemy';",
+        "export type RulebenchCapabilityKindDto = 'operation' | 'targeting' | 'policy' | 'content' | 'replay' | 'session';",
         "export type RulebenchLegalityDto = 'accepted' | 'rejected';",
         "export type RulebenchAttackOutcomeDto = 'hit' | 'miss';",
         "export type RulebenchTracePhaseDto = 'proposal' | 'validation' | 'resolution' | 'commit';",

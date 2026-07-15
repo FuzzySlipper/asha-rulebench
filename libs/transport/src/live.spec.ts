@@ -26,7 +26,7 @@ describe("live Rulebench transport", () => {
     }> = [];
     const responseBodies: unknown[] = [
       handshake,
-      ...Array.from({ length: 24 }, () => ({})),
+      ...Array.from({ length: 25 }, () => ({})),
     ];
     const fetchRequest: typeof fetch = async (input, init) => {
       calls.push({
@@ -121,6 +121,7 @@ describe("live Rulebench transport", () => {
     await transport.loadReplayPackage("replay/one");
     await transport.loadReplayVerification("replay/one");
     await transport.compareReplayPackages("expected", "actual");
+    await transport.getCapabilities();
 
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "GET http://rulebench.test/api/rulebench/v1/handshake",
@@ -148,6 +149,7 @@ describe("live Rulebench transport", () => {
       "GET http://rulebench.test/api/rulebench/v1/replays/replay%2Fone",
       "POST http://rulebench.test/api/rulebench/v1/replays/replay%2Fone/verify",
       "POST http://rulebench.test/api/rulebench/v1/replays/compare",
+      "GET http://rulebench.test/api/rulebench/v1/capabilities",
     ]);
     expect(calls.every((call) => call.version === "3")).toBe(true);
     expect(calls[3]?.body).toBe(JSON.stringify(createRequest));

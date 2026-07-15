@@ -60,6 +60,9 @@ export function createFakeRulebenchLiveTransport(
     disconnect: () => {
       connectionState = { kind: "disconnected", error: null };
     },
+    getCapabilities: (requestOptions) =>
+      handlers.getCapabilities?.(requestOptions) ??
+      unavailable("getCapabilities"),
     listScenarios: (requestOptions) =>
       handlers.listScenarios?.(requestOptions) ?? unavailable("listScenarios"),
     listSessions: (requestOptions) =>

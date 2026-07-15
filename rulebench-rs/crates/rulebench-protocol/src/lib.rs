@@ -8,6 +8,7 @@
 
 mod authoring;
 mod bridge;
+mod capabilities;
 mod content;
 mod live;
 mod reaction;
@@ -25,6 +26,10 @@ pub use bridge::{
     CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, CommandRollModeDto,
     ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioOptionDto,
     ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
+};
+pub use capabilities::{
+    CapabilityEntryDto, CapabilityIdentityDto, CapabilitySupportDto, HostCapabilityProfileDto,
+    RulebenchCapabilityManifestDto,
 };
 pub use content::{
     AuthoredContentCatalogsDto, AuthoredContentDecodeError, AuthoredContentPackDocumentDto,

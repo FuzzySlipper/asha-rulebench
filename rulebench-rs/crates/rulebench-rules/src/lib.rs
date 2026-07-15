@@ -17,6 +17,15 @@
 
 #![forbid(unsafe_code)]
 
+mod capabilities;
+
+pub use capabilities::{
+    assemble_capability_manifest, CapabilityEntry, CapabilityIdentity, CapabilityKind,
+    CapabilityManifestError, CapabilityRegistryInput, CapabilitySupport, HostCapabilityProfile,
+    RulebenchCapabilityManifest, CAPABILITY_ARTIFACT_SCHEMA, CAPABILITY_MANIFEST_ID,
+    CAPABILITY_MANIFEST_VERSION,
+};
+
 pub use rulebench_combat::model::*;
 pub use rulebench_combat::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
@@ -70,7 +79,8 @@ pub use rulebench_replay::{
     ReplayVerificationDecisionKind, ReplayVerificationReadout,
 };
 pub use rulebench_ruleset::{
-    CombatEndPolicy, RuleModuleId, RulesetArtifactProvenance, RulesetModuleProvenance,
+    CombatEndPolicy, EffectOperationId, OperationPipelineV2, RuleModuleId,
+    RulesetArtifactProvenance, RulesetModuleProvenance, TargetingOperationId,
 };
 
 #[cfg(test)]

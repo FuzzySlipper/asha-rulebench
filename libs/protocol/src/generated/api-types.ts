@@ -2,6 +2,8 @@
 
 export type RulebenchTeamDto = 'ally' | 'enemy';
 
+export type RulebenchCapabilityKindDto = 'operation' | 'targeting' | 'policy' | 'content' | 'replay' | 'session';
+
 export type RulebenchLegalityDto = 'accepted' | 'rejected';
 
 export type RulebenchAttackOutcomeDto = 'hit' | 'miss';
@@ -478,6 +480,55 @@ export interface RulebenchLiveAutomaticRunDto {
   readonly steps: readonly RulebenchLiveAutomaticStepDto[];
   readonly finalSnapshot: RulebenchLiveSessionSnapshotDto;
   readonly reason: string;
+}
+
+export interface RulebenchCapabilitySupportDto {
+  readonly declared: boolean;
+  readonly validationSupported: boolean;
+  readonly runtimeExecutable: boolean;
+  readonly protocolExposed: boolean;
+  readonly liveHostExposed: boolean;
+  readonly uiExposed: boolean;
+  readonly regressionCovered: boolean;
+  readonly durableAcrossRestart: boolean;
+}
+
+export interface RulebenchCapabilityEntryDto {
+  readonly id: string;
+  readonly kind: RulebenchCapabilityKindDto;
+  readonly version: string;
+  readonly support: RulebenchCapabilitySupportDto;
+  readonly evidence: readonly string[];
+}
+
+export interface RulebenchCapabilityIdentityDto {
+  readonly id: string;
+  readonly version: string;
+}
+
+export interface RulebenchHostCapabilityProfileDto {
+  readonly adapterId: string;
+  readonly storageMode: string;
+  readonly contentStorageAdapter: string;
+  readonly replayStorageAdapter: string;
+  readonly replayRecoveryMode: string;
+  readonly sessionRecoveryMode: string;
+}
+
+export interface RulebenchCapabilityManifestDto {
+  readonly manifestId: string;
+  readonly manifestVersion: number;
+  readonly generatedArtifactSchema: string;
+  readonly governedAshaRevision: string;
+  readonly operationVocabularyVersion: string;
+  readonly effectVocabularyVersion: string;
+  readonly protocolId: string;
+  readonly protocolVersion: number;
+  readonly host: RulebenchHostCapabilityProfileDto;
+  readonly rulesets: readonly RulebenchCapabilityIdentityDto[];
+  readonly packages: readonly RulebenchCapabilityIdentityDto[];
+  readonly scenarios: readonly RulebenchCapabilityIdentityDto[];
+  readonly capabilities: readonly RulebenchCapabilityEntryDto[];
 }
 
 export interface RulebenchProtocolRequestContextDto {

@@ -86,10 +86,11 @@ authority, adapter, protocol, fixture, and codegen owner while retaining the
 dev-dependencies remain subject to the same one-way boundary policy.
 
 `pnpm run generated:check` is the canonical generated-artifact gate. It emits
-the protocol, scenario catalog, and combat session projections to a temporary
-directory and compares all three with their committed outputs. Failures name
-the Rust emitter and artifact; `pnpm run generated:write` is the only supported
-update path. Every generated header records its emitter and protocol schema.
+the protocol, scenario catalog, combat session, and executable capability
+manifest projections to a temporary directory and compares all four with
+their committed outputs. Failures name the Rust emitter and artifact;
+`pnpm run generated:write` is the only supported update path. Every generated
+header records its emitter and protocol schema.
 
 `pnpm run regression:check` executes every package-owned catalog case twice
 through Rust authority, checks its declared outcome plus deterministic
@@ -105,6 +106,16 @@ derivation, roll policy, atomic stateful effects, reaction suspension, replay,
 and resource-ledger fingerprints; generated TypeScript only submits and renders
 those facts. See `../docs/operation-pipeline-v2.md` for the compatibility and
 migration contract.
+
+The executable manifest is assembled from the ruleset operation registry,
+combat execution and automation-policy registries, registered regression
+packages, and the concrete host's selected storage/recovery adapters. The
+current durable-host artifact reports 1 ruleset identity, 3 packages, 7
+scenarios, 1 policy, and the exact governed ASHA revision. The process host
+serves the same typed DTO at `GET /api/rulebench/v1/capabilities`; a memory-mode
+host therefore cannot inherit durable support merely because the checked
+artifact was emitted from a filesystem-mode host. See
+`../docs/capability-manifest.md`.
 
 `pnpm run rust:test` is part of `pnpm run verify`, so clean CI executes the
 focused owner suites, cross-crate authority harness, host-neutral bridge

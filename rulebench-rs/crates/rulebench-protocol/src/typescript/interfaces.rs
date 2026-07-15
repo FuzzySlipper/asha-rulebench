@@ -6,6 +6,167 @@ type Interface = ProtocolInterface;
 pub fn interfaces() -> &'static [ProtocolInterface] {
     &[
         Interface {
+            name: "RulebenchCapabilitySupportDto",
+            fields: &[
+                Field {
+                    name: "declared",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "validationSupported",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "runtimeExecutable",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "protocolExposed",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "liveHostExposed",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "uiExposed",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "regressionCovered",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "durableAcrossRestart",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCapabilityEntryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "kind",
+                    ty: "RulebenchCapabilityKindDto",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "support",
+                    ty: "RulebenchCapabilitySupportDto",
+                },
+                Field {
+                    name: "evidence",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCapabilityIdentityDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchHostCapabilityProfileDto",
+            fields: &[
+                Field {
+                    name: "adapterId",
+                    ty: "string",
+                },
+                Field {
+                    name: "storageMode",
+                    ty: "string",
+                },
+                Field {
+                    name: "contentStorageAdapter",
+                    ty: "string",
+                },
+                Field {
+                    name: "replayStorageAdapter",
+                    ty: "string",
+                },
+                Field {
+                    name: "replayRecoveryMode",
+                    ty: "string",
+                },
+                Field {
+                    name: "sessionRecoveryMode",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchCapabilityManifestDto",
+            fields: &[
+                Field {
+                    name: "manifestId",
+                    ty: "string",
+                },
+                Field {
+                    name: "manifestVersion",
+                    ty: "number",
+                },
+                Field {
+                    name: "generatedArtifactSchema",
+                    ty: "string",
+                },
+                Field {
+                    name: "governedAshaRevision",
+                    ty: "string",
+                },
+                Field {
+                    name: "operationVocabularyVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "effectVocabularyVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "protocolId",
+                    ty: "string",
+                },
+                Field {
+                    name: "protocolVersion",
+                    ty: "number",
+                },
+                Field {
+                    name: "host",
+                    ty: "RulebenchHostCapabilityProfileDto",
+                },
+                Field {
+                    name: "rulesets",
+                    ty: "readonly RulebenchCapabilityIdentityDto[]",
+                },
+                Field {
+                    name: "packages",
+                    ty: "readonly RulebenchCapabilityIdentityDto[]",
+                },
+                Field {
+                    name: "scenarios",
+                    ty: "readonly RulebenchCapabilityIdentityDto[]",
+                },
+                Field {
+                    name: "capabilities",
+                    ty: "readonly RulebenchCapabilityEntryDto[]",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchProtocolRequestContextDto",
             fields: &[Field {
                 name: "protocolVersion",

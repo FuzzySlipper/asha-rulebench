@@ -19,6 +19,12 @@ const PROVIDER_ID: &str = "provider.rulebench.pre-effect-reaction";
 const OWNER_ID: &str = "authority.rulebench.combat";
 const STATE_READ_ID: &str = "reaction-state";
 
+/// Exact ASHA Git revision resolved by Cargo for the governed public facade.
+///
+/// The build script reads Cargo.lock so capability evidence cannot drift from
+/// the dependency that actually compiled this crate.
+pub const GOVERNED_ASHA_REVISION: &str = env!("RULEBENCH_GOVERNED_ASHA_REVISION");
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreEffectWorkspace {

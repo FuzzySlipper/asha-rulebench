@@ -21,6 +21,7 @@ import type {
   RulebenchScenarioReadoutDto,
 } from "@asha-rulebench/protocol";
 import { rustBackedCombatSessionCatalog } from "./generated/rust-combat-session";
+import { rustCapabilityManifest } from "./generated/rust-capability-manifest";
 import {
   rustBackedContentImportCatalog,
   rustBackedContentValidationCatalog,
@@ -67,6 +68,7 @@ export interface RulebenchTransport {
 
 export const defaultRulesetCatalog: RulebenchRulesetCatalogDto =
   rustBackedRulesetCatalog;
+export const defaultCapabilityManifest = rustCapabilityManifest;
 export const defaultContentValidationCatalog: RulebenchContentValidationCatalogDto =
   rustBackedContentValidationCatalog;
 export const defaultContentImportCatalog: RulebenchContentImportCatalogDto =

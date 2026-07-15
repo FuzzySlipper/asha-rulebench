@@ -34,6 +34,69 @@ const intent = {
 };
 
 describe("LiveCombatStore", () => {
+  it("projects live capability levels without turning them into permissions", async () => {
+    const transport = createFakeRulebenchLiveTransport({
+      getCapabilities: async () => ({
+        ok: true,
+        value: {
+          manifestId: "asha-rulebench.capabilities",
+          manifestVersion: 1,
+          generatedArtifactSchema: "asha-rulebench.capabilities.ts@1",
+          governedAshaRevision: "0123456789abcdef",
+          operationVocabularyVersion: "2",
+          effectVocabularyVersion: "1",
+          protocolId: "asha-rulebench.protocol",
+          protocolVersion: 3,
+          host: {
+            adapterId: "rulebench-process-host",
+            storageMode: "filesystem",
+            contentStorageAdapter: "versionedFilesystem",
+            replayStorageAdapter: "versionedFilesystem",
+            replayRecoveryMode: "finalizedArchive",
+            sessionRecoveryMode: "none",
+          },
+          rulesets: [],
+          packages: [],
+          scenarios: [],
+          capabilities: [
+            {
+              id: "session.active-recovery",
+              kind: "session",
+              version: "none",
+              support: {
+                declared: false,
+                validationSupported: false,
+                runtimeExecutable: false,
+                protocolExposed: false,
+                liveHostExposed: false,
+                uiExposed: false,
+                regressionCovered: false,
+                durableAcrossRestart: false,
+              },
+              evidence: ["rulebench-process-host.session-recovery-mode:none"],
+            },
+          ],
+        },
+      }),
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+
+    await store.loadCapabilities();
+
+    expect(store.capabilities()).toMatchObject({
+      kind: "data",
+      value: {
+        hostLabel: "rulebench-process-host · filesystem",
+        capabilities: [
+          {
+            id: "session.active-recovery",
+            support: { supportLabel: "Not declared" },
+          },
+        ],
+      },
+    });
+  });
+
   it("loads connection, scenarios, snapshot, options, candidates, and preflight through injected transport", async () => {
     const snapshot = makeLiveSessionSnapshot();
     const transport = createFakeRulebenchLiveTransport({
