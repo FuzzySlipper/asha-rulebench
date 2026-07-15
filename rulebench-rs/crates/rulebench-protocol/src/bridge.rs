@@ -70,6 +70,10 @@ pub struct UseActionIntentDto {
     pub action_id: String,
     pub target_id: String,
     #[serde(default)]
+    pub target_ids: Vec<String>,
+    #[serde(default)]
+    pub target_cell: Option<crate::LiveGridPositionDto>,
+    #[serde(default)]
     pub destination_cell: Option<crate::LiveGridPositionDto>,
     #[serde(default)]
     pub observed_origin: Option<crate::LiveGridPositionDto>,
@@ -77,8 +81,12 @@ pub struct UseActionIntentDto {
 
 impl UseActionIntentDto {
     pub fn to_authority(&self) -> UseActionIntent {
-        let intent = match &self.destination_cell {
-            Some(cell) => UseActionIntent::for_cell(
+        let intent = match (
+            &self.destination_cell,
+            &self.target_cell,
+            self.target_ids.is_empty(),
+        ) {
+            (Some(cell), _, _) => UseActionIntent::for_cell(
                 &self.actor_id,
                 &self.action_id,
                 GridPosition {
@@ -86,7 +94,22 @@ impl UseActionIntentDto {
                     y: cell.y,
                 },
             ),
-            None => UseActionIntent::new(&self.actor_id, &self.action_id, &self.target_id),
+            (None, Some(cell), _) => UseActionIntent::for_area(
+                &self.actor_id,
+                &self.action_id,
+                GridPosition {
+                    x: cell.x,
+                    y: cell.y,
+                },
+            ),
+            (None, None, false) => UseActionIntent::for_targets(
+                &self.actor_id,
+                &self.action_id,
+                self.target_ids.clone(),
+            ),
+            (None, None, true) => {
+                UseActionIntent::new(&self.actor_id, &self.action_id, &self.target_id)
+            }
         };
         match &self.observed_origin {
             Some(cell) => intent.with_observed_origin(GridPosition {
@@ -104,6 +127,11 @@ impl From<&UseActionIntent> for UseActionIntentDto {
             actor_id: value.actor_id.clone(),
             action_id: value.action_id.clone(),
             target_id: value.target_id.clone(),
+            target_ids: value.target_ids.clone(),
+            target_cell: value.target_cell.map(|cell| crate::LiveGridPositionDto {
+                x: cell.x,
+                y: cell.y,
+            }),
             destination_cell: value
                 .destination_cell
                 .map(|cell| crate::LiveGridPositionDto {
@@ -302,6 +330,8 @@ mod tests {
                 actor_id: "actor".to_string(),
                 action_id: "action".to_string(),
                 target_id: "target".to_string(),
+                target_ids: Vec::new(),
+                target_cell: None,
                 destination_cell: None,
                 observed_origin: None,
             },
@@ -323,6 +353,8 @@ mod tests {
             actor_id: "actor".to_string(),
             action_id: "move".to_string(),
             target_id: String::new(),
+            target_ids: Vec::new(),
+            target_cell: None,
             destination_cell: Some(crate::LiveGridPositionDto { x: 3, y: 4 }),
             observed_origin: None,
         };

@@ -2893,6 +2893,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "string",
                 },
                 Field {
+                    name: "targetIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "targetCell",
+                    ty: "RulebenchLiveGridPositionDto | null",
+                },
+                Field {
                     name: "destinationCell",
                     ty: "RulebenchLiveGridPositionDto | null",
                 },

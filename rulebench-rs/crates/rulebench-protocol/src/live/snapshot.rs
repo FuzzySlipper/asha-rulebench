@@ -2,8 +2,8 @@ use rulebench_rules::{
     ActionResourceCost, ActionResourceRefreshPolicy, ActionResourceState,
     CombatEndConditionReadout, CombatFinalizationReadout, CombatLogEntry, CombatSessionSnapshot,
     CommandAuditEntry, CurrentActorActionOption, CurrentActorCellOption, CurrentActorOptionSummary,
-    CurrentActorTargetOption, FinalCombatantState, SpatialBoardState, SpatialCellState,
-    StateFingerprint,
+    CurrentActorTargetOption, CurrentActorTargetSetOption, FinalCombatantState, SpatialBoardState,
+    SpatialCellState, StateFingerprint,
 };
 use serde::{Deserialize, Serialize};
 
@@ -165,6 +165,31 @@ impl From<&CurrentActorTargetOption> for LiveTargetOptionDto {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveTargetSetOptionDto {
+    pub id: String,
+    pub target_ids: Vec<String>,
+    pub target_cell: Option<LiveGridPositionDto>,
+    pub roll_policy: String,
+    pub reason: String,
+}
+
+impl From<&CurrentActorTargetSetOption> for LiveTargetSetOptionDto {
+    fn from(value: &CurrentActorTargetSetOption) -> Self {
+        Self {
+            id: value.id.clone(),
+            target_ids: value.target_ids.clone(),
+            target_cell: value.target_cell.map(|cell| LiveGridPositionDto {
+                x: cell.x,
+                y: cell.y,
+            }),
+            roll_policy: value.roll_policy.code().to_string(),
+            reason: value.reason.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LiveCellOptionDto {
     pub position: LiveGridPositionDto,
     pub reason: String,
@@ -194,6 +219,7 @@ pub struct LiveActionOptionDto {
     pub resource_states: Vec<LiveActionResourceStateDto>,
     pub target_mode: String,
     pub targets: Vec<LiveTargetOptionDto>,
+    pub target_sets: Vec<LiveTargetSetOptionDto>,
     pub destinations: Vec<LiveCellOptionDto>,
 }
 
@@ -220,6 +246,11 @@ impl From<&CurrentActorActionOption> for LiveActionOptionDto {
                 .target_options
                 .iter()
                 .map(LiveTargetOptionDto::from)
+                .collect(),
+            target_sets: value
+                .target_set_options
+                .iter()
+                .map(LiveTargetSetOptionDto::from)
                 .collect(),
             destinations: value
                 .destination_options
@@ -434,6 +465,7 @@ pub struct LiveSessionSnapshotDto {
     pub combat_log: Vec<LiveCombatLogEntryDto>,
     pub audit_log: Vec<LiveAuditEntryDto>,
     pub state_fingerprint: LiveStateFingerprintDto,
+    pub action_resource_fingerprint: LiveStateFingerprintDto,
 }
 
 impl From<&CombatSessionSnapshot> for LiveSessionSnapshotDto {
@@ -507,6 +539,9 @@ impl From<&CombatSessionSnapshot> for LiveSessionSnapshotDto {
                 .map(LiveAuditEntryDto::from)
                 .collect(),
             state_fingerprint: LiveStateFingerprintDto::from(&value.current_state_fingerprint),
+            action_resource_fingerprint: LiveStateFingerprintDto::from(
+                &value.action_resource_fingerprint,
+            ),
         }
     }
 }

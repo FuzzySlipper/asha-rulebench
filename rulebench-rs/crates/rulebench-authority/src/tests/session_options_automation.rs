@@ -1999,9 +1999,10 @@ fn session_runtime_selected_candidate_submission_accepts_hit() {
 }
 
 #[test]
-fn session_runtime_selected_candidate_submission_accepts_miss_noop() {
+fn session_runtime_selected_candidate_submission_accepts_miss_and_spends_its_resource() {
     let mut session =
         CombatSessionState::new("runtime-hexing-bolt", hexing_bolt_fixture_scenario());
+    let resource_fingerprint_before = session.snapshot().action_resource_fingerprint;
 
     let execution = session.submit_candidate_command(CombatSessionCandidateSelectionSpec::new(
         "selected-miss",
@@ -2032,9 +2033,17 @@ fn session_runtime_selected_candidate_submission_accepts_miss_noop() {
     );
 
     let snapshot = session.snapshot();
+    assert_ne!(
+        snapshot.action_resource_fingerprint,
+        resource_fingerprint_before
+    );
     assert_eq!(snapshot.current_state.combatants[1].hit_points.current, 18);
     assert!(snapshot.current_state.combatants[1].conditions.is_empty());
     assert_eq!(snapshot.action_usage_log.len(), 1);
+    assert_eq!(
+        snapshot.action_resource_ledger.combatants[0].resources[0].current,
+        0
+    );
     assert_eq!(
         snapshot.action_usage_log[0].outcome_class,
         CommandOutcomeClass::AcceptedMiss

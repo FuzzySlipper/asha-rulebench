@@ -1297,6 +1297,7 @@ mod tests {
                 visibility_requirement: VisibilityRequirement::Ignored,
                 target_ids: vec!["raider".to_string()],
                 visible_target_ids: Vec::new(),
+                operation_pipeline: None,
             },
             check: CheckDeclaration::Attack(AttackCheckDeclaration {
                 modifier: 1,

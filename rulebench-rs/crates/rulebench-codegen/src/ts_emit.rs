@@ -410,6 +410,38 @@ fn render_event(sequence: u32, event: &DomainEvent, indent: &str) -> String {
             &[actor_id.as_str()],
             indent,
         ),
+        DomainEvent::EffectMovementApplied {
+            target_id,
+            movement_kind,
+            from,
+            to,
+        } => event_block(
+            sequence,
+            "EffectMovementApplied",
+            &format!(
+                "{target_id} resolved {} movement from {},{} to {},{}.",
+                movement_kind.code(),
+                from.x,
+                from.y,
+                to.x,
+                to.y
+            ),
+            &[target_id.as_str()],
+            indent,
+        ),
+        DomainEvent::ResourceChanged {
+            target_id,
+            resource_id,
+            delta,
+            before,
+            after,
+        } => event_block(
+            sequence,
+            "ResourceChanged",
+            &format!("{target_id} changed {resource_id} by {delta} from {before} to {after}."),
+            &[target_id.as_str()],
+            indent,
+        ),
         DomainEvent::IntentShapeAccepted { .. } => String::new(),
     }
 }

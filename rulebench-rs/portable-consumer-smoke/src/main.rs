@@ -14,13 +14,19 @@ fn main() {
                 "consumer-command",
                 "Consumer command",
                 "External consumer submits one action.",
-                UseActionIntent::new("actor", "bolt", "target"),
-                vec![17, 5],
+                UseActionIntent::for_targets(
+                    "actor",
+                    "bolt",
+                    vec!["target-2".to_string(), "target".to_string()],
+                ),
+                vec![17, 5, 18, 4],
             ),
         )
         .expect("command is accepted");
 
     assert!(step.receipt.accepted);
+    assert_eq!(step.receipt.target_results.len(), 2);
+    assert_eq!(step.receipt.target_results[0].target_id, "target");
     assert!(!step.receipt.events.is_empty());
     let snapshot = api.snapshot(&session).expect("snapshot");
     assert_eq!(snapshot.combat_log.len(), 1);
@@ -37,12 +43,19 @@ fn scenario() -> RulebenchScenario {
         actor_id: "actor".to_string(),
         targeting: TargetingDeclaration {
             target_kind: TargetKind::Combatant,
-            selection: TargetSelection::Single,
+            selection: TargetSelection::Multiple,
             team_constraint: TargetTeamConstraint::Hostile,
             maximum_range: 10,
             visibility_requirement: VisibilityRequirement::Required,
-            target_ids: vec!["target".to_string()],
-            visible_target_ids: vec!["target".to_string()],
+            target_ids: vec!["target".to_string(), "target-2".to_string()],
+            visible_target_ids: vec!["target".to_string(), "target-2".to_string()],
+            operation_pipeline: Some(OperationPipelineV2 {
+                maximum_targets: 2,
+                area: None,
+                roll_policy: ActionRollPolicy::PerTarget,
+                failure_policy: TargetFailurePolicy::Atomic,
+                target_order: TargetOrderPolicy::CanonicalId,
+            }),
         },
         check: CheckDeclaration::Attack(AttackCheckDeclaration {
             modifier: 4,
@@ -73,9 +86,10 @@ fn scenario() -> RulebenchScenario {
         grid: Grid { width: 6, height: 1, cells: vec![
             GridCell { position: GridPosition { x: 0, y: 0 }, terrain_tags: vec!["clear".to_string()] },
             GridCell { position: GridPosition { x: 3, y: 0 }, terrain_tags: vec!["clear".to_string()] },
+            GridCell { position: GridPosition { x: 5, y: 0 }, terrain_tags: vec!["clear".to_string()] },
         ] },
-        combatants: vec![combatant("actor", "entity.actor", Team::Ally, 0, 20, 4, 15, true), combatant("target", "entity.target", Team::Enemy, 3, 18, 1, 13, false)],
-        entities: vec![entity("entity.actor"), entity("entity.target")],
+        combatants: vec![combatant("actor", "entity.actor", Team::Ally, 0, 20, 4, 15, true), combatant("target", "entity.target", Team::Enemy, 3, 18, 1, 13, false), combatant("target-2", "entity.target-2", Team::Enemy, 5, 16, 1, 12, false)],
+        entities: vec![entity("entity.actor"), entity("entity.target"), entity("entity.target-2")],
         abilities: vec![AbilityDefinition { id: "bolt-ability".to_string(), name: "Consumer Bolt".to_string(), kind: AbilityDefinitionKind::Ability, summary: "Standalone action ability.".to_string(), tags: vec![] }],
         selected_ability_id: Some("bolt-ability".to_string()),
         classes: vec![], selected_class_id: None,

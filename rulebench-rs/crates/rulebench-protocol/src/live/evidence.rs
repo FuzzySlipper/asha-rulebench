@@ -1,7 +1,7 @@
 use rulebench_rules::{
     CombatControlReadout, CombatSessionSnapshot, CombatSessionStepReadout, CommandCandidateEntry,
     CommandCandidateSummary, CommandPreflightReadout, DomainEvent, RollConsumptionEntry,
-    TraceEntry, TracePhase, TraceStatus,
+    TargetResolutionOutcome, TraceEntry, TracePhase, TraceStatus,
 };
 use serde::{Deserialize, Serialize};
 
@@ -247,11 +247,80 @@ pub struct LiveCommandStepDto {
     pub intent: UseActionIntentDto,
     pub rolls: Vec<LiveRollEvidenceDto>,
     pub events: Vec<LiveDomainEventDto>,
+    pub target_results: Vec<LiveTargetResolutionDto>,
     pub trace: Vec<LiveTraceEntryDto>,
     pub state_before_fingerprint: LiveStateFingerprintDto,
     pub state_after_fingerprint: LiveStateFingerprintDto,
     pub roll_mode: String,
     pub generated_rolls: Vec<LiveGeneratedRollDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveTargetResolutionDto {
+    pub target_id: String,
+    pub accepted: bool,
+    pub reason: String,
+    pub attack_outcome: Option<String>,
+    pub damage_amount: Option<i32>,
+    pub movement_kind: Option<String>,
+    pub movement_from: Option<super::LiveGridPositionDto>,
+    pub movement_to: Option<super::LiveGridPositionDto>,
+    pub resource_changes: Vec<LiveResourceChangeDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LiveResourceChangeDto {
+    pub resource_id: String,
+    pub requested_delta: i32,
+    pub before: i32,
+    pub after: i32,
+    pub maximum: i32,
+}
+
+impl From<&TargetResolutionOutcome> for LiveTargetResolutionDto {
+    fn from(value: &TargetResolutionOutcome) -> Self {
+        Self {
+            target_id: value.target_id.clone(),
+            accepted: value.target_legality.accepted,
+            reason: value.target_legality.reason.clone(),
+            attack_outcome: value.attack_roll.as_ref().map(|roll| match roll.outcome {
+                rulebench_rules::AttackOutcome::Hit => "hit".to_string(),
+                rulebench_rules::AttackOutcome::Miss => "miss".to_string(),
+            }),
+            damage_amount: value.damage.as_ref().map(|damage| damage.amount),
+            movement_kind: value
+                .movement
+                .as_ref()
+                .map(|movement| movement.movement_kind.code().to_string()),
+            movement_from: value
+                .movement
+                .as_ref()
+                .map(|movement| super::LiveGridPositionDto {
+                    x: movement.from.x,
+                    y: movement.from.y,
+                }),
+            movement_to: value
+                .movement
+                .as_ref()
+                .map(|movement| super::LiveGridPositionDto {
+                    x: movement.to.x,
+                    y: movement.to.y,
+                }),
+            resource_changes: value
+                .resource_changes
+                .iter()
+                .map(|change| LiveResourceChangeDto {
+                    resource_id: change.resource_id.clone(),
+                    requested_delta: change.requested_delta,
+                    before: change.before,
+                    after: change.after,
+                    maximum: change.maximum,
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -292,6 +361,12 @@ impl From<&CombatSessionStepReadout> for LiveCommandStepDto {
                 .events
                 .iter()
                 .map(LiveDomainEventDto::from)
+                .collect(),
+            target_results: value
+                .receipt
+                .target_results
+                .iter()
+                .map(LiveTargetResolutionDto::from)
                 .collect(),
             trace: value
                 .receipt
@@ -477,6 +552,34 @@ fn domain_event(value: &DomainEvent) -> (&'static str, String) {
         DomainEvent::MovementSpent { actor_id, amount, remaining } => (
             "movementSpent",
             format!("{actor_id} spent {amount} movement and has {remaining} remaining."),
+        ),
+        DomainEvent::EffectMovementApplied {
+            target_id,
+            movement_kind,
+            from,
+            to,
+        } => (
+            "effectMovementApplied",
+            format!(
+                "{target_id} resolved {} movement from {},{} to {},{}.",
+                movement_kind.code(),
+                from.x,
+                from.y,
+                to.x,
+                to.y
+            ),
+        ),
+        DomainEvent::ResourceChanged {
+            target_id,
+            resource_id,
+            delta,
+            before,
+            after,
+        } => (
+            "resourceChanged",
+            format!(
+                "{target_id} changed {resource_id} by {delta} from {before} to {after}."
+            ),
         ),
     }
 }

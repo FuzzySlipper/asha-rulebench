@@ -10,6 +10,12 @@ pub enum RulebenchRejection {
     InvalidAction,
     InvalidRulesetModules,
     InvalidTarget,
+    DuplicateTarget,
+    TargetLimitExceeded,
+    TargetDefeated,
+    AreaTargetMissing,
+    AreaOutOfBounds,
+    AreaOutOfRange,
     TargetLegalityFailed,
     TargetOutOfRange,
     TargetNotVisible,
@@ -25,6 +31,11 @@ pub enum RulebenchRejection {
     MovementStaleDestination,
     MovementOutOfRange,
     MovementBudgetExhausted,
+    EffectMovementOutOfBounds,
+    EffectMovementDestinationOccupied,
+    EffectMovementDestinationBlocked,
+    EffectResourceMissing,
+    EffectResourceOutOfBounds,
 }
 
 impl RulebenchRejection {
@@ -37,6 +48,12 @@ impl RulebenchRejection {
             RulebenchRejection::InvalidAction => "invalidAction",
             RulebenchRejection::InvalidRulesetModules => "invalidRulesetModules",
             RulebenchRejection::InvalidTarget => "invalidTarget",
+            RulebenchRejection::DuplicateTarget => "duplicateTarget",
+            RulebenchRejection::TargetLimitExceeded => "targetLimitExceeded",
+            RulebenchRejection::TargetDefeated => "targetDefeated",
+            RulebenchRejection::AreaTargetMissing => "areaTargetMissing",
+            RulebenchRejection::AreaOutOfBounds => "areaOutOfBounds",
+            RulebenchRejection::AreaOutOfRange => "areaOutOfRange",
             RulebenchRejection::TargetLegalityFailed => "targetLegalityFailed",
             RulebenchRejection::TargetOutOfRange => "targetOutOfRange",
             RulebenchRejection::TargetNotVisible => "targetNotVisible",
@@ -52,6 +69,15 @@ impl RulebenchRejection {
             RulebenchRejection::MovementStaleDestination => "movementStaleDestination",
             RulebenchRejection::MovementOutOfRange => "movementOutOfRange",
             RulebenchRejection::MovementBudgetExhausted => "movementBudgetExhausted",
+            RulebenchRejection::EffectMovementOutOfBounds => "effectMovementOutOfBounds",
+            RulebenchRejection::EffectMovementDestinationOccupied => {
+                "effectMovementDestinationOccupied"
+            }
+            RulebenchRejection::EffectMovementDestinationBlocked => {
+                "effectMovementDestinationBlocked"
+            }
+            RulebenchRejection::EffectResourceMissing => "effectResourceMissing",
+            RulebenchRejection::EffectResourceOutOfBounds => "effectResourceOutOfBounds",
         }
     }
 }
@@ -178,6 +204,25 @@ pub struct ModifierOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectMovementOutcome {
+    pub target_id: String,
+    pub movement_kind: rulebench_ruleset::MovementKind,
+    pub from: super::GridPosition,
+    pub to: super::GridPosition,
+    pub distance: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceChangeOutcome {
+    pub target_id: String,
+    pub resource_id: String,
+    pub requested_delta: i32,
+    pub before: i32,
+    pub after: i32,
+    pub maximum: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainEvent {
     IntentShapeAccepted {
         actor_id: String,
@@ -229,6 +274,19 @@ pub enum DomainEvent {
         target_id: String,
         modifier_id: String,
         duration: String,
+    },
+    EffectMovementApplied {
+        target_id: String,
+        movement_kind: rulebench_ruleset::MovementKind,
+        from: super::GridPosition,
+        to: super::GridPosition,
+    },
+    ResourceChanged {
+        target_id: String,
+        resource_id: String,
+        delta: i32,
+        before: i32,
+        after: i32,
     },
     PositionChanged {
         actor_id: String,

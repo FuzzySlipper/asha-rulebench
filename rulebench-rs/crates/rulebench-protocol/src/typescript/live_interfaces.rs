@@ -97,6 +97,16 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 ]),
             },
             Interface {
+                name: "RulebenchLiveTargetSetOptionDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("targetIds", "readonly string[]"),
+                    field("targetCell", "RulebenchLiveGridPositionDto | null"),
+                    field("rollPolicy", "'shared' | 'perTarget' | 'noRoll'"),
+                    field("reason", "string"),
+                ]),
+            },
+            Interface {
                 name: "RulebenchLiveActionOptionDto",
                 fields: fields(vec![
                     field("actionId", "string"),
@@ -114,6 +124,7 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     ),
                     field("targetMode", "'self' | 'entity' | 'cell'"),
                     field("targets", "readonly RulebenchLiveTargetOptionDto[]"),
+                    field("targetSets", "readonly RulebenchLiveTargetSetOptionDto[]"),
                     field("destinations", "readonly RulebenchLiveCellOptionDto[]"),
                 ]),
             },
@@ -256,6 +267,10 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("combatLog", "readonly RulebenchLiveCombatLogEntryDto[]"),
                     field("auditLog", "readonly RulebenchLiveAuditEntryDto[]"),
                     field("stateFingerprint", "RulebenchLiveStateFingerprintDto"),
+                    field(
+                        "actionResourceFingerprint",
+                        "RulebenchLiveStateFingerprintDto",
+                    ),
                 ]),
             },
             Interface {
@@ -345,11 +360,42 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("intent", "RulebenchUseActionIntentDto"),
                     field("rolls", "readonly RulebenchLiveRollEvidenceDto[]"),
                     field("events", "readonly RulebenchLiveDomainEventDto[]"),
+                    field(
+                        "targetResults",
+                        "readonly RulebenchLiveTargetResolutionDto[]",
+                    ),
                     field("trace", "readonly RulebenchLiveTraceEntryDto[]"),
                     field("stateBeforeFingerprint", "RulebenchLiveStateFingerprintDto"),
                     field("stateAfterFingerprint", "RulebenchLiveStateFingerprintDto"),
                     field("rollMode", "\"supplied\" | \"authorityGenerated\""),
                     field("generatedRolls", "readonly RulebenchLiveGeneratedRollDto[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchLiveTargetResolutionDto",
+                fields: fields(vec![
+                    field("targetId", "string"),
+                    field("accepted", "boolean"),
+                    field("reason", "string"),
+                    field("attackOutcome", "'hit' | 'miss' | null"),
+                    field("damageAmount", "number | null"),
+                    field("movementKind", "'push' | 'pull' | 'shift' | null"),
+                    field("movementFrom", "RulebenchLiveGridPositionDto | null"),
+                    field("movementTo", "RulebenchLiveGridPositionDto | null"),
+                    field(
+                        "resourceChanges",
+                        "readonly RulebenchLiveResourceChangeDto[]",
+                    ),
+                ]),
+            },
+            Interface {
+                name: "RulebenchLiveResourceChangeDto",
+                fields: fields(vec![
+                    field("resourceId", "string"),
+                    field("requestedDelta", "number"),
+                    field("before", "number"),
+                    field("after", "number"),
+                    field("maximum", "number"),
                 ]),
             },
             Interface {

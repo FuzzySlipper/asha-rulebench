@@ -117,6 +117,9 @@ impl CombatSessionState {
     pub fn snapshot(&self) -> CombatSessionSnapshot {
         let current_state = self.state.project("Current session state.");
         let current_state_fingerprint = fingerprint_projection(&current_state);
+        let action_resource_ledger = self.state.action_resource_ledger();
+        let action_resource_fingerprint =
+            crate::fingerprint_action_resource_ledger(&action_resource_ledger);
         let current_scenario = self.state.apply_to_scenario(self.scenario.clone());
 
         CombatSessionSnapshot {
@@ -137,7 +140,8 @@ impl CombatSessionState {
             current_reaction_window: self.current_reaction_window().cloned(),
             modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
-            action_resource_ledger: self.state.action_resource_ledger(),
+            action_resource_ledger,
+            action_resource_fingerprint,
             equipment_ledger: self.state.equipment_ledger(),
             class_build_ledger: self.state.class_build_ledger(),
             current_turn_action_usage: self.current_turn_action_usage(),
@@ -469,7 +473,9 @@ fn current_actor_option_summary(
 
     let available = actions.iter().any(|action| {
         action.available
-            && (!action.target_options.is_empty() || !action.destination_options.is_empty())
+            && (!action.target_options.is_empty()
+                || !action.target_set_options.is_empty()
+                || !action.destination_options.is_empty())
     });
     let unavailable_reason = if available {
         None
@@ -538,37 +544,88 @@ fn current_actor_id_command_candidates(
         .iter()
         .filter(|action| action.available)
         .flat_map(|action| {
-            action.target_options.iter().map(move |target| {
-                let intent = UseActionIntent::new(
-                    actor_id,
-                    action.action_id.clone(),
-                    target.target_id.clone(),
-                );
-                let preflight = command_preflight_readout(
-                    lifecycle,
-                    options.current_actor_id.clone(),
-                    scenario,
-                    action_resources,
-                    equipment,
-                    false,
-                    intent.clone(),
-                );
+            let target_sets = action
+                .target_set_options
+                .iter()
+                .filter_map(|target_set| {
+                    let first_target = target_set.target_ids.first()?;
+                    let target = action
+                        .target_options
+                        .iter()
+                        .find(|target| target.target_id == *first_target)?;
+                    let intent = match target_set.target_cell {
+                        Some(cell) => {
+                            UseActionIntent::for_area(actor_id, action.action_id.clone(), cell)
+                        }
+                        None => UseActionIntent::for_targets(
+                            actor_id,
+                            action.action_id.clone(),
+                            target_set.target_ids.clone(),
+                        ),
+                    };
+                    let preflight = command_preflight_readout(
+                        lifecycle,
+                        options.current_actor_id.clone(),
+                        scenario,
+                        action_resources,
+                        equipment,
+                        false,
+                        intent.clone(),
+                    );
+                    Some(CommandCandidateEntry {
+                        intent,
+                        action_id: action.action_id.clone(),
+                        ability_id: action.ability_id.clone(),
+                        target_id: target.target_id.clone(),
+                        target_name: target_set.target_ids.join(", "),
+                        target_current_hit_points: target.current_hit_points,
+                        target_max_hit_points: target.max_hit_points,
+                        accepted: preflight.accepted,
+                        decision_kind: preflight.decision_kind,
+                        rejection: preflight.rejection,
+                        target_legality: preflight.target_legality,
+                        reason: preflight.reason,
+                    })
+                })
+                .collect::<Vec<_>>();
+            if !target_sets.is_empty() {
+                return target_sets;
+            }
+            action
+                .target_options
+                .iter()
+                .map(move |target| {
+                    let intent = UseActionIntent::new(
+                        actor_id,
+                        action.action_id.clone(),
+                        target.target_id.clone(),
+                    );
+                    let preflight = command_preflight_readout(
+                        lifecycle,
+                        options.current_actor_id.clone(),
+                        scenario,
+                        action_resources,
+                        equipment,
+                        false,
+                        intent.clone(),
+                    );
 
-                CommandCandidateEntry {
-                    intent,
-                    action_id: action.action_id.clone(),
-                    ability_id: action.ability_id.clone(),
-                    target_id: target.target_id.clone(),
-                    target_name: target.target_name.clone(),
-                    target_current_hit_points: target.current_hit_points,
-                    target_max_hit_points: target.max_hit_points,
-                    accepted: preflight.accepted,
-                    decision_kind: preflight.decision_kind,
-                    rejection: preflight.rejection,
-                    target_legality: preflight.target_legality,
-                    reason: preflight.reason,
-                }
-            })
+                    CommandCandidateEntry {
+                        intent,
+                        action_id: action.action_id.clone(),
+                        ability_id: action.ability_id.clone(),
+                        target_id: target.target_id.clone(),
+                        target_name: target.target_name.clone(),
+                        target_current_hit_points: target.current_hit_points,
+                        target_max_hit_points: target.max_hit_points,
+                        accepted: preflight.accepted,
+                        decision_kind: preflight.decision_kind,
+                        rejection: preflight.rejection,
+                        target_legality: preflight.target_legality,
+                        reason: preflight.reason,
+                    }
+                })
+                .collect()
         })
         .collect()
 }
@@ -646,11 +703,12 @@ fn current_actor_action_option(
         .filter(|target| target.hit_points.current > 0)
         .filter(|target| target.id != actor_id)
         .filter(|target| {
-            actor_position.is_some_and(|actor_position| {
-                actor_position.x.abs_diff(target.position.x)
-                    + actor_position.y.abs_diff(target.position.y)
-                    <= action.targeting.maximum_range
-            })
+            action.targeting.target_kind == TargetKind::Area
+                || actor_position.is_some_and(|actor_position| {
+                    actor_position.x.abs_diff(target.position.x)
+                        + actor_position.y.abs_diff(target.position.y)
+                        <= action.targeting.maximum_range
+                })
         })
         .map(|target| CurrentActorTargetOption {
             target_id: target.id.clone(),
@@ -659,7 +717,9 @@ fn current_actor_action_option(
             max_hit_points: target.hit_points.max,
             reason: "Target is legal for the current authoritative state.".to_string(),
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let target_set_options =
+        operation_target_set_options(action, projection, actor_id, &target_options);
     let destination_options = if let Some(movement) = &action.movement {
         projection
             .board
@@ -687,7 +747,98 @@ fn current_actor_action_option(
         resource_states,
         target_mode,
         target_options,
+        target_set_options,
         destination_options,
+    }
+}
+
+fn operation_target_set_options(
+    action: &ActionDefinition,
+    projection: &ScenarioProjection,
+    actor_id: &str,
+    target_options: &[CurrentActorTargetOption],
+) -> Vec<CurrentActorTargetSetOption> {
+    let Some(pipeline) = &action.targeting.operation_pipeline else {
+        return Vec::new();
+    };
+    let mut canonical_targets = target_options.iter().collect::<Vec<_>>();
+    canonical_targets.sort_by(|left, right| left.target_id.cmp(&right.target_id));
+    match action.targeting.target_kind {
+        TargetKind::Combatant => {
+            let target_ids = canonical_targets
+                .into_iter()
+                .take(pipeline.maximum_targets as usize)
+                .map(|target| target.target_id.clone())
+                .collect::<Vec<_>>();
+            if target_ids.is_empty() {
+                Vec::new()
+            } else {
+                vec![CurrentActorTargetSetOption {
+                    id: format!("{}:targets:{}", action.id, target_ids.join("+")),
+                    target_ids,
+                    target_cell: None,
+                    roll_policy: pipeline.roll_policy,
+                    reason:
+                        "Rust projected this canonical bounded target set for the current state."
+                            .to_string(),
+                }]
+            }
+        }
+        TargetKind::Area => {
+            let Some(area) = &pipeline.area else {
+                return Vec::new();
+            };
+            let Some(actor) = projected_combatant_by_id(projection, actor_id) else {
+                return Vec::new();
+            };
+            let mut options = projection
+                .board
+                .cells
+                .iter()
+                .filter(|cell| {
+                    actor.position.x.abs_diff(cell.position.x)
+                        + actor.position.y.abs_diff(cell.position.y)
+                        <= action.targeting.maximum_range
+                })
+                .filter_map(|cell| {
+                    let target_ids = canonical_targets
+                        .iter()
+                        .filter_map(|target| {
+                            let projected =
+                                projected_combatant_by_id(projection, &target.target_id)?;
+                            let in_area = projected.position.x.abs_diff(cell.position.x)
+                                + projected.position.y.abs_diff(cell.position.y)
+                                <= area.radius;
+                            in_area.then_some(target.target_id.clone())
+                        })
+                        .take(pipeline.maximum_targets as usize)
+                        .collect::<Vec<_>>();
+                    (!target_ids.is_empty()).then_some(CurrentActorTargetSetOption {
+                        id: format!(
+                            "{}:area:{},{}:{}",
+                            action.id,
+                            cell.position.x,
+                            cell.position.y,
+                            target_ids.join("+")
+                        ),
+                        target_ids,
+                        target_cell: Some(cell.position),
+                        roll_policy: pipeline.roll_policy,
+                        reason: format!(
+                            "Rust projected a radius-{} Manhattan burst in canonical target order.",
+                            area.radius
+                        ),
+                    })
+                })
+                .collect::<Vec<_>>();
+            options.sort_by_key(|option| {
+                option
+                    .target_cell
+                    .map(|cell| (cell.y, cell.x))
+                    .unwrap_or_default()
+            });
+            options
+        }
     }
 }
 

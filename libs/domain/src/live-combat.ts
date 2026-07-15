@@ -42,6 +42,7 @@ export interface RulebenchLiveSessionView {
   readonly turnLabel: string;
   readonly currentActorId: string | null;
   readonly fingerprintLabel: string;
+  readonly actionResourceFingerprintLabel: string;
   readonly participantOrderIds: readonly string[];
   readonly participants: readonly RulebenchLiveParticipantView[];
   readonly board: RulebenchLiveBoardView;
@@ -127,7 +128,16 @@ export interface RulebenchLiveActionOptionView {
   readonly resourceLabels: readonly string[];
   readonly targetMode: "self" | "entity" | "cell";
   readonly targets: readonly RulebenchLiveTargetOptionView[];
+  readonly targetSets: readonly RulebenchLiveTargetSetOptionView[];
   readonly destinations: readonly RulebenchLiveCellOptionView[];
+}
+
+export interface RulebenchLiveTargetSetOptionView {
+  readonly id: string;
+  readonly targetIds: readonly string[];
+  readonly targetCell: Readonly<{ x: number; y: number }> | null;
+  readonly rollPolicyLabel: string;
+  readonly reason: string;
 }
 
 export interface RulebenchLiveTargetOptionView {
@@ -205,9 +215,20 @@ export interface RulebenchLiveCommandExecutionView {
   readonly rejectionLabel: string | null;
   readonly eventLabels: readonly string[];
   readonly traceLabels: readonly string[];
+  readonly targetResults: readonly RulebenchLiveTargetResolutionView[];
   readonly stateChanged: boolean;
   readonly rollModeLabel: string;
   readonly generatedRolls: readonly RulebenchLiveGeneratedRollView[];
+}
+
+export interface RulebenchLiveTargetResolutionView {
+  readonly targetId: string;
+  readonly accepted: boolean;
+  readonly outcomeLabel: string;
+  readonly damageLabel: string | null;
+  readonly movementLabel: string | null;
+  readonly resourceLabels: readonly string[];
+  readonly reason: string;
 }
 
 export interface RulebenchLiveGeneratedRollView {
@@ -228,6 +249,7 @@ export function projectLiveSessionSnapshot(
     turnLabel: String(snapshot.turnIndex + 1),
     currentActorId: snapshot.currentActorId,
     fingerprintLabel: `${snapshot.stateFingerprint.algorithm}:${snapshot.stateFingerprint.value}`,
+    actionResourceFingerprintLabel: `${snapshot.actionResourceFingerprint.algorithm}:${snapshot.actionResourceFingerprint.value}`,
     participantOrderIds: snapshot.participantOrder,
     participants: snapshot.participants.map((participant) => ({
       id: participant.id,
@@ -352,6 +374,13 @@ export function projectLiveOptions(
         hitPointLabel: `${target.currentHitPoints}/${target.maxHitPoints} HP`,
         reason: target.reason,
       })),
+      targetSets: action.targetSets.map((targetSet) => ({
+        id: targetSet.id,
+        targetIds: targetSet.targetIds,
+        targetCell: targetSet.targetCell,
+        rollPolicyLabel: labelCode(targetSet.rollPolicy),
+        reason: targetSet.reason,
+      })),
       destinations: action.destinations.map((destination) => ({
         x: destination.position.x,
         y: destination.position.y,
@@ -419,6 +448,23 @@ export function projectLiveCommandExecution(
         : labelCode(execution.step.rejectionCode),
     eventLabels: execution.step.events.map((event) => labelCode(event.kind)),
     traceLabels: execution.step.trace.map((entry) => entry.message),
+    targetResults: execution.step.targetResults.map((target) => ({
+      targetId: target.targetId,
+      accepted: target.accepted,
+      outcomeLabel:
+        target.attackOutcome === null ? "No roll" : labelCode(target.attackOutcome),
+      damageLabel:
+        target.damageAmount === null ? null : `${target.damageAmount} damage`,
+      movementLabel:
+        target.movementKind === null || target.movementFrom === null || target.movementTo === null
+          ? null
+          : `${labelCode(target.movementKind)} ${target.movementFrom.x},${target.movementFrom.y} → ${target.movementTo.x},${target.movementTo.y}`,
+      resourceLabels: target.resourceChanges.map(
+        (resource) =>
+          `${resource.resourceId} ${resource.before} → ${resource.after} (${resource.requestedDelta >= 0 ? "+" : ""}${resource.requestedDelta})`,
+      ),
+      reason: target.reason,
+    })),
     stateChanged:
       execution.step.stateBeforeFingerprint.value !==
       execution.step.stateAfterFingerprint.value,

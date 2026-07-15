@@ -112,7 +112,7 @@ fn content_diagnostics_reject_unimplemented_targeting_and_check_declarations() {
 }
 
 #[test]
-fn content_diagnostics_reject_deferred_effect_operations() {
+fn content_diagnostics_require_stateful_effects_to_use_operation_pipeline_v2() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions[0]
         .hit
@@ -127,13 +127,13 @@ fn content_diagnostics_reject_deferred_effect_operations() {
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(
         diagnostics[0].code,
-        ContentDiagnosticCode::UnsupportedEffectOperation
+        ContentDiagnosticCode::InvalidEffectOperation
     );
     assert_eq!(
-        ContentDiagnosticCode::UnsupportedEffectOperation.code(),
-        "unsupportedEffectOperation"
+        ContentDiagnosticCode::InvalidEffectOperation.code(),
+        "invalidEffectOperation"
     );
-    assert!(diagnostics[0].message.contains("move"));
+    assert!(diagnostics[0].message.contains("operation-pipeline v2"));
 }
 
 #[test]

@@ -1098,16 +1098,50 @@ fn validate_action_references(
 
     let supported_entity_target = action.movement.is_none()
         && action.targeting.target_kind == TargetKind::Combatant
-        && action.targeting.selection == TargetSelection::Single;
+        && action.targeting.selection == TargetSelection::Single
+        && action.targeting.operation_pipeline.is_none();
     let supported_movement_target = action.movement.is_some()
         && action.targeting.target_kind == TargetKind::Area
-        && action.targeting.selection == TargetSelection::Single;
-    if !supported_entity_target && !supported_movement_target {
+        && action.targeting.selection == TargetSelection::Single
+        && action.targeting.operation_pipeline.is_none();
+    let supported_v2_target = action.movement.is_none()
+        && action
+            .targeting
+            .operation_pipeline
+            .as_ref()
+            .is_some_and(|pipeline| {
+                let target_limit_valid = (1
+                    ..=rulebench_ruleset::OperationPipelineV2::MAXIMUM_TARGET_LIMIT)
+                    .contains(&pipeline.maximum_targets);
+                let shape_valid = match (
+                    action.targeting.target_kind,
+                    action.targeting.selection,
+                    &pipeline.area,
+                ) {
+                    (TargetKind::Combatant, TargetSelection::Multiple, None) => true,
+                    (TargetKind::Area, TargetSelection::Multiple, Some(area)) => (1
+                        ..=rulebench_ruleset::OperationPipelineV2::MAXIMUM_AREA_RADIUS)
+                        .contains(&area.radius),
+                    _ => false,
+                };
+                target_limit_valid && shape_valid
+            });
+    if !supported_entity_target && !supported_movement_target && !supported_v2_target {
         diagnostics.push(ContentDiagnostic::error(
             ContentDiagnosticCode::UnsupportedTargetingDeclaration,
             Some(action.id.clone()),
             format!(
                 "Action {} declares targeting that the current action-resolution module does not support.",
+                action.id
+            ),
+        ));
+    }
+    if action.targeting.operation_pipeline.is_some() && !supported_v2_target {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::InvalidOperationPipelineDeclaration,
+            Some(action.id.clone()),
+            format!(
+                "Action {} declares an invalid operation-pipeline v2 target limit or area shape.",
                 action.id
             ),
         ));
@@ -1447,6 +1481,50 @@ fn validate_effect_operations(
                     operation.id().code()
                 ),
             ));
+        }
+        match operation {
+            rulebench_ruleset::HitEffectOperation::Move(_)
+            | rulebench_ruleset::HitEffectOperation::ChangeResource(_)
+                if action.targeting.operation_pipeline.is_none() =>
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidEffectOperation,
+                    Some(action.id.clone()),
+                    format!(
+                        "Action {} declares a stateful effect outside operation-pipeline v2.",
+                        action.id
+                    ),
+                ));
+            }
+            rulebench_ruleset::HitEffectOperation::Move(movement)
+                if movement.maximum_distance == 0
+                    || movement.maximum_distance
+                        > rulebench_ruleset::OperationPipelineV2::MAXIMUM_AREA_RADIUS
+                    || (movement.movement_kind == rulebench_ruleset::MovementKind::Shift
+                        && movement.maximum_distance != 1) =>
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidEffectOperation,
+                    Some(action.id.clone()),
+                    format!(
+                        "Action {} declares an invalid bounded movement effect.",
+                        action.id
+                    ),
+                ));
+            }
+            rulebench_ruleset::HitEffectOperation::ChangeResource(change)
+                if change.resource_id.is_empty() || change.delta == 0 =>
+            {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidEffectOperation,
+                    Some(action.id.clone()),
+                    format!(
+                        "Action {} declares an empty or zero-delta resource effect.",
+                        action.id
+                    ),
+                ));
+            }
+            _ => {}
         }
         if let rulebench_ruleset::HitEffectOperation::OpenReactionWindow(hook) = operation {
             reaction_hook_count += 1;

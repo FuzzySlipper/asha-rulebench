@@ -41,7 +41,11 @@ pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     if intent.action_id.is_empty() {
         return rejected(intent.clone(), RulebenchRejection::EmptyActionId, trace);
     }
-    if intent.target_id.is_empty() && intent.destination_cell.is_none() {
+    if intent.target_id.is_empty()
+        && intent.target_ids.is_empty()
+        && intent.target_cell.is_none()
+        && intent.destination_cell.is_none()
+    {
         return rejected(intent.clone(), RulebenchRejection::EmptyTargetId, trace);
     }
 
@@ -88,7 +92,11 @@ pub fn resolve_use_action(
             trace,
         );
     }
-    if intent.target_id.is_empty() && intent.destination_cell.is_none() {
+    if intent.target_id.is_empty()
+        && intent.target_ids.is_empty()
+        && intent.target_cell.is_none()
+        && intent.destination_cell.is_none()
+    {
         return rejected_with_projection(
             scenario,
             intent,
@@ -165,6 +173,18 @@ pub fn resolve_use_action(
             intent,
             RulebenchRejection::InvalidAction,
             None,
+            trace,
+        );
+    }
+
+    if let Some(pipeline) = &action.targeting.operation_pipeline {
+        return resolve_operation_pipeline_v2(
+            scenario,
+            intent,
+            actor,
+            action,
+            pipeline,
+            roll_stream,
             trace,
         );
     }
@@ -936,6 +956,664 @@ fn resolve_accepted_action(
     )
 }
 
+fn resolve_operation_pipeline_v2(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    actor: &Combatant,
+    action: &ActionDefinition,
+    pipeline: &OperationPipelineV2,
+    roll_stream: &[i32],
+    mut trace: Vec<TraceEntry>,
+) -> RulebenchReceipt {
+    let targets = match operation_pipeline_targets(scenario, &intent, actor, action, pipeline) {
+        Ok(targets) => targets,
+        Err(rejection) => {
+            return rejected_with_projection(scenario, intent, rejection, None, trace);
+        }
+    };
+    let Some(attack) = action.attack_check() else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
+    let Some(attack_modifier) = attack_modifier(scenario, actor, attack) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
+    let Some(hit_operations) = hit_operations(action) else {
+        return rejected_with_projection(
+            scenario,
+            intent,
+            RulebenchRejection::InvalidAction,
+            None,
+            trace,
+        );
+    };
+
+    let required_rolls = match pipeline.roll_policy {
+        ActionRollPolicy::Shared => 2,
+        ActionRollPolicy::PerTarget => targets.len().saturating_mul(2),
+        ActionRollPolicy::NoRoll => 0,
+    };
+    if roll_stream.len() < required_rolls {
+        let request_kind = if roll_stream.len().is_multiple_of(2) {
+            RollRequestKind::AttackRoll
+        } else {
+            RollRequestKind::DamageRoll
+        };
+        let rejection = if request_kind == RollRequestKind::AttackRoll {
+            RulebenchRejection::MissingAttackRoll
+        } else {
+            RulebenchRejection::MissingDamageRoll
+        };
+        return rejected_with_projection_and_rolls(
+            scenario,
+            intent,
+            rejection,
+            None,
+            trace,
+            vec![missing_roll_consumption(
+                roll_stream.len() as u32,
+                request_kind,
+                "Operation-pipeline v2 requires a fixed roll bundle before atomic resolution.",
+            )],
+        );
+    }
+    for (index, value) in roll_stream.iter().take(required_rolls).enumerate() {
+        let request_kind = if index.is_multiple_of(2) {
+            RollRequestKind::AttackRoll
+        } else {
+            RollRequestKind::DamageRoll
+        };
+        let valid = match request_kind {
+            RollRequestKind::AttackRoll => (1..=20).contains(value),
+            RollRequestKind::DamageRoll => (1..=8).contains(value),
+            RollRequestKind::SavingThrowRoll
+            | RollRequestKind::ContestedActorRoll
+            | RollRequestKind::ContestedTargetRoll => false,
+        };
+        if !valid {
+            return rejected_with_projection_and_rolls(
+                scenario,
+                intent,
+                RulebenchRejection::InvalidRollValue,
+                None,
+                trace,
+                vec![unconsumed_roll(
+                    index as u32,
+                    request_kind,
+                    Some(*value),
+                    "Operation-pipeline v2 roll was outside its declared die bounds.",
+                )],
+            );
+        }
+    }
+
+    let mut state = CombatState::from_scenario(scenario);
+    let primary_target_id = targets
+        .first()
+        .map(|target| target.id.clone())
+        .unwrap_or_default();
+    let mut events = vec![DomainEvent::ActionUsed {
+        actor_id: intent.actor_id.clone(),
+        action_id: intent.action_id.clone(),
+        target_id: primary_target_id,
+    }];
+    let mut target_results = Vec::new();
+    let mut roll_consumption = Vec::new();
+
+    for (target_index, target) in targets.iter().enumerate() {
+        let legality = validate_operation_pipeline_target(actor, target, action);
+        let roll_offset = match pipeline.roll_policy {
+            ActionRollPolicy::Shared | ActionRollPolicy::NoRoll => 0,
+            ActionRollPolicy::PerTarget => target_index * 2,
+        };
+        let attack_roll = match pipeline.roll_policy {
+            ActionRollPolicy::NoRoll => None,
+            ActionRollPolicy::Shared | ActionRollPolicy::PerTarget => {
+                let roll = roll_stream[roll_offset];
+                let defense_value = defense_value(target, &attack.defense.id);
+                let total = roll + attack_modifier;
+                Some(AttackRollResult {
+                    roll,
+                    modifier: attack_modifier,
+                    total,
+                    defense_id: attack.defense.id.clone(),
+                    defense_value,
+                    outcome: if total >= defense_value {
+                        AttackOutcome::Hit
+                    } else {
+                        AttackOutcome::Miss
+                    },
+                })
+            }
+        };
+        if let Some(result) = &attack_roll {
+            events.push(DomainEvent::AttackRolled {
+                actor_id: intent.actor_id.clone(),
+                target_id: target.id.clone(),
+                total: result.total,
+                defense_id: result.defense_id.clone(),
+                defense_value: result.defense_value,
+                outcome: result.outcome,
+            });
+        }
+        let accepted_effects = attack_roll
+            .as_ref()
+            .is_none_or(|result| result.outcome == AttackOutcome::Hit);
+        if !accepted_effects {
+            target_results.push(TargetResolutionOutcome {
+                target_id: target.id.clone(),
+                target_legality: legality,
+                attack_roll,
+                damage: None,
+                healing: None,
+                temporary_vitality: None,
+                modifier: None,
+                movement: None,
+                resource_changes: Vec::new(),
+            });
+            continue;
+        }
+
+        let damage_roll = match pipeline.roll_policy {
+            ActionRollPolicy::NoRoll => 0,
+            ActionRollPolicy::Shared | ActionRollPolicy::PerTarget => roll_stream[roll_offset + 1],
+        };
+        let vitality = apply_vitality_effects(scenario, target, damage_roll, hit_operations);
+        let modifier = match hit_operations.modifier {
+            Some(operation) => {
+                let Some(outcome) =
+                    modifier_outcome(scenario, target, &intent.action_id, operation)
+                else {
+                    return rejected_with_projection(
+                        scenario,
+                        intent,
+                        RulebenchRejection::InvalidAction,
+                        None,
+                        trace,
+                    );
+                };
+                Some(outcome)
+            }
+            None => None,
+        };
+        state.apply_hit(&vitality.damage, modifier.as_ref());
+        if let Some(healing) = &vitality.healing {
+            state.apply_healing(healing);
+        }
+        if let Some(temporary_vitality) = &vitality.temporary_vitality {
+            state.apply_temporary_vitality(temporary_vitality);
+        }
+
+        events.push(DomainEvent::DamageApplied {
+            target_id: vitality.damage.target_id.clone(),
+            amount: vitality.damage.amount,
+            damage_type: vitality.damage.damage_type.clone(),
+        });
+        if let Some(healing) = &vitality.healing {
+            events.push(DomainEvent::HealingApplied {
+                target_id: healing.target_id.clone(),
+                amount: healing.amount,
+                healing_type: healing.healing_type.clone(),
+            });
+        }
+        if let Some(temporary_vitality) = &vitality.temporary_vitality {
+            events.push(DomainEvent::TemporaryVitalityGranted {
+                target_id: temporary_vitality.target_id.clone(),
+                amount: temporary_vitality.after - temporary_vitality.before,
+            });
+        }
+        if let Some(modifier) = &modifier {
+            events.push(DomainEvent::ModifierApplied {
+                target_id: modifier.target_id.clone(),
+                modifier_id: modifier.modifier_id.clone(),
+                duration: modifier.duration.clone(),
+            });
+        }
+
+        let movement = action
+            .hit
+            .operations
+            .iter()
+            .find_map(|operation| match operation {
+                HitEffectOperation::Move(operation) => Some(operation),
+                _ => None,
+            });
+        let movement = match movement {
+            Some(operation) => {
+                let projection = state.project("Operation-pipeline v2 movement preview.");
+                let outcome = match preview_effect_movement(
+                    scenario,
+                    &projection,
+                    actor,
+                    target,
+                    operation,
+                ) {
+                    Ok(outcome) => outcome,
+                    Err(rejection) => {
+                        return rejected_with_projection(scenario, intent, rejection, None, trace);
+                    }
+                };
+                state.apply_effect_movement(&target.id, outcome.to);
+                events.push(DomainEvent::EffectMovementApplied {
+                    target_id: target.id.clone(),
+                    movement_kind: outcome.movement_kind,
+                    from: outcome.from,
+                    to: outcome.to,
+                });
+                Some(outcome)
+            }
+            None => None,
+        };
+
+        let mut resource_changes = Vec::new();
+        for operation in action
+            .hit
+            .operations
+            .iter()
+            .filter_map(|operation| match operation {
+                HitEffectOperation::ChangeResource(operation) => Some(operation),
+                _ => None,
+            })
+        {
+            let outcome = match state.preview_resource_change(
+                &target.id,
+                &operation.resource_id,
+                operation.delta,
+            ) {
+                Ok(outcome) => outcome,
+                Err(rejection) => {
+                    return rejected_with_projection(scenario, intent, rejection, None, trace);
+                }
+            };
+            state.apply_resource_change(&outcome);
+            events.push(DomainEvent::ResourceChanged {
+                target_id: target.id.clone(),
+                resource_id: outcome.resource_id.clone(),
+                delta: outcome.after - outcome.before,
+                before: outcome.before,
+                after: outcome.after,
+            });
+            resource_changes.push(outcome);
+        }
+
+        trace.push(TraceEntry::new(
+            trace.len() as u32 + 1,
+            TracePhase::Resolution,
+            TraceStatus::Accepted,
+            "Operation-pipeline v2 target resolved.",
+            format!(
+                "Target {} resolved in canonical target order with {}.",
+                target.id,
+                pipeline.roll_policy.code()
+            ),
+        ));
+        target_results.push(TargetResolutionOutcome {
+            target_id: target.id.clone(),
+            target_legality: legality,
+            attack_roll,
+            damage: Some(vitality.damage),
+            healing: vitality.healing,
+            temporary_vitality: vitality.temporary_vitality,
+            modifier,
+            movement,
+            resource_changes,
+        });
+    }
+
+    match pipeline.roll_policy {
+        ActionRollPolicy::Shared => {
+            let any_hit = target_results.iter().any(|result| result.damage.is_some());
+            roll_consumption.push(consumed_roll(
+                0,
+                RollRequestKind::AttackRoll,
+                roll_stream[0],
+                "Shared attack roll was consumed for every target.",
+            ));
+            roll_consumption.push(if any_hit {
+                consumed_roll(
+                    1,
+                    RollRequestKind::DamageRoll,
+                    roll_stream[1],
+                    "Shared damage roll was consumed for every hit target.",
+                )
+            } else {
+                unconsumed_roll(
+                    1,
+                    RollRequestKind::DamageRoll,
+                    Some(roll_stream[1]),
+                    "Shared damage roll was not consumed because every target missed.",
+                )
+            });
+        }
+        ActionRollPolicy::PerTarget => {
+            for (index, result) in target_results.iter().enumerate() {
+                roll_consumption.push(consumed_roll(
+                    (index * 2) as u32,
+                    RollRequestKind::AttackRoll,
+                    roll_stream[index * 2],
+                    format!(
+                        "Per-target attack roll was consumed for {}.",
+                        result.target_id
+                    ),
+                ));
+                roll_consumption.push(if result.damage.is_some() {
+                    consumed_roll(
+                        (index * 2 + 1) as u32,
+                        RollRequestKind::DamageRoll,
+                        roll_stream[index * 2 + 1],
+                        format!(
+                            "Per-target damage roll was consumed for {}.",
+                            result.target_id
+                        ),
+                    )
+                } else {
+                    unconsumed_roll(
+                        (index * 2 + 1) as u32,
+                        RollRequestKind::DamageRoll,
+                        Some(roll_stream[index * 2 + 1]),
+                        format!(
+                            "Per-target damage roll was unused for missed target {}.",
+                            result.target_id
+                        ),
+                    )
+                });
+            }
+        }
+        ActionRollPolicy::NoRoll => {}
+    }
+    for (index, value) in roll_stream.iter().skip(required_rolls).enumerate() {
+        roll_consumption.push(unconsumed_roll(
+            (required_rolls + index) as u32,
+            RollRequestKind::DamageRoll,
+            Some(*value),
+            "Excess roll was not requested by operation-pipeline v2.",
+        ));
+    }
+
+    trace.push(TraceEntry::new(
+        trace.len() as u32 + 1,
+        TracePhase::Commit,
+        TraceStatus::Accepted,
+        "Operation-pipeline v2 frame committed.",
+        format!(
+            "{} targets and all stateful effects committed atomically.",
+            target_results.len()
+        ),
+    ));
+    let first = target_results.first().cloned();
+    RulebenchReceipt {
+        accepted: true,
+        authority_surface: AUTHORITY_SURFACE,
+        intent,
+        rejection: None,
+        target_legality: first.as_ref().map(|result| result.target_legality.clone()),
+        attack_roll: first.as_ref().and_then(|result| result.attack_roll.clone()),
+        damage: first.as_ref().and_then(|result| result.damage.clone()),
+        healing: first.as_ref().and_then(|result| result.healing.clone()),
+        temporary_vitality: first
+            .as_ref()
+            .and_then(|result| result.temporary_vitality.clone()),
+        modifier: first.as_ref().and_then(|result| result.modifier.clone()),
+        target_results,
+        roll_consumption,
+        events,
+        trace,
+        projection: Some(state.project("Operation-pipeline v2 effects committed atomically.")),
+    }
+}
+
+pub(crate) fn operation_pipeline_targets<'a>(
+    scenario: &'a RulebenchScenario,
+    intent: &UseActionIntent,
+    actor: &Combatant,
+    action: &ActionDefinition,
+    pipeline: &OperationPipelineV2,
+) -> Result<Vec<&'a Combatant>, RulebenchRejection> {
+    let mut targets = match action.targeting.target_kind {
+        TargetKind::Combatant => {
+            let selected_ids = if intent.target_ids.is_empty() {
+                vec![intent.target_id.clone()]
+            } else {
+                intent.target_ids.clone()
+            };
+            if selected_ids.is_empty() || selected_ids.iter().any(String::is_empty) {
+                return Err(RulebenchRejection::EmptyTargetId);
+            }
+            let mut unique = std::collections::HashSet::new();
+            if selected_ids.iter().any(|id| !unique.insert(id.clone())) {
+                return Err(RulebenchRejection::DuplicateTarget);
+            }
+            if selected_ids.len() > pipeline.maximum_targets as usize {
+                return Err(RulebenchRejection::TargetLimitExceeded);
+            }
+            let mut selected = Vec::new();
+            for target_id in selected_ids {
+                let target = scenario
+                    .combatants
+                    .iter()
+                    .find(|combatant| combatant.id == target_id)
+                    .ok_or(RulebenchRejection::InvalidTarget)?;
+                if range_between(actor.position, target.position) > action.targeting.maximum_range {
+                    return Err(RulebenchRejection::TargetOutOfRange);
+                }
+                let legality = validate_operation_pipeline_target(actor, target, action);
+                if !legality.accepted {
+                    return Err(target_legality_rejection(&legality));
+                }
+                if target.hit_points.current <= 0 {
+                    return Err(RulebenchRejection::TargetDefeated);
+                }
+                selected.push(target);
+            }
+            selected
+        }
+        TargetKind::Area => {
+            let center = intent
+                .target_cell
+                .ok_or(RulebenchRejection::AreaTargetMissing)?;
+            if center.x >= scenario.grid.width
+                || center.y >= scenario.grid.height
+                || scenario
+                    .grid
+                    .cells
+                    .iter()
+                    .all(|cell| cell.position != center)
+            {
+                return Err(RulebenchRejection::AreaOutOfBounds);
+            }
+            if range_between(actor.position, center) > action.targeting.maximum_range {
+                return Err(RulebenchRejection::AreaOutOfRange);
+            }
+            let area = pipeline
+                .area
+                .as_ref()
+                .ok_or(RulebenchRejection::InvalidAction)?;
+            let mut selected = scenario
+                .combatants
+                .iter()
+                .filter(|target| action.targeting.target_ids.contains(&target.id))
+                .filter(|target| range_between(center, target.position) <= area.radius)
+                .filter(|target| target.hit_points.current > 0)
+                .filter(|target| validate_operation_pipeline_target(actor, target, action).accepted)
+                .collect::<Vec<_>>();
+            selected.sort_by(|left, right| left.id.cmp(&right.id));
+            selected.truncate(pipeline.maximum_targets as usize);
+            if selected.is_empty() {
+                return Err(RulebenchRejection::InvalidTarget);
+            }
+            selected
+        }
+    };
+    targets.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(targets)
+}
+
+pub(crate) fn validate_operation_pipeline_target(
+    actor: &Combatant,
+    target: &Combatant,
+    action: &ActionDefinition,
+) -> TargetLegality {
+    if !action.targeting.target_ids.contains(&target.id) {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target is not declared for this action.".to_string(),
+        };
+    }
+    if action.targeting.team_constraint == TargetTeamConstraint::Hostile
+        && actor.team == target.team
+    {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target is not hostile.".to_string(),
+        };
+    }
+    if action.targeting.team_constraint == TargetTeamConstraint::Ally && actor.team != target.team {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Target is not allied.".to_string(),
+        };
+    }
+    if action.targeting.visibility_requirement == VisibilityRequirement::Required
+        && !action.targeting.visible_target_ids.contains(&target.id)
+    {
+        return TargetLegality {
+            target_id: target.id.clone(),
+            accepted: false,
+            reason: "Line of sight is blocked.".to_string(),
+        };
+    }
+    TargetLegality {
+        target_id: target.id.clone(),
+        accepted: true,
+        reason: "Target belongs to the Rust-projected bounded target set.".to_string(),
+    }
+}
+
+fn preview_effect_movement(
+    scenario: &RulebenchScenario,
+    projection: &ScenarioProjection,
+    actor: &Combatant,
+    target: &Combatant,
+    operation: &MovementEffectOperation,
+) -> Result<EffectMovementOutcome, RulebenchRejection> {
+    let from = projection
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == target.id)
+        .map(|combatant| combatant.position)
+        .unwrap_or(target.position);
+    let to = match operation.movement_kind {
+        MovementKind::Shift => {
+            let directions = [(0_i32, -1_i32), (-1, 0), (1, 0), (0, 1)];
+            directions
+                .into_iter()
+                .filter_map(|(dx, dy)| offset_position(from, dx, dy))
+                .find(|candidate| {
+                    effect_destination_is_legal(scenario, projection, &target.id, *candidate)
+                })
+                .ok_or(RulebenchRejection::EffectMovementDestinationBlocked)?
+        }
+        MovementKind::Push | MovementKind::Pull => {
+            let (mut dx, mut dy) = dominant_movement_step(actor.position, from);
+            if operation.movement_kind == MovementKind::Pull {
+                dx = -dx;
+                dy = -dy;
+            }
+            let mut current = from;
+            for _ in 0..operation.maximum_distance {
+                let next = offset_position(current, dx, dy)
+                    .ok_or(RulebenchRejection::EffectMovementOutOfBounds)?;
+                if next.x >= scenario.grid.width || next.y >= scenario.grid.height {
+                    return Err(RulebenchRejection::EffectMovementOutOfBounds);
+                }
+                let cell = scenario
+                    .grid
+                    .cells
+                    .iter()
+                    .find(|cell| cell.position == next)
+                    .ok_or(RulebenchRejection::EffectMovementOutOfBounds)?;
+                if cell
+                    .terrain_tags
+                    .iter()
+                    .any(|tag| tag == "wall" || tag == "blocked")
+                {
+                    return Err(RulebenchRejection::EffectMovementDestinationBlocked);
+                }
+                if projection
+                    .combatants
+                    .iter()
+                    .any(|combatant| combatant.id != target.id && combatant.position == next)
+                {
+                    return Err(RulebenchRejection::EffectMovementDestinationOccupied);
+                }
+                current = next;
+            }
+            current
+        }
+    };
+    Ok(EffectMovementOutcome {
+        target_id: target.id.clone(),
+        movement_kind: operation.movement_kind,
+        from,
+        to,
+        distance: range_between(from, to),
+    })
+}
+
+fn dominant_movement_step(actor: GridPosition, target: GridPosition) -> (i32, i32) {
+    let dx = i64::from(target.x) - i64::from(actor.x);
+    let dy = i64::from(target.y) - i64::from(actor.y);
+    if dx.abs() >= dy.abs() && dx != 0 {
+        (if dx > 0 { 1 } else { -1 }, 0)
+    } else {
+        (0, if dy >= 0 { 1 } else { -1 })
+    }
+}
+
+fn offset_position(position: GridPosition, dx: i32, dy: i32) -> Option<GridPosition> {
+    let x = i64::from(position.x).checked_add(i64::from(dx))?;
+    let y = i64::from(position.y).checked_add(i64::from(dy))?;
+    Some(GridPosition {
+        x: u32::try_from(x).ok()?,
+        y: u32::try_from(y).ok()?,
+    })
+}
+
+fn effect_destination_is_legal(
+    scenario: &RulebenchScenario,
+    projection: &ScenarioProjection,
+    target_id: &str,
+    destination: GridPosition,
+) -> bool {
+    destination.x < scenario.grid.width
+        && destination.y < scenario.grid.height
+        && scenario.grid.cells.iter().any(|cell| {
+            cell.position == destination
+                && !cell
+                    .terrain_tags
+                    .iter()
+                    .any(|tag| tag == "wall" || tag == "blocked")
+        })
+        && projection
+            .combatants
+            .iter()
+            .all(|combatant| combatant.id == target_id || combatant.position != destination)
+}
+
 fn effective_stat_value(
     scenario: &RulebenchScenario,
     combatant_id: &str,
@@ -967,6 +1645,7 @@ fn accepted_non_effect_receipt(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption,
         events: vec![
             DomainEvent::ActionUsed {
@@ -1042,6 +1721,7 @@ fn resolve_check_effects(resolution: CheckEffectResolution<'_>) -> RulebenchRece
         healing: vitality_effects.healing.clone(),
         temporary_vitality: vitality_effects.temporary_vitality.clone(),
         modifier: modifier.clone(),
+        target_results: Vec::new(),
         roll_consumption,
         events: accepted_check_effect_events(
             &intent,
@@ -1119,6 +1799,7 @@ fn accepted_shape(intent: UseActionIntent, mut trace: Vec<TraceEntry>) -> Rulebe
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: vec![DomainEvent::IntentShapeAccepted {
             actor_id: intent.actor_id,
@@ -1153,6 +1834,7 @@ fn rejected(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: Vec::new(),
         trace,
@@ -1192,6 +1874,7 @@ fn accepted_hit_receipt(
         healing: healing.clone(),
         temporary_vitality: temporary_vitality.clone(),
         modifier: modifier.clone(),
+        target_results: Vec::new(),
         roll_consumption,
         events: accepted_hit_events(
             &intent,
@@ -1225,6 +1908,7 @@ fn accepted_miss_receipt(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption,
         events: vec![
             DomainEvent::ActionUsed {
@@ -1347,6 +2031,7 @@ fn rejected_with_projection_and_rolls(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption,
         events: Vec::new(),
         trace,

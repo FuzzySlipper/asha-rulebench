@@ -539,6 +539,8 @@ fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
                 actor_id: "entity-adept".to_owned(),
                 action_id: "hexing_bolt".to_owned(),
                 target_id: "entity-raider".to_owned(),
+                target_ids: Vec::new(),
+                target_cell: None,
                 destination_cell: None,
                 observed_origin: None,
             },

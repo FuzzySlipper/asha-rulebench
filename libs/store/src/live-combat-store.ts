@@ -42,6 +42,8 @@ export interface RulebenchLiveIntentInput {
   readonly actorId: string;
   readonly actionId: string;
   readonly targetId: string;
+  readonly targetIds?: readonly string[];
+  readonly targetCell?: Readonly<{ x: number; y: number }>;
   readonly destinationCell?: Readonly<{ x: number; y: number }>;
   readonly observedOrigin?: Readonly<{ x: number; y: number }>;
 }
@@ -281,6 +283,20 @@ export class LiveCombatStore {
       actorId: current.actorId,
       actionId: current.actionId,
       targetId,
+    });
+  }
+
+  selectTargetSet(
+    targetIds: readonly string[],
+    targetCell: Readonly<{ x: number; y: number }> | null,
+  ): void {
+    const current = this._intent();
+    this.setIntent({
+      actorId: current.actorId,
+      actionId: current.actionId,
+      targetId: "",
+      targetIds,
+      ...(targetCell === null ? {} : { targetCell }),
     });
   }
 
@@ -576,6 +592,10 @@ export class LiveCombatStore {
     }
     if (
       action.targetMode === "entity" &&
+      !(current.targetIds !== undefined &&
+        action.targetSets.some((targetSet) =>
+          sameTargetIds(targetSet.targetIds, current.targetIds ?? []),
+        )) &&
       !action.targets.some((target) => target.id === current.targetId)
     ) {
       this._intent.set({
@@ -587,6 +607,25 @@ export class LiveCombatStore {
       return;
     }
     if (action.targetMode === "cell") {
+      const currentTargetCell = current.targetCell;
+      if (currentTargetCell !== undefined) {
+        const targetSetStillLegal = action.targetSets.some(
+          (targetSet) =>
+            targetSet.targetCell !== null &&
+            targetSet.targetCell.x === currentTargetCell.x &&
+            targetSet.targetCell.y === currentTargetCell.y &&
+            sameTargetIds(targetSet.targetIds, current.targetIds ?? []),
+        );
+        if (!targetSetStillLegal) {
+          this._intent.set({
+            actorId: current.actorId,
+            actionId: current.actionId,
+            targetId: "",
+          });
+          this._preflight.set({ kind: "idle" });
+        }
+        return;
+      }
       const destination = current.destinationCell;
       const origin = snapshot.participants.find(
         (participant) => participant.id === current.actorId,
@@ -664,9 +703,15 @@ function protocolIntent(
     actorId: intent.actorId,
     actionId: intent.actionId,
     targetId: intent.targetId,
+    targetIds: intent.targetIds ?? [],
+    targetCell: intent.targetCell ?? null,
     destinationCell: intent.destinationCell ?? null,
     observedOrigin: intent.observedOrigin ?? null,
   };
+}
+
+function sameTargetIds(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 export function provideLiveCombatStoreKernel(): Provider[] {

@@ -283,6 +283,7 @@ fn hexing_bolt_action() -> ActionDefinition {
             visibility_requirement: VisibilityRequirement::Required,
             target_ids: vec!["entity-raider".to_string()],
             visible_target_ids: vec!["entity-raider".to_string()],
+            operation_pipeline: None,
         },
         check: CheckDeclaration::Attack(AttackCheckDeclaration {
             modifier: 4,
@@ -332,6 +333,7 @@ fn move_action(actor_id: &str) -> ActionDefinition {
         visibility_requirement: VisibilityRequirement::Ignored,
         target_ids: Vec::new(),
         visible_target_ids: Vec::new(),
+        operation_pipeline: None,
     };
     action.resource_costs = Vec::new();
     action.movement = Some(MovementActionDeclaration {
@@ -373,6 +375,7 @@ fn basic_attack_action(
             visibility_requirement: VisibilityRequirement::Required,
             target_ids: targets.clone(),
             visible_target_ids: targets,
+            operation_pipeline: None,
         },
         check: CheckDeclaration::Attack(AttackCheckDeclaration {
             modifier: 0,

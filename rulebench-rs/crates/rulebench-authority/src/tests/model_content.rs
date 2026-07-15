@@ -22,6 +22,10 @@ fn accepted_intent_shape_emits_one_domain_event() {
 fn action_resource_transition_kind_codes_are_stable() {
     assert_eq!(ActionResourceTransitionKind::Spent.code(), "spent");
     assert_eq!(ActionResourceTransitionKind::Refreshed.code(), "refreshed");
+    assert_eq!(
+        ActionResourceTransitionKind::ChangedByEffect.code(),
+        "changedByEffect"
+    );
 }
 
 #[test]

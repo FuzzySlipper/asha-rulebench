@@ -70,6 +70,7 @@ pub(super) fn resolve_movement_command(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: vec![
             DomainEvent::PositionChanged {
@@ -130,6 +131,7 @@ fn rejected_movement(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![TraceEntry::new(

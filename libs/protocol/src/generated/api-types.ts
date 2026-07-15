@@ -10,7 +10,7 @@ export type RulebenchTracePhaseDto = 'proposal' | 'validation' | 'resolution' | 
 
 export type RulebenchTraceStatusDto = 'accepted' | 'rejected' | 'info';
 
-export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingCheckRoll' | 'missingDamageRoll' | 'invalidRollValue' | 'movementDestinationMissing' | 'movementActorDefeated' | 'movementOutOfBounds' | 'movementDestinationOccupied' | 'movementDestinationBlocked' | 'movementStaleDestination' | 'movementOutOfRange' | 'movementBudgetExhausted';
+export type RulebenchRejectionCodeDto = 'emptyActorId' | 'emptyActionId' | 'emptyTargetId' | 'invalidActor' | 'invalidAction' | 'invalidRulesetModules' | 'invalidTarget' | 'duplicateTarget' | 'targetLimitExceeded' | 'targetDefeated' | 'areaTargetMissing' | 'areaOutOfBounds' | 'areaOutOfRange' | 'targetLegalityFailed' | 'targetOutOfRange' | 'targetNotVisible' | 'missingAttackRoll' | 'missingCheckRoll' | 'missingDamageRoll' | 'invalidRollValue' | 'movementDestinationMissing' | 'movementActorDefeated' | 'movementOutOfBounds' | 'movementDestinationOccupied' | 'movementDestinationBlocked' | 'movementStaleDestination' | 'movementOutOfRange' | 'movementBudgetExhausted' | 'effectMovementOutOfBounds' | 'effectMovementDestinationOccupied' | 'effectMovementDestinationBlocked' | 'effectResourceMissing' | 'effectResourceOutOfBounds';
 
 export type RulebenchRulesetCompatibilityErrorCodeDto = 'unknownRulesetId' | 'newerRulesetVersion' | 'incompatibleRulesetVersion' | 'incompatibleRulesetModules';
 
@@ -80,7 +80,7 @@ export type RulebenchModifierDurationPolicyDto = { readonly kind: 'permanent'; r
 
 export type RulebenchModifierDurationTransitionTriggerDto = { readonly kind: 'turnBoundary' | 'roundBoundary'; readonly event: null } | { readonly kind: 'event'; readonly event: string };
 
-export type RulebenchActionResourceTransitionKindDto = 'spent' | 'refreshed' | 'cooldownAdvanced';
+export type RulebenchActionResourceTransitionKindDto = 'spent' | 'changedByEffect' | 'refreshed' | 'cooldownAdvanced';
 
 export type RulebenchEquipmentTransitionKindDto = 'equip' | 'unequip';
 
@@ -194,6 +194,14 @@ export interface RulebenchLiveCellOptionDto {
   readonly reason: string;
 }
 
+export interface RulebenchLiveTargetSetOptionDto {
+  readonly id: string;
+  readonly targetIds: readonly string[];
+  readonly targetCell: RulebenchLiveGridPositionDto | null;
+  readonly rollPolicy: 'shared' | 'perTarget' | 'noRoll';
+  readonly reason: string;
+}
+
 export interface RulebenchLiveActionOptionDto {
   readonly actionId: string;
   readonly abilityId: string;
@@ -204,6 +212,7 @@ export interface RulebenchLiveActionOptionDto {
   readonly resourceStates: readonly RulebenchLiveActionResourceStateDto[];
   readonly targetMode: 'self' | 'entity' | 'cell';
   readonly targets: readonly RulebenchLiveTargetOptionDto[];
+  readonly targetSets: readonly RulebenchLiveTargetSetOptionDto[];
   readonly destinations: readonly RulebenchLiveCellOptionDto[];
 }
 
@@ -316,6 +325,7 @@ export interface RulebenchLiveSessionSnapshotDto {
   readonly combatLog: readonly RulebenchLiveCombatLogEntryDto[];
   readonly auditLog: readonly RulebenchLiveAuditEntryDto[];
   readonly stateFingerprint: RulebenchLiveStateFingerprintDto;
+  readonly actionResourceFingerprint: RulebenchLiveStateFingerprintDto;
 }
 
 export interface RulebenchLiveRollEvidenceDto {
@@ -388,11 +398,32 @@ export interface RulebenchLiveCommandStepDto {
   readonly intent: RulebenchUseActionIntentDto;
   readonly rolls: readonly RulebenchLiveRollEvidenceDto[];
   readonly events: readonly RulebenchLiveDomainEventDto[];
+  readonly targetResults: readonly RulebenchLiveTargetResolutionDto[];
   readonly trace: readonly RulebenchLiveTraceEntryDto[];
   readonly stateBeforeFingerprint: RulebenchLiveStateFingerprintDto;
   readonly stateAfterFingerprint: RulebenchLiveStateFingerprintDto;
   readonly rollMode: "supplied" | "authorityGenerated";
   readonly generatedRolls: readonly RulebenchLiveGeneratedRollDto[];
+}
+
+export interface RulebenchLiveTargetResolutionDto {
+  readonly targetId: string;
+  readonly accepted: boolean;
+  readonly reason: string;
+  readonly attackOutcome: 'hit' | 'miss' | null;
+  readonly damageAmount: number | null;
+  readonly movementKind: 'push' | 'pull' | 'shift' | null;
+  readonly movementFrom: RulebenchLiveGridPositionDto | null;
+  readonly movementTo: RulebenchLiveGridPositionDto | null;
+  readonly resourceChanges: readonly RulebenchLiveResourceChangeDto[];
+}
+
+export interface RulebenchLiveResourceChangeDto {
+  readonly resourceId: string;
+  readonly requestedDelta: number;
+  readonly before: number;
+  readonly after: number;
+  readonly maximum: number;
 }
 
 export interface RulebenchLiveCommandExecutionDto {
@@ -1351,6 +1382,8 @@ export interface RulebenchUseActionIntentDto {
   readonly actorId: string;
   readonly actionId: string;
   readonly targetId: string;
+  readonly targetIds: readonly string[];
+  readonly targetCell: RulebenchLiveGridPositionDto | null;
   readonly destinationCell: RulebenchLiveGridPositionDto | null;
   readonly observedOrigin: RulebenchLiveGridPositionDto | null;
 }

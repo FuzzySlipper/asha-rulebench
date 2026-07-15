@@ -77,6 +77,7 @@ impl CombatantState {
             position: self.position,
             movement_remaining: self.movement_remaining,
             movement_maximum: self.movement_maximum,
+            action_resources: self.action_resources.clone(),
         }
     }
 
@@ -88,7 +89,7 @@ impl CombatantState {
             temporary_vitality: combatant.temporary_vitality,
             active_modifiers: Vec::new(),
             conditions: combatant.conditions.clone(),
-            action_resources: vec![ActionResourceState::standard_action_available()],
+            action_resources: combatant.action_resources.clone(),
             inventory_item_ids: Vec::new(),
             equipped_item_ids: Vec::new(),
             base_ability_ids: Vec::new(),
@@ -262,6 +263,7 @@ impl CombatantState {
         self.position = combatant.position;
         self.movement_remaining = combatant.movement_remaining;
         self.movement_maximum = combatant.movement_maximum;
+        self.action_resources = combatant.action_resources.clone();
     }
 
     pub(super) fn condition_labels(&self) -> Vec<String> {

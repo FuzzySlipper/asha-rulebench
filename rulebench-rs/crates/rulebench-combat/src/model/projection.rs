@@ -1,8 +1,8 @@
 /// Authoritative action receipts and projected combat state.
 use super::{
-    AttackRollResult, BoundedValue, DamageOutcome, DomainEvent, GridPosition, HealingOutcome,
-    ModifierOutcome, RulebenchRejection, TargetLegality, TemporaryVitalityOutcome, TraceEntry,
-    UseActionIntent,
+    ActionResourceState, AttackRollResult, BoundedValue, DamageOutcome, DomainEvent,
+    EffectMovementOutcome, GridPosition, HealingOutcome, ModifierOutcome, ResourceChangeOutcome,
+    RulebenchRejection, TargetLegality, TemporaryVitalityOutcome, TraceEntry, UseActionIntent,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +31,7 @@ pub struct FinalCombatantState {
     pub position: GridPosition,
     pub movement_remaining: u32,
     pub movement_maximum: u32,
+    pub action_resources: Vec<ActionResourceState>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,8 +83,22 @@ pub struct RulebenchReceipt {
     pub healing: Option<HealingOutcome>,
     pub temporary_vitality: Option<TemporaryVitalityOutcome>,
     pub modifier: Option<ModifierOutcome>,
+    pub target_results: Vec<TargetResolutionOutcome>,
     pub roll_consumption: Vec<RollConsumptionEntry>,
     pub events: Vec<DomainEvent>,
     pub trace: Vec<TraceEntry>,
     pub projection: Option<ScenarioProjection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetResolutionOutcome {
+    pub target_id: String,
+    pub target_legality: TargetLegality,
+    pub attack_roll: Option<AttackRollResult>,
+    pub damage: Option<DamageOutcome>,
+    pub healing: Option<HealingOutcome>,
+    pub temporary_vitality: Option<TemporaryVitalityOutcome>,
+    pub modifier: Option<ModifierOutcome>,
+    pub movement: Option<EffectMovementOutcome>,
+    pub resource_changes: Vec<ResourceChangeOutcome>,
 }

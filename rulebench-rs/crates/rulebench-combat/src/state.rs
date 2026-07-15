@@ -10,8 +10,9 @@ use crate::model::{
     ActiveModifier, ClassBuildLedgerReadout, CombatantActionResourceReadout,
     CombatantClassBuildReadout, CombatantEquipmentReadout, DamageOutcome, EquipmentLedgerReadout,
     GridPosition, HealingOutcome, ItemDefinition, ModifierDefinition,
-    ModifierDurationExpirationReadout, ModifierOutcome, RulebenchScenario, ScenarioProjection,
-    SpatialBoardState, SpatialCellState, TemporaryVitalityOutcome,
+    ModifierDurationExpirationReadout, ModifierOutcome, ResourceChangeOutcome, RulebenchRejection,
+    RulebenchScenario, ScenarioProjection, SpatialBoardState, SpatialCellState,
+    TemporaryVitalityOutcome,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,6 +131,70 @@ impl CombatState {
         true
     }
 
+    pub fn apply_effect_movement(&mut self, combatant_id: &str, destination: GridPosition) -> bool {
+        let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|item| item.id == combatant_id)
+        else {
+            return false;
+        };
+        combatant.position = destination;
+        true
+    }
+
+    pub fn preview_resource_change(
+        &self,
+        combatant_id: &str,
+        resource_id: &str,
+        delta: i32,
+    ) -> Result<ResourceChangeOutcome, RulebenchRejection> {
+        let resource = self
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == combatant_id)
+            .and_then(|combatant| {
+                combatant
+                    .action_resources
+                    .iter()
+                    .find(|resource| resource.resource_id == resource_id)
+            })
+            .ok_or(RulebenchRejection::EffectResourceMissing)?;
+        let Some(after) = resource.current.checked_add(delta) else {
+            return Err(RulebenchRejection::EffectResourceOutOfBounds);
+        };
+        if after < 0 || after > resource.max {
+            return Err(RulebenchRejection::EffectResourceOutOfBounds);
+        }
+        Ok(ResourceChangeOutcome {
+            target_id: combatant_id.to_string(),
+            resource_id: resource_id.to_string(),
+            requested_delta: delta,
+            before: resource.current,
+            after,
+            maximum: resource.max,
+        })
+    }
+
+    pub fn apply_resource_change(&mut self, outcome: &ResourceChangeOutcome) -> bool {
+        let Some(resource) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == outcome.target_id)
+            .and_then(|combatant| {
+                combatant
+                    .action_resources
+                    .iter_mut()
+                    .find(|resource| resource.resource_id == outcome.resource_id)
+            })
+        else {
+            return false;
+        };
+        resource.current = outcome.after;
+        resource.available = outcome.after > 0;
+        true
+    }
+
     pub fn apply_hit(&mut self, damage: &DamageOutcome, modifier: Option<&ModifierOutcome>) {
         for combatant in &mut self.combatants {
             if combatant.id == damage.target_id {
@@ -139,6 +204,16 @@ impl CombatState {
             if modifier.is_some_and(|modifier| combatant.id == modifier.target_id) {
                 combatant.apply_modifier(modifier.expect("checked modifier presence"));
             }
+        }
+    }
+
+    pub fn apply_modifier(&mut self, modifier: &ModifierOutcome) {
+        if let Some(combatant) = self
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.id == modifier.target_id)
+        {
+            combatant.apply_modifier(modifier);
         }
     }
 
@@ -543,6 +618,7 @@ mod tests {
                 visibility_requirement: VisibilityRequirement::Ignored,
                 target_ids: vec!["entity-raider".to_string()],
                 visible_target_ids: vec!["entity-raider".to_string()],
+                operation_pipeline: None,
             },
             check: CheckDeclaration::Attack(AttackCheckDeclaration {
                 modifier: 0,

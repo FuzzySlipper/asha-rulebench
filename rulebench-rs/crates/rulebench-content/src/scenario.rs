@@ -118,6 +118,8 @@ pub struct UseActionIntent {
     pub actor_id: String,
     pub action_id: String,
     pub target_id: String,
+    pub target_ids: Vec<String>,
+    pub target_cell: Option<GridPosition>,
     pub destination_cell: Option<GridPosition>,
     pub observed_origin: Option<GridPosition>,
 }
@@ -132,6 +134,8 @@ impl UseActionIntent {
             actor_id: actor_id.into(),
             action_id: action_id.into(),
             target_id: target_id.into(),
+            target_ids: Vec::new(),
+            target_cell: None,
             destination_cell: None,
             observed_origin: None,
         }
@@ -146,7 +150,42 @@ impl UseActionIntent {
             actor_id: actor_id.into(),
             action_id: action_id.into(),
             target_id: String::new(),
+            target_ids: Vec::new(),
+            target_cell: None,
             destination_cell: Some(destination_cell),
+            observed_origin: None,
+        }
+    }
+
+    pub fn for_targets(
+        actor_id: impl Into<String>,
+        action_id: impl Into<String>,
+        target_ids: Vec<String>,
+    ) -> Self {
+        let target_id = target_ids.first().cloned().unwrap_or_default();
+        Self {
+            actor_id: actor_id.into(),
+            action_id: action_id.into(),
+            target_id,
+            target_ids,
+            target_cell: None,
+            destination_cell: None,
+            observed_origin: None,
+        }
+    }
+
+    pub fn for_area(
+        actor_id: impl Into<String>,
+        action_id: impl Into<String>,
+        target_cell: GridPosition,
+    ) -> Self {
+        Self {
+            actor_id: actor_id.into(),
+            action_id: action_id.into(),
+            target_id: String::new(),
+            target_ids: Vec::new(),
+            target_cell: Some(target_cell),
+            destination_cell: None,
             observed_origin: None,
         }
     }

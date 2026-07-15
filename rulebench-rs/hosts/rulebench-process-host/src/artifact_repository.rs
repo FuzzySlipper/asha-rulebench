@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 const REPLAY_STORAGE_FORMAT_VERSION: u32 = 1;
 const REPLAY_INDEX_FORMAT_VERSION: u32 = 1;
 const STORAGE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-artifact-store.v1";
+const LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-replay-archive.v0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactRepositoryIssue {
@@ -185,8 +186,11 @@ impl FileReplayArchiveStorage {
                     message,
                 )
             })?;
-        if entry.payload_fingerprint_algorithm != envelope.archive_fingerprint_algorithm
-            || entry.payload_fingerprint != envelope.archive_payload_fingerprint
+        let legacy_archive_fingerprint =
+            envelope.archive_fingerprint_algorithm == LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM;
+        if !legacy_archive_fingerprint
+            && (entry.payload_fingerprint_algorithm != envelope.archive_fingerprint_algorithm
+                || entry.payload_fingerprint != envelope.archive_payload_fingerprint)
         {
             return Err(issue(
                 "replay",
@@ -937,6 +941,10 @@ struct StoredIntent {
     actor_id: String,
     action_id: String,
     target_id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    target_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    target_cell: Option<StoredGridPosition>,
     destination_cell: Option<StoredGridPosition>,
     observed_origin: Option<StoredGridPosition>,
 }
@@ -947,6 +955,11 @@ impl StoredIntent {
             actor_id: self.actor_id.clone(),
             action_id: self.action_id.clone(),
             target_id: self.target_id.clone(),
+            target_ids: self.target_ids.clone(),
+            target_cell: self
+                .target_cell
+                .as_ref()
+                .map(StoredGridPosition::to_authority),
             destination_cell: self
                 .destination_cell
                 .as_ref()
@@ -965,6 +978,8 @@ impl From<&UseActionIntent> for StoredIntent {
             actor_id: value.actor_id.clone(),
             action_id: value.action_id.clone(),
             target_id: value.target_id.clone(),
+            target_ids: value.target_ids.clone(),
+            target_cell: value.target_cell.map(StoredGridPosition::from),
             destination_cell: value.destination_cell.map(StoredGridPosition::from),
             observed_origin: value.observed_origin.map(StoredGridPosition::from),
         }
@@ -1201,7 +1216,7 @@ mod tests {
 
         let report =
             FileReplayArchiveStorage::open(&directory, scenarios()).expect("v1 repository opens");
-        assert!(report.issues.is_empty());
+        assert!(report.issues.is_empty(), "v1 issues: {:?}", report.issues);
         let entry = report
             .storage
             .read("hexing-bolt-replay")
@@ -1209,6 +1224,10 @@ mod tests {
             .expect("v1 fixture is visible");
         assert_eq!(entry.package.package_version, "1.0.0");
         assert_eq!(entry.metadata.completed_at, "v1-compatibility-fixture");
+        assert_eq!(
+            entry.payload_fingerprint_algorithm,
+            "fnv1a64.rulebench-replay-archive.v1"
+        );
         assert!(entry.is_self_consistent());
         cleanup(&directory);
     }

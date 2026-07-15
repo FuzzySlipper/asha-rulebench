@@ -126,6 +126,7 @@ export class WorkbenchShellComponent {
   );
   protected readonly attackRollInput = signal("17");
   protected readonly damageRollInput = signal("5");
+  protected readonly additionalRollInput = signal("");
   protected readonly automationConfigOpen = signal(false);
   protected readonly automaticRollInput = signal("17,5,2,5,17,5");
   protected readonly maxStepsInput = signal("8");
@@ -144,7 +145,7 @@ export class WorkbenchShellComponent {
   );
   protected readonly rollInputError = computed(() =>
     this.defaultRollMode() === "supplied" && this.rollStream() === null
-      ? "Attack and damage rolls must be integers."
+      ? "Rolls must be integers, with additional rolls separated by commas."
       : null,
   );
   protected readonly canSubmit = computed(
@@ -152,6 +153,8 @@ export class WorkbenchShellComponent {
       this.intent().actorId.length > 0 &&
       this.intent().actionId.length > 0 &&
       (this.intent().targetId.length > 0 ||
+        (this.intent().targetIds?.length ?? 0) > 0 ||
+        this.intent().targetCell !== undefined ||
         this.intent().destinationCell !== undefined) &&
       (this.defaultRollMode() === "authorityGenerated" ||
         this.rollStream() !== null) &&
@@ -427,7 +430,7 @@ export class WorkbenchShellComponent {
     return `Coordinate ${x}, ${y}; ${terrain}; ${occupants}`;
   }
 
-  protected liveCellOperation(x: number, y: number): "destination" | "target" | null {
+  protected liveCellOperation(x: number, y: number): "destination" | "target" | "area" | null {
     const options = this.options();
     const snapshot = this.snapshot();
     if (options.kind !== "data" || snapshot.kind !== "data") return null;
@@ -436,6 +439,13 @@ export class WorkbenchShellComponent {
     );
     if (action === undefined || !action.available) return null;
     if (action.targetMode === "cell") {
+      if (
+        action.targetSets.some(
+          (targetSet) => targetSet.targetCell?.x === x && targetSet.targetCell.y === y,
+        )
+      ) {
+        return "area";
+      }
       return action.destinations.some((cell) => cell.x === x && cell.y === y)
         ? "destination"
         : null;
@@ -451,6 +461,20 @@ export class WorkbenchShellComponent {
     const operation = this.liveCellOperation(x, y);
     if (operation === "destination") {
       this.liveStore.selectCellTarget({ x, y });
+      return;
+    }
+    if (operation === "area") {
+      const options = this.options();
+      if (options.kind !== "data") return;
+      const action = options.value.actions.find(
+        (candidate) => candidate.actionId === this.intent().actionId,
+      );
+      const targetSet = action?.targetSets.find(
+        (candidate) => candidate.targetCell?.x === x && candidate.targetCell.y === y,
+      );
+      if (targetSet !== undefined) {
+        this.liveStore.selectTargetSet(targetSet.targetIds, targetSet.targetCell);
+      }
       return;
     }
     if (operation !== "target") return;
@@ -481,6 +505,10 @@ export class WorkbenchShellComponent {
     this.damageRollInput.set(value);
   }
 
+  protected setAdditionalRolls(value: string): void {
+    this.additionalRollInput.set(value);
+  }
+
   protected setRollMode(mode: "supplied" | "authorityGenerated"): void {
     this.liveStore.setDefaultRollMode(mode);
   }
@@ -492,6 +520,34 @@ export class WorkbenchShellComponent {
 
   protected selectTarget(targetId: string): void {
     this.liveStore.selectEntityTarget(targetId);
+  }
+
+  protected selectTargetSet(
+    targetIds: readonly string[],
+    targetCell: Readonly<{ x: number; y: number }> | null,
+  ): void {
+    this.liveStore.selectTargetSet(targetIds, targetCell);
+  }
+
+  protected targetSetLabel(targetIds: readonly string[]): string {
+    return targetIds
+      .map((targetId) => this.participantById(targetId)?.name ?? targetId)
+      .join(", ");
+  }
+
+  protected targetSetSelected(
+    targetIds: readonly string[],
+    targetCell: Readonly<{ x: number; y: number }> | null,
+  ): boolean {
+    const intent = this.intent();
+    const sameIds =
+      (intent.targetIds?.length ?? 0) === targetIds.length &&
+      targetIds.every((targetId, index) => intent.targetIds?.[index] === targetId);
+    const sameCell =
+      targetCell === null
+        ? intent.targetCell === undefined
+        : intent.targetCell?.x === targetCell.x && intent.targetCell.y === targetCell.y;
+    return sameIds && sameCell;
   }
 
   protected refreshCommandEvidence(): void {
@@ -679,8 +735,16 @@ export class WorkbenchShellComponent {
   private rollStream(): readonly number[] | null {
     const attack = Number(this.attackRollInput());
     const damage = Number(this.damageRollInput());
-    return Number.isInteger(attack) && Number.isInteger(damage)
-      ? [attack, damage]
+    if (!Number.isInteger(attack) || !Number.isInteger(damage)) return null;
+
+    const additionalText = this.additionalRollInput().trim();
+    if (additionalText.length === 0) return [attack, damage];
+
+    const additional = additionalText
+      .split(",")
+      .map((value) => Number(value.trim()));
+    return additional.every(Number.isInteger)
+      ? [attack, damage, ...additional]
       : null;
   }
 

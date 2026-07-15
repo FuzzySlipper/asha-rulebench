@@ -8,6 +8,7 @@ import type {
   RulebenchCombatAutomationPolicySpecDto,
   RulebenchLivePreflightDto,
   RulebenchLiveSessionSnapshotDto,
+  RulebenchUseActionIntentDto,
 } from "@asha-rulebench/protocol";
 import {
   createFakeRulebenchLiveTransport,
@@ -26,6 +27,8 @@ const intent = {
   actorId: "entity-adept",
   actionId: "hexing_bolt",
   targetId: "entity-raider",
+  targetIds: [],
+  targetCell: null,
   destinationCell: null,
   observedOrigin: null,
 };
@@ -275,6 +278,58 @@ describe("LiveCombatStore", () => {
       actorId: "entity-raider",
       actionId: "",
       targetId: "",
+    });
+  });
+
+  it("submits generated target-set intent fields without flattening area selection", async () => {
+    const base = makeLiveSessionSnapshot();
+    const areaAction = {
+      ...base.options.actions[0],
+      actionId: "storm-pulse",
+      actionName: "Storm Pulse",
+      targetMode: "cell" as const,
+      targets: [],
+      targetSets: [
+        {
+          id: "area-8-3",
+          targetIds: ["entity-bruiser", "entity-raider"],
+          targetCell: { x: 8, y: 3 },
+          rollPolicy: "shared" as const,
+          reason: "Canonical bounded area set.",
+        },
+      ],
+    };
+    const snapshot = {
+      ...base,
+      options: { ...base.options, actions: [areaAction] },
+    };
+    let observedIntent: RulebenchUseActionIntentDto | null = null;
+    const transport = createFakeRulebenchLiveTransport({
+      getSession: async () => ({ ok: true, value: snapshot }),
+      preflightIntent: async (_sessionId, submittedIntent) => {
+        observedIntent = submittedIntent;
+        return {
+          ok: true,
+          value: { ...acceptedLivePreflight, intent: submittedIntent },
+        };
+      },
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+    await store.selectSession("live-session");
+    store.selectAction("storm-pulse");
+    store.selectTargetSet(
+      ["entity-bruiser", "entity-raider"],
+      { x: 8, y: 3 },
+    );
+    await store.preflightIntent();
+
+    expect(observedIntent).toMatchObject({
+      actorId: "entity-adept",
+      actionId: "storm-pulse",
+      targetId: "",
+      targetIds: ["entity-bruiser", "entity-raider"],
+      targetCell: { x: 8, y: 3 },
+      destinationCell: null,
     });
   });
 
@@ -649,6 +704,7 @@ function makeLiveSessionSnapshot(
                 resourceCosts: [],
                 resourceStates: [],
                 targetMode: "entity",
+                targetSets: [],
                 destinations: [],
                 targets: [
                   {
@@ -711,6 +767,10 @@ function makeLiveSessionSnapshot(
     combatLog: [],
     auditLog: [],
     stateFingerprint: { algorithm: "test", value: fingerprint },
+    actionResourceFingerprint: {
+      algorithm: "test-resources",
+      value: `resources-${fingerprint}`,
+    },
   };
 }
 
@@ -733,6 +793,7 @@ function makeLiveCommandExecution(
       events: accepted
         ? [{ kind: "damageApplied", summary: "Raider took damage." }]
         : [],
+      targetResults: [],
       trace: [],
       stateBeforeFingerprint: { algorithm: "test", value: "state-0" },
       stateAfterFingerprint: {

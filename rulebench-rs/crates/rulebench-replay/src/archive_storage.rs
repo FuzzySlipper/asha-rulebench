@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::ReplayPackage;
 
 pub const REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM: &str =
-    "fnv1a64.rulebench-replay-archive.v0";
+    "fnv1a64.rulebench-replay-archive.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplayArchiveMetadata {

@@ -18,7 +18,8 @@ pub use api::{
     CombatSessionCreateRequest, CombatSessionHandle,
 };
 pub use audit::{
-    fingerprint_projected_state, fingerprint_projection, PROJECTION_FINGERPRINT_ALGORITHM,
+    fingerprint_action_resource_ledger, fingerprint_projected_state, fingerprint_projection,
+    ACTION_RESOURCE_FINGERPRINT_ALGORITHM, PROJECTION_FINGERPRINT_ALGORITHM,
     STATE_FINGERPRINT_ALGORITHM,
 };
 pub use modifiers::{

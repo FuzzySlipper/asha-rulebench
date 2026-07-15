@@ -51,6 +51,8 @@ fn replay_package(package_id: &str, session_id: &str, explicit_start: bool) -> R
                 actor_id: "entity-adept".to_string(),
                 action_id: "hexing_bolt".to_string(),
                 target_id: "entity-raider".to_string(),
+                target_ids: Vec::new(),
+                target_cell: None,
                 destination_cell: None,
                 observed_origin: None,
             },

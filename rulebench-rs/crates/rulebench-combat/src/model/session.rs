@@ -348,6 +348,15 @@ pub struct CurrentActorCellOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentActorTargetSetOption {
+    pub id: String,
+    pub target_ids: Vec<String>,
+    pub target_cell: Option<GridPosition>,
+    pub roll_policy: rulebench_ruleset::ActionRollPolicy,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CurrentActorActionOption {
     pub action_id: String,
     pub ability_id: String,
@@ -358,6 +367,7 @@ pub struct CurrentActorActionOption {
     pub resource_states: Vec<ActionResourceState>,
     pub target_mode: ActionTargetMode,
     pub target_options: Vec<CurrentActorTargetOption>,
+    pub target_set_options: Vec<CurrentActorTargetSetOption>,
     pub destination_options: Vec<CurrentActorCellOption>,
 }
 
@@ -462,6 +472,7 @@ pub struct CombatSessionSnapshot {
     pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,
     pub action_resource_ledger: ActionResourceLedgerReadout,
+    pub action_resource_fingerprint: StateFingerprint,
     pub equipment_ledger: EquipmentLedgerReadout,
     pub class_build_ledger: ClassBuildLedgerReadout,
     pub current_turn_action_usage: ActionUsageSummary,

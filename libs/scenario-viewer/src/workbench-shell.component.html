@@ -172,6 +172,8 @@
         <span>{{ snapshot().value.lifecycleLabel }} · {{ snapshot().value.turnLabel }}</span>
         @if (intent().destinationCell; as destination) {
           <span>Proposed destination {{ destination.x }},{{ destination.y }}</span>
+        } @else if (intent().targetCell; as targetCell) {
+          <span>Proposed area {{ targetCell.x }},{{ targetCell.y }} · {{ targetSetLabel(intent().targetIds ?? []) }}</span>
         } @else if (intent().targetId) {
           <span>Proposed target {{ participantById(intent().targetId)?.name ?? intent().targetId }}</span>
         }
@@ -191,12 +193,12 @@
               type="button"
               class="grid-cell grid-cell--operable"
               role="gridcell"
-              [class.grid-cell--selected]="intent().destinationCell?.x === cell.x && intent().destinationCell?.y === cell.y"
+              [class.grid-cell--selected]="(intent().destinationCell?.x === cell.x && intent().destinationCell?.y === cell.y) || (intent().targetCell?.x === cell.x && intent().targetCell?.y === cell.y)"
               [class.grid-cell--terrain]="cell.terrainLabels.length > 0"
               [attr.aria-rowindex]="cell.y + 1"
               [attr.aria-colindex]="cell.x + 1"
-              [attr.aria-label]="(operation === 'destination' ? 'Move to ' : 'Target at ') + liveGridCellLabel(cell.x, cell.y, cell.terrainLabels, cell.occupantIds)"
-              [attr.aria-pressed]="intent().destinationCell?.x === cell.x && intent().destinationCell?.y === cell.y || (cell.occupantIds.includes(intent().targetId))"
+              [attr.aria-label]="(operation === 'destination' ? 'Move to ' : operation === 'area' ? 'Target area at ' : 'Target at ') + liveGridCellLabel(cell.x, cell.y, cell.terrainLabels, cell.occupantIds)"
+              [attr.aria-pressed]="intent().destinationCell?.x === cell.x && intent().destinationCell?.y === cell.y || intent().targetCell?.x === cell.x && intent().targetCell?.y === cell.y || (cell.occupantIds.includes(intent().targetId))"
               (click)="selectLiveGridCell(cell.x, cell.y)"
             >
               <ng-container *ngTemplateOutlet="liveCell; context: { $implicit: cell }" />
@@ -732,6 +734,7 @@
               <section>
                 <h4>Live resulting state</h4>
                 <span>{{ snapshot().value.fingerprintLabel }}</span
+                ><span>Resources {{ snapshot().value.actionResourceFingerprintLabel }}</span
                 ><span>{{ snapshot().value.combatEndLabel }}</span
                 ><span>{{
                   snapshot().value.finalizationLabel ?? "Not finalized"
@@ -1047,7 +1050,7 @@
                   <span>{{ action.abilityId }}</span>
                   <span>
                     {{ action.targetMode === "cell" ? "Grid destination" : action.targetMode === "entity" ? "Entity target" : "Self" }}
-                    · {{ action.targetMode === "cell" ? action.destinations.length : action.targets.length }} legal option(s)
+                    · {{ action.targetSets.length > 0 ? action.targetSets.length : action.targetMode === "cell" ? action.destinations.length : action.targets.length }} legal option(s)
                   </span>
                   <span>{{
                     action.resourceCostLabels.join(", ") || "No resource cost"
@@ -1072,6 +1075,18 @@
                         (click)="selectTarget(target.id)"
                       >
                         {{ target.name }} · {{ target.hitPointLabel }}
+                      </button>
+                    }
+                    @for (targetSet of action.targetSets; track targetSet.id) {
+                      <button
+                        type="button"
+                        [attr.aria-pressed]="targetSetSelected(targetSet.targetIds, targetSet.targetCell)"
+                        [attr.aria-label]="'Select ' + action.name + ' target set ' + targetSetLabel(targetSet.targetIds)"
+                        (click)="selectTargetSet(targetSet.targetIds, targetSet.targetCell)"
+                      >
+                        {{ targetSet.targetCell === null ? "Targets" : "Area " + targetSet.targetCell.x + "," + targetSet.targetCell.y }}
+                        · {{ targetSetLabel(targetSet.targetIds) }}
+                        · {{ targetSet.rollPolicyLabel }}
                       </button>
                     }
                   </div>
@@ -1169,8 +1184,19 @@
             (input)="setDamageRoll(damageRoll.value)"
           />
         </label>
+        <label>
+          Additional rolls
+          <input
+            #additionalRolls
+            type="text"
+            inputmode="numeric"
+            [value]="additionalRollInput()"
+            aria-describedby="roll-input-help roll-input-error"
+            (input)="setAdditionalRolls(additionalRolls.value)"
+          />
+        </label>
         <span id="roll-input-help"
-          >Deterministic integer roll stream supplied to Rust authority.</span
+          >Deterministic integer roll stream supplied to Rust authority. Add comma-separated rolls for per-target actions.</span
         >
         @if (rollInputError(); as error) {
           <span id="roll-input-error" role="alert">{{ error }}</span>
@@ -1260,6 +1286,15 @@
               }}</span>
               <span>{{ submission().value.traceLabels.join(" · ") }}</span>
               <span>Roll source: {{ submission().value.rollModeLabel }}</span>
+              @for (target of submission().value.targetResults; track target.targetId) {
+                <span data-testid="target-result">
+                  {{ participantById(target.targetId)?.name ?? target.targetId }} ·
+                  {{ target.outcomeLabel }} ·
+                  {{ target.damageLabel ?? "No damage" }} ·
+                  {{ target.movementLabel ?? "No movement" }} ·
+                  {{ target.resourceLabels.join(", ") || "No resource changes" }}
+                </span>
+              }
               @for (roll of submission().value.generatedRolls; track roll.sequenceLabel) {
                 <span>{{ roll.sequenceLabel }} · {{ roll.purposeLabel }} · {{ roll.dieExpression }} = {{ roll.valueLabel }} · {{ roll.sourceLabel }}</span>
               }

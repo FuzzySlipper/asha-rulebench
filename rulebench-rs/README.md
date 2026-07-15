@@ -99,6 +99,13 @@ ruleset-version, and scenario filters are accepted by the underlying binary;
 `pnpm run regression:list` prints the registered identities before an
 intentional package expectation or generated-artifact update.
 
+Operation pipeline v2 adds bounded explicit multi-target and Manhattan-area
+actions without changing the legacy single-target path. Rust owns target-set
+derivation, roll policy, atomic stateful effects, reaction suspension, replay,
+and resource-ledger fingerprints; generated TypeScript only submits and renders
+those facts. See `../docs/operation-pipeline-v2.md` for the compatibility and
+migration contract.
+
 `pnpm run rust:test` is part of `pnpm run verify`, so clean CI executes the
 focused owner suites, cross-crate authority harness, host-neutral bridge
 contracts, composed-owner reaction rollback checks, and real process-host
@@ -157,8 +164,11 @@ renames, and prints a repository summary plus classified startup issues.
 Unknown format versions, corrupt
 fingerprints, and interrupted temporary files are ignored with explicit issue
 codes rather than interpreted as current data. Replay envelopes reconstruct
-through the registered scenario and Rust authority and must reproduce their
-recorded archive fingerprint before becoming visible.
+through the registered scenario and Rust authority. Current entries must
+reproduce their v1 archive fingerprint before becoming visible. Legacy v0
+archive fingerprints were coupled to Rust debug shape; their integrity-checked
+command payloads are read-migrated into a new self-consistent v1 entry without
+rewriting the source artifact.
 
 The authored content route accepts only `asha-rulebench.content-pack` version
 1 documents up to 512 KiB. The protocol DTO owns decoding; portable content

@@ -157,6 +157,7 @@ pub struct ActionResourceRefreshReadout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionResourceTransitionKind {
     Spent,
+    ChangedByEffect,
     Refreshed,
     CooldownAdvanced,
 }
@@ -165,6 +166,7 @@ impl ActionResourceTransitionKind {
     pub const fn code(self) -> &'static str {
         match self {
             ActionResourceTransitionKind::Spent => "spent",
+            ActionResourceTransitionKind::ChangedByEffect => "changedByEffect",
             ActionResourceTransitionKind::Refreshed => "refreshed",
             ActionResourceTransitionKind::CooldownAdvanced => "cooldownAdvanced",
         }

@@ -671,16 +671,73 @@ pub struct TargetingDeclaration {
     pub visibility_requirement: VisibilityRequirement,
     pub target_ids: Vec<String>,
     pub visible_target_ids: Vec<String>,
+    /// Present only for operation-pipeline v2 actions. Existing v1 actions
+    /// retain their exact declaration and artifact fingerprints with `None`.
+    pub operation_pipeline: Option<OperationPipelineV2>,
 }
 
-/// Declared target shapes. Area targeting is reserved for later authority work.
+/// Bounded target and effect execution contract for operation pipeline v2.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationPipelineV2 {
+    pub maximum_targets: u32,
+    pub area: Option<AreaTargetingDeclaration>,
+    pub roll_policy: ActionRollPolicy,
+    pub failure_policy: TargetFailurePolicy,
+    pub target_order: TargetOrderPolicy,
+}
+
+impl OperationPipelineV2 {
+    pub const VOCABULARY_VERSION: &'static str = "2";
+    pub const MAXIMUM_TARGET_LIMIT: u32 = 8;
+    pub const MAXIMUM_AREA_RADIUS: u32 = 4;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AreaTargetingDeclaration {
+    pub shape: AreaShape,
+    pub radius: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AreaShape {
+    ManhattanBurst,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionRollPolicy {
+    Shared,
+    PerTarget,
+    NoRoll,
+}
+
+impl ActionRollPolicy {
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Shared => "shared",
+            Self::PerTarget => "perTarget",
+            Self::NoRoll => "noRoll",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetFailurePolicy {
+    Atomic,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetOrderPolicy {
+    CanonicalId,
+}
+
+/// Declared target shapes. Area targeting uses a bounded Rust-projected cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetKind {
     Combatant,
     Area,
 }
 
-/// Declared target cardinality. Multi-target resolution is not yet implemented.
+/// Declared target cardinality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetSelection {
     Single,
@@ -823,6 +880,8 @@ impl HitEffectOperation {
                 | HitEffectOperation::Heal(_)
                 | HitEffectOperation::GrantTemporaryVitality(_)
                 | HitEffectOperation::ApplyModifier(_)
+                | HitEffectOperation::Move(_)
+                | HitEffectOperation::ChangeResource(_)
                 | HitEffectOperation::OpenReactionWindow(_)
         )
     }
@@ -897,6 +956,16 @@ pub enum MovementKind {
     Push,
     Pull,
     Shift,
+}
+
+impl MovementKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Push => "push",
+            Self::Pull => "pull",
+            Self::Shift => "shift",
+        }
+    }
 }
 
 /// A resource mutation declaration. Runtime application is not implemented yet.

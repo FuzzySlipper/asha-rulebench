@@ -45,8 +45,9 @@ pub use live::{
     LiveCommandExecutionDto, LiveCommandStepDto, LiveControlExecutionDto,
     LiveCurrentActorOptionsDto, LiveDomainEventDto, LiveFinalizationDto, LiveGeneratedRollDto,
     LiveGridPositionDto, LiveParticipantDto, LivePreflightDto, LiveReactionExecutionDto,
-    LiveRollEvidenceDto, LiveSessionSnapshotDto, LiveStateFingerprintDto, LiveTargetOptionDto,
-    LiveTraceEntryDto, LiveTransportErrorDto,
+    LiveResourceChangeDto, LiveRollEvidenceDto, LiveSessionSnapshotDto, LiveStateFingerprintDto,
+    LiveTargetOptionDto, LiveTargetResolutionDto, LiveTargetSetOptionDto, LiveTraceEntryDto,
+    LiveTransportErrorDto,
 };
 pub use reaction::{
     ReactionAuditEntryDto, ReactionCommandReadoutDto, ReactionCommandSpecDto, ReactionOptionDto,

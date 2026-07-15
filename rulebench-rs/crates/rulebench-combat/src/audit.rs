@@ -1,11 +1,12 @@
 //! Deterministic state fingerprints used by combat audit readbacks.
 
-use crate::model::{ScenarioProjection, StateFingerprint};
+use crate::model::{ActionResourceLedgerReadout, ScenarioProjection, StateFingerprint};
 
 const FNV_OFFSET: u64 = 0xcbf29ce484222325;
 const FNV_PRIME: u64 = 0x100000001b3;
 pub const PROJECTION_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-projection.v0";
 pub const STATE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-state.v0";
+pub const ACTION_RESOURCE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-action-resources.v0";
 
 pub fn fingerprint_projection(projection: &ScenarioProjection) -> StateFingerprint {
     let mut builder = FingerprintBuilder::new();
@@ -27,6 +28,32 @@ pub fn fingerprint_projected_state(projection: &ScenarioProjection) -> StateFing
 
     StateFingerprint {
         algorithm: STATE_FINGERPRINT_ALGORITHM.to_string(),
+        value: format!("{:016x}", builder.finish()),
+    }
+}
+
+pub fn fingerprint_action_resource_ledger(
+    ledger: &ActionResourceLedgerReadout,
+) -> StateFingerprint {
+    let mut builder = FingerprintBuilder::new();
+    let mut combatants = ledger.combatants.iter().collect::<Vec<_>>();
+    combatants.sort_by(|left, right| left.combatant_id.cmp(&right.combatant_id));
+    builder.feed_u32(combatants.len() as u32);
+    for combatant in combatants {
+        builder.feed_str(&combatant.combatant_id);
+        let mut resources = combatant.resources.iter().collect::<Vec<_>>();
+        resources.sort_by(|left, right| left.resource_id.cmp(&right.resource_id));
+        builder.feed_u32(resources.len() as u32);
+        for resource in resources {
+            builder.feed_str(&resource.resource_id);
+            builder.feed_str(resource.kind.code());
+            builder.feed_i32(resource.current);
+            builder.feed_i32(resource.max);
+            builder.feed_u32(resource.available as u32);
+        }
+    }
+    StateFingerprint {
+        algorithm: ACTION_RESOURCE_FINGERPRINT_ALGORITHM.to_string(),
         value: format!("{:016x}", builder.finish()),
     }
 }

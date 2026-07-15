@@ -146,6 +146,8 @@ test("invokes live Rust authority through the Angular origin", async ({
         actorId: "entity-adept",
         actionId: "hexing_bolt",
         targetId: "entity-raider",
+        targetIds: [],
+        targetCell: null,
         destinationCell: null,
         observedOrigin: null,
       },
@@ -328,6 +330,7 @@ test("completes a supported scenario through the visible panel workbench", async
   await expect(actionsPanel).toContainText("records the concrete results");
   await actionsPanel.getByRole("radio", { name: "Manual" }).check();
   await expect(actionsPanel.getByLabel("Attack roll")).toBeVisible();
+  await expect(actionsPanel.getByLabel("Additional rolls")).toBeVisible();
   await actionsPanel.getByRole("button", { name: "Select Move" }).click();
   const destinations = gridPanel.getByRole("gridcell", { name: /^Move to / });
   await expect(destinations.first()).toBeVisible();
@@ -429,6 +432,68 @@ test("completes a supported scenario through the visible panel workbench", async
     .click();
   await expect(replayWorkspace.getByRole("region", { name: "Replay command evidence" })).toContainText("Move");
   await replayDialog.getByLabel("Close", { exact: true }).click();
+});
+
+test("resolves a bounded area target set and renders every v2 result @live", async ({
+  page,
+}) => {
+  const sessionId = `e2e-operation-pipeline-v2-${Date.now()}`;
+  await page.goto("/");
+  const workspace = await openLiveCombatWorkspace(page);
+  await workspace
+    .getByRole("button", { name: "Ruined Watchtower Skirmish", exact: true })
+    .click();
+  await workspace.getByLabel("Session", { exact: true }).fill(sessionId);
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
+  await invokeApplicationCommand(page, "Run", "Start combat");
+
+  const actionsPanel = page.getByRole("region", {
+    name: "6. Available actions",
+  });
+  const gridPanel = page.getByRole("region", { name: "1. Combat grid" });
+  const unitsPanel = page.getByRole("region", { name: "7. Active units" });
+  await actionsPanel
+    .getByRole("button", { name: "Select Storm Pulse", exact: true })
+    .click();
+  await expect(actionsPanel).toContainText("Shared");
+  const area = gridPanel.getByRole("gridcell", {
+    name: /^Target area at Coordinate 8, 3/,
+  });
+  await area.click();
+  await expect(area).toHaveAttribute("aria-pressed", "true");
+  await actionsPanel
+    .getByRole("button", { name: "Preflight", exact: true })
+    .click();
+  const commandEvidence = actionsPanel.getByRole("region", {
+    name: "Command decision evidence",
+  });
+  await expect(commandEvidence).toContainText("Accepted");
+  await actionsPanel
+    .getByRole("button", { name: "Submit", exact: true })
+    .click();
+
+  await expect(commandEvidence.getByTestId("target-result")).toHaveCount(2);
+  await expect(commandEvidence).toContainText("Bruiser · Hit · 7 damage");
+  await expect(commandEvidence).toContainText("Raider · Hit · 7 damage");
+  await expect(commandEvidence).toContainText("Push 8,4 → 9,4");
+  await expect(commandEvidence).toContainText("standard-action 1 → 0 (-1)");
+  await expect(
+    unitsPanel.getByRole("listitem", { name: /Bruiser, Active/ }),
+  ).toContainText("11/18 HP");
+  await expect(
+    unitsPanel.getByRole("listitem", { name: /Raider, Active/ }),
+  ).toContainText("11/18 HP");
+  await page.screenshot({
+    path: "dist/.playwright/operation-pipeline-v2-area.png",
+    fullPage: true,
+  });
+
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await invokeApplicationCommand(page, "Run", "Close session");
 });
 
 test("completes and archives a Rust-owned gameplay-fabric reaction @live", async ({

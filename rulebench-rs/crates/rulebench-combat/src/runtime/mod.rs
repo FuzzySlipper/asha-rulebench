@@ -1,7 +1,10 @@
 //! Authoritative session lifecycle, command intake, and control runtime.
 
 use crate::model::*;
-use crate::resolver::{resolve_use_action, target_legality_rejection, validate_target_legality};
+use crate::resolver::{
+    operation_pipeline_targets, resolve_use_action, target_legality_rejection,
+    validate_operation_pipeline_target, validate_target_legality,
+};
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
 use rulebench_gameplay_module::{
@@ -352,12 +355,21 @@ impl CombatSessionState {
             outcome_class,
             log_index: self.next_step_index + 1,
         };
+        let command_target_id = if intent.target_id.is_empty() {
+            receipt
+                .target_results
+                .first()
+                .map(|result| result.target_id.clone())
+                .unwrap_or_default()
+        } else {
+            intent.target_id.clone()
+        };
         let command = CommandAttempt {
             step_id: step.id.clone(),
             step_index: step.index,
             actor_id: intent.actor_id,
             action_id: intent.action_id,
-            target_id: intent.target_id,
+            target_id: command_target_id,
             roll_stream,
             outcome_class: step.outcome_class,
         };
@@ -423,16 +435,9 @@ impl CombatSessionState {
         } else {
             None
         };
-        let state_after_fingerprint = fingerprint_projected_state(&state_after);
-        let audit_entry = command_audit_entry(
-            &step,
-            &receipt,
-            decision_kind,
-            preflight_decision_kind,
-            state_before_fingerprint,
-            state_after_fingerprint,
-        );
-        self.audit_log.push(audit_entry.clone());
+        if should_apply_state && !pauses_before_effect {
+            self.apply_receipt_effects_to_state(&step, &receipt);
+        }
         if receipt.accepted {
             let resource_costs = self
                 .scenario
@@ -459,11 +464,25 @@ impl CombatSessionState {
                 }
             }
         }
-        self.next_step_index += 1;
         if should_apply_state && !pauses_before_effect {
-            self.apply_receipt_effects_to_state(&receipt);
+            state_after = self
+                .state
+                .project("Authoritative state after committed command effects and costs.");
+        }
+        let state_after_fingerprint = fingerprint_projected_state(&state_after);
+        let audit_entry = command_audit_entry(
+            &step,
+            &receipt,
+            decision_kind,
+            preflight_decision_kind,
+            state_before_fingerprint,
+            state_after_fingerprint,
+        );
+        self.audit_log.push(audit_entry.clone());
+        if should_apply_state && !pauses_before_effect {
             self.finalize_if_condition_met();
         }
+        self.next_step_index += 1;
 
         CombatSessionStepReadout {
             session_id: self.session_id.clone(),
@@ -628,8 +647,22 @@ impl CombatSessionState {
             .collect()
     }
 
-    fn apply_receipt_effects_to_state(&mut self, receipt: &RulebenchReceipt) {
+    fn apply_receipt_effects_to_state(
+        &mut self,
+        step: &CombatSessionStepSummary,
+        receipt: &RulebenchReceipt,
+    ) {
         if !receipt.accepted {
+            return;
+        }
+
+        if !receipt.target_results.is_empty() {
+            apply_target_results_to_state(&mut self.state, receipt);
+            for target in &receipt.target_results {
+                for resource in &target.resource_changes {
+                    self.record_effect_resource_transition(step, resource);
+                }
+            }
             return;
         }
 
@@ -962,6 +995,51 @@ impl CombatSessionState {
             });
     }
 
+    fn record_effect_resource_transition(
+        &mut self,
+        step: &CombatSessionStepSummary,
+        change: &ResourceChangeOutcome,
+    ) {
+        let Some(next_resource) =
+            self.state
+                .action_resources_for(&change.target_id)
+                .and_then(|combatant| {
+                    combatant
+                        .resources
+                        .into_iter()
+                        .find(|resource| resource.resource_id == change.resource_id)
+                })
+        else {
+            return;
+        };
+        let mut previous_resource = next_resource.clone();
+        previous_resource.current = change.before;
+        previous_resource.available = change.before > 0;
+        let amount = change.requested_delta.unsigned_abs();
+
+        self.action_resource_transition_log
+            .push(ActionResourceTransitionEntry {
+                sequence: self.action_resource_transition_log.len() as u32,
+                transition_kind: ActionResourceTransitionKind::ChangedByEffect,
+                combatant_id: change.target_id.clone(),
+                resource_id: change.resource_id.clone(),
+                resource_kind: next_resource.kind,
+                amount,
+                previous_resource,
+                next_resource,
+                command_step_id: Some(step.id.clone()),
+                command_step_index: Some(step.index),
+                turn_transition_sequence: None,
+                round_number: Some(self.turn_order.round_number),
+                turn_index: Some(self.turn_order.current_turn_index),
+                current_actor_id: self.turn_order.current_actor_id.clone(),
+                reason: format!(
+                    "Authoritative effect changed {} by {}.",
+                    change.resource_id, change.requested_delta
+                ),
+            });
+    }
+
     fn record_action_resource_refresh_transition(
         &mut self,
         transition: &TurnTransitionEntry,
@@ -1113,6 +1191,7 @@ fn ended_combat_receipt(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![
@@ -1166,7 +1245,11 @@ fn command_preflight_readout(
             "Action id is empty.",
         );
     }
-    if intent.target_id.is_empty() && intent.destination_cell.is_none() {
+    if intent.target_id.is_empty()
+        && intent.target_ids.is_empty()
+        && intent.target_cell.is_none()
+        && intent.destination_cell.is_none()
+    {
         return rejected_command_preflight(
             intent,
             CommandPreflightDecisionKind::RejectedByShape,
@@ -1316,6 +1399,59 @@ fn command_preflight_readout(
             resource_costs: action.resource_costs.clone(),
             action_resource: action_resources_for_costs.first().cloned(),
             reason: "Movement command is structurally admissible; destination legality remains Rust-resolved.".to_string(),
+        };
+    }
+
+    if let Some(pipeline) = &action.targeting.operation_pipeline {
+        let targets = match operation_pipeline_targets(scenario, &intent, actor, action, pipeline) {
+            Ok(targets) => targets,
+            Err(rejection) => {
+                return rejected_command_preflight(
+                    intent,
+                    CommandPreflightDecisionKind::RejectedByTargetLegality,
+                    Some(rejection),
+                    current_actor_id,
+                    None,
+                    None,
+                    "Operation-pipeline v2 target set is stale or illegal.",
+                );
+            }
+        };
+        let target_legality = targets
+            .first()
+            .map(|target| validate_operation_pipeline_target(actor, target, action));
+        let action_resources_for_costs = match action_resource_costs_available(
+            action_resources,
+            &intent.actor_id,
+            &action.resource_costs,
+        ) {
+            Ok(resources) => resources,
+            Err((action_resource, reason)) => {
+                let mut readout = rejected_command_preflight(
+                    intent,
+                    CommandPreflightDecisionKind::RejectedByActionResource,
+                    Some(RulebenchRejection::InvalidAction),
+                    current_actor_id,
+                    target_legality,
+                    action_resource,
+                    reason,
+                );
+                readout.resource_costs = action.resource_costs.clone();
+                return readout;
+            }
+        };
+        return CommandPreflightReadout {
+            intent,
+            accepted: true,
+            decision_kind: CommandPreflightDecisionKind::Accepted,
+            rejection: None,
+            current_actor_id,
+            target_legality,
+            resource_costs: action.resource_costs.clone(),
+            action_resource: action_resources_for_costs.first().cloned(),
+            reason:
+                "Operation-pipeline v2 target set and action resources are currently admissible."
+                    .to_string(),
         };
     }
 
@@ -1503,6 +1639,7 @@ fn non_current_actor_receipt(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![
@@ -1540,6 +1677,7 @@ fn preflight_rejected_receipt(
         healing: None,
         temporary_vitality: None,
         modifier: None,
+        target_results: Vec::new(),
         roll_consumption: Vec::new(),
         events: Vec::new(),
         trace: vec![
@@ -1604,6 +1742,28 @@ fn derive_command_outcome_class(receipt: &RulebenchReceipt) -> CommandOutcomeCla
 
 fn domain_event_is_damage_applied(event: &DomainEvent) -> bool {
     matches!(event, DomainEvent::DamageApplied { .. })
+}
+
+fn apply_target_results_to_state(state: &mut CombatState, receipt: &RulebenchReceipt) {
+    for target in &receipt.target_results {
+        if let Some(damage) = &target.damage {
+            state.apply_hit(damage, target.modifier.as_ref());
+        } else if let Some(modifier) = &target.modifier {
+            state.apply_modifier(modifier);
+        }
+        if let Some(healing) = &target.healing {
+            state.apply_healing(healing);
+        }
+        if let Some(vitality) = &target.temporary_vitality {
+            state.apply_temporary_vitality(vitality);
+        }
+        if let Some(movement) = &target.movement {
+            state.apply_effect_movement(&target.target_id, movement.to);
+        }
+        for resource in &target.resource_changes {
+            state.apply_resource_change(resource);
+        }
+    }
 }
 
 fn is_target_legality_rejection(rejection: RulebenchRejection) -> bool {
@@ -1674,6 +1834,8 @@ fn domain_event_type(event: &DomainEvent) -> String {
         DomainEvent::ModifierApplied { .. } => "ModifierApplied",
         DomainEvent::PositionChanged { .. } => "PositionChanged",
         DomainEvent::MovementSpent { .. } => "MovementSpent",
+        DomainEvent::EffectMovementApplied { .. } => "EffectMovementApplied",
+        DomainEvent::ResourceChanged { .. } => "ResourceChanged",
     }
     .to_string()
 }

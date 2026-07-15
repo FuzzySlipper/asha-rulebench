@@ -423,6 +423,31 @@ fn feed_action(encoder: &mut FingerprintEncoder, action: &ActionDefinition) {
     });
     encoder.feed_strings(&action.targeting.target_ids);
     encoder.feed_strings(&action.targeting.visible_target_ids);
+    if let Some(pipeline) = &action.targeting.operation_pipeline {
+        encoder.feed_str("operationPipelineV2");
+        encoder.feed_str(rulebench_ruleset::OperationPipelineV2::VOCABULARY_VERSION);
+        encoder.feed_u32(pipeline.maximum_targets);
+        match &pipeline.area {
+            Some(area) => {
+                encoder.feed_str(match area.shape {
+                    rulebench_ruleset::AreaShape::ManhattanBurst => "manhattanBurst",
+                });
+                encoder.feed_u32(area.radius);
+            }
+            None => encoder.feed_str("noArea"),
+        }
+        encoder.feed_str(match pipeline.roll_policy {
+            rulebench_ruleset::ActionRollPolicy::Shared => "shared",
+            rulebench_ruleset::ActionRollPolicy::PerTarget => "perTarget",
+            rulebench_ruleset::ActionRollPolicy::NoRoll => "noRoll",
+        });
+        encoder.feed_str(match pipeline.failure_policy {
+            rulebench_ruleset::TargetFailurePolicy::Atomic => "atomic",
+        });
+        encoder.feed_str(match pipeline.target_order {
+            rulebench_ruleset::TargetOrderPolicy::CanonicalId => "canonicalId",
+        });
+    }
     feed_check(encoder, &action.check);
     encoder.feed_i32(action.hit.damage_bonus);
     encoder.feed_str(&action.hit.damage_type);

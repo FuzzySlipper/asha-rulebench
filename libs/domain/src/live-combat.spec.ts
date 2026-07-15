@@ -26,6 +26,11 @@ describe("live combat domain projections", () => {
       movementLabel: "0/0",
     });
     expect(view.options.actions[0]?.targets[0]?.id).toBe("entity-raider");
+    expect(view.options.actions[0]?.targetSets[0]).toMatchObject({
+      id: "set-1",
+      targetIds: ["entity-raider"],
+      rollPolicyLabel: "Shared",
+    });
   });
 
   it("projects accepted and rejected command evidence from Rust fingerprints", () => {
@@ -39,6 +44,14 @@ describe("live combat domain projections", () => {
           purposeLabel: "Attack Roll",
           dieExpression: "1d20",
           valueLabel: "17",
+        },
+      ],
+      targetResults: [
+        {
+          targetId: "entity-raider",
+          damageLabel: "9 damage",
+          movementLabel: "Push 4,1 → 5,1",
+          resourceLabels: ["standard-action 1 → 0 (-1)"],
         },
       ],
     });
@@ -121,6 +134,15 @@ function snapshot(
           resourceCosts: [],
           resourceStates: [],
           targetMode: "entity",
+          targetSets: [
+            {
+              id: "set-1",
+              targetIds: ["entity-raider"],
+              targetCell: null,
+              rollPolicy: "shared",
+              reason: "Canonical explicit target set.",
+            },
+          ],
           destinations: [],
           targets: [
             {
@@ -159,6 +181,10 @@ function snapshot(
     reactionWindowLifecycleLog: [],
     reactionAuditLog: [],
     stateFingerprint: { algorithm: "test", value: fingerprint },
+    actionResourceFingerprint: {
+      algorithm: "test-resources",
+      value: `resources-${fingerprint}`,
+    },
   };
 }
 
@@ -178,12 +204,37 @@ function execution(accepted: boolean): RulebenchLiveCommandExecutionDto {
         actorId: "entity-adept",
         actionId: "hexing_bolt",
         targetId: "entity-raider",
+        targetIds: [],
+        targetCell: null,
         destinationCell: null,
         observedOrigin: null,
       },
       rolls: [],
       events: accepted
         ? [{ kind: "damageApplied", summary: "Raider took damage." }]
+        : [],
+      targetResults: accepted
+        ? [
+            {
+              targetId: "entity-raider",
+              accepted: true,
+              reason: "Target resolved.",
+              attackOutcome: "hit",
+              damageAmount: 9,
+              movementKind: "push",
+              movementFrom: { x: 4, y: 1 },
+              movementTo: { x: 5, y: 1 },
+              resourceChanges: [
+                {
+                  resourceId: "standard-action",
+                  requestedDelta: -1,
+                  before: 1,
+                  after: 0,
+                  maximum: 1,
+                },
+              ],
+            },
+          ]
         : [],
       trace: [],
       stateBeforeFingerprint: { algorithm: "test", value: "state-0" },

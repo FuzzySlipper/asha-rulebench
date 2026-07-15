@@ -209,7 +209,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
         finalState: {
-          summary: 'Raider is damaged and rattled; Adept is unchanged.',
+          summary: 'Authoritative state after committed command effects and costs.',
           combatants: [
             {
               id: 'entity-adept',
@@ -289,7 +289,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         ],
       },
       stateAfter: {
-        summary: 'Raider is damaged and rattled; Adept is unchanged.',
+        summary: 'Authoritative state after committed command effects and costs.',
         combatants: [
           {
             id: 'entity-adept',
@@ -442,7 +442,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
         finalState: {
-          summary: 'Attack missed; no authority state changed.',
+          summary: 'Authoritative state after committed command effects and costs.',
           combatants: [
             {
               id: 'entity-adept',
@@ -522,7 +522,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         ],
       },
       stateAfter: {
-        summary: 'Attack missed; no authority state changed.',
+        summary: 'Authoritative state after committed command effects and costs.',
         combatants: [
           {
             id: 'entity-adept',
@@ -649,7 +649,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
         finalState: {
-          summary: 'No authority state changed; intent rejected.',
+          summary: 'Authoritative state after committed command effects and costs.',
           combatants: [
             {
               id: 'entity-adept',
@@ -729,7 +729,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         ],
       },
       stateAfter: {
-        summary: 'No authority state changed; intent rejected.',
+        summary: 'Authoritative state after committed command effects and costs.',
         combatants: [
           {
             id: 'entity-adept',
@@ -901,7 +901,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
           },
         ],
         finalState: {
-          summary: 'Raider is damaged and rattled; Adept is unchanged.',
+          summary: 'Authoritative state after committed command effects and costs.',
           combatants: [
             {
               id: 'entity-veteran-adept',
@@ -981,7 +981,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         ],
       },
       stateAfter: {
-        summary: 'Raider is damaged and rattled; Adept is unchanged.',
+        summary: 'Authoritative state after committed command effects and costs.',
         combatants: [
           {
             id: 'entity-veteran-adept',
@@ -2010,7 +2010,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       },
       finalization: {
         trigger: 'conditionalEnd',
-        finalizedAtStep: 2,
+        finalizedAtStep: 1,
         endCondition: {
           policy: {
             kind: 'lastSideStanding',
@@ -2131,11 +2131,11 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
 {
           sequence: 1,
           trigger: 'conditionalEnd',
-          stepIndex: 2,
+          stepIndex: 1,
           previousLifecyclePhase: 'inProgress',
           nextLifecyclePhase: 'ended',
           startedAtStep: 0,
-          endedAtStep: 2,
+          endedAtStep: 1,
         },
       ],
       turnTransitionLog: [
@@ -2711,7 +2711,7 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
         },
         finalization: {
           trigger: 'conditionalEnd',
-          finalizedAtStep: 2,
+          finalizedAtStep: 1,
           endCondition: {
             policy: {
               kind: 'lastSideStanding',
@@ -2832,11 +2832,11 @@ export const rustBackedCombatSessionCatalog: RulebenchCombatSessionCatalogDto = 
       {
             sequence: 1,
             trigger: 'conditionalEnd',
-            stepIndex: 2,
+            stepIndex: 1,
             previousLifecyclePhase: 'inProgress',
             nextLifecyclePhase: 'ended',
             startedAtStep: 0,
-            endedAtStep: 2,
+            endedAtStep: 1,
           },
         ],
         turnTransitionLog: [

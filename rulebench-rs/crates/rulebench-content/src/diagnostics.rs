@@ -107,8 +107,10 @@ pub enum ContentDiagnosticCode {
     MissingActionActor,
     MissingActionTarget,
     UnsupportedTargetingDeclaration,
+    InvalidOperationPipelineDeclaration,
     UnsupportedCheckDeclaration,
     UnsupportedEffectOperation,
+    InvalidEffectOperation,
     InvalidReactionHookId,
     DuplicateReactionHook,
     InvalidReactionEligibleReactor,
@@ -241,8 +243,12 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::UnsupportedTargetingDeclaration => {
                 "unsupportedTargetingDeclaration"
             }
+            ContentDiagnosticCode::InvalidOperationPipelineDeclaration => {
+                "invalidOperationPipelineDeclaration"
+            }
             ContentDiagnosticCode::UnsupportedCheckDeclaration => "unsupportedCheckDeclaration",
             ContentDiagnosticCode::UnsupportedEffectOperation => "unsupportedEffectOperation",
+            ContentDiagnosticCode::InvalidEffectOperation => "invalidEffectOperation",
             ContentDiagnosticCode::InvalidReactionHookId => "invalidReactionHookId",
             ContentDiagnosticCode::DuplicateReactionHook => "duplicateReactionHook",
             ContentDiagnosticCode::InvalidReactionEligibleReactor => {

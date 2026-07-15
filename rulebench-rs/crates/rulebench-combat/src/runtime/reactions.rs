@@ -367,6 +367,11 @@ impl CombatSessionState {
             "gameplay pre-effect owner route must accept the current Rulebench revision: {:?}",
             decision_receipt.diagnostics
         );
+        for target in &pending.receipt.target_results {
+            for resource in &target.resource_changes {
+                self.record_effect_resource_transition(&pending.step, resource);
+            }
+        }
         for cost in &pending.resource_costs {
             let spend =
                 self.state
@@ -479,10 +484,10 @@ impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
     }
 
     fn commit(&mut self, workspace: &PreEffectWorkspace) -> Vec<String> {
-        let damage = self
+        let mut damage = self
             .receipt
             .damage
-            .as_mut()
+            .clone()
             .expect("validated pre-effect commit retains damage evidence");
         let amount = i32::try_from(workspace.damage_amount)
             .expect("validated pre-effect damage remains in range");
@@ -492,7 +497,25 @@ impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
             .current
             .saturating_sub(amount)
             .clamp(0, damage.before.max);
-        self.state.apply_hit(damage, self.receipt.modifier.as_ref());
+        self.receipt.damage = Some(damage.clone());
+        if let Some(target) = self
+            .receipt
+            .target_results
+            .iter_mut()
+            .find(|target| target.target_id == damage.target_id)
+        {
+            target.damage = Some(damage);
+        }
+        if self.receipt.target_results.is_empty() {
+            let damage = self
+                .receipt
+                .damage
+                .as_ref()
+                .expect("pending legacy damage remains present");
+            self.state.apply_hit(damage, self.receipt.modifier.as_ref());
+        } else {
+            apply_target_results_to_state(self.state, self.receipt);
+        }
         let fingerprint =
             fingerprint_projected_state(&self.state.project("Gameplay pre-effect owner commit."));
         vec![format!("{}:{}", fingerprint.algorithm, fingerprint.value)]
