@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod artifact_repository;
+mod content_workspace;
 mod http;
 mod router;
 mod server;

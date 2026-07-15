@@ -134,7 +134,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
       <arb-application-dialog
         dialogId="content-packs-dialog"
         dialogTitle="Content packs"
-        dialogDescription="Load imported packs and inspect Rust-owned validation diagnostics."
+        dialogDescription="Import, review, activate, and audit Rust-owned authored content."
         [open]="activeDialog() === 'content'"
         (closeRequested)="closeDialog()"
       >

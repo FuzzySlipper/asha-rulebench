@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::content_workspace::{ContentWorkspace, ContentWorkspaceError};
 use crate::{ArtifactRepositoryIssue, FileReplayArchiveStorage};
 use crate::{HttpMethod, HttpRequest, HttpResponse};
 use rulebench_bridge::replay_storage::{
@@ -10,6 +11,7 @@ use rulebench_fixtures::{aggregated_scenario_catalog_cases, replay_review_packag
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
+    ContentImportRequestDto, ContentPayloadRequestDto, ContentReferenceRequestDto,
     LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
     LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
     LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
@@ -119,7 +121,8 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         .len();
     let (content, content_issues) = ContentPackStorage::open_quarantining(root.join("content"))
         .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
-    let content_artifact_count = content.list().len();
+    let (content, workspace_issues) = ContentWorkspace::open(content);
+    let content_artifact_count = content.storage().list().len();
     let mut issues = report.issues;
     issues.extend(
         content_issues
@@ -131,6 +134,7 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
                 message: issue.reason,
             }),
     );
+    issues.extend(workspace_issues);
     let status = ArtifactRepositoryStatus {
         mode: "filesystem".to_string(),
         root: Some(root.display().to_string()),
@@ -148,7 +152,7 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
 #[derive(Debug)]
 pub struct ProcessHostRouter {
     bridge: RulebenchBridge,
-    content_storage: Option<ContentPackStorage>,
+    content_workspace: Option<ContentWorkspace>,
     repository_status: ArtifactRepositoryStatus,
 }
 
@@ -159,19 +163,19 @@ impl ProcessHostRouter {
             .map_or(0, |packages| packages.len());
         Self {
             bridge,
-            content_storage: None,
+            content_workspace: None,
             repository_status: ArtifactRepositoryStatus::in_memory(replay_artifact_count),
         }
     }
 
     pub fn new_with_repository(
         bridge: RulebenchBridge,
-        content_storage: ContentPackStorage,
+        content_workspace: ContentWorkspace,
         repository_status: ArtifactRepositoryStatus,
     ) -> Self {
         Self {
             bridge,
-            content_storage: Some(content_storage),
+            content_workspace: Some(content_workspace),
             repository_status,
         }
     }
@@ -181,11 +185,15 @@ impl ProcessHostRouter {
     }
 
     pub fn content_storage(&self) -> Option<&ContentPackStorage> {
-        self.content_storage.as_ref()
+        self.content_workspace
+            .as_ref()
+            .map(ContentWorkspace::storage)
     }
 
     pub fn content_storage_mut(&mut self) -> Option<&mut ContentPackStorage> {
-        self.content_storage.as_mut()
+        self.content_workspace
+            .as_mut()
+            .map(ContentWorkspace::storage_mut)
     }
 
     pub fn handle(&mut self, request: &HttpRequest) -> HttpResponse {
@@ -217,8 +225,85 @@ impl ProcessHostRouter {
                     Ok(request) => request,
                     Err(response) => return response,
                 };
-                match self.bridge.create_session(&context, &request) {
-                    Ok(created) => json_ok(LiveSessionSnapshotDto::from(&created.snapshot)),
+                let selected_content = match &request.content_pack {
+                    Some(reference) => {
+                        let reference = reference.to_authority();
+                        let Some(workspace) = self.content_workspace.as_ref() else {
+                            return error_response(
+                                409,
+                                "content",
+                                "durableContentRepositoryRequired",
+                                "Authored content sessions require the configured durable host.",
+                                false,
+                            );
+                        };
+                        let scenario = match self.bridge.list_scenarios(&context) {
+                            Ok(scenarios) => scenarios
+                                .into_iter()
+                                .find(|scenario| scenario.id == request.scenario_id),
+                            Err(error) => return bridge_error(error),
+                        };
+                        let Some(scenario) = scenario else {
+                            return error_response(
+                                404,
+                                "bridge",
+                                "unknownScenario",
+                                format!("Scenario does not exist: {}", request.scenario_id),
+                                false,
+                            );
+                        };
+                        let (ruleset_id, ruleset_version) = match workspace.ruleset_for(&reference)
+                        {
+                            Ok(ruleset) => ruleset,
+                            Err(error) => return content_error(error),
+                        };
+                        if ruleset_id != scenario.ruleset_id
+                            || ruleset_version != scenario.ruleset_version
+                        {
+                            return error_response(
+                                422,
+                                "content",
+                                "incompatibleSessionRuleset",
+                                format!(
+                                    "Content requires {ruleset_id} {ruleset_version}; scenario uses {} {}.",
+                                    scenario.ruleset_id, scenario.ruleset_version
+                                ),
+                                false,
+                            );
+                        }
+                        let provenance = match workspace.ruleset_provenance_for(&reference) {
+                            Ok(provenance) => provenance,
+                            Err(error) => return content_error(error),
+                        };
+                        match workspace.active_pack_set(&reference) {
+                            Ok(set) => Some((reference, set, provenance)),
+                            Err(error) => return content_error(error),
+                        }
+                    }
+                    None => None,
+                };
+                let created = match &selected_content {
+                    Some((_, set, provenance)) => self.bridge.create_session_with_content_pack_set(
+                        &context,
+                        &request,
+                        Some(set.clone()),
+                        Some(provenance.clone()),
+                    ),
+                    None => self.bridge.create_session(&context, &request),
+                };
+                match created {
+                    Ok(created) => {
+                        if let (Some((reference, _, _)), Some(workspace)) =
+                            (selected_content, self.content_workspace.as_mut())
+                        {
+                            if let Err(error) =
+                                workspace.record_session_use(&reference, &request.session_id)
+                            {
+                                return content_error(error);
+                            }
+                        }
+                        json_ok(LiveSessionSnapshotDto::from(&created.snapshot))
+                    }
                     Err(error) => bridge_error(error),
                 }
             }
@@ -339,6 +424,68 @@ impl ProcessHostRouter {
                     Err(error) => bridge_error(error),
                 }
             }
+            (HttpMethod::Get, ["content"]) => match self.content_workspace.as_ref() {
+                Some(workspace) => json_ok(workspace.snapshot()),
+                None => content_repository_required(),
+            },
+            (HttpMethod::Post, ["content", "import"]) => {
+                let request = match decode_body::<ContentImportRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                match self.content_workspace.as_mut() {
+                    Some(workspace) => json_ok(
+                        workspace.import(&request.authored_payload, request.replacement_policy),
+                    ),
+                    None => content_repository_required(),
+                }
+            }
+            (HttpMethod::Post, ["content", "review"]) => {
+                let request = match decode_body::<ContentReferenceRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                match self.content_workspace.as_ref() {
+                    Some(workspace) => match workspace.review(&request.reference.to_authority()) {
+                        Ok(review) => json_ok(review),
+                        Err(error) => content_error(error),
+                    },
+                    None => content_repository_required(),
+                }
+            }
+            (HttpMethod::Post, ["content", "compare"]) => {
+                let request = match decode_body::<ContentPayloadRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                match self.content_workspace.as_ref() {
+                    Some(workspace) => match workspace.compare(&request.authored_payload) {
+                        Ok(diff) => json_ok(diff),
+                        Err(error) => content_error(error),
+                    },
+                    None => content_repository_required(),
+                }
+            }
+            (HttpMethod::Post, ["content", operation @ ("activate" | "deactivate" | "delete")]) => {
+                let request = match decode_body::<ContentReferenceRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                let reference = request.reference.to_authority();
+                let Some(workspace) = self.content_workspace.as_mut() else {
+                    return content_repository_required();
+                };
+                let result = match *operation {
+                    "activate" => workspace.activate(&reference),
+                    "deactivate" => workspace.deactivate(&reference),
+                    "delete" => workspace.delete(&reference),
+                    _ => unreachable!(),
+                };
+                match result {
+                    Ok(snapshot) => json_ok(snapshot),
+                    Err(error) => content_error(error),
+                }
+            }
             (HttpMethod::Get, ["replays"]) => {
                 bridge_result(self.bridge.list_replay_packages(&context))
             }
@@ -450,6 +597,32 @@ fn bridge_error(error: BridgeError) -> HttpResponse {
         BridgeErrorKind::ReplayArchive => 422,
     };
     error_response(status, "bridge", error.code, error.message, error.retryable)
+}
+
+fn content_repository_required() -> HttpResponse {
+    error_response(
+        409,
+        "content",
+        "durableContentRepositoryRequired",
+        "Authored content operations require the configured durable process host.",
+        false,
+    )
+}
+
+fn content_error(error: ContentWorkspaceError) -> HttpResponse {
+    let status = match error.code.as_str() {
+        "contentPackNotFound" | "contentReplacementTargetNotFound" => 404,
+        "contentStorageUnavailable" | "contentAuditStorageUnavailable" => 503,
+        "contentReplacementConfirmationRequired" | "contentPackAlreadyStored" => 409,
+        _ => 422,
+    };
+    error_response(
+        status,
+        "content",
+        error.code,
+        error.message,
+        error.retryable,
+    )
 }
 
 fn error_response(

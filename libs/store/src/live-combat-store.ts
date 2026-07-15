@@ -27,6 +27,7 @@ import type {
   RulebenchUseActionIntentDto,
   RulebenchProtocolHandshakeDto,
   RulebenchScenarioOptionDto,
+  RulebenchContentPackReferenceDto,
 } from "@asha-rulebench/protocol";
 import {
   createLiveRulebenchTransport,
@@ -184,6 +185,7 @@ export class LiveCombatStore {
     sessionId: string,
     scenarioId: string,
     participantOrder: readonly string[],
+    contentPack: RulebenchContentPackReferenceDto | null = null,
   ): Promise<void> {
     this.selectSessionIdentity(sessionId);
     const generation = this.sessionGeneration;
@@ -192,6 +194,7 @@ export class LiveCombatStore {
       sessionId,
       scenarioId,
       participantOrder,
+      contentPack,
     });
     if (!this.isCurrent(sessionId, generation)) return;
     this._snapshot.set(

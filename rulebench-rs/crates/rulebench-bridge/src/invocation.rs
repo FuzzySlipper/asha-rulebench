@@ -13,9 +13,10 @@ use rulebench_rules::{
     CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    CurrentActorOptionSummary, InMemoryReplayArchiveStorage, ReactionCommandReadout, ReplayArchive,
-    ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand, ReplayCommandRecordingSpec,
-    ReplayPackage, RulebenchScenario, AUTHORITY_SURFACE,
+    ContentPackSetReference, CurrentActorOptionSummary, InMemoryReplayArchiveStorage,
+    ReactionCommandReadout, ReplayArchive, ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand,
+    ReplayCommandRecordingSpec, ReplayPackage, RulebenchScenario, RulesetArtifactProvenance,
+    AUTHORITY_SURFACE,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -187,6 +188,16 @@ impl RulebenchBridge {
         context: &ProtocolRequestContextDto,
         request: &CombatSessionCreateRequestDto,
     ) -> Result<CombatSessionCreateReadout, BridgeError> {
+        self.create_session_with_content_pack_set(context, request, None, None)
+    }
+
+    pub fn create_session_with_content_pack_set(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        request: &CombatSessionCreateRequestDto,
+        content_pack_set: Option<ContentPackSetReference>,
+        content_ruleset: Option<RulesetArtifactProvenance>,
+    ) -> Result<CombatSessionCreateReadout, BridgeError> {
         self.check_version(context)?;
         if request.session_id.is_empty() || request.scenario_id.is_empty() {
             return Err(BridgeError::new(
@@ -200,8 +211,27 @@ impl RulebenchBridge {
                 format!("Scenario does not exist: {}", request.scenario_id),
             )
         })?;
-        let configured_scenario =
+        let mut configured_scenario =
             configure_participant_order(scenario.scenario.clone(), &request.participant_order)?;
+        if let Some(content_ruleset) = &content_ruleset {
+            let ruleset = configured_scenario.selected_ruleset().ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidScenario,
+                    "Scenario selected ruleset does not exist.",
+                )
+            })?;
+            ruleset
+                .validate_artifact_provenance(content_ruleset)
+                .map_err(|error| {
+                    BridgeError::new(
+                        BridgeErrorKind::InvalidScenario,
+                        format!("Authored content ruleset is incompatible: {error:?}"),
+                    )
+                })?;
+        }
+        if let Some(content_pack_set) = content_pack_set {
+            configured_scenario.content_pack_set = Some(content_pack_set);
+        }
         let initial_session = rulebench_rules::CombatSessionCreateRequest::new(
             &request.session_id,
             prepare_replay_scenario(configured_scenario.clone()),

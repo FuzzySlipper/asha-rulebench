@@ -22,6 +22,12 @@ export type RulebenchContentImportDiagnosticSeverityDto = 'error' | 'warning';
 
 export type RulebenchContentDefinitionKindDto = 'ruleset' | 'entity' | 'ability' | 'class' | 'stat' | 'modifier' | 'item' | 'action';
 
+export type RulebenchAuthoredContentSourceKindDto = 'authoredFile' | 'bridgeSubmission';
+
+export type RulebenchAuthoredDamageAdjustmentPolicyDto = 'resistance' | 'vulnerability' | 'immunity';
+
+export type RulebenchContentReplacementPolicyDto = 'reject' | 'replaceSameIdentity';
+
 export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';
 
 export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';
@@ -475,6 +481,7 @@ export interface RulebenchCombatSessionCreateRequestDto {
   readonly sessionId: string;
   readonly scenarioId: string;
   readonly participantOrder: readonly string[];
+  readonly contentPack?: RulebenchContentPackReferenceDto | null;
 }
 
 export interface RulebenchCombatSessionIntentCommandDto {
@@ -1174,6 +1181,135 @@ export interface RulebenchContentFingerprintDto {
   readonly value: string;
 }
 
+export interface RulebenchAuthoredContentPackDocumentDto {
+  readonly format: string;
+  readonly formatVersion: number;
+  readonly pack: RulebenchAuthoredContentPackDto;
+}
+
+export interface RulebenchAuthoredContentPackDto {
+  readonly id: string;
+  readonly version: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly tags: readonly string[];
+  readonly provenance: RulebenchAuthoredContentProvenanceDto;
+  readonly rulesetId: string;
+  readonly dependencies: readonly RulebenchContentPackReferenceDto[];
+  readonly catalogs: RulebenchAuthoredContentCatalogsDto;
+}
+
+export interface RulebenchAuthoredContentProvenanceDto {
+  readonly sourceKind: RulebenchAuthoredContentSourceKindDto;
+  readonly sourceId: string;
+  readonly authoredBy: string | null;
+}
+
+export interface RulebenchAuthoredContentCatalogsDto {
+  readonly rulesets: readonly RulebenchRulesetDefinitionDto[];
+  readonly entities: readonly RulebenchAuthoredEntityDefinitionDto[];
+}
+
+export interface RulebenchAuthoredEntityDefinitionDto {
+  readonly id: string;
+  readonly name: string;
+  readonly summary: string;
+  readonly tags: readonly string[];
+  readonly damageAdjustments: readonly RulebenchAuthoredDamageAdjustmentDto[];
+}
+
+export interface RulebenchAuthoredDamageAdjustmentDto {
+  readonly damageType: string;
+  readonly policy: RulebenchAuthoredDamageAdjustmentPolicyDto;
+}
+
+export interface RulebenchContentPackReferenceDto {
+  readonly id: string;
+  readonly version: string;
+  readonly fingerprint: RulebenchContentFingerprintDto;
+}
+
+export interface RulebenchContentImportRequestDto {
+  readonly authoredPayload: string;
+  readonly replacementPolicy: RulebenchContentReplacementPolicyDto;
+}
+
+export interface RulebenchContentPayloadRequestDto {
+  readonly authoredPayload: string;
+}
+
+export interface RulebenchContentReferenceRequestDto {
+  readonly reference: RulebenchContentPackReferenceDto;
+}
+
+export interface RulebenchContentDefinitionSummaryDto {
+  readonly kind: RulebenchContentDefinitionKindDto;
+  readonly id: string;
+}
+
+export interface RulebenchStoredContentPackSummaryDto {
+  readonly reference: RulebenchContentPackReferenceDto;
+  readonly title: string;
+  readonly summary: string;
+  readonly sourceKind: string;
+  readonly sourceId: string;
+  readonly authoredBy: string | null;
+  readonly rulesetId: string;
+  readonly rulesetVersion: string;
+  readonly dependencies: readonly RulebenchContentPackReferenceDto[];
+  readonly definitions: readonly RulebenchContentDefinitionSummaryDto[];
+  readonly active: boolean;
+}
+
+export interface RulebenchContentPackReviewDto {
+  readonly pack: RulebenchStoredContentPackSummaryDto;
+  readonly authoredPayload: string;
+  readonly diagnostics: readonly RulebenchContentImportDiagnosticDto[];
+}
+
+export interface RulebenchContentDefinitionChangeDto {
+  readonly kind: RulebenchContentDefinitionKindDto;
+  readonly id: string;
+  readonly change: 'added' | 'removed' | 'changed';
+}
+
+export interface RulebenchContentPackDiffDto {
+  readonly before: RulebenchContentPackReferenceDto;
+  readonly after: RulebenchContentPackReferenceDto;
+  readonly changed: boolean;
+  readonly fingerprintChanged: boolean;
+  readonly rulesetCompatibilityChanged: boolean;
+  readonly dependencySetChanged: boolean;
+  readonly metadataChanges: readonly string[];
+  readonly definitionChanges: readonly RulebenchContentDefinitionChangeDto[];
+}
+
+export interface RulebenchContentImportOutcomeDto {
+  readonly review: RulebenchContentPackReviewDto;
+  readonly replaced: RulebenchContentPackReferenceDto | null;
+}
+
+export interface RulebenchContentImportAttemptDto {
+  readonly accepted: boolean;
+  readonly pack: RulebenchContentPackIdentityDto;
+  readonly outcome: RulebenchContentImportOutcomeDto | null;
+  readonly diagnostics: readonly RulebenchContentImportDiagnosticDto[];
+  readonly errorCode: string | null;
+  readonly errorMessage: string | null;
+}
+
+export interface RulebenchContentAuditEntryDto {
+  readonly sequence: number;
+  readonly operation: string;
+  readonly reference: RulebenchContentPackReferenceDto;
+  readonly detail: string;
+}
+
+export interface RulebenchContentWorkspaceDto {
+  readonly packs: readonly RulebenchStoredContentPackSummaryDto[];
+  readonly audit: readonly RulebenchContentAuditEntryDto[];
+}
+
 export interface RulebenchContentImportDiagnosticDto {
   readonly severity: RulebenchContentImportDiagnosticSeverityDto;
   readonly code: string;
@@ -1388,6 +1524,9 @@ export interface RulebenchReplayPackageReviewDto {
   readonly scenarioId: string;
   readonly rulesetId: string;
   readonly rulesetVersion: string;
+  readonly contentPackRoot: RulebenchContentPackReferenceDto | null;
+  readonly contentPackSetFingerprint: RulebenchContentFingerprintDto | null;
+  readonly contentPackReferences: readonly RulebenchContentPackReferenceDto[];
   readonly commandCount: number;
   readonly finalStateFingerprint: RulebenchStateFingerprintDto;
   readonly fingerprintKind: string;

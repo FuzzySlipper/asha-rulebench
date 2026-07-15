@@ -4,6 +4,12 @@ import type {
   RulebenchCombatControlCommandDto,
   RulebenchCombatSessionCreateRequestDto,
   RulebenchCombatSessionIntentCommandDto,
+  RulebenchContentImportAttemptDto,
+  RulebenchContentPackDiffDto,
+  RulebenchContentPackReferenceDto,
+  RulebenchContentPackReviewDto,
+  RulebenchContentReplacementPolicyDto,
+  RulebenchContentWorkspaceDto,
   RulebenchLiveAutomaticRunDto,
   RulebenchLiveAutomaticStepDto,
   RulebenchLiveCandidateSummaryDto,
@@ -119,6 +125,34 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
     request: RulebenchAutomaticRunSpecDto,
     options?: RulebenchLiveRequestOptions,
   ) => Promise<RulebenchLiveTransportResult<RulebenchLiveAutomaticRunDto>>;
+  readonly listContentWorkspace: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentWorkspaceDto>>;
+  readonly importContent: (
+    authoredPayload: string,
+    replacementPolicy: RulebenchContentReplacementPolicyDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentImportAttemptDto>>;
+  readonly reviewContent: (
+    reference: RulebenchContentPackReferenceDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentPackReviewDto>>;
+  readonly compareContent: (
+    authoredPayload: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentPackDiffDto>>;
+  readonly activateContent: (
+    reference: RulebenchContentPackReferenceDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentWorkspaceDto>>;
+  readonly deactivateContent: (
+    reference: RulebenchContentPackReferenceDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentWorkspaceDto>>;
+  readonly deleteContent: (
+    reference: RulebenchContentPackReferenceDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentWorkspaceDto>>;
 }
 
 export interface RulebenchLiveTransportOptions {
@@ -338,6 +372,25 @@ export function createLiveRulebenchTransport(
         automaticRequest,
         requestOptions,
       ),
+    listContentWorkspace: (requestOptions) =>
+      request("GET", "/content", undefined, requestOptions),
+    importContent: (authoredPayload, replacementPolicy, requestOptions) =>
+      request(
+        "POST",
+        "/content/import",
+        { authoredPayload, replacementPolicy },
+        requestOptions,
+      ),
+    reviewContent: (reference, requestOptions) =>
+      request("POST", "/content/review", { reference }, requestOptions),
+    compareContent: (authoredPayload, requestOptions) =>
+      request("POST", "/content/compare", { authoredPayload }, requestOptions),
+    activateContent: (reference, requestOptions) =>
+      request("POST", "/content/activate", { reference }, requestOptions),
+    deactivateContent: (reference, requestOptions) =>
+      request("POST", "/content/deactivate", { reference }, requestOptions),
+    deleteContent: (reference, requestOptions) =>
+      request("POST", "/content/delete", { reference }, requestOptions),
     listReplayPackages: () =>
       replayRequest<readonly RulebenchReplayArchiveMetadataDto[]>(
         "GET",

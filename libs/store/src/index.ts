@@ -1,6 +1,7 @@
 export * from "./replay-review-store";
 export * from "./async-state";
 export * from "./live-combat-store";
+export * from "./content-workspace-store";
 
 import { InjectionToken, Injectable, signal } from '@angular/core';
 import type { Provider, Signal } from '@angular/core';
@@ -22,6 +23,7 @@ import type {
 import { createFakeRulebenchTransport, type RulebenchTransport } from '@asha-rulebench/transport';
 import type { AsyncState } from "./async-state";
 import { provideLiveCombatStoreKernel } from './live-combat-store';
+import { provideContentWorkbenchStoreKernel } from './content-workspace-store';
 
 export const RULEBENCH_TRANSPORT = new InjectionToken<RulebenchTransport>('RULEBENCH_TRANSPORT', {
   factory: () => createFakeRulebenchTransport(),
@@ -225,6 +227,7 @@ export class ContentStore {
 export function provideRulebenchStoreKernel(): Provider[] {
   return [
     ...provideLiveCombatStoreKernel(),
+    ...provideContentWorkbenchStoreKernel(),
     { provide: RULEBENCH_TRANSPORT, useFactory: () => createFakeRulebenchTransport() },
     { provide: RULEBENCH_CLOCK, useValue: browserClock },
     {

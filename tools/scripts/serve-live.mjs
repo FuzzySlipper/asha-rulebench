@@ -1,6 +1,8 @@
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const root = process.cwd();
 const hostAddress = '127.0.0.1';
@@ -9,6 +11,13 @@ const hostUrl = `http://${hostAddress}:${hostPort}`;
 const proxyPath = join(root, 'tools/config/rulebench-proxy.cjs');
 const forwardedArguments = process.argv.slice(2);
 if (forwardedArguments[0] === '--') forwardedArguments.shift();
+const ephemeralArtifacts = process.env['RULEBENCH_EPHEMERAL_ARTIFACTS'] === '1';
+const artifactRoot =
+  process.env['RULEBENCH_ARTIFACT_ROOT'] ??
+  (ephemeralArtifacts
+    ? mkdtempSync(join(tmpdir(), 'asha-rulebench-e2e-artifacts-'))
+    : null);
+const artifactArguments = artifactRoot === null ? [] : ['--artifact-root', artifactRoot];
 
 const rustHost = spawn(
   'cargo',
@@ -23,6 +32,7 @@ const rustHost = spawn(
     '--',
     '--bind',
     `${hostAddress}:${hostPort}`,
+    ...artifactArguments,
   ],
   { cwd: root, stdio: 'inherit', shell: false },
 );
@@ -73,6 +83,9 @@ async function stop(exitCode) {
   stopping = true;
   angular?.kill('SIGTERM');
   rustHost.kill('SIGTERM');
+  if (ephemeralArtifacts && artifactRoot !== null) {
+    rmSync(artifactRoot, { recursive: true, force: true });
+  }
   process.exit(exitCode);
 }
 

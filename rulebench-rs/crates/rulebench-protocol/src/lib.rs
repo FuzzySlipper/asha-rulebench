@@ -27,8 +27,16 @@ pub use bridge::{
     ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 pub use content::{
-    ContentFingerprintDto, ContentImportDiagnosticDto, ContentImportReadoutDto,
-    ContentPackIdentityDto,
+    AuthoredContentCatalogsDto, AuthoredContentDecodeError, AuthoredContentPackDocumentDto,
+    AuthoredContentPackDto, AuthoredContentProvenanceDto, AuthoredContentSourceKindDto,
+    AuthoredDamageAdjustmentDto, AuthoredDamageAdjustmentPolicyDto, AuthoredEntityDefinitionDto,
+    ContentAuditEntryDto, ContentDefinitionChangeDto, ContentDefinitionSummaryDto,
+    ContentFingerprintDto, ContentImportAttemptDto, ContentImportDiagnosticDto,
+    ContentImportOutcomeDto, ContentImportReadoutDto, ContentImportRequestDto, ContentPackDiffDto,
+    ContentPackIdentityDto, ContentPackReferenceDto, ContentPackReviewDto,
+    ContentPayloadRequestDto, ContentReferenceRequestDto, ContentReplacementPolicyDto,
+    ContentWorkspaceDto, StoredContentPackSummaryDto, AUTHORED_CONTENT_PACK_FORMAT,
+    AUTHORED_CONTENT_PACK_VERSION,
 };
 pub use live::{
     LiveActionOptionDto, LiveActionResourceCostDto, LiveActionResourceStateDto, LiveAuditEntryDto,

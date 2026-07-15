@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::ContentStorageRecord;
 use crate::{
@@ -6,7 +6,8 @@ use crate::{
     ContentPackReference, ContentPackSourceKind,
 };
 
-const STORAGE_FORMAT: &str = "rulebench-content-storage.v0";
+const STORAGE_FORMAT: &str = "rulebench-content-storage.v1";
+const ACTIVATION_FORMAT: &str = "rulebench-content-activation.v1";
 const PAYLOAD_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-payload.v0";
 
 pub(super) fn record_file_stem(reference: &ContentPackReference) -> String {
@@ -60,6 +61,9 @@ pub(super) fn encode_record(record: &ContentStorageRecord) -> Vec<u8> {
         ),
         encoded_pair("payloadFingerprintValue", &record.payload_fingerprint.value),
     ];
+    for dependency in &record.dependencies {
+        lines.push(format!("dependency={}", encode_reference(dependency)));
+    }
     for definition in &record.definitions {
         lines.push(format!(
             "definition={}:{}",
@@ -75,12 +79,15 @@ pub(super) fn decode_record(bytes: &[u8]) -> Result<ContentStorageRecord, String
     let source = std::str::from_utf8(bytes).map_err(|_| "record is not UTF-8".to_string())?;
     let mut fields = BTreeMap::new();
     let mut definitions = Vec::new();
+    let mut dependencies = Vec::new();
     for line in source.lines() {
         let Some((key, value)) = line.split_once('=') else {
             return Err("record line has no field separator".to_string());
         };
         if key == "definition" {
             definitions.push(decode_definition(value)?);
+        } else if key == "dependency" {
+            dependencies.push(decode_reference(value)?);
         } else if fields.insert(key, value).is_some() {
             return Err(format!("duplicate record field {key}"));
         }
@@ -92,6 +99,10 @@ pub(super) fn decode_record(bytes: &[u8]) -> Result<ContentStorageRecord, String
     definitions.sort();
     if definitions.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err("duplicate definition index entry".to_string());
+    }
+    dependencies.sort();
+    if dependencies.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("duplicate dependency entry".to_string());
     }
     let source_kind = match required(&fields, "sourceKind")? {
         "embedded" => ContentPackSourceKind::Embedded,
@@ -119,10 +130,78 @@ pub(super) fn decode_record(bytes: &[u8]) -> Result<ContentStorageRecord, String
         },
         ruleset_id: decode_field(&fields, "rulesetId")?,
         ruleset_version: decode_field(&fields, "rulesetVersion")?,
+        dependencies,
         definitions,
         payload_fingerprint: ContentFingerprint {
             algorithm: decode_field(&fields, "payloadFingerprintAlgorithm")?,
             value: decode_field(&fields, "payloadFingerprintValue")?,
+        },
+    })
+}
+
+pub(super) fn encode_activation_index(active: &BTreeSet<ContentPackReference>) -> Vec<u8> {
+    let mut lines = vec![pair("format", ACTIVATION_FORMAT)];
+    lines.extend(
+        active
+            .iter()
+            .map(|reference| pair("active", &encode_reference(reference))),
+    );
+    lines.push(String::new());
+    lines.join("\n").into_bytes()
+}
+
+pub(super) fn decode_activation_index(
+    bytes: &[u8],
+) -> Result<BTreeSet<ContentPackReference>, String> {
+    let source =
+        std::str::from_utf8(bytes).map_err(|_| "activation index is not UTF-8".to_string())?;
+    let mut format = None;
+    let mut active = BTreeSet::new();
+    for line in source.lines() {
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| "activation index line has no field separator".to_string())?;
+        match key {
+            "format" if format.replace(value).is_none() => {}
+            "format" => return Err("duplicate activation format".to_string()),
+            "active" => {
+                if !active.insert(decode_reference(value)?) {
+                    return Err("duplicate active reference".to_string());
+                }
+            }
+            _ => return Err(format!("unknown activation field {key}")),
+        }
+    }
+    if format != Some(ACTIVATION_FORMAT) {
+        return Err("unsupported activation index format".to_string());
+    }
+    Ok(active)
+}
+
+fn encode_reference(reference: &ContentPackReference) -> String {
+    [
+        reference.id.as_str(),
+        reference.version.as_str(),
+        reference.fingerprint.algorithm.as_str(),
+        reference.fingerprint.value.as_str(),
+    ]
+    .into_iter()
+    .map(|value| hex_encode(value.as_bytes()))
+    .collect::<Vec<_>>()
+    .join(":")
+}
+
+fn decode_reference(value: &str) -> Result<ContentPackReference, String> {
+    let parts = value.split(':').collect::<Vec<_>>();
+    let [id, version, algorithm, fingerprint] = parts.as_slice() else {
+        return Err("content reference has invalid field count".to_string());
+    };
+    Ok(ContentPackReference {
+        id: decode_hex_string(id)?,
+        version: decode_hex_string(version)?,
+        fingerprint: ContentFingerprint {
+            algorithm: decode_hex_string(algorithm)?,
+            value: decode_hex_string(fingerprint)?,
         },
     })
 }

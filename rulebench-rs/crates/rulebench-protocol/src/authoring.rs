@@ -3,9 +3,11 @@ use rulebench_rules::{
     CombatEndPolicy, RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
     RuleModuleValidationError, RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,
 };
+use serde::{Deserialize, Serialize};
 
 /// Stable wire form of a ruleset definition authored outside Rust authority.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RulesetDefinitionDto {
     pub id: String,
     pub name: String,
@@ -15,7 +17,8 @@ pub struct RulesetDefinitionDto {
 }
 
 /// Stable wire form of one selected Rust behavior module.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuleModuleDeclarationDto {
     pub module: String,
     pub version: String,
@@ -23,7 +26,13 @@ pub struct RuleModuleDeclarationDto {
 }
 
 /// Closed configuration vocabulary carried over the protocol boundary.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "module",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
 pub enum RuleModuleConfigurationDto {
     ActionResolution {
         targeting_policy: String,

@@ -61,25 +61,12 @@ test("boots the rulebench shell", async ({ page }) => {
     .click();
   const contentDialog = page.getByRole("dialog", { name: "Content packs" });
   await expect(
-    contentDialog.getByRole("heading", { name: "Content Packs", exact: true }),
+    contentDialog.getByRole("heading", { name: "Live Authored Content", exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Selected content pack review")).toContainText(
-    "pack.valid@1.0.0",
-  );
-  await expect(page.getByLabel("Selected content pack review")).toContainText(
-    "fnv1a64.rulebench-content-pack.v0",
-  );
-  await expect(page.getByLabel("Content validation review")).toContainText(
-    "Hexing Bolt Hit",
-  );
-  await page.getByRole("button", { name: /pack.warning@1.0.0/ }).click();
-  await expect(page.getByLabel("Selected content pack review")).toContainText(
-    "duplicateContentTagCanonicalized",
-  );
-  await page.getByRole("button", { name: /pack.error@1.0.0/ }).click();
-  await expect(page.getByLabel("Selected content pack review")).toContainText(
-    "missingContentPackDependency",
-  );
+  await expect(
+    contentDialog.getByRole("region", { name: "Live authored content workspace" }),
+  ).toBeVisible();
+  await expect(contentDialog.getByText("No authored packs stored.")).toBeVisible();
   await contentDialog.getByRole("button", { name: "Close" }).click();
 
   await menubar.getByRole("menuitem", { name: "Scenario" }).click();

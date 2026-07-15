@@ -59,6 +59,8 @@ pub struct CombatSessionCreateRequestDto {
     pub scenario_id: String,
     #[serde(default)]
     pub participant_order: Vec<String>,
+    #[serde(default)]
+    pub content_pack: Option<crate::ContentPackReferenceDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

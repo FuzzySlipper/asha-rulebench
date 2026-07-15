@@ -160,6 +160,19 @@ codes rather than interpreted as current data. Replay envelopes reconstruct
 through the registered scenario and Rust authority and must reproduce their
 recorded archive fingerprint before becoming visible.
 
+The authored content route accepts only `asha-rulebench.content-pack` version
+1 documents up to 512 KiB. The protocol DTO owns decoding; portable content
+and ruleset crates remain free of JSON/serde concerns. Rust converts the closed
+wire vocabulary, validates structural limits and exact dependencies, resolves
+ruleset compatibility, canonicalizes the pack, and stores the original payload
+beside its canonical receipt. On restart every payload is decoded and imported
+again; corrupt, unsupported, dependency-incomplete, or canonically drifted
+payloads are classified and excluded from activation. Activation is an atomic
+exact-reference index, replacement clears the old activation, and deletion is
+denied for active packs or packs with stored dependents. The host audit log
+distinguishes payload acceptance, canonical receipt storage, activation,
+replacement, deletion, and session binding.
+
 This filesystem repository is deliberately single-writer. Run only one host
 against an artifact root; it does not provide locking, multi-process conflict
 resolution, or a database migration service. Storage format changes require an

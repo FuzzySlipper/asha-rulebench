@@ -102,6 +102,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "participantOrder",
                     ty: "readonly string[]",
                 },
+                Field {
+                    name: "contentPack?",
+                    ty: "RulebenchContentPackReferenceDto | null",
+                },
             ],
         },
         Interface {
@@ -2382,6 +2386,385 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             ],
         },
         Interface {
+            name: "RulebenchAuthoredContentPackDocumentDto",
+            fields: &[
+                Field {
+                    name: "format",
+                    ty: "string",
+                },
+                Field {
+                    name: "formatVersion",
+                    ty: "number",
+                },
+                Field {
+                    name: "pack",
+                    ty: "RulebenchAuthoredContentPackDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredContentPackDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tags",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "provenance",
+                    ty: "RulebenchAuthoredContentProvenanceDto",
+                },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "dependencies",
+                    ty: "readonly RulebenchContentPackReferenceDto[]",
+                },
+                Field {
+                    name: "catalogs",
+                    ty: "RulebenchAuthoredContentCatalogsDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredContentProvenanceDto",
+            fields: &[
+                Field {
+                    name: "sourceKind",
+                    ty: "RulebenchAuthoredContentSourceKindDto",
+                },
+                Field {
+                    name: "sourceId",
+                    ty: "string",
+                },
+                Field {
+                    name: "authoredBy",
+                    ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredContentCatalogsDto",
+            fields: &[
+                Field {
+                    name: "rulesets",
+                    ty: "readonly RulebenchRulesetDefinitionDto[]",
+                },
+                Field {
+                    name: "entities",
+                    ty: "readonly RulebenchAuthoredEntityDefinitionDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredEntityDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tags",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "damageAdjustments",
+                    ty: "readonly RulebenchAuthoredDamageAdjustmentDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredDamageAdjustmentDto",
+            fields: &[
+                Field {
+                    name: "damageType",
+                    ty: "string",
+                },
+                Field {
+                    name: "policy",
+                    ty: "RulebenchAuthoredDamageAdjustmentPolicyDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentPackReferenceDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "fingerprint",
+                    ty: "RulebenchContentFingerprintDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentImportRequestDto",
+            fields: &[
+                Field {
+                    name: "authoredPayload",
+                    ty: "string",
+                },
+                Field {
+                    name: "replacementPolicy",
+                    ty: "RulebenchContentReplacementPolicyDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentPayloadRequestDto",
+            fields: &[Field {
+                name: "authoredPayload",
+                ty: "string",
+            }],
+        },
+        Interface {
+            name: "RulebenchContentReferenceRequestDto",
+            fields: &[Field {
+                name: "reference",
+                ty: "RulebenchContentPackReferenceDto",
+            }],
+        },
+        Interface {
+            name: "RulebenchContentDefinitionSummaryDto",
+            fields: &[
+                Field {
+                    name: "kind",
+                    ty: "RulebenchContentDefinitionKindDto",
+                },
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchStoredContentPackSummaryDto",
+            fields: &[
+                Field {
+                    name: "reference",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "sourceKind",
+                    ty: "string",
+                },
+                Field {
+                    name: "sourceId",
+                    ty: "string",
+                },
+                Field {
+                    name: "authoredBy",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "dependencies",
+                    ty: "readonly RulebenchContentPackReferenceDto[]",
+                },
+                Field {
+                    name: "definitions",
+                    ty: "readonly RulebenchContentDefinitionSummaryDto[]",
+                },
+                Field {
+                    name: "active",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentPackReviewDto",
+            fields: &[
+                Field {
+                    name: "pack",
+                    ty: "RulebenchStoredContentPackSummaryDto",
+                },
+                Field {
+                    name: "authoredPayload",
+                    ty: "string",
+                },
+                Field {
+                    name: "diagnostics",
+                    ty: "readonly RulebenchContentImportDiagnosticDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentDefinitionChangeDto",
+            fields: &[
+                Field {
+                    name: "kind",
+                    ty: "RulebenchContentDefinitionKindDto",
+                },
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "change",
+                    ty: "'added' | 'removed' | 'changed'",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentPackDiffDto",
+            fields: &[
+                Field {
+                    name: "before",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "after",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "changed",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "fingerprintChanged",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "rulesetCompatibilityChanged",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "dependencySetChanged",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "metadataChanges",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "definitionChanges",
+                    ty: "readonly RulebenchContentDefinitionChangeDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentImportOutcomeDto",
+            fields: &[
+                Field {
+                    name: "review",
+                    ty: "RulebenchContentPackReviewDto",
+                },
+                Field {
+                    name: "replaced",
+                    ty: "RulebenchContentPackReferenceDto | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentImportAttemptDto",
+            fields: &[
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "pack",
+                    ty: "RulebenchContentPackIdentityDto",
+                },
+                Field {
+                    name: "outcome",
+                    ty: "RulebenchContentImportOutcomeDto | null",
+                },
+                Field {
+                    name: "diagnostics",
+                    ty: "readonly RulebenchContentImportDiagnosticDto[]",
+                },
+                Field {
+                    name: "errorCode",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "errorMessage",
+                    ty: "string | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentAuditEntryDto",
+            fields: &[
+                Field {
+                    name: "sequence",
+                    ty: "number",
+                },
+                Field {
+                    name: "operation",
+                    ty: "string",
+                },
+                Field {
+                    name: "reference",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "detail",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentWorkspaceDto",
+            fields: &[
+                Field {
+                    name: "packs",
+                    ty: "readonly RulebenchStoredContentPackSummaryDto[]",
+                },
+                Field {
+                    name: "audit",
+                    ty: "readonly RulebenchContentAuditEntryDto[]",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchContentImportDiagnosticDto",
             fields: &[
                 Field {
@@ -3053,6 +3436,18 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "rulesetVersion",
                     ty: "string",
+                },
+                Field {
+                    name: "contentPackRoot",
+                    ty: "RulebenchContentPackReferenceDto | null",
+                },
+                Field {
+                    name: "contentPackSetFingerprint",
+                    ty: "RulebenchContentFingerprintDto | null",
+                },
+                Field {
+                    name: "contentPackReferences",
+                    ty: "readonly RulebenchContentPackReferenceDto[]",
                 },
                 Field {
                     name: "commandCount",

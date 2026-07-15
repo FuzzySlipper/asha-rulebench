@@ -6,10 +6,11 @@ use rulebench_bridge::replay_storage::{
     record_replay_package, CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec,
     CombatControlCommandSpec, CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
     CombatSessionCandidateSelectionSpec, CombatSessionCreateRequest,
-    CombatSessionIntentCommandSpec, CommandRollMode, EquipmentCommandKind, EquipmentCommandSpec,
-    GridPosition, ReactionCommandSpec, ReactionResponseKind, ReplayArchiveEntry,
-    ReplayArchiveMetadata, ReplayArchiveStorage, ReplayArchiveStorageError, ReplayCommand,
-    ReplayCommandRecordingSpec, ReplayNarration, UseActionIntent,
+    CombatSessionIntentCommandSpec, CommandRollMode, ContentFingerprint, ContentPackReference,
+    ContentPackSetReference, EquipmentCommandKind, EquipmentCommandSpec, GridPosition,
+    ReactionCommandSpec, ReactionResponseKind, ReplayArchiveEntry, ReplayArchiveMetadata,
+    ReplayArchiveStorage, ReplayArchiveStorageError, ReplayCommand, ReplayCommandRecordingSpec,
+    ReplayNarration, UseActionIntent,
 };
 use rulebench_bridge::{prepare_replay_scenario, BridgeScenario};
 use serde::{Deserialize, Serialize};
@@ -372,6 +373,8 @@ struct StoredReplayPayload {
     package_version: String,
     session_id: String,
     scenario_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    content_pack_set: Option<StoredContentPackSet>,
     participants: Vec<StoredParticipant>,
     ruleset: StoredRulesetProvenance,
     completed_at: String,
@@ -387,6 +390,12 @@ impl StoredReplayPayload {
             package_version: package.package_version.clone(),
             session_id: package.initial_session.session.id.clone(),
             scenario_id: package.initial_session.scenario.metadata.id.clone(),
+            content_pack_set: package
+                .initial_session
+                .scenario
+                .content_pack_set
+                .as_ref()
+                .map(StoredContentPackSet::from_authority),
             participants: package
                 .initial_session
                 .scenario
@@ -436,7 +445,10 @@ impl StoredReplayPayload {
         })?;
         let mut scenario = bridge_scenario.scenario.clone();
         apply_participant_configuration(&mut scenario.combatants, &self.participants)?;
-        let scenario = prepare_replay_scenario(scenario);
+        let mut scenario = prepare_replay_scenario(scenario);
+        if let Some(content_pack_set) = &self.content_pack_set {
+            scenario.content_pack_set = Some(content_pack_set.to_authority()?);
+        }
         let ruleset = scenario
             .selected_ruleset()
             .ok_or_else(|| "The recorded scenario no longer selects a ruleset.".to_string())?
@@ -461,6 +473,93 @@ impl StoredReplayPayload {
         }
         package.narration = self.narration.as_ref().map(StoredNarration::to_authority);
         Ok(ReplayArchiveEntry::new(package, &self.completed_at))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredContentPackSet {
+    root: StoredContentPackReference,
+    packs: Vec<StoredContentPackReference>,
+    fingerprint: StoredContentFingerprint,
+}
+
+impl StoredContentPackSet {
+    fn from_authority(value: &ContentPackSetReference) -> Self {
+        Self {
+            root: StoredContentPackReference::from_authority(&value.root),
+            packs: value
+                .packs
+                .iter()
+                .map(StoredContentPackReference::from_authority)
+                .collect(),
+            fingerprint: StoredContentFingerprint::from_authority(&value.fingerprint),
+        }
+    }
+
+    fn to_authority(&self) -> Result<ContentPackSetReference, String> {
+        let reference = ContentPackSetReference {
+            root: self.root.to_authority(),
+            packs: self
+                .packs
+                .iter()
+                .map(StoredContentPackReference::to_authority)
+                .collect(),
+            fingerprint: self.fingerprint.to_authority(),
+        };
+        if !reference.is_self_consistent() {
+            return Err("Stored replay content pack set is not self-consistent.".to_string());
+        }
+        Ok(reference)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredContentPackReference {
+    id: String,
+    version: String,
+    fingerprint: StoredContentFingerprint,
+}
+
+impl StoredContentPackReference {
+    fn from_authority(value: &ContentPackReference) -> Self {
+        Self {
+            id: value.id.clone(),
+            version: value.version.clone(),
+            fingerprint: StoredContentFingerprint::from_authority(&value.fingerprint),
+        }
+    }
+
+    fn to_authority(&self) -> ContentPackReference {
+        ContentPackReference {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            fingerprint: self.fingerprint.to_authority(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredContentFingerprint {
+    algorithm: String,
+    value: String,
+}
+
+impl StoredContentFingerprint {
+    fn from_authority(value: &ContentFingerprint) -> Self {
+        Self {
+            algorithm: value.algorithm.clone(),
+            value: value.value.clone(),
+        }
+    }
+
+    fn to_authority(&self) -> ContentFingerprint {
+        ContentFingerprint {
+            algorithm: self.algorithm.clone(),
+            value: self.value.clone(),
+        }
     }
 }
 

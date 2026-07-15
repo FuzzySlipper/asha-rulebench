@@ -19,6 +19,13 @@ export interface DocumentEffectsPort {
   readonly setRootClass: (className: string, enabled: boolean) => void;
 }
 
+export interface TextFileInputPort {
+  readonly readText: (file: File) => Promise<{
+    readonly name: string;
+    readonly text: string;
+  }>;
+}
+
 export const browserClock: ClockPort = {
   now: () => new Date(),
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
@@ -49,4 +56,8 @@ export const browserDocumentEffects = (): DocumentEffectsPort => ({
     document.title = title;
   },
   setRootClass: (className, enabled) => document.documentElement.classList.toggle(className, enabled),
+});
+
+export const browserTextFileInput = (): TextFileInputPort => ({
+  readText: async (file) => ({ name: file.name, text: await file.text() }),
 });

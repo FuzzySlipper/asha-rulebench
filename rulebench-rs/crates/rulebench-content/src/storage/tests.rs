@@ -127,6 +127,9 @@ fn replacement_is_explicit_and_drifted_reimport_cannot_activate() {
     storage
         .store(&original, b"original", StorageReplacementPolicy::Reject)
         .expect("original should store");
+    storage
+        .activate(&original_reference)
+        .expect("original activation persists");
 
     let denied = storage
         .store(
@@ -159,6 +162,53 @@ fn replacement_is_explicit_and_drifted_reimport_cannot_activate() {
         Err(ContentStorageError::NotFound { .. })
     ));
     assert!(storage.retrieve(&replacement_reference).is_ok());
+    assert!(!storage.is_active(&original_reference));
+    assert!(!storage.is_active(&replacement_reference));
+    cleanup(&directory);
+}
+
+#[test]
+fn activation_sets_and_safe_deletion_survive_restart_and_honor_dependencies() {
+    let directory = test_directory("activation-dependencies");
+    let dependency = imported_pack("pack.dependency", "entity.dependency");
+    let dependency_reference = dependency.pack.exact_reference();
+    let root = imported_pack_with_dependency("pack.root", "entity.root", dependency.pack.clone());
+    let root_reference = root.pack.exact_reference();
+    let mut storage = ContentPackStorage::open(&directory).expect("storage should open");
+    storage
+        .store(&dependency, b"dependency", StorageReplacementPolicy::Reject)
+        .expect("dependency stores");
+    storage
+        .store(&root, b"root", StorageReplacementPolicy::Reject)
+        .expect("root stores");
+    storage
+        .activate_set(&root.resolved_set.reference.packs)
+        .expect("exact resolved set activates atomically");
+    drop(storage);
+
+    let mut reopened = ContentPackStorage::open(&directory).expect("activation index reloads");
+    assert!(reopened.is_active(&dependency_reference));
+    assert!(reopened.is_active(&root_reference));
+    assert!(matches!(
+        reopened.delete(&root_reference),
+        Err(ContentStorageError::ActivePack { .. })
+    ));
+    reopened
+        .deactivate(&root_reference)
+        .expect("root deactivates");
+    reopened
+        .deactivate(&dependency_reference)
+        .expect("dependency deactivates");
+    assert!(matches!(
+        reopened.delete(&dependency_reference),
+        Err(ContentStorageError::RequiredBy { .. })
+    ));
+    reopened
+        .delete(&root_reference)
+        .expect("root deletes first");
+    reopened
+        .delete(&dependency_reference)
+        .expect("unreferenced dependency deletes");
     cleanup(&directory);
 }
 
@@ -237,6 +287,47 @@ fn imported_pack(pack_id: &str, entity_id: &str) -> ImportedContentPack {
         ContentImportContext::empty(),
     )
     .expect("storage fixture should import")
+}
+
+fn imported_pack_with_dependency(
+    pack_id: &str,
+    entity_id: &str,
+    dependency: CanonicalContentPack,
+) -> ImportedContentPack {
+    let ruleset = ruleset();
+    import_content_pack(
+        ContentPackDefinition {
+            identity: ContentPackIdentity::new(pack_id, "1.0.0"),
+            title: "Dependent Stored Pack".to_string(),
+            summary: "Storage dependency fixture".to_string(),
+            tags: Vec::new(),
+            provenance: ContentPackProvenance {
+                source_kind: ContentPackSourceKind::AuthoredFile,
+                source_id: format!("fixture:{pack_id}"),
+                authored_by: Some("storage-test".to_string()),
+            },
+            ruleset: ruleset.artifact_provenance(),
+            dependencies: vec![dependency.exact_reference()],
+            collision_policy: ContentPackCollisionPolicy::Reject,
+            catalogs: ContentPackCatalogs {
+                rulesets: Vec::new(),
+                entities: vec![EntityDefinition {
+                    id: entity_id.to_string(),
+                    name: "Dependent Entity".to_string(),
+                    summary: "Entity in dependent pack".to_string(),
+                    tags: Vec::new(),
+                    damage_adjustments: Vec::new(),
+                }],
+                ..ContentPackCatalogs::default()
+            },
+        },
+        ContentImportLimits::default(),
+        ContentImportContext {
+            available_packs: std::slice::from_ref(&dependency),
+            rulesets: std::slice::from_ref(&ruleset),
+        },
+    )
+    .expect("dependent fixture should import")
 }
 
 fn ruleset() -> RulesetMetadata {

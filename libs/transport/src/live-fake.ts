@@ -97,6 +97,30 @@ export function createFakeRulebenchLiveTransport(
     runAutomaticCombat: (sessionId, request, requestOptions) =>
       handlers.runAutomaticCombat?.(sessionId, request, requestOptions) ??
       unavailable("runAutomaticCombat"),
+    listContentWorkspace: (requestOptions) =>
+      handlers.listContentWorkspace?.(requestOptions) ??
+      unavailable("listContentWorkspace"),
+    importContent: (authoredPayload, replacementPolicy, requestOptions) =>
+      handlers.importContent?.(
+        authoredPayload,
+        replacementPolicy,
+        requestOptions,
+      ) ?? unavailable("importContent"),
+    reviewContent: (reference, requestOptions) =>
+      handlers.reviewContent?.(reference, requestOptions) ??
+      unavailable("reviewContent"),
+    compareContent: (authoredPayload, requestOptions) =>
+      handlers.compareContent?.(authoredPayload, requestOptions) ??
+      unavailable("compareContent"),
+    activateContent: (reference, requestOptions) =>
+      handlers.activateContent?.(reference, requestOptions) ??
+      unavailable("activateContent"),
+    deactivateContent: (reference, requestOptions) =>
+      handlers.deactivateContent?.(reference, requestOptions) ??
+      unavailable("deactivateContent"),
+    deleteContent: (reference, requestOptions) =>
+      handlers.deleteContent?.(reference, requestOptions) ??
+      unavailable("deleteContent"),
     listReplayPackages: () =>
       handlers.listReplayPackages?.() ?? replayUnavailable("listReplayPackages"),
     loadReplayPackage: (packageId) =>

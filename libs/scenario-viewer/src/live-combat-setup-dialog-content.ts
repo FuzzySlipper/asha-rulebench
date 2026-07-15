@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import type { OnInit } from "@angular/core";
-import { LiveCombatStore } from "@asha-rulebench/store";
+import { ContentWorkbenchStore, LiveCombatStore } from "@asha-rulebench/store";
+import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol";
 
 @Component({
   selector: "arb-live-combat-setup-dialog-content",
@@ -203,6 +204,13 @@ import { LiveCombatStore } from "@asha-rulebench/store";
                           scenario.contentPackVersion
                     }}
                   </p>
+                  <div class="choice-row" aria-label="Activated authored content choices">
+                    <button type="button" [attr.aria-pressed]="selectedContentPack() === null" (click)="selectContentPack(null)">Built-in</button>
+                    @for (pack of compatibleActivePacks(); track pack.fingerprintLabel) {
+                      <button type="button" [attr.aria-pressed]="selectedContentPack()?.fingerprint.value === pack.reference.fingerprint.value" (click)="selectContentPack(pack.reference)">{{ pack.identityLabel }}</button>
+                    }
+                  </div>
+                  @if (contentWorkspace().kind === "error") { <p role="alert">{{ contentWorkspace().error.code }} · {{ contentWorkspace().error.message }}</p> }
                 </section>
                 <section class="setup-section">
                   <h4>Participant order</h4>
@@ -272,6 +280,7 @@ import { LiveCombatStore } from "@asha-rulebench/store";
 })
 export class LiveCombatSetupDialogContentComponent implements OnInit {
   private readonly store = inject(LiveCombatStore);
+  private readonly contentStore = inject(ContentWorkbenchStore);
   protected readonly connection = computed(() => this.store.connection());
   protected readonly scenarios = computed(() => this.store.scenarios());
   protected readonly sessions = computed(() => this.store.sessions());
@@ -292,6 +301,18 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   );
   protected readonly sessionIdInput = signal("manual-session");
   protected readonly participantOrder = signal<readonly string[]>([]);
+  protected readonly selectedContentPack = signal<RulebenchContentPackReferenceDto | null>(null);
+  protected readonly contentWorkspace = computed(() => this.contentStore.workspace());
+  protected readonly compatibleActivePacks = computed(() => {
+    const workspace = this.contentWorkspace();
+    const scenario = this.selectedScenario();
+    if (workspace.kind !== "data" || scenario === null) return [];
+    return workspace.value.packs.filter(
+      (pack) =>
+        pack.active &&
+        pack.rulesetLabel === `${scenario.rulesetId}@${scenario.rulesetVersion}`,
+    );
+  });
   protected readonly canCreateSession = computed(
     () =>
       this.connection().kind === "data" &&
@@ -324,6 +345,10 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     this.sessionIdInput.set(value);
   }
 
+  protected selectContentPack(reference: RulebenchContentPackReferenceDto | null): void {
+    this.selectedContentPack.set(reference);
+  }
+
   protected participantById(participantId: string) {
     return (
       this.selectedScenario()?.participants.find(
@@ -350,6 +375,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
       this.sessionIdInput().trim(),
       scenarioId,
       this.participantOrder(),
+      this.selectedContentPack(),
     );
   }
 
@@ -360,7 +386,11 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   private async initialize(): Promise<void> {
     await this.store.connect();
     if (this.store.connection().kind !== "data") return;
-    await Promise.all([this.store.loadScenarios(), this.store.loadSessions()]);
+    await Promise.all([
+      this.store.loadScenarios(),
+      this.store.loadSessions(),
+      this.contentStore.loadWorkspace(),
+    ]);
     this.syncParticipantOrder();
   }
 

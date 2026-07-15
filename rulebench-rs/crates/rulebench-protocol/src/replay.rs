@@ -59,6 +59,9 @@ pub struct ReplayPackageReviewDto {
     pub scenario_id: String,
     pub ruleset_id: String,
     pub ruleset_version: String,
+    pub content_pack_root: Option<crate::ContentPackReferenceDto>,
+    pub content_pack_set_fingerprint: Option<crate::ContentFingerprintDto>,
+    pub content_pack_references: Vec<crate::ContentPackReferenceDto>,
     pub command_count: u32,
     pub final_state_fingerprint: ReplayStateFingerprintDto,
     pub fingerprint_kind: String,
@@ -76,6 +79,33 @@ impl From<&ReplayPackage> for ReplayPackageReviewDto {
             scenario_id: value.initial_session.scenario.metadata.id.clone(),
             ruleset_id: value.ruleset.ruleset_id.clone(),
             ruleset_version: value.ruleset.ruleset_version.clone(),
+            content_pack_root: value
+                .initial_session
+                .scenario
+                .content_pack_set
+                .as_ref()
+                .map(|set| crate::ContentPackReferenceDto::from(&set.root)),
+            content_pack_set_fingerprint: value
+                .initial_session
+                .scenario
+                .content_pack_set
+                .as_ref()
+                .map(|set| crate::ContentFingerprintDto {
+                    algorithm: set.fingerprint.algorithm.clone(),
+                    value: set.fingerprint.value.clone(),
+                }),
+            content_pack_references: value
+                .initial_session
+                .scenario
+                .content_pack_set
+                .as_ref()
+                .map(|set| {
+                    set.packs
+                        .iter()
+                        .map(crate::ContentPackReferenceDto::from)
+                        .collect()
+                })
+                .unwrap_or_default(),
             command_count: value.commands.len() as u32,
             final_state_fingerprint: (&value.final_state_fingerprint).into(),
             fingerprint_kind: value.fingerprint_kind.clone(),

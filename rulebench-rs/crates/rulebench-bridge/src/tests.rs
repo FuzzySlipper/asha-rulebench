@@ -203,6 +203,7 @@ fn create(bridge: &mut RulebenchBridge, session_id: &str) -> CombatSessionHandle
                 session_id: session_id.to_string(),
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: Vec::new(),
+                content_pack: None,
             },
         )
         .expect("fixture session is valid");
@@ -401,6 +402,7 @@ fn bridge_rejects_duplicate_and_unknown_scenario_requests() {
                 session_id: "duplicate".to_string(),
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: Vec::new(),
+                content_pack: None,
             },
         )
         .expect_err("duplicate session must fail");
@@ -413,6 +415,7 @@ fn bridge_rejects_duplicate_and_unknown_scenario_requests() {
                 session_id: "unknown".to_string(),
                 scenario_id: "missing".to_string(),
                 participant_order: Vec::new(),
+                content_pack: None,
             },
         )
         .expect_err("unknown scenario must fail");
@@ -436,6 +439,7 @@ fn bridge_exposes_setup_metadata_and_validates_participant_order() {
                 session_id: "reordered".to_string(),
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: vec!["raider".to_string(), "adept".to_string()],
+                content_pack: None,
             },
         )
         .expect("complete participant order is valid");
@@ -451,6 +455,7 @@ fn bridge_exposes_setup_metadata_and_validates_participant_order() {
                 session_id: "invalid-setup".to_string(),
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: vec!["adept".to_string()],
+                content_pack: None,
             },
         )
         .expect_err("incomplete participant order is rejected");

@@ -6,9 +6,11 @@
 
 #![forbid(unsafe_code)]
 
+mod content_invocation;
 mod error;
 mod invocation;
 
+pub use content_invocation::{import_authored_content, ContentInvocationError};
 pub use error::{BridgeError, BridgeErrorKind};
 pub use invocation::{prepare_replay_scenario, BridgeScenario, RulebenchBridge};
 
@@ -21,11 +23,23 @@ pub mod replay_storage {
         record_replay_package, CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec,
         CombatControlCommandSpec, CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
         CombatSessionCandidateSelectionSpec, CombatSessionCreateRequest,
-        CombatSessionIntentCommandSpec, Combatant, CommandRollMode, ContentPackStorage,
-        EquipmentCommandKind, EquipmentCommandSpec, GridPosition, ReactionCommandSpec,
-        ReactionResponseKind, ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage,
-        ReplayArchiveStorageError, ReplayCommand, ReplayCommandRecord, ReplayCommandRecordingSpec,
-        ReplayNarration, RulesetArtifactProvenance, UseActionIntent,
+        CombatSessionIntentCommandSpec, Combatant, CommandRollMode, ContentFingerprint,
+        ContentPackReference, ContentPackSetReference, ContentPackStorage, EquipmentCommandKind,
+        EquipmentCommandSpec, GridPosition, ReactionCommandSpec, ReactionResponseKind,
+        ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage, ReplayArchiveStorageError,
+        ReplayCommand, ReplayCommandRecord, ReplayCommandRecordingSpec, ReplayNarration,
+        RulesetArtifactProvenance, UseActionIntent,
+    };
+}
+
+/// Host-neutral types and operations needed by a concrete content repository.
+pub mod content_storage {
+    pub use rulebench_rules::{
+        compare_content_packs, CanonicalContentPack, ContentDefinitionKind,
+        ContentImportDiagnostic, ContentImportDiagnosticSeverity, ContentImportLimits,
+        ContentPackDiffReadout, ContentPackReference, ContentPackSetReference, ContentPackStorage,
+        ContentStorageError, ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
+        StorageReplacementPolicy, StoredContentPayload,
     };
 }
 

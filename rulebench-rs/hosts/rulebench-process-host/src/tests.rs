@@ -8,12 +8,12 @@ use std::time::Duration;
 
 use rulebench_protocol::{
     CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
-    CombatSessionIntentCommandDto, CommandRollModeDto, LiveCommandExecutionDto,
-    LiveControlExecutionDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
-    ProtocolHandshakeDto, ReactionCommandSpecDto, ReactionResponseKindDto,
-    ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayComparisonRequestDto,
-    ReplayPackageReviewDto, ReplayVerificationReadoutDto, ScenarioOptionDto, UseActionIntentDto,
-    PROTOCOL_VERSION,
+    CombatSessionIntentCommandDto, CommandRollModeDto, ContentImportAttemptDto,
+    ContentWorkspaceDto, LiveCommandExecutionDto, LiveControlExecutionDto,
+    LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
+    ReactionResponseKindDto, ReplayArchiveMetadataDto, ReplayComparisonReadoutDto,
+    ReplayComparisonRequestDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
+    ScenarioOptionDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
 
 use crate::{
@@ -63,6 +63,7 @@ fn router_serializes_lifecycle_and_isolates_multiple_sessions() {
                 session_id: session_id.to_string(),
                 scenario_id: scenario_id.clone(),
                 participant_order: Vec::new(),
+                content_pack: None,
             },
         ));
         assert_eq!(created.status, 200);
@@ -131,6 +132,7 @@ fn router_classifies_version_serialization_handle_and_lifecycle_errors() {
             session_id: "ready".to_string(),
             scenario_id: scenarios[0].id.clone(),
             participant_order: Vec::new(),
+            content_pack: None,
         },
     ));
     assert_eq!(created.status, 200);
@@ -232,6 +234,7 @@ fn durable_router_reports_repository_state_and_reloads_a_finalized_live_replay()
                     session_id: session_id.to_string(),
                     scenario_id,
                     participant_order: Vec::new(),
+                    content_pack: None,
                 },
             ))
             .status,
@@ -292,6 +295,200 @@ fn durable_router_reports_repository_state_and_reloads_a_finalized_live_replay()
 }
 
 #[test]
+fn authored_content_survives_restart_binds_a_session_and_replay_to_the_exact_pack() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-content-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "hexing-bolt-hit")
+        .expect("authored-content compatible fixture exists");
+    let payload = authored_content_payload(scenario, "Durable Authored Pack", 1);
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": payload,
+            "replacementPolicy": "reject"
+        }),
+    ));
+    assert_eq!(imported.status, 200);
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("import attempt is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .as_ref()
+        .expect("accepted import has outcome")
+        .review
+        .pack
+        .reference
+        .clone();
+
+    let activated = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/activate",
+        &serde_json::json!({ "reference": reference }),
+    ));
+    assert_eq!(activated.status, 200);
+    let activated: ContentWorkspaceDto =
+        serde_json::from_slice(&activated.body).expect("activation is JSON");
+    assert!(activated.packs.iter().all(|pack| pack.active));
+
+    let unsupported = authored_content_payload(scenario, "Rejected Replacement", 99);
+    let rejected = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": unsupported,
+            "replacementPolicy": "replaceSameIdentity"
+        }),
+    ));
+    let rejected: ContentImportAttemptDto =
+        serde_json::from_slice(&rejected.body).expect("rejection is JSON");
+    assert!(!rejected.accepted);
+    assert_eq!(
+        rejected.error_code.as_deref(),
+        Some("unsupportedAuthoredContentVersion")
+    );
+    let retained = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let retained: ContentWorkspaceDto =
+        serde_json::from_slice(&retained.body).expect("workspace is JSON");
+    assert_eq!(retained.packs.len(), 1);
+    assert!(retained.packs[0].active);
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("content repository restarts");
+    let workspace = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let workspace: ContentWorkspaceDto =
+        serde_json::from_slice(&workspace.body).expect("restarted workspace is JSON");
+    assert_eq!(workspace.packs.len(), 1);
+    assert!(workspace.packs[0].active);
+    assert_eq!(workspace.packs[0].reference, reference);
+
+    let session_id = "authored-content-session";
+    let created = restarted.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: session_id.to_string(),
+            scenario_id: scenario.id.clone(),
+            participant_order: Vec::new(),
+            content_pack: Some(reference.clone()),
+        },
+    ));
+    assert_eq!(
+        created.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&created.body)
+    );
+    for kind in [
+        CombatControlCommandKindDto::ExplicitStart,
+        CombatControlCommandKindDto::ExplicitEnd,
+    ] {
+        assert_eq!(
+            restarted
+                .handle(&json_request(
+                    HttpMethod::Post,
+                    &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                    &CombatControlCommandDto { kind },
+                ))
+                .status,
+            200
+        );
+    }
+    let closed = restarted.handle(&request(
+        HttpMethod::Delete,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    assert_eq!(
+        closed.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&closed.body)
+    );
+    let replay = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/live-{session_id}"),
+    ));
+    let replay: ReplayPackageReviewDto =
+        serde_json::from_slice(&replay.body).expect("replay review is JSON");
+    assert_eq!(replay.content_pack_root, Some(reference.clone()));
+    assert_eq!(replay.content_pack_references, vec![reference]);
+    assert!(replay.content_pack_set_fingerprint.is_some());
+
+    let workspace = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let workspace: ContentWorkspaceDto =
+        serde_json::from_slice(&workspace.body).expect("audited workspace is JSON");
+    assert!(workspace
+        .audit
+        .iter()
+        .any(|entry| entry.operation == "contentBoundToSession"));
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+fn authored_content_payload(
+    scenario: &ScenarioOptionDto,
+    title: &str,
+    format_version: u32,
+) -> String {
+    serde_json::to_string_pretty(&serde_json::json!({
+        "format": "asha-rulebench.content-pack",
+        "formatVersion": format_version,
+        "pack": {
+            "id": "pack.authored.durable",
+            "version": "1.0.0",
+            "title": title,
+            "summary": "Authored host lifecycle integration fixture.",
+            "tags": ["authored", "integration"],
+            "provenance": {
+                "sourceKind": "authoredFile",
+                "sourceId": "fixture:authored-content",
+                "authoredBy": "Rulebench integration test"
+            },
+            "rulesetId": scenario.ruleset_id,
+            "dependencies": [],
+            "catalogs": {
+                "rulesets": [{
+                    "id": scenario.ruleset_id,
+                    "name": "Authored Compatible Ruleset",
+                    "version": scenario.ruleset_version,
+                    "summary": "Matches the selected live scenario authority modules.",
+                    "modules": [{
+                        "module": "actionResolution",
+                        "version": "1",
+                        "configuration": {
+                            "module": "actionResolution",
+                            "targetingPolicy": "declaredTargetsAndLineOfSight",
+                            "supportedCheckHandlers": ["attackVsDefense"]
+                        }
+                    }]
+                }],
+                "entities": [{
+                    "id": "entity.authored-review",
+                    "name": "Authored Review Entity",
+                    "summary": "Proves generic canonical definition review.",
+                    "tags": ["review"],
+                    "damageAdjustments": [{
+                        "damageType": "arcane",
+                        "policy": "resistance"
+                    }]
+                }]
+            }
+        }
+    }))
+    .expect("authored fixture serializes")
+}
+
+#[test]
 fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
     let mut router = router();
     let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
@@ -313,6 +510,7 @@ fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
                     session_id: session_id.to_owned(),
                     scenario_id,
                     participant_order: Vec::new(),
+                    content_pack: None,
                 },
             ))
             .status,
@@ -480,6 +678,7 @@ fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
                     session_id: session_id.to_string(),
                     scenario_id: scenario_id.clone(),
                     participant_order: Vec::new(),
+                    content_pack: None,
                 },
             ));
             assert_eq!(created.status, 200);
@@ -509,6 +708,7 @@ fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
             session_id: session_id.to_string(),
             scenario_id: scenario_id.clone(),
             participant_order: Vec::new(),
+            content_pack: None,
         },
     ));
     assert_eq!(retained_archive.status, 409);
@@ -521,6 +721,7 @@ fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
             session_id: session_id.to_string(),
             scenario_id,
             participant_order: Vec::new(),
+            content_pack: None,
         },
     ));
     assert_eq!(recreated.status, 200);

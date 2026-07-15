@@ -60,6 +60,10 @@ consume that public transport boundary rather than call the host directly.
 `LiveCombatStore` owns live connection/session selection, command inputs,
 preflight, submission, snapshot refresh, stale-response suppression, and
 cleanup; domain projections turn Rust evidence into display labels only.
+`ContentWorkbenchStore` owns the live authored-pack lifecycle through the same
+transport: file text crosses a platform port, Rust decodes and semantically
+validates the versioned document, and TypeScript displays generic diagnostics,
+canonical definitions, diffs, activation state, and audit evidence.
 The canonical `pnpm run e2e` gate starts this combined stack and completes a
 real Rust-owned combat session through the transport, including cleanup and
 classified failure/version-mismatch checks.
@@ -69,6 +73,11 @@ with `--artifact-root PATH` (or set `RULEBENCH_ARTIFACT_ROOT`). The concrete
 host owns that versioned, single-writer filesystem repository; portable Rust
 crates remain serialization-free and the bridge remains host-neutral. Active
 combat sessions are still process-local and are not recovered after restart.
+Stored authored packs are re-decoded and re-imported on every host start before
+their exact activation can be used. A new session may select a compatible
+activated pack set; its exact references and set fingerprint are then retained
+in the finalized replay. See `docs/authored-content-format.md` for the v1 wire
+contract and migration posture.
 
 ## Source Material
 
@@ -240,7 +249,9 @@ display Rust-owned outcomes.
 
 The current surface proves one developed Hexing Bolt rules fixture through
 deterministic cases, live commands, bounded automatic control, and replay
-inspection. Replay packages are currently in-memory fixtures rather than a
-durable archive of arbitrary finalized sessions. Live session snapshots do not
-yet expose authoritative positions, so panel 1 labels its board as selected
-scenario setup evidence rather than live movement state.
+inspection. With an artifact root configured, the content tool imports,
+reviews, compares, activates, deactivates, and safely deletes authored packs;
+authored packs and finalized replays survive host restart. Active sessions
+remain process-local. Live session snapshots do not yet expose authoritative
+positions, so panel 1 labels its board as selected scenario setup evidence
+rather than live movement state.

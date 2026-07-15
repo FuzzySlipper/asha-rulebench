@@ -31,6 +31,7 @@ liveScenario(
   "boot live evidence @live",
   async ({ page, collector, liveBaseUrl }) => {
     const liveSessionId = `live-evidence-${Date.now()}`;
+    const livePackId = `pack.live.${Date.now()}`;
     const angularTrackWarnings: string[] = [];
     page.on("console", (message) => {
       if (message.text().includes("NG0955")) {
@@ -48,27 +49,57 @@ liveScenario(
     const contentDialog = page.getByRole("dialog", { name: "Content packs" });
     await expect(
       contentDialog.getByRole("heading", {
-        name: "Content Packs",
+        name: "Live Authored Content",
         exact: true,
       }),
     ).toBeVisible();
-    await contentDialog
-      .getByRole("button", { name: /pack.error@1.0.0/ })
-      .click();
-    await expect(
-      contentDialog.getByLabel("Selected content pack review"),
-    ).toContainText("missingContentPackDependency");
-    await collector.milestone("content diagnostics rendered", {
+    await contentDialog.locator('input[type="file"]').setInputFiles({
+      name: "live-authored-pack.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(authoredPack(livePackId, 1, "Live Evidence Pack")),
+    });
+    await contentDialog.getByRole("button", { name: "Import", exact: true }).click();
+    await expect(contentDialog.getByText("Accepted", { exact: true })).toBeVisible();
+    await contentDialog.getByRole("button", { name: "Activate exact set" }).click();
+    const selectedContent = contentDialog.getByRole("region", {
+      name: "Selected authored pack review",
+    });
+    await expect(selectedContent.getByText("Active", { exact: true })).toBeVisible();
+    await collector.milestone("authored content active desktop", {
       screenshot: true,
       layerSnapshot: {
-        selectedPack: await contentDialog
-          .getByLabel("Selected content pack review")
-          .innerText(),
-        validation: await contentDialog
-          .getByLabel("Content validation review")
+        selectedPack: await selectedContent.innerText(),
+        lifecycleAudit: await contentDialog
+          .getByRole("region", { name: "Content lifecycle audit" })
           .innerText(),
       },
     });
+    await contentDialog.locator('input[type="file"]').setInputFiles({
+      name: "unsupported-live-pack.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(authoredPack(livePackId, 99, "Unsupported Live Pack")),
+    });
+    await contentDialog.getByRole("button", { name: "Import", exact: true }).click();
+    await expect(contentDialog.getByText("unsupportedAuthoredContentVersion")).toBeVisible();
+    await expect(selectedContent.getByText("Active", { exact: true })).toBeVisible();
+    await collector.milestone("authored content rejection preserves active pack", {
+      screenshot: true,
+      layerSnapshot: {
+        rejection: await contentDialog
+          .getByRole("region", { name: "Import authored content" })
+          .innerText(),
+        retainedPack: await selectedContent.innerText(),
+      },
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await collector.milestone("authored content mobile", {
+      screenshot: true,
+      layerSnapshot: {
+        viewport: "390x844",
+        selectedPack: await selectedContent.innerText(),
+      },
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
     await contentDialog.getByRole("button", { name: "Close" }).click();
 
     const liveSetup = await openLiveSetup(page);
@@ -78,7 +109,12 @@ liveScenario(
     await liveSetup.controls
       .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
       .click();
-    await liveSetup.controls.getByLabel("Session").fill(liveSessionId);
+    await liveSetup.controls
+      .getByRole("button", { name: `${livePackId}@1.0.0`, exact: true })
+      .click();
+    await liveSetup.controls
+      .getByRole("textbox", { name: "Session" })
+      .fill(liveSessionId);
     await liveSetup.controls
       .getByRole("button", { name: "Create session" })
       .click();
@@ -143,7 +179,7 @@ liveScenario(
       .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
       .click();
     await automaticSetup.controls
-      .getByLabel("Session")
+      .getByRole("textbox", { name: "Session" })
       .fill(`live-automatic-${Date.now()}`);
     await automaticSetup.controls
       .getByRole("button", { name: "Create session" })
@@ -186,3 +222,58 @@ liveScenario(
     expect(angularTrackWarnings).toEqual([]);
   },
 );
+
+function authoredPack(
+  packId: string,
+  formatVersion: number,
+  title: string,
+): string {
+  return JSON.stringify({
+    format: "asha-rulebench.content-pack",
+    formatVersion,
+    pack: {
+      id: packId,
+      version: "1.0.0",
+      title,
+      summary: "Live rendered authored-content evidence.",
+      tags: ["live", "authored"],
+      provenance: {
+        sourceKind: "authoredFile",
+        sourceId: `live:${packId}`,
+        authoredBy: "Rulebench live scenario",
+      },
+      rulesetId: "asha-rulebench.hexing-bolt.v0",
+      dependencies: [],
+      catalogs: {
+        rulesets: [
+          {
+            id: "asha-rulebench.hexing-bolt.v0",
+            name: "Live Compatible Ruleset",
+            version: "0.0.0",
+            summary: "Matches the live Hexing Bolt authority modules.",
+            modules: [
+              {
+                module: "actionResolution",
+                version: "1",
+                configuration: {
+                  module: "actionResolution",
+                  targetingPolicy: "declaredTargetsAndLineOfSight",
+                  supportedCheckHandlers: ["attackVsDefense"],
+                },
+              },
+            ],
+          },
+        ],
+        entities: [
+          {
+            id: `entity.${packId}`,
+            name: "Live Authored Entity",
+            summary: "Generic definition projection evidence.",
+            tags: ["live"],
+            damageAdjustments: [],
+          },
+        ],
+      },
+    },
+  });
+}

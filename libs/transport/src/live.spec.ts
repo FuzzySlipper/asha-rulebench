@@ -26,23 +26,7 @@ describe("live Rulebench transport", () => {
     }> = [];
     const responseBodies: unknown[] = [
       handshake,
-      [],
-      [],
-      {},
-      {},
-      {},
-      {},
-      [],
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
-      {},
+      ...Array.from({ length: 24 }, () => ({})),
     ];
     const fetchRequest: typeof fetch = async (input, init) => {
       calls.push({
@@ -121,6 +105,18 @@ describe("live Rulebench transport", () => {
     await transport.submitReaction(createRequest.sessionId, reactionCommand);
     await transport.runAutomaticStep(createRequest.sessionId, automaticStep);
     await transport.runAutomaticCombat(createRequest.sessionId, automaticRun);
+    const contentReference = {
+      id: "pack.authored",
+      version: "1.0.0",
+      fingerprint: { algorithm: "fnv1a64", value: "abc123" },
+    };
+    await transport.listContentWorkspace();
+    await transport.importContent("{\"formatVersion\":1}", "reject");
+    await transport.reviewContent(contentReference);
+    await transport.compareContent("{\"formatVersion\":1}");
+    await transport.activateContent(contentReference);
+    await transport.deactivateContent(contentReference);
+    await transport.deleteContent(contentReference);
     await transport.listReplayPackages();
     await transport.loadReplayPackage("replay/one");
     await transport.loadReplayVerification("replay/one");
@@ -141,6 +137,13 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/reactions",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-step",
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-run",
+      "GET http://rulebench.test/api/rulebench/v1/content",
+      "POST http://rulebench.test/api/rulebench/v1/content/import",
+      "POST http://rulebench.test/api/rulebench/v1/content/review",
+      "POST http://rulebench.test/api/rulebench/v1/content/compare",
+      "POST http://rulebench.test/api/rulebench/v1/content/activate",
+      "POST http://rulebench.test/api/rulebench/v1/content/deactivate",
+      "POST http://rulebench.test/api/rulebench/v1/content/delete",
       "GET http://rulebench.test/api/rulebench/v1/replays",
       "GET http://rulebench.test/api/rulebench/v1/replays/replay%2Fone",
       "POST http://rulebench.test/api/rulebench/v1/replays/replay%2Fone/verify",
@@ -153,7 +156,7 @@ describe("live Rulebench transport", () => {
     expect(calls[11]?.body).toBe(JSON.stringify(reactionCommand));
     expect(calls[12]?.body).toBe(JSON.stringify(automaticStep));
     expect(calls[13]?.body).toBe(JSON.stringify(automaticRun));
-    expect(calls[17]?.body).toBe(
+    expect(calls[24]?.body).toBe(
       JSON.stringify({
         expectedPackageId: "expected",
         actualPackageId: "actual",

@@ -9,7 +9,10 @@ use crate::{
 
 mod codec;
 
-use codec::{decode_record, encode_record, fingerprint_payload, record_file_stem};
+use codec::{
+    decode_activation_index, decode_record, encode_activation_index, encode_record,
+    fingerprint_payload, record_file_stem,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageReplacementPolicy {
@@ -25,6 +28,7 @@ pub struct ContentStorageRecord {
     pub provenance: ContentPackProvenance,
     pub ruleset_id: String,
     pub ruleset_version: String,
+    pub dependencies: Vec<ContentPackReference>,
     pub definitions: Vec<ContentDefinitionReference>,
     pub payload_fingerprint: ContentFingerprint,
 }
@@ -62,6 +66,13 @@ pub enum ContentStorageError {
         expected: ContentPackReference,
         actual: ContentPackReference,
     },
+    ActivePack {
+        reference: ContentPackReference,
+    },
+    RequiredBy {
+        reference: ContentPackReference,
+        dependent: ContentPackReference,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,6 +86,7 @@ pub struct ContentStorageStartupIssue {
 pub struct ContentPackStorage {
     root: PathBuf,
     records: BTreeMap<ContentPackReference, ContentStorageRecord>,
+    active: BTreeSet<ContentPackReference>,
     definition_index: BTreeMap<(ContentDefinitionKind, String), Vec<ContentPackReference>>,
 }
 
@@ -128,10 +140,21 @@ impl ContentPackStorage {
             }
         }
 
+        let active = read_activation_index(&root)?;
+        if let Some(reference) = active
+            .iter()
+            .find(|reference| !records.contains_key(*reference))
+        {
+            return Err(ContentStorageError::CorruptRecord {
+                path: activation_index_path(&root),
+                reason: format!("activation index references missing content: {reference:?}"),
+            });
+        }
         let definition_index = build_definition_index(records.values());
         Ok(Self {
             root,
             records,
+            active,
             definition_index,
         })
     }
@@ -206,11 +229,36 @@ impl ContentPackStorage {
             }
             records.insert(record.reference.clone(), record);
         }
+        let mut active = match read_activation_index(&root) {
+            Ok(active) => active,
+            Err(error) => {
+                issues.push(ContentStorageStartupIssue {
+                    code: "corruptContentActivationIndexQuarantined".to_string(),
+                    path: activation_index_path(&root),
+                    reason: format!("{error:?}"),
+                });
+                BTreeSet::new()
+            }
+        };
+        let stale = active
+            .iter()
+            .filter(|reference| !records.contains_key(*reference))
+            .cloned()
+            .collect::<Vec<_>>();
+        for reference in stale {
+            active.remove(&reference);
+            issues.push(ContentStorageStartupIssue {
+                code: "staleContentActivationQuarantined".to_string(),
+                path: activation_index_path(&root),
+                reason: format!("Activation referenced unavailable content: {reference:?}"),
+            });
+        }
         let definition_index = build_definition_index(records.values());
         Ok((
             Self {
                 root,
                 records,
+                active,
                 definition_index,
             },
             issues,
@@ -223,6 +271,14 @@ impl ContentPackStorage {
 
     pub fn list(&self) -> Vec<&ContentStorageRecord> {
         self.records.values().collect()
+    }
+
+    pub fn active_references(&self) -> Vec<&ContentPackReference> {
+        self.active.iter().collect()
+    }
+
+    pub fn is_active(&self, reference: &ContentPackReference) -> bool {
+        self.active.contains(reference)
     }
 
     pub fn references_for_definition(
@@ -272,12 +328,25 @@ impl ContentPackStorage {
             discard_staged_replacements(&staged_replacements);
             return Err(error);
         }
+        let mut next_active = self.active.clone();
+        for replaced in &same_identity {
+            next_active.remove(replaced);
+        }
+        if next_active != self.active {
+            if let Err(error) = write_activation_index(&self.root, &next_active) {
+                remove_committed_files(&self.root, &record.reference);
+                restore_staged_replacements(&staged_replacements);
+                discard_staged_replacements(&staged_replacements);
+                return Err(error);
+            }
+        }
         discard_staged_replacements(&staged_replacements);
         for replaced in same_identity {
             self.records.remove(&replaced);
         }
         self.records
             .insert(record.reference.clone(), record.clone());
+        self.active = next_active;
         self.definition_index = build_definition_index(self.records.values());
         Ok(record)
     }
@@ -313,6 +382,66 @@ impl ContentPackStorage {
         }
         Ok(reimported.pack)
     }
+
+    pub fn activate(
+        &mut self,
+        reference: &ContentPackReference,
+    ) -> Result<(), ContentStorageError> {
+        self.activate_set(std::slice::from_ref(reference))
+    }
+
+    pub fn activate_set(
+        &mut self,
+        references: &[ContentPackReference],
+    ) -> Result<(), ContentStorageError> {
+        for reference in references {
+            self.retrieve(reference)?;
+        }
+        let mut active = self.active.clone();
+        active.extend(references.iter().cloned());
+        write_activation_index(&self.root, &active)?;
+        self.active = active;
+        Ok(())
+    }
+
+    pub fn deactivate(
+        &mut self,
+        reference: &ContentPackReference,
+    ) -> Result<(), ContentStorageError> {
+        self.retrieve(reference)?;
+        let mut active = self.active.clone();
+        active.remove(reference);
+        write_activation_index(&self.root, &active)?;
+        self.active = active;
+        Ok(())
+    }
+
+    pub fn delete(&mut self, reference: &ContentPackReference) -> Result<(), ContentStorageError> {
+        if self.active.contains(reference) {
+            return Err(ContentStorageError::ActivePack {
+                reference: reference.clone(),
+            });
+        }
+        if let Some(dependent) = self.records.values().find(|record| {
+            record.reference != *reference && record.dependencies.contains(reference)
+        }) {
+            return Err(ContentStorageError::RequiredBy {
+                reference: reference.clone(),
+                dependent: dependent.reference.clone(),
+            });
+        }
+        self.retrieve(reference)?;
+        let staged = stage_replacements(&self.root, std::slice::from_ref(reference))?;
+        if let Err(error) = remove_staged_originals(&staged) {
+            restore_staged_replacements(&staged);
+            discard_staged_replacements(&staged);
+            return Err(error);
+        }
+        discard_staged_replacements(&staged);
+        self.records.remove(reference);
+        self.definition_index = build_definition_index(self.records.values());
+        Ok(())
+    }
 }
 
 fn record_from_pack(pack: &CanonicalContentPack, payload: &[u8]) -> ContentStorageRecord {
@@ -323,6 +452,7 @@ fn record_from_pack(pack: &CanonicalContentPack, payload: &[u8]) -> ContentStora
         provenance: pack.provenance.clone(),
         ruleset_id: pack.ruleset.ruleset_id.clone(),
         ruleset_version: pack.ruleset.ruleset_version.clone(),
+        dependencies: pack.dependencies.clone(),
         definitions: pack.definition_references(),
         payload_fingerprint: fingerprint_payload(payload),
     }
@@ -387,6 +517,46 @@ fn validate_payload(
         });
     }
     Ok(())
+}
+
+fn activation_index_path(root: &Path) -> PathBuf {
+    root.join("activation.index")
+}
+
+fn read_activation_index(
+    root: &Path,
+) -> Result<BTreeSet<ContentPackReference>, ContentStorageError> {
+    let path = activation_index_path(root);
+    if !path.exists() {
+        return Ok(BTreeSet::new());
+    }
+    let bytes = fs::read(&path).map_err(|_| ContentStorageError::Io {
+        operation: "readContentActivationIndex",
+        path: path.clone(),
+    })?;
+    decode_activation_index(&bytes)
+        .map_err(|reason| ContentStorageError::CorruptRecord { path, reason })
+}
+
+fn write_activation_index(
+    root: &Path,
+    active: &BTreeSet<ContentPackReference>,
+) -> Result<(), ContentStorageError> {
+    let path = activation_index_path(root);
+    let temporary = root.join("activation.index.tmp");
+    fs::write(&temporary, encode_activation_index(active)).map_err(|_| {
+        ContentStorageError::Io {
+            operation: "writeContentActivationIndex",
+            path: temporary.clone(),
+        }
+    })?;
+    fs::rename(&temporary, &path).map_err(|_| {
+        let _ = fs::remove_file(&temporary);
+        ContentStorageError::Io {
+            operation: "commitContentActivationIndex",
+            path,
+        }
+    })
 }
 
 #[derive(Debug)]
