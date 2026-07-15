@@ -54,12 +54,19 @@ fn capability_route_reports_registry_and_actual_host_composition() {
     assert_eq!(manifest.host.session_recovery_mode, "none");
     assert_eq!(manifest.rulesets.len(), 1);
     assert_eq!(manifest.packages.len(), 3);
-    assert_eq!(manifest.scenarios.len(), 7);
+    assert_eq!(manifest.scenarios.len(), 10);
     assert!(manifest.capabilities.iter().any(|capability| {
         capability.id == "targeting.multipleCombatants"
             && capability.support.runtime_executable
-            && !capability.support.regression_covered
+            && capability.support.regression_covered
     }));
+    for capability_id in ["operation.heal", "operation.grantTemporaryVitality"] {
+        assert!(manifest.capabilities.iter().any(|capability| {
+            capability.id == capability_id
+                && capability.support.runtime_executable
+                && capability.support.regression_covered
+        }));
+    }
     assert!(manifest.capabilities.iter().any(|capability| {
         capability.id == "content.authored-pack"
             && !capability.support.runtime_executable

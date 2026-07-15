@@ -144,6 +144,9 @@ describe("RulebenchTransport fixtures", () => {
         "turn-control-hit",
         "hexing-bolt-veteran-hit",
         "watchtower-skirmish",
+        "watchtower-storm-pulse-area",
+        "watchtower-storm-pulse-multiple",
+        "watchtower-vitality-operations",
       ]);
     }
     expect(result.ok).toBe(true);

@@ -37,7 +37,7 @@
     },
     {
       "file": "README.md",
-      "text": "1 ruleset identity, 3 registered packages, 7 scenario cases, 1 automation policy"
+      "text": "1 ruleset identity, 3 registered packages, 10 scenario cases, 1 automation policy"
     }
   ],
   "requiredNonClaims": [
@@ -92,10 +92,6 @@
     {
       "id": "schema-coupled-replay-fingerprint",
       "denHeading": "Replay archive fingerprints are schema-coupled"
-    },
-    {
-      "id": "executable-capability-regression-gaps",
-      "denHeading": "Executable capability regression gaps"
     }
   ]
 }

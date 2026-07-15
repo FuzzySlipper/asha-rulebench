@@ -38,6 +38,9 @@ describe('SessionStore', () => {
         'turn-control-hit',
         'hexing-bolt-veteran-hit',
         'watchtower-skirmish',
+        'watchtower-storm-pulse-area',
+        'watchtower-storm-pulse-multiple',
+        'watchtower-vitality-operations',
       ]);
     }
     expect(store.selectedScenarioId()).toBe('hexing-bolt-hit');

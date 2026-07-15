@@ -1,9 +1,9 @@
 use rulebench_rules::{
-    fingerprint_projected_state, resolve_use_action, AttackOutcome, RulebenchReceipt,
-    RulebenchRejection,
+    fingerprint_projected_state, resolve_use_action, AttackOutcome, CombatSessionIntentCommandSpec,
+    CombatSessionState, RulebenchReceipt, RulebenchRejection,
 };
 
-use crate::{ScenarioOutcomeClass, ScenarioPackageRegistry};
+use crate::{ScenarioCatalogCase, ScenarioOutcomeClass, ScenarioPackageRegistry};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ScenarioRegressionFilter {
@@ -62,8 +62,8 @@ pub fn run_scenario_regressions(
             if !matches_filter(filter.scenario_id.as_deref(), &case.summary.id) {
                 continue;
             }
-            let first = resolve_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
-            let second = resolve_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
+            let first = execute_catalog_case(&case);
+            let second = execute_catalog_case(&case);
             let actual_outcome = classify_outcome(&first);
             let first_difference = compare_outcome(case.summary.outcome_class, actual_outcome)
                 .or_else(|| compare_receipts(&first, &second));
@@ -101,6 +101,31 @@ pub fn run_scenario_regressions(
         cases,
         first_difference,
     }
+}
+
+fn execute_catalog_case(case: &ScenarioCatalogCase) -> RulebenchReceipt {
+    let is_movement = case
+        .scenario
+        .actions
+        .iter()
+        .find(|action| action.id == case.intent.action_id)
+        .is_some_and(|action| action.movement.is_some());
+    if !is_movement {
+        return resolve_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
+    }
+    let mut session = CombatSessionState::new(
+        format!("regression-{}", case.summary.id),
+        case.scenario.clone(),
+    );
+    session
+        .submit_intent_command(CombatSessionIntentCommandSpec::new(
+            case.summary.id.clone(),
+            case.summary.title.clone(),
+            "Execute registered movement conformance through the session owner.",
+            case.intent.clone(),
+            case.roll_stream.clone(),
+        ))
+        .receipt
 }
 
 fn matches_filter(filter: Option<&str>, value: &str) -> bool {
@@ -188,7 +213,7 @@ mod tests {
             run_scenario_regressions(&crate::scenario_package_registry(), &Default::default());
 
         assert!(report.accepted, "{:?}", report.first_difference);
-        assert_eq!(report.cases.len(), 7);
+        assert_eq!(report.cases.len(), 10);
         assert_eq!(
             report
                 .cases

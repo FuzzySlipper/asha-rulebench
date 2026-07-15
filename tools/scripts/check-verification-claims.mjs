@@ -35,7 +35,6 @@ for (const id of [
   "active-session-recovery",
   "authored-content-v1-vocabulary",
   "schema-coupled-replay-fingerprint",
-  "executable-capability-regression-gaps",
 ]) {
   if (!limitationIds.has(id))
     failures.push(`verification review omits active limitation ${id}.`);
@@ -231,6 +230,15 @@ function checkCapabilityManifest(capabilities) {
     );
     if (entry.evidence.length === 0) {
       failures.push(`${entry.id} must name at least one Rust evidence owner.`);
+    }
+    if (
+      ["operation", "targeting", "policy"].includes(entry.kind) &&
+      support.runtimeExecutable &&
+      !support.regressionCovered
+    ) {
+      failures.push(
+        `${entry.id} is executable but lacks a successful owner-level conformance case.`,
+      );
     }
   }
 

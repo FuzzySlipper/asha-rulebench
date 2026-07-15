@@ -285,7 +285,7 @@ mod tests {
         let registry = crate::scenario_package_registry();
 
         assert_eq!(registry.registrations().len(), 3);
-        assert_eq!(registry.scenario_catalog_cases().len(), 7);
+        assert_eq!(registry.scenario_catalog_cases().len(), 10);
         assert_eq!(registry.combat_session_transcripts().len(), 2);
         assert_eq!(registry.combat_session_script_readouts().len(), 1);
     }

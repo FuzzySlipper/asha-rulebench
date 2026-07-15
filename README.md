@@ -261,7 +261,7 @@ positions, so panel 1 labels its board as selected scenario setup evidence
 rather than live movement state.
 
 The executable capability manifest currently reports 1 ruleset identity, 3
-registered packages, 7 scenario cases, 1 automation policy, and operation
+registered packages, 10 scenario cases, 1 automation policy, and operation
 pipeline v2. Its checked TypeScript projection records the exact governed ASHA
 revision and the configured durable-host support matrix; the live workbench
 always reads the current process-host manifest instead. See

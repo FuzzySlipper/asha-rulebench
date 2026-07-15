@@ -72,6 +72,44 @@ impl CapabilitySupport {
     }
 }
 
+/// Executable operation, targeting, and automation-policy identities that
+/// require authority-level conformance evidence.
+///
+/// This is assembled from the same owner registries as the manifest. Fixture
+/// runners use it to reject missing, renamed, or version-drifted conformance
+/// registrations without maintaining a parallel capability checklist.
+pub fn executable_conformance_capabilities() -> Vec<CapabilityIdentity> {
+    let mut identities = EffectOperationId::ALL
+        .iter()
+        .copied()
+        .filter(|operation| RUNTIME_EFFECT_OPERATION_REGISTRY.contains(operation))
+        .map(|operation| CapabilityIdentity {
+            id: format!("operation.{}", operation.code()),
+            version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+        })
+        .chain(
+            TargetingOperationId::ALL
+                .iter()
+                .copied()
+                .filter(|targeting| RUNTIME_TARGETING_OPERATION_REGISTRY.contains(targeting))
+                .map(|targeting| CapabilityIdentity {
+                    id: format!("targeting.{}", targeting.code()),
+                    version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+                }),
+        )
+        .chain(
+            COMBAT_AUTOMATION_POLICY_REGISTRY
+                .iter()
+                .map(|policy| CapabilityIdentity {
+                    id: format!("policy.{}", policy.id),
+                    version: policy.version.to_string(),
+                }),
+        )
+        .collect::<Vec<_>>();
+    identities.sort();
+    identities
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilityEntry {
     pub id: String,
@@ -450,5 +488,25 @@ mod tests {
             .capabilities
             .iter()
             .any(|entry| entry.id == "policy.firstAcceptedCandidate"));
+    }
+
+    #[test]
+    fn executable_conformance_identities_are_derived_from_owner_registries() {
+        let identities = executable_conformance_capabilities();
+
+        assert_eq!(
+            identities.len(),
+            RUNTIME_EFFECT_OPERATION_REGISTRY.len()
+                + RUNTIME_TARGETING_OPERATION_REGISTRY.len()
+                + COMBAT_AUTOMATION_POLICY_REGISTRY.len()
+        );
+        assert!(identities.iter().any(|identity| {
+            identity.id == "operation.heal"
+                && identity.version == EffectOperationId::VOCABULARY_VERSION
+        }));
+        assert!(identities.iter().any(|identity| {
+            identity.id == "targeting.multipleCombatants"
+                && identity.version == OperationPipelineV2::VOCABULARY_VERSION
+        }));
     }
 }

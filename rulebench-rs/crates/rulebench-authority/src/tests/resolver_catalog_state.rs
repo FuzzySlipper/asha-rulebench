@@ -980,7 +980,10 @@ fn catalog_enumerates_stable_scenario_summaries() {
             "hexing-bolt-self-target-rejected",
             "turn-control-hit",
             "hexing-bolt-veteran-hit",
-            "watchtower-skirmish"
+            "watchtower-skirmish",
+            "watchtower-storm-pulse-area",
+            "watchtower-storm-pulse-multiple",
+            "watchtower-vitality-operations"
         ]
     );
     assert_eq!(
@@ -993,6 +996,9 @@ fn catalog_enumerates_stable_scenario_summaries() {
             "acceptedHit",
             "acceptedMiss",
             "rejectedTargetLegality",
+            "acceptedHit",
+            "acceptedHit",
+            "acceptedHit",
             "acceptedHit",
             "acceptedHit",
             "acceptedHit"

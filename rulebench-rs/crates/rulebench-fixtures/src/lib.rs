@@ -7,6 +7,7 @@
 
 mod capabilities;
 mod catalog;
+mod conformance;
 mod content_import;
 mod goldens;
 mod package;
@@ -17,6 +18,10 @@ pub mod scenarios;
 
 pub use capabilities::capability_registry_input;
 pub use catalog::*;
+pub use conformance::{
+    run_capability_conformance, CapabilityConformanceCaseReadout, CapabilityConformanceFailure,
+    CapabilityConformanceFailureKind, CapabilityConformanceFilter, CapabilityConformanceReport,
+};
 pub use content_import::{
     content_import_examples, ContentImportExample, ContentImportExampleOutcome,
 };

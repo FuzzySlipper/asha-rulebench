@@ -23,7 +23,7 @@ test("renders the current Rust host capability manifest", async ({ page }) => {
   ).toBeVisible();
   await expect(dialog.getByText("pipeline 2 · effects 1")).toBeVisible();
   await expect(
-    dialog.getByText("1 ruleset · 3 packages · 7 scenarios"),
+    dialog.getByText("1 ruleset · 3 packages · 10 scenarios"),
   ).toBeVisible();
 
   const supportMatrix = dialog.getByRole("table", {

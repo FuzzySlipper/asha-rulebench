@@ -20,10 +20,10 @@
 mod capabilities;
 
 pub use capabilities::{
-    assemble_capability_manifest, CapabilityEntry, CapabilityIdentity, CapabilityKind,
-    CapabilityManifestError, CapabilityRegistryInput, CapabilitySupport, HostCapabilityProfile,
-    RulebenchCapabilityManifest, CAPABILITY_ARTIFACT_SCHEMA, CAPABILITY_MANIFEST_ID,
-    CAPABILITY_MANIFEST_VERSION,
+    assemble_capability_manifest, executable_conformance_capabilities, CapabilityEntry,
+    CapabilityIdentity, CapabilityKind, CapabilityManifestError, CapabilityRegistryInput,
+    CapabilitySupport, HostCapabilityProfile, RulebenchCapabilityManifest,
+    CAPABILITY_ARTIFACT_SCHEMA, CAPABILITY_MANIFEST_ID, CAPABILITY_MANIFEST_VERSION,
 };
 
 pub use rulebench_combat::model::*;

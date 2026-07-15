@@ -93,12 +93,14 @@ their committed outputs. Failures name the Rust emitter and artifact;
 header records its emitter and protocol schema.
 
 `pnpm run regression:check` executes every package-owned catalog case twice
-through Rust authority, checks its declared outcome plus deterministic
-decisions/events/rolls/trace/final state, and reports the first mismatch with a
-replay-compatible path. Exact package, package-version, ruleset,
-ruleset-version, and scenario filters are accepted by the underlying binary;
-`pnpm run regression:list` prints the registered identities before an
-intentional package expectation or generated-artifact update.
+through Rust authority, then executes the capability conformance registry. A
+capability is marked regression-covered only after its registered case proves
+operation-specific events and state, deterministic rolls/trace/fingerprint,
+classified rejection behavior, replay reproduction, and replay mismatch
+diagnostics. Exact package, package-version, ruleset, ruleset-version,
+scenario, and capability filters are accepted by the underlying binary;
+`pnpm run regression:list` prints both scenario and capability identities
+before an intentional package expectation or generated-artifact update.
 
 Operation pipeline v2 adds bounded explicit multi-target and Manhattan-area
 actions without changing the legacy single-target path. Rust owns target-set
@@ -110,7 +112,7 @@ migration contract.
 The executable manifest is assembled from the ruleset operation registry,
 combat execution and automation-policy registries, registered regression
 packages, and the concrete host's selected storage/recovery adapters. The
-current durable-host artifact reports 1 ruleset identity, 3 packages, 7
+current durable-host artifact reports 1 ruleset identity, 3 packages, 10
 scenarios, 1 policy, and the exact governed ASHA revision. The process host
 serves the same typed DTO at `GET /api/rulebench/v1/capabilities`; a memory-mode
 host therefore cannot inherit durable support merely because the checked

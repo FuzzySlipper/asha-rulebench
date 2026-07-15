@@ -42,6 +42,7 @@ pub fn watchtower_skirmish_scenario() -> RulebenchScenario {
         height: 7,
         cells: vec![
             cell(1, 2, "clear"),
+            cell(2, 2, "clear"),
             cell(1, 4, "clear"),
             cell(8, 2, "clear"),
             cell(9, 2, "clear"),
@@ -285,8 +286,47 @@ fn scenario_package() -> ScenarioPackage {
 }
 
 fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
-    let scenario = watchtower_skirmish_scenario();
-    vec![ScenarioCatalogCase {
+    let base = watchtower_skirmish_scenario();
+    let area = storm_pulse_area_conformance_scenario();
+    let multiple = storm_pulse_multiple_conformance_scenario();
+    let vitality = vitality_operations_conformance_scenario();
+    vec![
+        ScenarioCatalogCase {
+            summary: ScenarioCatalogSummary {
+                id: base.metadata.id.clone(),
+                title: base.metadata.title.clone(),
+                summary: base.metadata.summary.clone(),
+                seed_label: base.metadata.seed_label.clone(),
+                outcome_class: ScenarioOutcomeClass::AcceptedHit,
+            },
+            scenario: base,
+            intent: UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+            roll_stream: vec![17, 5],
+        },
+        accepted_catalog_case(
+            area,
+            UseActionIntent::for_area("entity-adept", "storm-pulse", GridPosition { x: 8, y: 3 }),
+        ),
+        accepted_catalog_case(
+            multiple,
+            UseActionIntent::for_targets(
+                "entity-adept",
+                "storm-pulse",
+                vec!["entity-raider".to_string(), "entity-bruiser".to_string()],
+            ),
+        ),
+        accepted_catalog_case(
+            vitality,
+            UseActionIntent::new("entity-adept", "vitality-strike", "entity-raider"),
+        ),
+    ]
+}
+
+fn accepted_catalog_case(
+    scenario: RulebenchScenario,
+    intent: UseActionIntent,
+) -> ScenarioCatalogCase {
+    ScenarioCatalogCase {
         summary: ScenarioCatalogSummary {
             id: scenario.metadata.id.clone(),
             title: scenario.metadata.title.clone(),
@@ -295,9 +335,88 @@ fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {
             outcome_class: ScenarioOutcomeClass::AcceptedHit,
         },
         scenario,
-        intent: UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
+        intent,
         roll_stream: vec![17, 5],
-    }]
+    }
+}
+
+fn storm_pulse_area_conformance_scenario() -> RulebenchScenario {
+    let mut scenario = watchtower_skirmish_scenario();
+    scenario.metadata.id = "watchtower-storm-pulse-area".to_string();
+    scenario.metadata.title = "Storm Pulse Area Conformance".to_string();
+    scenario.metadata.summary =
+        "Executes canonical area selection and the atomic stateful operation pipeline.".to_string();
+    scenario.selected_action = scenario
+        .actions
+        .iter()
+        .find(|action| action.id == "storm-pulse")
+        .expect("storm pulse exists")
+        .clone();
+    scenario
+}
+
+fn storm_pulse_multiple_conformance_scenario() -> RulebenchScenario {
+    let mut scenario = watchtower_skirmish_scenario();
+    scenario.metadata.id = "watchtower-storm-pulse-multiple".to_string();
+    scenario.metadata.title = "Storm Pulse Multiple-target Conformance".to_string();
+    scenario.metadata.summary =
+        "Executes canonical explicit multi-target selection through the atomic pipeline."
+            .to_string();
+    let action = scenario
+        .actions
+        .iter_mut()
+        .find(|action| action.id == "storm-pulse")
+        .expect("storm pulse exists");
+    action.targeting.target_kind = TargetKind::Combatant;
+    action.targeting.selection = TargetSelection::Multiple;
+    action.targeting.maximum_range = 10;
+    action.targeting.operation_pipeline = Some(OperationPipelineV2 {
+        maximum_targets: 2,
+        area: None,
+        roll_policy: ActionRollPolicy::Shared,
+        failure_policy: TargetFailurePolicy::Atomic,
+        target_order: TargetOrderPolicy::CanonicalId,
+    });
+    scenario.selected_action = action.clone();
+    scenario
+}
+
+fn vitality_operations_conformance_scenario() -> RulebenchScenario {
+    let mut scenario = watchtower_skirmish_scenario();
+    scenario.metadata.id = "watchtower-vitality-operations".to_string();
+    scenario.metadata.title = "Vitality Operations Conformance".to_string();
+    scenario.metadata.summary =
+        "Executes capped healing and replace-only temporary vitality as Rust-owned effects."
+            .to_string();
+    let target = scenario
+        .combatants
+        .iter_mut()
+        .find(|combatant| combatant.id == "entity-raider")
+        .expect("raider exists");
+    target.hit_points.current = 16;
+    target.temporary_vitality = 4;
+    let action = scenario
+        .actions
+        .iter_mut()
+        .find(|action| action.id == "hexing_bolt")
+        .expect("hexing bolt exists");
+    action.id = "vitality-strike".to_string();
+    action.name = "Vitality Strike".to_string();
+    action
+        .hit
+        .operations
+        .push(HitEffectOperation::Heal(HealingEffectOperation {
+            healing_bonus: 99,
+            healing_type: "vitality".to_string(),
+        }));
+    action
+        .hit
+        .operations
+        .push(HitEffectOperation::GrantTemporaryVitality(
+            TemporaryVitalityEffectOperation { vitality_bonus: 10 },
+        ));
+    scenario.selected_action = action.clone();
+    scenario
 }
 
 fn ruleset_catalog_readout() -> RulesetCatalogReadout {

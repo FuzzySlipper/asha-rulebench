@@ -67,6 +67,18 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
     {
       "id": "watchtower-skirmish",
       "version": "registered"
+    },
+    {
+      "id": "watchtower-storm-pulse-area",
+      "version": "registered"
+    },
+    {
+      "id": "watchtower-storm-pulse-multiple",
+      "version": "registered"
+    },
+    {
+      "id": "watchtower-vitality-operations",
+      "version": "registered"
     }
   ],
   "capabilities": [
@@ -138,7 +150,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "protocolExposed": true,
         "liveHostExposed": true,
         "uiExposed": true,
-        "regressionCovered": false,
+        "regressionCovered": true,
         "durableAcrossRestart": true
       },
       "evidence": [
@@ -157,7 +169,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "protocolExposed": true,
         "liveHostExposed": true,
         "uiExposed": true,
-        "regressionCovered": false,
+        "regressionCovered": true,
         "durableAcrossRestart": true
       },
       "evidence": [
@@ -252,7 +264,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "protocolExposed": true,
         "liveHostExposed": true,
         "uiExposed": true,
-        "regressionCovered": false,
+        "regressionCovered": true,
         "durableAcrossRestart": true
       },
       "evidence": [
