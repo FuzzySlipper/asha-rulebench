@@ -65,6 +65,18 @@ export function createFakeRulebenchLiveTransport(
       unavailable("getCapabilities"),
     listScenarios: (requestOptions) =>
       handlers.listScenarios?.(requestOptions) ?? unavailable("listScenarios"),
+    listViewerScenarios: (requestOptions) =>
+      handlers.listViewerScenarios?.(requestOptions) ??
+      unavailable("listViewerScenarios"),
+    getViewerScenario: (scenarioId, requestOptions) =>
+      handlers.getViewerScenario?.(scenarioId, requestOptions) ??
+      unavailable("getViewerScenario"),
+    listViewerSessions: (requestOptions) =>
+      handlers.listViewerSessions?.(requestOptions) ??
+      unavailable("listViewerSessions"),
+    getViewerSessionStep: (sessionId, stepId, requestOptions) =>
+      handlers.getViewerSessionStep?.(sessionId, stepId, requestOptions) ??
+      unavailable("getViewerSessionStep"),
     listSessions: (requestOptions) =>
       handlers.listSessions?.(requestOptions) ?? unavailable("listSessions"),
     createSession: (request, requestOptions) =>

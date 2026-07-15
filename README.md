@@ -248,11 +248,14 @@ the printed `lan:` URL for human inspection from another machine.
 ## Current State
 
 The human testing surface is a seven-panel Angular workbench. Application menus
-open focused setup tools for content packs, deterministic cases, live Rust
+open focused setup tools for content packs, live authority evidence, live Rust
 sessions, automatic runs, and replay packages; panels retain the board,
 initiative, encounter status, available actions, participants, and evidence.
 The focused tools configure or select authority behavior, while panel view models
-display Rust-owned outcomes.
+display Rust-owned outcomes. Scenario and transcript evidence is read from the
+running process host; checked TypeScript catalogs are offline fixture and golden
+evidence only and are never a live fallback. See
+`docs/viewer-evidence-boundaries.md` for the complete consumer inventory.
 
 The current surface proves two compiled ruleset providers: Hexing Bolt's
 attack-versus-defense package family and Objective Turn Control's
@@ -261,9 +264,8 @@ commands, bounded automatic control, and replay inspection. With an artifact
 root configured, the content tool imports,
 reviews, compares, activates, deactivates, and safely deletes authored packs;
 authored packs and finalized replays survive host restart. Active sessions
-remain process-local. Live session snapshots do not yet expose authoritative
-positions, so panel 1 labels its board as selected scenario setup evidence
-rather than live movement state.
+remain process-local. Live session snapshots expose authoritative board and
+participant positions to the workbench.
 
 The executable capability manifest currently reports 2 compiled providers, 2
 ruleset identities, 4 registered packages, 11 scenario cases, 1 automation

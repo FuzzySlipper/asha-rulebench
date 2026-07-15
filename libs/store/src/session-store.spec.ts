@@ -1,244 +1,322 @@
-import { describe, expect, it } from 'vitest';
-import type { ClockPort } from '@asha-rulebench/platform';
+import { describe, expect, it } from "vitest";
+import type { ClockPort } from "@asha-rulebench/platform";
 import type {
-  ClassifiedError,
-  RulebenchCombatSessionSummaryDto,
-  RulebenchScenarioCatalogSummaryDto,
-} from '@asha-rulebench/protocol';
+  RulebenchLiveTransportErrorDto,
+  RulebenchViewerScenarioReadoutDto,
+  RulebenchViewerScenarioSummaryDto,
+  RulebenchViewerSessionStepReadoutDto,
+  RulebenchViewerSessionSummaryDto,
+} from "@asha-rulebench/protocol";
 import {
-  createFakeRulebenchTransport,
-  defaultCombatSessionCatalog,
-  defaultCombatSessionStepReadout,
-  defaultScenarioCatalog,
-  defaultScenarioReadout,
-  type RulebenchTransport,
-} from '@asha-rulebench/transport';
-import { SessionStore } from './index';
+  createFakeRulebenchLiveTransport,
+  type RulebenchLiveTransport,
+  type RulebenchLiveTransportResult,
+} from "@asha-rulebench/transport";
+import { SessionStore } from "./index";
 
 const fixedClock: ClockPort = {
-  now: () => new Date('2026-07-07T00:00:00.000Z'),
+  now: () => new Date("2026-07-07T00:00:00.000Z"),
   setTimeout: () => 1,
   clearTimeout: () => undefined,
 };
 
-describe('SessionStore', () => {
-  it('loads the Rust-backed catalog through transport and records the first selected id', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
+const scenarioSummary: RulebenchViewerScenarioSummaryDto = {
+  id: "provider-scenario",
+  title: "Provider Scenario",
+  summary: "Authority-owned scenario evidence.",
+  seedLabel: "roll-stream:17,5",
+  outcomeClass: "acceptedHit",
+};
+
+const scenarioReadout: RulebenchViewerScenarioReadoutDto = {
+  identity: scenarioSummary,
+  board: {
+    id: "provider-board",
+    width: 2,
+    height: 1,
+    cells: [
+      {
+        position: { x: 0, y: 0 },
+        terrainTags: [],
+        blocksMovement: false,
+        occupantIds: ["actor"],
+      },
+      {
+        position: { x: 1, y: 0 },
+        terrainTags: ["cover"],
+        blocksMovement: false,
+        occupantIds: ["target"],
+      },
+    ],
+  },
+  combatants: [
+    {
+      id: "actor",
+      name: "Adept",
+      team: "ally",
+      sideId: "allies",
+      currentHitPoints: 12,
+      maxHitPoints: 12,
+      temporaryVitality: 0,
+      conditions: [],
+      positionX: 0,
+      positionY: 0,
+      defenses: [{ id: "nerve", label: "Nerve", value: 14 }],
+      isActor: true,
+    },
+    {
+      id: "target",
+      name: "Raider",
+      team: "enemy",
+      sideId: "enemies",
+      currentHitPoints: 9,
+      maxHitPoints: 18,
+      temporaryVitality: 0,
+      conditions: ["rattled"],
+      positionX: 1,
+      positionY: 0,
+      defenses: [{ id: "nerve", label: "Nerve", value: 13 }],
+      isActor: false,
+    },
+  ],
+  selectedAction: {
+    id: "hexing-bolt",
+    name: "Hexing Bolt",
+    actorId: "actor",
+    targetIds: ["target"],
+    actionText: "A ranged spell attack.",
+    effectText: "Deals damage and rattles the target.",
+  },
+  selectedTarget: {
+    targetId: "target",
+    accepted: true,
+    reason: "Target is in range and visible.",
+  },
+  domainEvents: [
+    {
+      sequence: 1,
+      kind: "damageApplied",
+      summary: "target took 9 psychic damage.",
+      entityIds: ["target"],
+    },
+  ],
+  trace: [
+    {
+      sequence: 1,
+      phase: "commit",
+      status: "accepted",
+      message: "State committed.",
+      detail: "Authority projection updated.",
+    },
+  ],
+  finalState: {
+    summary: "Raider has 9 vitality remaining.",
+    combatants: [
+      {
+        id: "actor",
+        name: "Adept",
+        currentHitPoints: 12,
+        maxHitPoints: 12,
+        temporaryVitality: 0,
+        conditions: [],
+        positionX: 0,
+        positionY: 0,
+      },
+      {
+        id: "target",
+        name: "Raider",
+        currentHitPoints: 9,
+        maxHitPoints: 18,
+        temporaryVitality: 0,
+        conditions: ["rattled"],
+        positionX: 1,
+        positionY: 0,
+      },
+    ],
+  },
+};
+
+const sessionStepSummary: RulebenchViewerSessionSummaryDto["steps"][number] = {
+  id: "provider-step",
+  index: 0,
+  title: "Adept hits Raider",
+  summary: "The opening attack hits.",
+  outcomeClass: "acceptedHit",
+  logIndex: 1,
+};
+
+const sessionSummary: RulebenchViewerSessionSummaryDto = {
+  id: "provider-session",
+  title: "Provider Session",
+  summary: "Authority-owned transcript.",
+  seedLabel: "session-seed",
+  steps: [sessionStepSummary],
+};
+
+const sessionStep: RulebenchViewerSessionStepReadoutDto = {
+  sessionId: sessionSummary.id,
+  step: sessionStepSummary,
+  command: {
+    stepId: "provider-step",
+    stepIndex: 0,
+    actorId: "actor",
+    actionId: "hexing-bolt",
+    targetId: "target",
+    rollStream: [17, 5],
+    outcomeClass: "acceptedHit",
+  },
+  scenario: scenarioReadout,
+  combatLog: [
+    {
+      id: "log-1",
+      stepId: "provider-step",
+      logIndex: 1,
+      title: "Adept hits Raider",
+      summary: "Raider took damage.",
+      outcomeClass: "acceptedHit",
+      eventTypes: ["damageApplied"],
+    },
+  ],
+  stateBefore: {
+    ...scenarioReadout.finalState,
+    summary: "Raider begins at full vitality.",
+    combatants: scenarioReadout.finalState.combatants.map((combatant) =>
+      combatant.id === "target"
+        ? { ...combatant, currentHitPoints: 18, conditions: [] }
+        : combatant,
+    ),
+  },
+  stateAfter: scenarioReadout.finalState,
+};
+
+describe("SessionStore live authority viewer", () => {
+  it("loads provider-driven scenario and session catalogs and records initial selections", async () => {
+    const store = new SessionStore(viewerTransport(), fixedClock);
 
     await store.loadCatalog();
+    await store.loadSessionCatalog();
 
-    const catalog = store.catalog();
-    expect(catalog.kind).toBe('data');
-    if (catalog.kind === 'data') {
-      expect(catalog.value.map((summary) => summary.id)).toEqual([
-        'hexing-bolt-hit',
-        'hexing-bolt-reaction',
-        'hexing-bolt-miss',
-        'hexing-bolt-self-target-rejected',
-        'hexing-bolt-veteran-hit',
-        'binding-glyph-failed-save',
-        'binding-glyph-saved',
-        'watchtower-skirmish',
-        'watchtower-storm-pulse-area',
-        'watchtower-storm-pulse-multiple',
-        'watchtower-vitality-operations',
-      ]);
-    }
-    expect(store.selectedScenarioId()).toBe('hexing-bolt-hit');
+    expect(store.catalog()).toEqual({ kind: "data", value: [scenarioSummary] });
+    expect(store.selectedScenarioId()).toBe(scenarioSummary.id);
+    expect(store.sessionCatalog()).toEqual({ kind: "data", value: [sessionSummary] });
+    expect(store.selectedSessionId()).toBe(sessionSummary.id);
+    expect(store.selectedSessionStepId()).toBe(sessionSummary.steps[0]?.id);
   });
 
-  it('loads a scenario through transport and exposes projected async data', async () => {
-    const store = new SessionStore(
-      {
-        ...createFakeRulebenchTransport(),
-        loadCatalog: async () => ({ ok: true, value: defaultScenarioCatalog.summaries }),
-        loadScenario: async () => ({ ok: true, value: defaultScenarioReadout }),
-        loadSessionCatalog: async () => ({ ok: true, value: defaultCombatSessionCatalog.summaries }),
-        loadSessionStep: async () => ({ ok: true, value: defaultCombatSessionStepReadout }),
-      },
-      fixedClock,
-    );
+  it("projects scenario and transcript readbacks without TypeScript authority mutation", async () => {
+    const store = new SessionStore(viewerTransport(), fixedClock);
+    await store.loadCatalog();
+    await store.loadSessionCatalog();
 
     await store.loadScenario();
-
-    const state = store.scenario();
-    expect(state.kind).toBe('data');
-    if (state.kind === 'data') {
-      expect(state.value.title).toBe('Hexing Bolt Hit');
-      expect(state.value.selectedAction.actorLabel).toBe('Adept');
-      expect(state.value.timeline.map((row) => row.typeLabel)).toContain('DamageApplied');
-    }
-  });
-
-  it('selects a scenario id and exposes the selected Rust-backed readout', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
-    await store.loadCatalog();
-    await store.selectScenario('hexing-bolt-miss');
-
-    expect(store.selectedScenarioId()).toBe('hexing-bolt-miss');
-    const state = store.scenario();
-    expect(state.kind).toBe('data');
-    if (state.kind === 'data') {
-      expect(state.value.title).toBe('Hexing Bolt Miss');
-      expect(state.value.timeline.map((row) => row.typeLabel)).toEqual(['ActionUsed', 'AttackRolled']);
-      expect(state.value.finalState.combatants[1]?.hitPointLabel).toBe('18/18 HP');
-    }
-  });
-
-  it('maps missing scenario ids to error async state', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
-    await store.selectScenario('missing-scenario');
-
-    expect(store.selectedScenarioId()).toBe('missing-scenario');
-    expect(store.scenario()).toEqual({
-      kind: 'error',
-      error: {
-        kind: 'not-found',
-        message: 'Scenario not found: missing-scenario',
-        retryable: false,
-      },
-    });
-  });
-
-  it('loads the Rust-backed combat session catalog and records first session step selection', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
-    await store.loadSessionCatalog();
-
-    const catalog = store.sessionCatalog();
-    expect(catalog.kind).toBe('data');
-    if (catalog.kind === 'data') {
-      expect(catalog.value[0]?.id).toBe('hexing-bolt-opening-exchange');
-      expect(catalog.value[0]?.steps.map((step) => step.id)).toEqual([
-        'adept-hexing-bolt-hit',
-        'adept-hexing-bolt-miss',
-        'adept-hexing-bolt-self-target-rejected',
-      ]);
-    }
-    expect(store.selectedSessionId()).toBe('hexing-bolt-opening-exchange');
-    expect(store.selectedSessionStepId()).toBe('adept-hexing-bolt-hit');
-  });
-
-  it('loads a combat session step through transport and exposes projected async data', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
     await store.loadSessionStep();
 
-    const state = store.sessionStep();
-    expect(state.kind).toBe('data');
-    if (state.kind === 'data') {
-      expect(store.selectedSessionId()).toBe('hexing-bolt-opening-exchange');
-      expect(store.selectedSessionStepId()).toBe('adept-hexing-bolt-hit');
-      expect(state.value.step.title).toBe('Adept hits Raider');
-      expect(state.value.command.rollStreamLabel).toBe('17,5');
-      expect(state.value.combatLog[0]?.eventTypeLabels).toEqual([
-        'ActionUsed',
-        'AttackRolled',
-        'DamageApplied',
-        'ModifierApplied',
-      ]);
-      expect(state.value.stateBefore.combatants[1]?.hitPointLabel).toBe('18/18 HP');
-      expect(state.value.stateAfter.combatants[1]?.conditionLabels).toEqual(['rattled']);
+    const scenario = store.scenario();
+    expect(scenario.kind).toBe("data");
+    if (scenario.kind === "data") {
+      expect(scenario.value.selectedAction.actorLabel).toBe("Adept");
+      expect(scenario.value.timeline[0]).toMatchObject({
+        typeLabel: "Damage Applied",
+        participantLabels: ["Raider"],
+      });
+      expect(scenario.value.finalState.combatants[1]?.hitPointLabel).toBe("9/18 HP");
+    }
+    const step = store.sessionStep();
+    expect(step.kind).toBe("data");
+    if (step.kind === "data") {
+      expect(step.value.command.rollStreamLabel).toBe("17,5");
+      expect(step.value.stateBefore.combatants[1]?.hitPointLabel).toBe("18/18 HP");
+      expect(step.value.stateAfter.combatants[1]?.conditionLabels).toEqual(["rattled"]);
     }
   });
 
-  it('selects a combat session step and exposes the selected Rust-backed readout', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
+  it("classifies missing selections before making a request", async () => {
+    const store = new SessionStore(viewerTransport(), fixedClock);
 
-    await store.selectSessionStep('hexing-bolt-opening-exchange', 'adept-hexing-bolt-self-target-rejected');
-
-    expect(store.selectedSessionId()).toBe('hexing-bolt-opening-exchange');
-    expect(store.selectedSessionStepId()).toBe('adept-hexing-bolt-self-target-rejected');
-    const state = store.sessionStep();
-    expect(state.kind).toBe('data');
-    if (state.kind === 'data') {
-      expect(state.value.step.outcomeLabel).toBe('Rejected target');
-      expect(state.value.scenario.selectedTarget.legalityLabel).toBe('Rejected');
-      expect(state.value.scenario.timeline).toEqual([]);
-      expect(state.value.stateAfter.combatants[1]?.hitPointLabel).toBe('9/18 HP');
-    }
-  });
-
-  it('steps forward and backward through combat session summaries without computing combat state', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
-    await store.loadSessionCatalog();
+    await store.loadScenario();
     await store.loadSessionStep();
-    await store.nextSessionStep();
 
-    expect(store.selectedSessionStepId()).toBe('adept-hexing-bolt-miss');
-    let state = store.sessionStep();
-    expect(state.kind).toBe('data');
-    if (state.kind === 'data') {
-      expect(state.value.step.outcomeLabel).toBe('Accepted miss');
-      expect(state.value.stateAfter.combatants[1]?.hitPointLabel).toBe('9/18 HP');
-    }
-
-    await store.previousSessionStep();
-
-    expect(store.selectedSessionStepId()).toBe('adept-hexing-bolt-hit');
-    state = store.sessionStep();
-    expect(state.kind).toBe('data');
-    if (state.kind === 'data') {
-      expect(state.value.step.outcomeLabel).toBe('Accepted hit');
-    }
-  });
-
-  it('maps missing combat session ids to error async state', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
-    await store.selectSessionStep('missing-session', 'missing-step');
-
-    expect(store.selectedSessionId()).toBe('missing-session');
-    expect(store.selectedSessionStepId()).toBe('missing-step');
-    expect(store.sessionStep()).toEqual({
-      kind: 'error',
-      error: {
-        kind: 'not-found',
-        message: 'Combat session not found: missing-session',
-        retryable: false,
-      },
+    expect(store.scenario()).toMatchObject({
+      kind: "error",
+      error: { code: "viewerScenarioRequired", retryable: false },
+    });
+    expect(store.sessionStep()).toMatchObject({
+      kind: "error",
+      error: { code: "viewerSessionStepRequired", retryable: false },
     });
   });
 
-  it('maps missing combat session step ids to error async state', async () => {
-    const store = new SessionStore(createFakeRulebenchTransport(), fixedClock);
-
-    await store.selectSessionStep('hexing-bolt-opening-exchange', 'missing-step');
-
-    expect(store.sessionStep()).toEqual({
-      kind: 'error',
-      error: {
-        kind: 'not-found',
-        message: 'Combat session step not found: hexing-bolt-opening-exchange / missing-step',
-        retryable: false,
-      },
-    });
-  });
-
-  it('maps transport failures to error async state without mutating through callers', async () => {
-    const error: ClassifiedError = {
-      kind: 'network',
-      message: 'Scenario transport unavailable',
+  it("preserves classified host failures and explicit retry", async () => {
+    const error: RulebenchLiveTransportErrorDto = {
+      kind: "network",
+      code: "requestFailed",
+      message: "Authority viewer unavailable.",
       retryable: true,
     };
-    const summaries: readonly RulebenchScenarioCatalogSummaryDto[] = [];
-    const sessionSummaries: readonly RulebenchCombatSessionSummaryDto[] = [];
-    const transport: RulebenchTransport = {
-      ...createFakeRulebenchTransport(),
-      loadCatalog: async () => ({ ok: true, value: summaries }),
-      loadScenario: async () => ({ ok: false, error }),
-      loadSessionCatalog: async () => ({ ok: true, value: sessionSummaries }),
-      loadSessionStep: async () => ({ ok: false, error }),
-    };
+    let attempt = 0;
+    const transport = viewerTransport({
+      listViewerScenarios: async () => {
+        attempt += 1;
+        return attempt === 1
+          ? { ok: false, error }
+          : { ok: true, value: [scenarioSummary] };
+      },
+    });
     const store = new SessionStore(transport, fixedClock);
 
-    await store.loadScenario();
-    await store.loadSessionStep();
+    await store.loadCatalog();
+    expect(store.catalog()).toEqual({ kind: "error", error });
 
-    expect(store.scenario()).toEqual({ kind: 'error', error });
-    expect(store.sessionStep()).toEqual({ kind: 'error', error });
+    await store.retryCatalog();
+    expect(store.catalog()).toEqual({ kind: "data", value: [scenarioSummary] });
+  });
+
+  it("aborts superseded requests and ignores their stale response", async () => {
+    let resolveFirst: ((result: RulebenchLiveTransportResult<readonly RulebenchViewerScenarioSummaryDto[]>) => void) | null = null;
+    let firstSignal: AbortSignal | undefined;
+    let attempt = 0;
+    const transport = viewerTransport({
+      listViewerScenarios: (options) => {
+        attempt += 1;
+        if (attempt === 1) {
+          firstSignal = options?.signal;
+          return new Promise((resolve) => {
+            resolveFirst = resolve;
+          });
+        }
+        return Promise.resolve({ ok: true, value: [scenarioSummary] });
+      },
+    });
+    const store = new SessionStore(transport, fixedClock);
+
+    const first = store.loadCatalog();
+    await store.loadCatalog();
+    expect(firstSignal?.aborted).toBe(true);
+    resolveFirst?.({ ok: true, value: [] });
+    await first;
+
+    expect(store.catalog()).toEqual({ kind: "data", value: [scenarioSummary] });
   });
 });
+
+function viewerTransport(
+  overrides: Partial<Pick<RulebenchLiveTransport, "listViewerScenarios">> = {},
+): RulebenchLiveTransport {
+  return createFakeRulebenchLiveTransport({
+    listViewerScenarios: async () => ({ ok: true, value: [scenarioSummary] }),
+    getViewerScenario: async (scenarioId) =>
+      scenarioId === scenarioSummary.id
+        ? { ok: true, value: scenarioReadout }
+        : { ok: false, error: missingError(`Scenario not found: ${scenarioId}`) },
+    listViewerSessions: async () => ({ ok: true, value: [sessionSummary] }),
+    getViewerSessionStep: async (sessionId, stepId) =>
+      sessionId === sessionSummary.id && stepId === sessionStep.step.id
+        ? { ok: true, value: sessionStep }
+        : { ok: false, error: missingError(`Session step not found: ${sessionId}/${stepId}`) },
+    ...overrides,
+  });
+}
+
+function missingError(message: string): RulebenchLiveTransportErrorDto {
+  return { kind: "bridge", code: "notFound", message, retryable: false };
+}

@@ -43,7 +43,13 @@ consume that generated DTO. They do not fall back to the checked durable-host
 artifact when the live route is unavailable, because that would turn build
 evidence into a false runtime claim.
 
-Manifest v2 adds compiled provider entries. Each entry names exact provider and
+Manifest v3 adds an explicit `authorityViewerMode` host readback and the
+`viewer.authority-readback` capability. `liveAuthorityReadback` means the
+versioned viewer routes are composed from the current Rust registries and are
+visible in the UI; it never means the checked TypeScript catalogs are a runtime
+fallback.
+
+Manifest v2 added compiled provider entries. Each entry names exact provider and
 ruleset identities, accepted operation/effect vocabulary versions, and the
 closed capability set available to packages. The ruleset inventory is derived
 from this catalog, not inferred from scenario metadata. See

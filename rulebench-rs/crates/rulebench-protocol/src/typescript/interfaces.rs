@@ -132,6 +132,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "sessionRecoveryMode",
                     ty: "string",
                 },
+                Field {
+                    name: "authorityViewerMode",
+                    ty: "'liveAuthorityReadback' | 'none'",
+                },
             ],
         },
         Interface {

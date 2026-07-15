@@ -38,7 +38,7 @@ test("boots the rulebench shell", async ({ page }) => {
   await expect(page.getByRole("tabpanel")).toContainText(
     "Accepted DomainEvents",
   );
-  await expect(page.getByRole("tabpanel")).toContainText("DamageApplied");
+  await expect(page.getByRole("tabpanel")).toContainText("Damage Applied");
   await page.getByRole("tab", { name: "DomainEvents" }).press("End");
   await expect(page.getByRole("tab", { name: "Replay" })).toBeFocused();
   await expect(page.getByRole("tab", { name: "Replay" })).toHaveAttribute(
@@ -79,7 +79,7 @@ test("boots the rulebench shell", async ({ page }) => {
     .getByRole("menuitem", { name: "Scenario cases" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Combat Session" }),
+    page.getByRole("heading", { name: "Authority Session Evidence" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
@@ -93,7 +93,7 @@ test("boots the rulebench shell", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /Adept targets themself/ }),
   ).toBeVisible();
-  const scenarioDialog = page.getByRole("dialog", { name: "Scenario cases" });
+  const scenarioDialog = page.getByRole("dialog", { name: "Live authority viewer" });
   const combatSession = scenarioDialog.getByRole("region", {
     name: "Combat session",
   });

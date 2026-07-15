@@ -92,6 +92,11 @@ their committed outputs. Failures name the Rust emitter and artifact;
 `pnpm run generated:write` is the only supported update path. Every generated
 header records its emitter and protocol schema.
 
+The scenario and combat-session TypeScript catalogs are offline fixture and
+golden evidence. The product viewer reads the process host's versioned viewer
+routes through `RulebenchLiveTransport`; it never falls back to these checked
+artifacts. `docs/viewer-evidence-boundaries.md` inventories every consumer.
+
 `pnpm run regression:check` executes every package-owned catalog case twice
 through Rust authority, then executes the capability conformance registry. A
 capability is marked regression-covered only after its registered case proves

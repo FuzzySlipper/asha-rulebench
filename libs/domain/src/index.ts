@@ -13,6 +13,9 @@ import type {
   RulebenchContentImportDiagnosticDto,
   RulebenchContentImportReadoutDto,
   RulebenchContentValidationReadoutDto,
+  RulebenchViewerFinalStateDto,
+  RulebenchViewerScenarioReadoutDto,
+  RulebenchViewerSessionStepReadoutDto,
 } from '@asha-rulebench/protocol';
 
 export interface RulebenchContentValidationView {
@@ -275,6 +278,117 @@ export function projectRulebenchCombatSessionStep(
   };
 }
 
+export function projectRulebenchViewerScenario(
+  readout: RulebenchViewerScenarioReadoutDto,
+): RulebenchScenarioView {
+  const combatantLabels = new Map(
+    readout.combatants.map((combatant) => [combatant.id, combatant.name]),
+  );
+  const selectedTarget = readout.selectedTarget;
+  return {
+    title: readout.identity.title,
+    summary: readout.identity.summary,
+    seedLabel: readout.identity.seedLabel,
+    board: {
+      width: readout.board.width,
+      height: readout.board.height,
+      cells: readout.board.cells.map((cell) => ({
+        x: cell.position.x,
+        y: cell.position.y,
+        terrainLabel: labelTerrain(cell.terrainTags),
+        occupantIds: cell.occupantIds,
+      })),
+    },
+    combatants: readout.combatants.map((combatant) => ({
+      id: combatant.id,
+      name: combatant.name,
+      teamLabel: combatant.team === 'ally' ? 'Ally' : 'Enemy',
+      positionLabel: labelPosition(combatant.positionX, combatant.positionY),
+      hitPointLabel: labelHitPoints(combatant.currentHitPoints, combatant.maxHitPoints),
+      defenseLabels: combatant.defenses.map((defense) => `${defense.label} ${defense.value}`),
+      conditionLabels: labelConditions(combatant.conditions),
+      isActor: combatant.isActor,
+    })),
+    selectedAction: {
+      name: readout.selectedAction.name,
+      actorLabel: labelForId(combatantLabels, readout.selectedAction.actorId),
+      targetLabels: readout.selectedAction.targetIds.map((targetId) =>
+        labelForId(combatantLabels, targetId),
+      ),
+      actionText: readout.selectedAction.actionText,
+      effectText: readout.selectedAction.effectText,
+    },
+    selectedTarget: selectedTarget === null
+      ? {
+          targetLabel: 'No target readback',
+          legalityLabel: 'Not resolved',
+          reason: 'Authority did not emit a target-legality readback.',
+        }
+      : {
+          targetLabel: labelForId(combatantLabels, selectedTarget.targetId),
+          legalityLabel: selectedTarget.accepted ? 'Accepted' : 'Rejected',
+          reason: selectedTarget.reason,
+        },
+    timeline: readout.domainEvents.map((event) => ({
+      sequenceLabel: String(event.sequence),
+      typeLabel: humanizeIdentifier(event.kind),
+      summary: event.summary,
+      participantLabels: event.entityIds.map((id) => labelForId(combatantLabels, id)),
+    })),
+    traceGroups: projectTraceGroups(readout.trace),
+    finalState: projectViewerFinalState(readout.finalState),
+  };
+}
+
+export function projectRulebenchViewerSessionStep(
+  readout: RulebenchViewerSessionStepReadoutDto,
+): RulebenchCombatSessionStepView {
+  return {
+    sessionId: readout.sessionId,
+    step: {
+      id: readout.step.id,
+      indexLabel: String(readout.step.index + 1),
+      title: readout.step.title,
+      summary: readout.step.summary,
+      outcomeLabel: labelOutcomeClass(readout.step.outcomeClass),
+      logIndexLabel: String(readout.step.logIndex),
+    },
+    command: {
+      stepId: readout.command.stepId,
+      stepIndexLabel: String(readout.command.stepIndex + 1),
+      actorId: readout.command.actorId,
+      actionId: readout.command.actionId,
+      targetId: readout.command.targetId,
+      rollStreamLabel: readout.command.rollStream.join(','),
+      outcomeLabel: labelOutcomeClass(readout.command.outcomeClass),
+    },
+    scenario: projectRulebenchViewerScenario(readout.scenario),
+    combatLog: readout.combatLog.map((entry) => ({
+      id: entry.id,
+      stepId: entry.stepId,
+      logIndexLabel: String(entry.logIndex),
+      title: entry.title,
+      summary: entry.summary,
+      outcomeLabel: labelOutcomeClass(entry.outcomeClass),
+      eventTypeLabels: entry.eventTypes.map(humanizeIdentifier),
+    })),
+    stateBefore: projectViewerFinalState(readout.stateBefore),
+    stateAfter: projectViewerFinalState(readout.stateAfter),
+  };
+}
+
+function projectViewerFinalState(state: RulebenchViewerFinalStateDto): RulebenchFinalStateView {
+  return {
+    summary: state.summary,
+    combatants: state.combatants.map((combatant) => ({
+      id: combatant.id,
+      name: combatant.name,
+      hitPointLabel: labelHitPoints(combatant.currentHitPoints, combatant.maxHitPoints),
+      conditionLabels: labelConditions(combatant.conditions),
+    })),
+  };
+}
+
 function projectBoard(readout: RulebenchScenarioReadoutDto): RulebenchBoardView {
   const terrainByPosition = new Map(
     readout.grid.cells.map((cell) => [positionKey(cell.x, cell.y), labelTerrain(cell.terrainTags)]),
@@ -396,6 +510,13 @@ function labelConditions(conditions: readonly string[]): readonly string[] {
 
 function labelTerrain(tags: readonly string[]): string {
   return tags.length === 0 ? 'clear' : tags.join(', ');
+}
+
+function humanizeIdentifier(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[-_]/g, ' ')
+    .replace(/^./, (first) => first.toUpperCase());
 }
 
 function labelLegality(legality: RulebenchScenarioReadoutDto['selectedTarget']['legality']): string {

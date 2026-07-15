@@ -3,7 +3,6 @@ import type { OnInit } from "@angular/core";
 import { LiveCombatStore, SessionStore } from "@asha-rulebench/store";
 import type {
   RulebenchCommandOutcomeClassDto,
-  RulebenchScenarioOutcomeClassDto,
 } from "@asha-rulebench/protocol";
 import {
   ApplicationDialogComponent,
@@ -175,13 +174,13 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
 
       <arb-application-dialog
         dialogId="scenario-cases-dialog"
-        dialogTitle="Scenario cases"
-        dialogDescription="Select deterministic scenarios and inspect ordered combat-session steps."
+        dialogTitle="Live authority viewer"
+        dialogDescription="Inspect scenario and session evidence read directly from the running Rust authority host."
         [open]="activeDialog() === 'scenario'"
         (closeRequested)="closeDialog()"
       >
         <section class="session" aria-label="Combat session">
-          <h2>Combat Session</h2>
+          <h2>Authority Session Evidence</h2>
           @switch (sessionCatalog().kind) {
             @case ("data") {
               @for (session of sessionCatalog().value; track session.id) {
@@ -232,6 +231,9 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
             }
             @case ("error") {
               <p class="session-status">{{ sessionCatalog().error.message }}</p>
+              <button class="control-button" type="button" (click)="retrySessionCatalog()">
+                Retry sessions
+              </button>
             }
             @case ("idle") {
               <p class="session-status">Combat session idle</p>
@@ -240,7 +242,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
         </section>
 
         <section class="catalog" aria-label="Scenario catalog">
-          <h2>Scenario Cases</h2>
+          <h2>Authority Scenario Evidence</h2>
           @switch (catalog().kind) {
             @case ("data") {
               <div class="catalog-row">
@@ -268,6 +270,9 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
             }
             @case ("error") {
               <p class="catalog-status">{{ catalog().error.message }}</p>
+              <button class="control-button" type="button" (click)="retryCatalog()">
+                Retry scenarios
+              </button>
             }
             @case ("idle") {
               <p class="catalog-status">Scenario catalog idle</p>
@@ -373,8 +378,16 @@ export class ScenarioViewerFeatureComponent implements OnInit {
     void this.sessionStore.previousSessionStep();
   }
 
+  protected retryCatalog(): void {
+    void this.sessionStore.retryCatalog();
+  }
+
+  protected retrySessionCatalog(): void {
+    void this.sessionStore.retrySessionCatalog();
+  }
+
   protected outcomeClassLabel(
-    outcomeClass: RulebenchScenarioOutcomeClassDto,
+    outcomeClass: RulebenchCommandOutcomeClassDto,
   ): string {
     switch (outcomeClass) {
       case "acceptedHit":
@@ -383,6 +396,8 @@ export class ScenarioViewerFeatureComponent implements OnInit {
         return "Accepted miss";
       case "rejectedTargetLegality":
         return "Rejected target";
+      case "rejectedInvalidCommand":
+        return "Rejected invalid command";
     }
   }
 

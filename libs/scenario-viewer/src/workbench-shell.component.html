@@ -318,6 +318,9 @@
         <p class="panel-state panel-state--error" role="alert">
           {{ deterministicScenario().error.message }}
         </p>
+        <button type="button" (click)="retryAuthorityEvidence()">
+          Retry authority evidence
+        </button>
       }
       @case ("idle") {
         <p class="panel-state">No scenario board selected</p>

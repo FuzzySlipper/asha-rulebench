@@ -483,6 +483,131 @@ export interface RulebenchLiveAutomaticRunDto {
   readonly reason: string;
 }
 
+export interface RulebenchViewerScenarioSummaryDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly seedLabel: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+}
+
+export interface RulebenchViewerDefenseDto {
+  readonly id: string;
+  readonly label: string;
+  readonly value: number;
+}
+
+export interface RulebenchViewerCombatantDto {
+  readonly id: string;
+  readonly name: string;
+  readonly team: 'ally' | 'enemy';
+  readonly sideId: string;
+  readonly currentHitPoints: number;
+  readonly maxHitPoints: number;
+  readonly temporaryVitality: number;
+  readonly conditions: readonly string[];
+  readonly positionX: number;
+  readonly positionY: number;
+  readonly defenses: readonly RulebenchViewerDefenseDto[];
+  readonly isActor: boolean;
+}
+
+export interface RulebenchViewerSelectedActionDto {
+  readonly id: string;
+  readonly name: string;
+  readonly actorId: string;
+  readonly targetIds: readonly string[];
+  readonly actionText: string;
+  readonly effectText: string;
+}
+
+export interface RulebenchViewerSelectedTargetDto {
+  readonly targetId: string;
+  readonly accepted: boolean;
+  readonly reason: string;
+}
+
+export interface RulebenchViewerDomainEventDto {
+  readonly sequence: number;
+  readonly kind: string;
+  readonly summary: string;
+  readonly entityIds: readonly string[];
+}
+
+export interface RulebenchViewerFinalCombatantDto {
+  readonly id: string;
+  readonly name: string;
+  readonly currentHitPoints: number;
+  readonly maxHitPoints: number;
+  readonly temporaryVitality: number;
+  readonly conditions: readonly string[];
+  readonly positionX: number;
+  readonly positionY: number;
+}
+
+export interface RulebenchViewerFinalStateDto {
+  readonly summary: string;
+  readonly combatants: readonly RulebenchViewerFinalCombatantDto[];
+}
+
+export interface RulebenchViewerScenarioReadoutDto {
+  readonly identity: RulebenchViewerScenarioSummaryDto;
+  readonly board: RulebenchLiveBoardDto;
+  readonly combatants: readonly RulebenchViewerCombatantDto[];
+  readonly selectedAction: RulebenchViewerSelectedActionDto;
+  readonly selectedTarget: RulebenchViewerSelectedTargetDto | null;
+  readonly domainEvents: readonly RulebenchViewerDomainEventDto[];
+  readonly trace: readonly RulebenchLiveTraceEntryDto[];
+  readonly finalState: RulebenchViewerFinalStateDto;
+}
+
+export interface RulebenchViewerSessionStepSummaryDto {
+  readonly id: string;
+  readonly index: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly logIndex: number;
+}
+
+export interface RulebenchViewerSessionSummaryDto {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly seedLabel: string;
+  readonly steps: readonly RulebenchViewerSessionStepSummaryDto[];
+}
+
+export interface RulebenchViewerCommandAttemptDto {
+  readonly stepId: string;
+  readonly stepIndex: number;
+  readonly actorId: string;
+  readonly actionId: string;
+  readonly targetId: string;
+  readonly rollStream: readonly number[];
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+}
+
+export interface RulebenchViewerCombatLogEntryDto {
+  readonly id: string;
+  readonly stepId: string;
+  readonly logIndex: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly outcomeClass: RulebenchCommandOutcomeClassDto;
+  readonly eventTypes: readonly string[];
+}
+
+export interface RulebenchViewerSessionStepReadoutDto {
+  readonly sessionId: string;
+  readonly step: RulebenchViewerSessionStepSummaryDto;
+  readonly command: RulebenchViewerCommandAttemptDto;
+  readonly scenario: RulebenchViewerScenarioReadoutDto;
+  readonly combatLog: readonly RulebenchViewerCombatLogEntryDto[];
+  readonly stateBefore: RulebenchViewerFinalStateDto;
+  readonly stateAfter: RulebenchViewerFinalStateDto;
+}
+
 export interface RulebenchCapabilitySupportDto {
   readonly declared: boolean;
   readonly validationSupported: boolean;
@@ -522,6 +647,7 @@ export interface RulebenchHostCapabilityProfileDto {
   readonly replayStorageAdapter: string;
   readonly replayRecoveryMode: string;
   readonly sessionRecoveryMode: string;
+  readonly authorityViewerMode: 'liveAuthorityReadback' | 'none';
 }
 
 export interface RulebenchCapabilityManifestDto {

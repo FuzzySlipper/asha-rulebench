@@ -6,8 +6,8 @@ describe("projectCapabilityManifest", () => {
   it("keeps owner support levels explicit instead of collapsing them into one boolean", () => {
     const view = projectCapabilityManifest({
       manifestId: "asha-rulebench.capabilities",
-      manifestVersion: 2,
-      generatedArtifactSchema: "asha-rulebench.capabilities.ts@2",
+      manifestVersion: 3,
+      generatedArtifactSchema: "asha-rulebench.capabilities.ts@3",
       governedAshaRevision: "0123456789abcdef",
       operationVocabularyVersion: "2",
       effectVocabularyVersion: "1",
@@ -20,6 +20,7 @@ describe("projectCapabilityManifest", () => {
         replayStorageAdapter: "versionedFilesystem",
         replayRecoveryMode: "finalizedArchive",
         sessionRecoveryMode: "none",
+        authorityViewerMode: "liveAuthorityReadback",
       },
       providers: [
         {
@@ -54,6 +55,9 @@ describe("projectCapabilityManifest", () => {
     });
 
     expect(view.hostLabel).toBe("rulebench-process-host · filesystem");
+    expect(view.authorityViewerLabel).toBe(
+      "Live authority readback; no checked-artifact fallback",
+    );
     expect(view.capabilities[0]?.support.supportLabel).toBe(
       "UI exposed, regression gap",
     );

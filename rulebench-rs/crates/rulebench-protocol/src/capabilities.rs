@@ -53,6 +53,7 @@ pub struct HostCapabilityProfileDto {
     pub replay_storage_adapter: String,
     pub replay_recovery_mode: String,
     pub session_recovery_mode: String,
+    pub authority_viewer_mode: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,6 +171,7 @@ impl From<&HostCapabilityProfile> for HostCapabilityProfileDto {
             replay_storage_adapter: value.replay_storage_adapter.clone(),
             replay_recovery_mode: value.replay_recovery_mode.clone(),
             session_recovery_mode: value.session_recovery_mode.clone(),
+            authority_viewer_mode: value.authority_viewer_mode.clone(),
         }
     }
 }
@@ -199,6 +201,7 @@ mod tests {
                 replay_storage_adapter: "memory".to_string(),
                 replay_recovery_mode: "finalizedArchive".to_string(),
                 session_recovery_mode: "none".to_string(),
+                authority_viewer_mode: "liveAuthorityReadback".to_string(),
                 authored_content_enabled: false,
                 exposes_capabilities_through_protocol: true,
                 exposes_capabilities_through_live_host: true,

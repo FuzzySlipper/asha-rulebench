@@ -30,7 +30,6 @@ const limitationIds = new Set(
 );
 for (const id of [
   "trusted-local-process-host",
-  "checked-viewer-artifacts",
   "active-session-recovery",
   "authored-content-v1-vocabulary",
 ]) {
@@ -141,11 +140,11 @@ function checkCapabilityManifest(capabilities) {
   if (capabilities.manifestId !== "asha-rulebench.capabilities") {
     failures.push("capability manifest has the wrong manifestId.");
   }
-  if (capabilities.manifestVersion !== 2) {
-    failures.push("capability manifest must use manifestVersion 2.");
+  if (capabilities.manifestVersion !== 3) {
+    failures.push("capability manifest must use manifestVersion 3.");
   }
   if (
-    capabilities.generatedArtifactSchema !== "asha-rulebench.capabilities.ts@2"
+    capabilities.generatedArtifactSchema !== "asha-rulebench.capabilities.ts@3"
   ) {
     failures.push(
       "capability manifest has the wrong generated artifact schema.",
@@ -234,6 +233,22 @@ function checkCapabilityManifest(capabilities) {
 
   const capabilityIds = capabilities.capabilities.map((entry) => entry.id);
   requireUnique(capabilityIds, "capability id");
+  if (capabilities.host.authorityViewerMode !== "liveAuthorityReadback") {
+    failures.push("process-host capability artifact must declare live authority viewer readbacks.");
+  }
+  const viewerReadback = capabilities.capabilities.find(
+    (entry) => entry.id === "viewer.authority-readback",
+  );
+  if (
+    viewerReadback === undefined ||
+    !viewerReadback.support.protocolExposed ||
+    !viewerReadback.support.liveHostExposed ||
+    !viewerReadback.support.uiExposed ||
+    !viewerReadback.support.regressionCovered ||
+    viewerReadback.support.durableAcrossRestart
+  ) {
+    failures.push("viewer authority readback capability support is inconsistent.");
+  }
   const capabilityRows = capabilities.capabilities.map(
     (entry) => `${capabilityKindRank(entry.kind)}:${entry.id}:${entry.version}`,
   );

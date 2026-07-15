@@ -43,6 +43,7 @@ export interface RulebenchCapabilityManifestView {
   readonly protocolLabel: string;
   readonly hostLabel: string;
   readonly recoveryLabel: string;
+  readonly authorityViewerLabel: string;
   readonly providers: readonly RulebenchRulesetProviderView[];
   readonly rulesetLabels: readonly string[];
   readonly packageLabels: readonly string[];
@@ -63,6 +64,10 @@ export function projectCapabilityManifest(
     protocolLabel: `${dto.protocolId} v${dto.protocolVersion}`,
     hostLabel: `${dto.host.adapterId} · ${dto.host.storageMode}`,
     recoveryLabel: `Replay: ${dto.host.replayRecoveryMode}; session: ${dto.host.sessionRecoveryMode}`,
+    authorityViewerLabel:
+      dto.host.authorityViewerMode === "liveAuthorityReadback"
+        ? "Live authority readback; no checked-artifact fallback"
+        : "Not exposed by this host",
     providers: dto.providers.map((provider) => ({
       providerLabel: identityLabel(provider.provider),
       rulesetLabel: identityLabel(provider.ruleset),

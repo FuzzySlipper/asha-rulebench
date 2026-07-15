@@ -78,10 +78,6 @@
       "denHeading": "Trusted-local single-writer process host"
     },
     {
-      "id": "checked-viewer-artifacts",
-      "denHeading": "Checked-artifact viewer remains alongside live control"
-    },
-    {
       "id": "active-session-recovery",
       "denHeading": "Active sessions remain process-local"
     },

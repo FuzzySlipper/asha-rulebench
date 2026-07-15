@@ -15,6 +15,7 @@ mod reaction;
 mod replay;
 mod session;
 mod typescript;
+mod viewer;
 
 pub use authoring::{
     validate_ruleset_definition, RuleModuleConfigurationDto, RuleModuleDeclarationDto,
@@ -67,6 +68,13 @@ pub use replay::{
 };
 pub use session::CombatSessionHandleDto;
 pub use typescript::{render_api_types, ProtocolAlias, ProtocolField, ProtocolInterface};
+pub use viewer::{
+    ViewerCombatLogEntryDto, ViewerCombatantDto, ViewerCommandAttemptDto, ViewerDefenseDto,
+    ViewerDomainEventDto, ViewerFinalCombatantDto, ViewerFinalStateDto, ViewerScenarioReadoutDto,
+    ViewerScenarioSummaryDto, ViewerSelectedActionDto, ViewerSelectedTargetDto,
+    ViewerSessionStepReadoutDto, ViewerSessionStepSummaryDto, ViewerSessionSummaryDto,
+    ViewerSessionTranscriptDto,
+};
 
 #[cfg(test)]
 mod tests {

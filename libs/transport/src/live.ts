@@ -30,6 +30,10 @@ import type {
   RulebenchReactionCommandSpecDto,
   RulebenchScenarioOptionDto,
   RulebenchUseActionIntentDto,
+  RulebenchViewerScenarioReadoutDto,
+  RulebenchViewerScenarioSummaryDto,
+  RulebenchViewerSessionStepReadoutDto,
+  RulebenchViewerSessionSummaryDto,
 } from "@asha-rulebench/protocol";
 import type { ReplayReviewResult, ReplayReviewTransport } from "./replay-review";
 
@@ -72,6 +76,25 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
   ) => Promise<
     RulebenchLiveTransportResult<readonly RulebenchScenarioOptionDto[]>
   >;
+  readonly listViewerScenarios: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<
+    RulebenchLiveTransportResult<readonly RulebenchViewerScenarioSummaryDto[]>
+  >;
+  readonly getViewerScenario: (
+    scenarioId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchViewerScenarioReadoutDto>>;
+  readonly listViewerSessions: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<
+    RulebenchLiveTransportResult<readonly RulebenchViewerSessionSummaryDto[]>
+  >;
+  readonly getViewerSessionStep: (
+    sessionId: string,
+    stepId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchViewerSessionStepReadoutDto>>;
   readonly listSessions: (
     options?: RulebenchLiveRequestOptions,
   ) => Promise<
@@ -260,6 +283,10 @@ export function createLiveRulebenchTransport(
 
   const sessionPath = (sessionId: string): string =>
     `/sessions/${encodeURIComponent(sessionId)}`;
+  const viewerScenarioPath = (scenarioId: string): string =>
+    `/viewer/scenarios/${encodeURIComponent(scenarioId)}`;
+  const viewerSessionStepPath = (sessionId: string, stepId: string): string =>
+    `/viewer/sessions/${encodeURIComponent(sessionId)}/steps/${encodeURIComponent(stepId)}`;
   const replayPath = (packageId: string): string =>
     `/replays/${encodeURIComponent(packageId)}`;
   const replayRequest = async <T>(
@@ -314,6 +341,19 @@ export function createLiveRulebenchTransport(
       request("GET", "/capabilities", undefined, requestOptions),
     listScenarios: (requestOptions) =>
       request("GET", "/scenarios", undefined, requestOptions),
+    listViewerScenarios: (requestOptions) =>
+      request("GET", "/viewer/scenarios", undefined, requestOptions),
+    getViewerScenario: (scenarioId, requestOptions) =>
+      request("GET", viewerScenarioPath(scenarioId), undefined, requestOptions),
+    listViewerSessions: (requestOptions) =>
+      request("GET", "/viewer/sessions", undefined, requestOptions),
+    getViewerSessionStep: (sessionId, stepId, requestOptions) =>
+      request(
+        "GET",
+        viewerSessionStepPath(sessionId, stepId),
+        undefined,
+        requestOptions,
+      ),
     listSessions: (requestOptions) =>
       request("GET", "/sessions", undefined, requestOptions),
     createSession: (createRequest, requestOptions) =>

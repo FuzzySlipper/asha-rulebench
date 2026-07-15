@@ -235,6 +235,14 @@ export class WorkbenchShellComponent {
       ? "Authority connected; no session selected"
       : "Authority disconnected";
   });
+
+  protected retryAuthorityEvidence(): void {
+    if (this.deterministicMode() === "scenario") {
+      void this.sessionStore.retryScenario();
+      return;
+    }
+    void this.sessionStore.retrySessionStep();
+  }
   private readonly panelMenuGroups = computed<readonly ApplicationMenuGroup[]>(
     () => {
       const snapshot = this.snapshot();

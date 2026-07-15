@@ -26,7 +26,7 @@ describe("live Rulebench transport", () => {
     }> = [];
     const responseBodies: unknown[] = [
       handshake,
-      ...Array.from({ length: 25 }, () => ({})),
+      ...Array.from({ length: 29 }, () => ({})),
     ];
     const fetchRequest: typeof fetch = async (input, init) => {
       calls.push({
@@ -85,6 +85,10 @@ describe("live Rulebench transport", () => {
 
     await transport.connect();
     await transport.listScenarios();
+    await transport.listViewerScenarios();
+    await transport.getViewerScenario("scenario/one");
+    await transport.listViewerSessions();
+    await transport.getViewerSessionStep("session/one", "step/one");
     await transport.listSessions();
     await transport.createSession(createRequest);
     await transport.getSession(createRequest.sessionId);
@@ -126,6 +130,10 @@ describe("live Rulebench transport", () => {
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "GET http://rulebench.test/api/rulebench/v1/handshake",
       "GET http://rulebench.test/api/rulebench/v1/scenarios",
+      "GET http://rulebench.test/api/rulebench/v1/viewer/scenarios",
+      "GET http://rulebench.test/api/rulebench/v1/viewer/scenarios/scenario%2Fone",
+      "GET http://rulebench.test/api/rulebench/v1/viewer/sessions",
+      "GET http://rulebench.test/api/rulebench/v1/viewer/sessions/session%2Fone/steps/step%2Fone",
       "GET http://rulebench.test/api/rulebench/v1/sessions",
       "POST http://rulebench.test/api/rulebench/v1/sessions",
       "GET http://rulebench.test/api/rulebench/v1/sessions/session%2Fone",
@@ -152,13 +160,13 @@ describe("live Rulebench transport", () => {
       "GET http://rulebench.test/api/rulebench/v1/capabilities",
     ]);
     expect(calls.every((call) => call.version === "3")).toBe(true);
-    expect(calls[3]?.body).toBe(JSON.stringify(createRequest));
-    expect(calls[7]?.body).toBe(JSON.stringify(intent));
-    expect(calls[9]?.body).toBe(JSON.stringify(intentCommand));
-    expect(calls[11]?.body).toBe(JSON.stringify(reactionCommand));
-    expect(calls[12]?.body).toBe(JSON.stringify(automaticStep));
-    expect(calls[13]?.body).toBe(JSON.stringify(automaticRun));
-    expect(calls[24]?.body).toBe(
+    expect(calls[7]?.body).toBe(JSON.stringify(createRequest));
+    expect(calls[11]?.body).toBe(JSON.stringify(intent));
+    expect(calls[13]?.body).toBe(JSON.stringify(intentCommand));
+    expect(calls[15]?.body).toBe(JSON.stringify(reactionCommand));
+    expect(calls[16]?.body).toBe(JSON.stringify(automaticStep));
+    expect(calls[17]?.body).toBe(JSON.stringify(automaticRun));
+    expect(calls[28]?.body).toBe(
       JSON.stringify({
         expectedPackageId: "expected",
         actualPackageId: "actual",

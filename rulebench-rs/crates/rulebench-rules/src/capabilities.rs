@@ -7,8 +7,8 @@ use rulebench_combat::{
 use rulebench_ruleset::{EffectOperationId, OperationPipelineV2, TargetingOperationId};
 
 pub const CAPABILITY_MANIFEST_ID: &str = "asha-rulebench.capabilities";
-pub const CAPABILITY_MANIFEST_VERSION: u32 = 2;
-pub const CAPABILITY_ARTIFACT_SCHEMA: &str = "asha-rulebench.capabilities.ts@2";
+pub const CAPABILITY_MANIFEST_VERSION: u32 = 3;
+pub const CAPABILITY_ARTIFACT_SCHEMA: &str = "asha-rulebench.capabilities.ts@3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CapabilityKind {
@@ -142,6 +142,7 @@ pub struct HostCapabilityProfile {
     pub replay_storage_adapter: String,
     pub replay_recovery_mode: String,
     pub session_recovery_mode: String,
+    pub authority_viewer_mode: String,
     pub authored_content_enabled: bool,
     pub exposes_capabilities_through_protocol: bool,
     pub exposes_capabilities_through_live_host: bool,
@@ -347,6 +348,20 @@ fn host_capabilities(
     host: &HostCapabilityProfile,
     regression: &BTreeSet<String>,
 ) -> Vec<CapabilityEntry> {
+    let mut viewer_readback = host_capability(
+        "viewer.authority-readback",
+        "1",
+        CapabilityKind::Session,
+        host.authority_viewer_mode == "liveAuthorityReadback",
+        false,
+        host,
+        regression,
+    );
+    viewer_readback.evidence = vec![
+        "rulebench-fixtures.scenario-package-registry".to_string(),
+        "rulebench-bridge.viewer-readback-index".to_string(),
+        "rulebench-process-host.viewer-readback-routes".to_string(),
+    ];
     vec![
         host_capability(
             "content.authored-pack",
@@ -366,6 +381,7 @@ fn host_capabilities(
             host,
             regression,
         ),
+        viewer_readback,
         CapabilityEntry {
             id: "session.active-recovery".to_string(),
             kind: CapabilityKind::Session,
@@ -435,6 +451,7 @@ mod tests {
             replay_storage_adapter: "memory".to_string(),
             replay_recovery_mode: "finalizedArchive".to_string(),
             session_recovery_mode: "none".to_string(),
+            authority_viewer_mode: "liveAuthorityReadback".to_string(),
             authored_content_enabled: false,
             exposes_capabilities_through_protocol: true,
             exposes_capabilities_through_live_host: true,

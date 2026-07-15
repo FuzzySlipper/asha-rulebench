@@ -469,6 +469,159 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("reason", "string"),
                 ]),
             },
+            Interface {
+                name: "RulebenchViewerScenarioSummaryDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("title", "string"),
+                    field("summary", "string"),
+                    field("seedLabel", "string"),
+                    field("outcomeClass", "RulebenchCommandOutcomeClassDto"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerDefenseDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("label", "string"),
+                    field("value", "number"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerCombatantDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("name", "string"),
+                    field("team", "'ally' | 'enemy'"),
+                    field("sideId", "string"),
+                    field("currentHitPoints", "number"),
+                    field("maxHitPoints", "number"),
+                    field("temporaryVitality", "number"),
+                    field("conditions", "readonly string[]"),
+                    field("positionX", "number"),
+                    field("positionY", "number"),
+                    field("defenses", "readonly RulebenchViewerDefenseDto[]"),
+                    field("isActor", "boolean"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerSelectedActionDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("name", "string"),
+                    field("actorId", "string"),
+                    field("targetIds", "readonly string[]"),
+                    field("actionText", "string"),
+                    field("effectText", "string"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerSelectedTargetDto",
+                fields: fields(vec![
+                    field("targetId", "string"),
+                    field("accepted", "boolean"),
+                    field("reason", "string"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerDomainEventDto",
+                fields: fields(vec![
+                    field("sequence", "number"),
+                    field("kind", "string"),
+                    field("summary", "string"),
+                    field("entityIds", "readonly string[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerFinalCombatantDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("name", "string"),
+                    field("currentHitPoints", "number"),
+                    field("maxHitPoints", "number"),
+                    field("temporaryVitality", "number"),
+                    field("conditions", "readonly string[]"),
+                    field("positionX", "number"),
+                    field("positionY", "number"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerFinalStateDto",
+                fields: fields(vec![
+                    field("summary", "string"),
+                    field("combatants", "readonly RulebenchViewerFinalCombatantDto[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerScenarioReadoutDto",
+                fields: fields(vec![
+                    field("identity", "RulebenchViewerScenarioSummaryDto"),
+                    field("board", "RulebenchLiveBoardDto"),
+                    field("combatants", "readonly RulebenchViewerCombatantDto[]"),
+                    field("selectedAction", "RulebenchViewerSelectedActionDto"),
+                    field("selectedTarget", "RulebenchViewerSelectedTargetDto | null"),
+                    field("domainEvents", "readonly RulebenchViewerDomainEventDto[]"),
+                    field("trace", "readonly RulebenchLiveTraceEntryDto[]"),
+                    field("finalState", "RulebenchViewerFinalStateDto"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerSessionStepSummaryDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("index", "number"),
+                    field("title", "string"),
+                    field("summary", "string"),
+                    field("outcomeClass", "RulebenchCommandOutcomeClassDto"),
+                    field("logIndex", "number"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerSessionSummaryDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("title", "string"),
+                    field("summary", "string"),
+                    field("seedLabel", "string"),
+                    field("steps", "readonly RulebenchViewerSessionStepSummaryDto[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerCommandAttemptDto",
+                fields: fields(vec![
+                    field("stepId", "string"),
+                    field("stepIndex", "number"),
+                    field("actorId", "string"),
+                    field("actionId", "string"),
+                    field("targetId", "string"),
+                    field("rollStream", "readonly number[]"),
+                    field("outcomeClass", "RulebenchCommandOutcomeClassDto"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerCombatLogEntryDto",
+                fields: fields(vec![
+                    field("id", "string"),
+                    field("stepId", "string"),
+                    field("logIndex", "number"),
+                    field("title", "string"),
+                    field("summary", "string"),
+                    field("outcomeClass", "RulebenchCommandOutcomeClassDto"),
+                    field("eventTypes", "readonly string[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchViewerSessionStepReadoutDto",
+                fields: fields(vec![
+                    field("sessionId", "string"),
+                    field("step", "RulebenchViewerSessionStepSummaryDto"),
+                    field("command", "RulebenchViewerCommandAttemptDto"),
+                    field("scenario", "RulebenchViewerScenarioReadoutDto"),
+                    field("combatLog", "readonly RulebenchViewerCombatLogEntryDto[]"),
+                    field("stateBefore", "RulebenchViewerFinalStateDto"),
+                    field("stateAfter", "RulebenchViewerFinalStateDto"),
+                ]),
+            },
         ]
     })
 }

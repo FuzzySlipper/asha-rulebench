@@ -13,7 +13,9 @@ use rulebench_protocol::{
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
     ReactionResponseKindDto, ReplayArchiveMetadataDto, ReplayComparisonReadoutDto,
     ReplayComparisonRequestDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
-    RulebenchCapabilityManifestDto, ScenarioOptionDto, UseActionIntentDto, PROTOCOL_VERSION,
+    RulebenchCapabilityManifestDto, ScenarioOptionDto, UseActionIntentDto,
+    ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto,
+    ViewerSessionSummaryDto, PROTOCOL_VERSION,
 };
 
 use crate::{
@@ -52,6 +54,7 @@ fn capability_route_reports_registry_and_actual_host_composition() {
 
     assert_eq!(manifest.host.storage_mode, "memory");
     assert_eq!(manifest.host.session_recovery_mode, "none");
+    assert_eq!(manifest.host.authority_viewer_mode, "liveAuthorityReadback");
     assert_eq!(manifest.providers.len(), 2);
     assert_eq!(manifest.rulesets.len(), 2);
     assert_eq!(manifest.packages.len(), 4);
@@ -81,6 +84,85 @@ fn capability_route_reports_registry_and_actual_host_composition() {
             && !capability.support.runtime_executable
             && !capability.support.live_host_exposed
     }));
+    assert!(manifest.capabilities.iter().any(|capability| {
+        capability.id == "viewer.authority-readback"
+            && capability.support.protocol_exposed
+            && capability.support.live_host_exposed
+            && capability.support.ui_exposed
+            && capability.support.regression_covered
+            && !capability.support.durable_across_restart
+    }));
+}
+
+#[test]
+fn viewer_routes_expose_registry_driven_authority_readbacks() {
+    let mut router = router();
+    let scenarios = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/viewer/scenarios",
+    ));
+    assert_eq!(scenarios.status, 200);
+    let scenarios: Vec<ViewerScenarioSummaryDto> =
+        serde_json::from_slice(&scenarios.body).expect("viewer scenarios are JSON");
+    assert_eq!(scenarios.len(), 11);
+    let provider_scenario = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "watchtower-storm-pulse-multiple")
+        .expect("provider-registered scenario is exposed");
+
+    let scenario = router.handle(&request(
+        HttpMethod::Get,
+        &format!(
+            "/api/rulebench/v1/viewer/scenarios/{}",
+            provider_scenario.id
+        ),
+    ));
+    assert_eq!(scenario.status, 200);
+    let scenario: ViewerScenarioReadoutDto =
+        serde_json::from_slice(&scenario.body).expect("viewer scenario is JSON");
+    assert_eq!(scenario.identity.id, provider_scenario.id);
+    assert!(!scenario.domain_events.is_empty());
+    assert!(!scenario.trace.is_empty());
+    assert_eq!(scenario.board.width, 10);
+
+    let sessions = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/viewer/sessions",
+    ));
+    assert_eq!(sessions.status, 200);
+    let sessions: Vec<ViewerSessionSummaryDto> =
+        serde_json::from_slice(&sessions.body).expect("viewer sessions are JSON");
+    let provider_session = sessions
+        .iter()
+        .find(|session| session.id == "objective-turn-control-opening")
+        .expect("provider-owned transcript is exposed");
+    let step = provider_session
+        .steps
+        .first()
+        .expect("provider transcript has a step");
+    let step = router.handle(&request(
+        HttpMethod::Get,
+        &format!(
+            "/api/rulebench/v1/viewer/sessions/{}/steps/{}",
+            provider_session.id, step.id
+        ),
+    ));
+    assert_eq!(step.status, 200);
+    let step: ViewerSessionStepReadoutDto =
+        serde_json::from_slice(&step.body).expect("viewer session step is JSON");
+    assert_eq!(step.session_id, provider_session.id);
+    assert!(!step.scenario.trace.is_empty());
+
+    let missing_scenario = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/viewer/scenarios/missing",
+    ));
+    assert_eq!(missing_scenario.status, 404);
+    let missing_step = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/viewer/sessions/objective-turn-control-opening/steps/missing",
+    ));
+    assert_eq!(missing_step.status, 400);
 }
 
 #[test]

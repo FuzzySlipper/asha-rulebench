@@ -6,7 +6,9 @@ use rulebench_protocol::{
     ProtocolHandshakeDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
     ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayPackageReviewDto,
     ReplayVerificationReadoutDto, ScenarioOptionDto, ScenarioParticipantOptionDto,
-    UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
+    UseActionIntentDto, ViewerScenarioReadoutDto, ViewerScenarioSummaryDto,
+    ViewerSessionStepReadoutDto, ViewerSessionSummaryDto, ViewerSessionTranscriptDto, PROTOCOL_ID,
+    PROTOCOL_VERSION,
 };
 use rulebench_rules::{
     compare_replay_packages, record_replay_package, verify_replay_package, CombatControlReadout,
@@ -25,6 +27,7 @@ use crate::{BridgeError, BridgeErrorKind};
 pub struct BridgeScenario {
     pub option: ScenarioOptionDto,
     pub scenario: RulebenchScenario,
+    pub viewer_readout: Option<ViewerScenarioReadoutDto>,
 }
 
 impl BridgeScenario {
@@ -68,12 +71,19 @@ impl BridgeScenario {
                 participants,
             },
             scenario,
+            viewer_readout: None,
         }
+    }
+
+    pub fn with_viewer_readout(mut self, readout: ViewerScenarioReadoutDto) -> Self {
+        self.viewer_readout = Some(readout);
+        self
     }
 }
 
 pub struct RulebenchBridge {
     scenarios: BTreeMap<String, BridgeScenario>,
+    viewer_sessions: BTreeMap<String, ViewerSessionTranscriptDto>,
     sessions: CombatSessionApi,
     replays: ReplayArchive<Box<dyn ReplayArchiveStorage>>,
     recordings: BTreeMap<String, LiveReplayRecording>,
@@ -100,6 +110,7 @@ impl Default for RulebenchBridge {
     fn default() -> Self {
         Self {
             scenarios: BTreeMap::new(),
+            viewer_sessions: BTreeMap::new(),
             sessions: CombatSessionApi::new(),
             replays: ReplayArchive::new(Box::new(InMemoryReplayArchiveStorage::new())),
             recordings: BTreeMap::new(),
@@ -115,6 +126,14 @@ impl RulebenchBridge {
     pub fn new_with_replays(
         scenarios: impl IntoIterator<Item = BridgeScenario>,
         replay_packages: impl IntoIterator<Item = ReplayPackage>,
+    ) -> Result<Self, BridgeError> {
+        Self::new_with_replays_and_viewer_sessions(scenarios, replay_packages, Vec::new())
+    }
+
+    pub fn new_with_replays_and_viewer_sessions(
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        replay_packages: impl IntoIterator<Item = ReplayPackage>,
+        viewer_sessions: impl IntoIterator<Item = ViewerSessionTranscriptDto>,
     ) -> Result<Self, BridgeError> {
         let mut indexed = BTreeMap::new();
         for scenario in scenarios {
@@ -142,8 +161,10 @@ impl RulebenchBridge {
                 .save(replay, format!("fixture-{index:04}"))
                 .map_err(BridgeError::from_replay_error)?;
         }
+        let viewer_sessions = index_viewer_sessions(viewer_sessions)?;
         Ok(Self {
             scenarios: indexed,
+            viewer_sessions,
             sessions: CombatSessionApi::new(),
             replays,
             recordings: BTreeMap::new(),
@@ -154,7 +175,16 @@ impl RulebenchBridge {
         scenarios: impl IntoIterator<Item = BridgeScenario>,
         replay_storage: Box<dyn ReplayArchiveStorage>,
     ) -> Result<Self, BridgeError> {
-        let mut bridge = Self::new(scenarios)?;
+        Self::new_with_replay_storage_and_viewer_sessions(scenarios, replay_storage, Vec::new())
+    }
+
+    pub fn new_with_replay_storage_and_viewer_sessions(
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        replay_storage: Box<dyn ReplayArchiveStorage>,
+        viewer_sessions: impl IntoIterator<Item = ViewerSessionTranscriptDto>,
+    ) -> Result<Self, BridgeError> {
+        let mut bridge =
+            Self::new_with_replays_and_viewer_sessions(scenarios, Vec::new(), viewer_sessions)?;
         bridge.replays = ReplayArchive::new(replay_storage);
         Ok(bridge)
     }
@@ -181,6 +211,78 @@ impl RulebenchBridge {
             .values()
             .map(|scenario| scenario.option.clone())
             .collect())
+    }
+
+    pub fn list_viewer_scenarios(
+        &self,
+        context: &ProtocolRequestContextDto,
+    ) -> Result<Vec<ViewerScenarioSummaryDto>, BridgeError> {
+        self.check_version(context)?;
+        Ok(self
+            .scenarios
+            .values()
+            .filter_map(|scenario| {
+                scenario
+                    .viewer_readout
+                    .as_ref()
+                    .map(|readout| readout.identity.clone())
+            })
+            .collect())
+    }
+
+    pub fn get_viewer_scenario(
+        &self,
+        context: &ProtocolRequestContextDto,
+        scenario_id: &str,
+    ) -> Result<ViewerScenarioReadoutDto, BridgeError> {
+        self.check_version(context)?;
+        self.scenarios
+            .get(scenario_id)
+            .and_then(|scenario| scenario.viewer_readout.clone())
+            .ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::UnknownScenario,
+                    format!("Viewer scenario does not exist: {scenario_id}"),
+                )
+            })
+    }
+
+    pub fn list_viewer_sessions(
+        &self,
+        context: &ProtocolRequestContextDto,
+    ) -> Result<Vec<ViewerSessionSummaryDto>, BridgeError> {
+        self.check_version(context)?;
+        Ok(self
+            .viewer_sessions
+            .values()
+            .map(|transcript| transcript.summary.clone())
+            .collect())
+    }
+
+    pub fn get_viewer_session_step(
+        &self,
+        context: &ProtocolRequestContextDto,
+        session_id: &str,
+        step_id: &str,
+    ) -> Result<ViewerSessionStepReadoutDto, BridgeError> {
+        self.check_version(context)?;
+        let transcript = self.viewer_sessions.get(session_id).ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::UnknownSession,
+                format!("Viewer session does not exist: {session_id}"),
+            )
+        })?;
+        transcript
+            .steps
+            .iter()
+            .find(|step| step.step.id == step_id)
+            .cloned()
+            .ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    format!("Viewer session step does not exist: {session_id}/{step_id}"),
+                )
+            })
     }
 
     pub fn create_session(
@@ -570,6 +672,30 @@ impl RulebenchBridge {
             .push(ReplayCommandRecordingSpec::new(id, command));
         Ok(())
     }
+}
+
+fn index_viewer_sessions(
+    sessions: impl IntoIterator<Item = ViewerSessionTranscriptDto>,
+) -> Result<BTreeMap<String, ViewerSessionTranscriptDto>, BridgeError> {
+    let mut indexed = BTreeMap::new();
+    for transcript in sessions {
+        if transcript.summary.id.is_empty() {
+            return Err(BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "Viewer session id must not be empty.",
+            ));
+        }
+        if indexed
+            .insert(transcript.summary.id.clone(), transcript)
+            .is_some()
+        {
+            return Err(BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "Viewer session ids must be unique.",
+            ));
+        }
+    }
+    Ok(indexed)
 }
 
 pub fn prepare_replay_scenario(mut scenario: RulebenchScenario) -> RulebenchScenario {

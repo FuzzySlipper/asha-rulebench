@@ -40,8 +40,8 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           manifestId: "asha-rulebench.capabilities",
-          manifestVersion: 2,
-          generatedArtifactSchema: "asha-rulebench.capabilities.ts@2",
+          manifestVersion: 3,
+          generatedArtifactSchema: "asha-rulebench.capabilities.ts@3",
           governedAshaRevision: "0123456789abcdef",
           operationVocabularyVersion: "2",
           effectVocabularyVersion: "1",
@@ -54,6 +54,7 @@ describe("LiveCombatStore", () => {
             replayStorageAdapter: "versionedFilesystem",
             replayRecoveryMode: "finalizedArchive",
             sessionRecoveryMode: "none",
+            authorityViewerMode: "liveAuthorityReadback",
           },
           providers: [],
           rulesets: [],

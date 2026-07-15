@@ -29,7 +29,8 @@ import {
   rustBackedScenarioCatalog,
 } from "./generated/rust-scenario-catalog";
 
-export interface RulebenchTransport {
+/** Checked Rust-generated evidence for deterministic tests and golden review only. */
+export interface RulebenchOfflineFixtureTransport {
   readonly loadContentImportExamples: () => Promise<
     Result<readonly RulebenchContentImportReadoutDto[]>
   >;
@@ -65,6 +66,9 @@ export interface RulebenchTransport {
     replayId?: string,
   ) => Promise<Result<RulebenchAutomaticRunReplayReadoutDto>>;
 }
+
+/** Compatibility name for existing offline fixture tests. Product providers must not use it. */
+export type RulebenchTransport = RulebenchOfflineFixtureTransport;
 
 export const defaultRulesetCatalog: RulebenchRulesetCatalogDto =
   rustBackedRulesetCatalog;
@@ -133,13 +137,13 @@ export const defaultCombatAutomaticRunReplayReadout: RulebenchAutomaticRunReplay
     defaultCombatAutomaticRunReplayReadoutId,
   );
 
-export const createFakeRulebenchTransport = (
+export const createOfflineFixtureRulebenchTransport = (
   catalog: RulebenchScenarioCatalogDto = defaultScenarioCatalog,
   sessionCatalog: RulebenchCombatSessionCatalogDto = defaultCombatSessionCatalog,
   rulesetCatalog: RulebenchRulesetCatalogDto = defaultRulesetCatalog,
   validationCatalog: RulebenchContentValidationCatalogDto = defaultContentValidationCatalog,
   importCatalog: RulebenchContentImportCatalogDto = defaultContentImportCatalog,
-): RulebenchTransport => ({
+): RulebenchOfflineFixtureTransport => ({
   loadContentImportExamples: async () => ({
     ok: true,
     value: importCatalog.examples,
@@ -255,6 +259,9 @@ export const createFakeRulebenchTransport = (
       : { ok: true, value: readout };
   },
 });
+
+/** Compatibility factory for existing deterministic tests. */
+export const createFakeRulebenchTransport = createOfflineFixtureRulebenchTransport;
 
 function firstContentValidationScenarioId(
   catalog: RulebenchContentValidationCatalogDto,

@@ -7,7 +7,10 @@ use rulebench_bridge::replay_storage::{
     ContentPackStorage, ReplayArchiveEntry, ReplayArchiveStorage,
 };
 use rulebench_bridge::{BridgeError, BridgeErrorKind, BridgeScenario, RulebenchBridge};
-use rulebench_fixtures::{aggregated_scenario_catalog_cases, replay_review_packages};
+use rulebench_fixtures::{
+    aggregated_combat_session_transcripts, aggregated_scenario_catalog_cases,
+    replay_review_packages, resolve_catalog_scenario,
+};
 use rulebench_fixtures::{
     assemble_capability_manifest, capability_registry_input, scenario_package_registry,
     HostCapabilityProfile,
@@ -20,26 +23,58 @@ use rulebench_protocol::{
     LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
     LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
     ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, UseActionIntentDto,
+    ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionTranscriptDto,
 };
 
 const API_PREFIX: &str = "/api/rulebench/v1";
 const PROTOCOL_VERSION_HEADER: &str = "x-rulebench-protocol-version";
 
 pub fn build_rulebench_bridge() -> Result<RulebenchBridge, BridgeError> {
-    RulebenchBridge::new_with_replays(bridge_scenarios(), replay_review_packages())
+    RulebenchBridge::new_with_replays_and_viewer_sessions(
+        bridge_scenarios(),
+        replay_review_packages(),
+        viewer_session_transcripts(),
+    )
 }
 
 fn bridge_scenarios() -> Vec<BridgeScenario> {
     aggregated_scenario_catalog_cases()
         .into_iter()
         .map(|case| {
+            let resolution = resolve_catalog_scenario(&case.summary.id)
+                .expect("registered viewer scenario resolves through Rust authority");
+            let projection = resolution
+                .receipt
+                .projection
+                .as_ref()
+                .expect("registered viewer scenario has an authority projection");
+            let identity = ViewerScenarioSummaryDto {
+                id: case.summary.id.clone(),
+                title: case.summary.title.clone(),
+                summary: case.summary.summary.clone(),
+                seed_label: case.summary.seed_label.clone(),
+                outcome_class: case.summary.outcome_class.code().to_string(),
+            };
             BridgeScenario::new(
                 case.summary.id,
                 case.summary.title,
                 case.summary.summary,
                 case.scenario,
             )
+            .with_viewer_readout(ViewerScenarioReadoutDto::new(
+                identity,
+                &resolution.scenario,
+                &resolution.receipt,
+                projection,
+            ))
         })
+        .collect()
+}
+
+fn viewer_session_transcripts() -> Vec<ViewerSessionTranscriptDto> {
+    aggregated_combat_session_transcripts()
+        .iter()
+        .map(ViewerSessionTranscriptDto::from)
         .collect()
 }
 
@@ -54,6 +89,9 @@ fn process_host_capability_manifest(
     registry
         .regression_capability_ids
         .push("replay.finalized-archive".to_string());
+    registry
+        .regression_capability_ids
+        .push("viewer.authority-readback".to_string());
     let filesystem = repository_status.mode == "filesystem";
     let manifest = assemble_capability_manifest(
         registry,
@@ -72,6 +110,7 @@ fn process_host_capability_manifest(
             },
             replay_recovery_mode: "finalizedArchive".to_string(),
             session_recovery_mode: "none".to_string(),
+            authority_viewer_mode: "liveAuthorityReadback".to_string(),
             authored_content_enabled,
             exposes_capabilities_through_protocol: true,
             exposes_capabilities_through_live_host: true,
@@ -187,8 +226,12 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         replay_artifact_count,
         issues,
     };
-    let bridge = RulebenchBridge::new_with_replay_storage(scenarios, Box::new(storage))
-        .map_err(|error| error.to_string())?;
+    let bridge = RulebenchBridge::new_with_replay_storage_and_viewer_sessions(
+        scenarios,
+        Box::new(storage),
+        viewer_session_transcripts(),
+    )
+    .map_err(|error| error.to_string())?;
     Ok(ProcessHostRouter::new_with_repository(
         bridge, content, status,
     ))
@@ -264,6 +307,21 @@ impl ProcessHostRouter {
         match (request.method, segments.as_slice()) {
             (HttpMethod::Get, ["handshake"]) => bridge_result(self.bridge.handshake(&context)),
             (HttpMethod::Get, ["capabilities"]) => json_ok(&self.capability_manifest),
+            (HttpMethod::Get, ["viewer", "scenarios"]) => {
+                bridge_result(self.bridge.list_viewer_scenarios(&context))
+            }
+            (HttpMethod::Get, ["viewer", "scenarios", scenario_id]) => {
+                bridge_result(self.bridge.get_viewer_scenario(&context, scenario_id))
+            }
+            (HttpMethod::Get, ["viewer", "sessions"]) => {
+                bridge_result(self.bridge.list_viewer_sessions(&context))
+            }
+            (HttpMethod::Get, ["viewer", "sessions", session_id, "steps", step_id]) => {
+                bridge_result(
+                    self.bridge
+                        .get_viewer_session_step(&context, session_id, step_id),
+                )
+            }
             (HttpMethod::Get, ["scenarios"]) => bridge_result(self.bridge.list_scenarios(&context)),
             (HttpMethod::Get, ["sessions"]) => match self.bridge.list_sessions(&context) {
                 Ok(snapshots) => json_ok(

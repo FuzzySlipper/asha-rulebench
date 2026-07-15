@@ -105,6 +105,8 @@ import { LiveCombatStore } from "@asha-rulebench/store";
             </dd>
             <dt>Recovery</dt>
             <dd>{{ capabilities().value.recoveryLabel }}</dd>
+            <dt>Authority viewer</dt>
+            <dd>{{ capabilities().value.authorityViewerLabel }}</dd>
             <dt>ASHA revision</dt>
             <dd class="capability-id">
               {{ capabilities().value.governedAshaRevision }}
