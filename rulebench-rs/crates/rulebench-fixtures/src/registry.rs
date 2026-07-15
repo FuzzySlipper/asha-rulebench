@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use rulebench_rules::{
     CombatControlHistoryReadout, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticRunReplayReadout, CombatSessionScriptReadout, CombatSessionTranscript,
+    EffectOperationId, OperationPipelineV2, RulesetProviderCatalog,
 };
 
 use crate::{
@@ -44,11 +45,29 @@ impl ScenarioPackageRegistration {
 #[derive(Clone)]
 pub struct ScenarioPackageRegistry {
     registrations: Vec<ScenarioPackageRegistration>,
+    provider_catalog: RulesetProviderCatalog,
 }
 
 impl ScenarioPackageRegistry {
     pub fn new(
+        registrations: Vec<ScenarioPackageRegistration>,
+    ) -> Result<Self, Vec<ScenarioPackageRegistryError>> {
+        let provider_catalog = RulesetProviderCatalog::new(Vec::new())
+            .expect("an empty provider catalog is valid for isolated registry tests");
+        Self::build(registrations, provider_catalog, false)
+    }
+
+    pub fn new_with_providers(
+        registrations: Vec<ScenarioPackageRegistration>,
+        provider_catalog: RulesetProviderCatalog,
+    ) -> Result<Self, Vec<ScenarioPackageRegistryError>> {
+        Self::build(registrations, provider_catalog, true)
+    }
+
+    fn build(
         mut registrations: Vec<ScenarioPackageRegistration>,
+        provider_catalog: RulesetProviderCatalog,
+        require_registered_providers: bool,
     ) -> Result<Self, Vec<ScenarioPackageRegistryError>> {
         registrations.sort_by(|left, right| {
             left.package
@@ -78,10 +97,16 @@ impl ScenarioPackageRegistry {
                     package_id: registration.package.identity.id.clone(),
                 });
             }
+            if require_registered_providers {
+                validate_package_provider(registration, &provider_catalog, &mut errors);
+            }
         }
 
         if errors.is_empty() {
-            Ok(Self { registrations })
+            Ok(Self {
+                registrations,
+                provider_catalog,
+            })
         } else {
             Err(errors)
         }
@@ -89,6 +114,10 @@ impl ScenarioPackageRegistry {
 
     pub fn registrations(&self) -> &[ScenarioPackageRegistration] {
         &self.registrations
+    }
+
+    pub fn provider_catalog(&self) -> &RulesetProviderCatalog {
+        &self.provider_catalog
     }
 
     pub fn select(
@@ -193,6 +222,95 @@ impl ScenarioPackageRegistry {
 pub enum ScenarioPackageRegistryError {
     DuplicatePackageIdentity { identity: String },
     InvalidPackage { package_id: String },
+    IncompatiblePackageProvider { package_id: String, code: String },
+}
+
+fn validate_package_provider(
+    registration: &ScenarioPackageRegistration,
+    provider_catalog: &RulesetProviderCatalog,
+    errors: &mut Vec<ScenarioPackageRegistryError>,
+) {
+    let package = &registration.package;
+    let Some(ruleset) = package.initial_state.scenario.selected_ruleset() else {
+        return;
+    };
+    let provider = match provider_catalog.validate_ruleset(ruleset) {
+        Ok(provider) => provider,
+        Err(error) => {
+            errors.push(ScenarioPackageRegistryError::IncompatiblePackageProvider {
+                package_id: package.identity.id.clone(),
+                code: error.code().to_string(),
+            });
+            return;
+        }
+    };
+
+    for action in &package.initial_state.scenario.actions {
+        if action.ruleset_id != ruleset.id {
+            errors.push(ScenarioPackageRegistryError::IncompatiblePackageProvider {
+                package_id: package.identity.id.clone(),
+                code: "crossRulesetActionReference".to_string(),
+            });
+            continue;
+        }
+        let requirements = std::iter::once(check_capability(&action.check))
+            .chain(std::iter::once(targeting_capability(action)))
+            .chain(action.hit.operations.iter().map(|operation| {
+                (
+                    format!("operation.{}", operation.id().code()),
+                    EffectOperationId::VOCABULARY_VERSION.to_string(),
+                )
+            }));
+        for (capability_id, capability_version) in requirements {
+            let supported = provider
+                .capability(&capability_id)
+                .is_some_and(|capability| capability.version == capability_version);
+            if !supported {
+                errors.push(ScenarioPackageRegistryError::IncompatiblePackageProvider {
+                    package_id: package.identity.id.clone(),
+                    code: "rulesetProviderCapabilityMissing".to_string(),
+                });
+            }
+        }
+    }
+}
+
+fn check_capability(check: &rulebench_rules::CheckDeclaration) -> (String, String) {
+    let id = match check {
+        rulebench_rules::CheckDeclaration::Attack(_) => "check.attackVsDefense",
+        rulebench_rules::CheckDeclaration::SavingThrow(_) => "check.savingThrow",
+        rulebench_rules::CheckDeclaration::Contested(_) => "check.contested",
+    };
+    (id.to_string(), "1".to_string())
+}
+
+fn targeting_capability(action: &rulebench_rules::ActionDefinition) -> (String, String) {
+    let id = if action.movement.is_some() {
+        "targeting.cellMovement"
+    } else {
+        match (
+            action.targeting.target_kind,
+            action.targeting.selection,
+            action.targeting.operation_pipeline.as_ref(),
+        ) {
+            (
+                rulebench_rules::TargetKind::Combatant,
+                rulebench_rules::TargetSelection::Single,
+                _,
+            ) => "targeting.singleCombatant",
+            (
+                rulebench_rules::TargetKind::Combatant,
+                rulebench_rules::TargetSelection::Multiple,
+                _,
+            ) => "targeting.multipleCombatants",
+            (rulebench_rules::TargetKind::Area, _, Some(_)) => "targeting.manhattanBurstArea",
+            (rulebench_rules::TargetKind::Area, _, None) => "targeting.cellMovement",
+        }
+    };
+    (
+        id.to_string(),
+        OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -284,9 +402,50 @@ mod tests {
     fn registry_aggregates_fixture_readbacks_without_package_specific_paths() {
         let registry = crate::scenario_package_registry();
 
-        assert_eq!(registry.registrations().len(), 3);
-        assert_eq!(registry.scenario_catalog_cases().len(), 10);
-        assert_eq!(registry.combat_session_transcripts().len(), 2);
+        assert_eq!(registry.registrations().len(), 4);
+        assert_eq!(registry.scenario_catalog_cases().len(), 11);
+        assert_eq!(registry.combat_session_transcripts().len(), 3);
         assert_eq!(registry.combat_session_script_readouts().len(), 1);
+    }
+
+    #[test]
+    fn strict_registry_rejects_missing_provider_capability_and_cross_ruleset_action() {
+        let registration = crate::scenarios::turn_control::registration();
+        let mut providers = crate::compiled_ruleset_provider_catalog()
+            .providers()
+            .to_vec();
+        let turn_provider = providers
+            .iter_mut()
+            .find(|provider| provider.provider_id == crate::TURN_CONTROL_PROVIDER_ID)
+            .expect("turn-control provider is registered");
+        turn_provider
+            .capabilities
+            .retain(|capability| capability.id != "operation.damage");
+        let catalog = RulesetProviderCatalog::new(providers)
+            .expect("a reduced capability declaration is structurally valid");
+        let missing =
+            ScenarioPackageRegistry::new_with_providers(vec![registration.clone()], catalog)
+                .err()
+                .expect("package capability must be supplied by its provider");
+        assert!(missing.iter().any(|error| matches!(
+            error,
+            ScenarioPackageRegistryError::IncompatiblePackageProvider { code, .. }
+                if code == "rulesetProviderCapabilityMissing"
+        )));
+
+        let mut crossed = registration;
+        crossed.package.initial_state.scenario.actions[0].ruleset_id =
+            crate::HEXING_BOLT_RULESET_ID.to_string();
+        let cross = ScenarioPackageRegistry::new_with_providers(
+            vec![crossed],
+            crate::compiled_ruleset_provider_catalog(),
+        )
+        .err()
+        .expect("cross-ruleset action must fail before execution");
+        assert!(cross.iter().any(|error| matches!(
+            error,
+            ScenarioPackageRegistryError::IncompatiblePackageProvider { code, .. }
+                if code == "crossRulesetActionReference"
+        )));
     }
 }

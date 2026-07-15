@@ -74,6 +74,30 @@ export class WorkbenchShellComponent {
   protected readonly snapshot = computed(() => this.liveStore.snapshot());
   protected readonly control = computed(() => this.liveStore.control());
   protected readonly options = computed(() => this.liveStore.options());
+  protected readonly selectedActionCheckKind = computed(() => {
+    const options = this.options();
+    if (options.kind !== "data") return null;
+    return (
+      options.value.actions.find(
+        (action) => action.actionId === this.intent().actionId,
+      )?.checkKind ?? null
+    );
+  });
+  protected readonly primaryRollLabel = computed(() => {
+    switch (this.selectedActionCheckKind()) {
+      case "savingThrow":
+        return "Saving throw roll";
+      case "contested":
+        return "Actor contest roll";
+      default:
+        return "Attack roll";
+    }
+  });
+  protected readonly secondaryRollLabel = computed(() =>
+    this.selectedActionCheckKind() === "contested"
+      ? "Target contest roll"
+      : "Damage roll",
+  );
   protected readonly candidates = computed(() => this.liveStore.candidates());
   protected readonly preflight = computed(() => this.liveStore.preflight());
   protected readonly submission = computed(() => this.liveStore.submission());

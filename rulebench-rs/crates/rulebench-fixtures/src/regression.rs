@@ -1,6 +1,7 @@
 use rulebench_rules::{
     fingerprint_projected_state, resolve_use_action, AttackOutcome, CombatSessionIntentCommandSpec,
-    CombatSessionState, RulebenchReceipt, RulebenchRejection,
+    CombatSessionState, ContestedCheckOutcome, DomainEvent, RulebenchReceipt, RulebenchRejection,
+    SavingThrowOutcome,
 };
 
 use crate::{ScenarioCatalogCase, ScenarioOutcomeClass, ScenarioPackageRegistry};
@@ -136,10 +137,23 @@ fn classify_outcome(receipt: &RulebenchReceipt) -> Option<ScenarioOutcomeClass> 
     if receipt.rejection == Some(RulebenchRejection::TargetLegalityFailed) {
         return Some(ScenarioOutcomeClass::RejectedTargetLegality);
     }
-    match receipt.attack_roll.as_ref()?.outcome {
-        AttackOutcome::Hit => Some(ScenarioOutcomeClass::AcceptedHit),
-        AttackOutcome::Miss => Some(ScenarioOutcomeClass::AcceptedMiss),
+    if let Some(attack) = &receipt.attack_roll {
+        return match attack.outcome {
+            AttackOutcome::Hit => Some(ScenarioOutcomeClass::AcceptedHit),
+            AttackOutcome::Miss => Some(ScenarioOutcomeClass::AcceptedMiss),
+        };
     }
+    receipt.events.iter().find_map(|event| match event {
+        DomainEvent::SavingThrowResolved { outcome, .. } => Some(match outcome {
+            SavingThrowOutcome::Failed => ScenarioOutcomeClass::AcceptedHit,
+            SavingThrowOutcome::Saved => ScenarioOutcomeClass::AcceptedMiss,
+        }),
+        DomainEvent::ContestedCheckResolved { outcome, .. } => Some(match outcome {
+            ContestedCheckOutcome::ActorWins => ScenarioOutcomeClass::AcceptedHit,
+            ContestedCheckOutcome::TargetWins => ScenarioOutcomeClass::AcceptedMiss,
+        }),
+        _ => None,
+    })
 }
 
 fn compare_outcome(
@@ -213,7 +227,7 @@ mod tests {
             run_scenario_regressions(&crate::scenario_package_registry(), &Default::default());
 
         assert!(report.accepted, "{:?}", report.first_difference);
-        assert_eq!(report.cases.len(), 10);
+        assert_eq!(report.cases.len(), 11);
         assert_eq!(
             report
                 .cases
@@ -221,7 +235,7 @@ mod tests {
                 .map(|case| case.package_id.as_str())
                 .collect::<std::collections::BTreeSet<_>>()
                 .len(),
-            3,
+            4,
         );
         assert!(report
             .cases
@@ -248,6 +262,25 @@ mod tests {
         assert!(report.accepted);
         assert_eq!(report.cases.len(), 1);
         assert_eq!(report.cases[0].scenario_id, selected_case);
+    }
+
+    #[test]
+    fn runner_filters_the_second_provider_by_exact_ruleset_identity() {
+        let report = run_scenario_regressions(
+            &crate::scenario_package_registry(),
+            &ScenarioRegressionFilter {
+                ruleset_id: Some(crate::TURN_CONTROL_RULESET_ID.to_string()),
+                ruleset_version: Some(crate::TURN_CONTROL_RULESET_VERSION.to_string()),
+                ..Default::default()
+            },
+        );
+
+        assert!(report.accepted);
+        assert_eq!(report.cases.len(), 2);
+        assert!(report
+            .cases
+            .iter()
+            .all(|case| case.ruleset_id == crate::TURN_CONTROL_RULESET_ID));
     }
 
     #[test]

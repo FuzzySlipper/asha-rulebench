@@ -30,7 +30,6 @@ const limitationIds = new Set(
 );
 for (const id of [
   "trusted-local-process-host",
-  "single-ruleset-identity",
   "checked-viewer-artifacts",
   "active-session-recovery",
   "authored-content-v1-vocabulary",
@@ -143,11 +142,11 @@ function checkCapabilityManifest(capabilities) {
   if (capabilities.manifestId !== "asha-rulebench.capabilities") {
     failures.push("capability manifest has the wrong manifestId.");
   }
-  if (capabilities.manifestVersion !== 1) {
-    failures.push("capability manifest must use manifestVersion 1.");
+  if (capabilities.manifestVersion !== 2) {
+    failures.push("capability manifest must use manifestVersion 2.");
   }
   if (
-    capabilities.generatedArtifactSchema !== "asha-rulebench.capabilities.ts@1"
+    capabilities.generatedArtifactSchema !== "asha-rulebench.capabilities.ts@2"
   ) {
     failures.push(
       "capability manifest has the wrong generated artifact schema.",
@@ -160,6 +159,10 @@ function checkCapabilityManifest(capabilities) {
   }
 
   const identities = [
+    ...capabilities.providers.map(
+      (entry) =>
+        `provider:${entry.provider.id}@${entry.provider.version}:${entry.ruleset.id}@${entry.ruleset.version}`,
+    ),
     ...capabilities.rulesets.map(
       (entry) => `ruleset:${entry.id}@${entry.version}`,
     ),
@@ -171,6 +174,64 @@ function checkCapabilityManifest(capabilities) {
     ),
   ];
   requireUnique(identities, "capability identity");
+
+  if (capabilities.providers.length !== capabilities.rulesets.length) {
+    failures.push(
+      "every runtime ruleset identity must have one compiled provider entry.",
+    );
+  }
+  const providerRows = capabilities.providers.map(
+    (entry) =>
+      `${entry.provider.id}@${entry.provider.version}:${entry.ruleset.id}@${entry.ruleset.version}`,
+  );
+  requireUnique(
+    capabilities.providers.map((entry) => entry.provider.id),
+    "provider id",
+  );
+  if (providerRows.join("\n") !== [...providerRows].sort().join("\n")) {
+    failures.push("compiled providers must use deterministic identity ordering.");
+  }
+  for (const provider of capabilities.providers) {
+    if (
+      provider.operationVocabularyVersion !==
+        capabilities.operationVocabularyVersion ||
+      provider.effectOperationVocabularyVersion !==
+        capabilities.effectVocabularyVersion
+    ) {
+      failures.push(
+        `${provider.provider.id} has incompatible operation vocabulary metadata.`,
+      );
+    }
+    if (provider.capabilities.length === 0) {
+      failures.push(`${provider.provider.id} declares no provider capabilities.`);
+    }
+    const providerCapabilities = provider.capabilities.map(
+      (capability) => `${capability.id}@${capability.version}`,
+    );
+    requireUnique(
+      providerCapabilities,
+      `${provider.provider.id} capability identity`,
+    );
+    if (
+      providerCapabilities.join("\n") !==
+      [...providerCapabilities].sort().join("\n")
+    ) {
+      failures.push(
+        `${provider.provider.id} capabilities must use deterministic identity ordering.`,
+      );
+    }
+    if (
+      !capabilities.rulesets.some(
+        (ruleset) =>
+          ruleset.id === provider.ruleset.id &&
+          ruleset.version === provider.ruleset.version,
+      )
+    ) {
+      failures.push(
+        `${provider.provider.id} references a ruleset absent from the runtime inventory.`,
+      );
+    }
+  }
 
   const capabilityIds = capabilities.capabilities.map((entry) => entry.id);
   requireUnique(capabilityIds, "capability id");

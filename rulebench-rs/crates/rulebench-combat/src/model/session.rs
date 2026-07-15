@@ -10,7 +10,7 @@ use super::{
     TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
 use rulebench_gameplay_module::RulebenchGameplayFabricReadout;
-use rulebench_ruleset::{ActionResourceCost, CombatEndPolicy};
+use rulebench_ruleset::{ActionResourceCost, CheckHandlerKind, CombatEndPolicy};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
@@ -361,6 +361,7 @@ pub struct CurrentActorActionOption {
     pub action_id: String,
     pub ability_id: String,
     pub action_name: String,
+    pub check_kind: CheckHandlerKind,
     pub available: bool,
     pub unavailable_reason: Option<String>,
     pub resource_costs: Vec<ActionResourceCost>,

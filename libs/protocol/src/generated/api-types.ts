@@ -208,6 +208,7 @@ export interface RulebenchLiveActionOptionDto {
   readonly actionId: string;
   readonly abilityId: string;
   readonly actionName: string;
+  readonly checkKind: 'attackVsDefense' | 'savingThrow' | 'contested';
   readonly available: boolean;
   readonly unavailableReason: string | null;
   readonly resourceCosts: readonly RulebenchLiveActionResourceCostDto[];
@@ -506,6 +507,14 @@ export interface RulebenchCapabilityIdentityDto {
   readonly version: string;
 }
 
+export interface RulebenchRulesetProviderDto {
+  readonly provider: RulebenchCapabilityIdentityDto;
+  readonly ruleset: RulebenchCapabilityIdentityDto;
+  readonly operationVocabularyVersion: string;
+  readonly effectOperationVocabularyVersion: string;
+  readonly capabilities: readonly RulebenchCapabilityIdentityDto[];
+}
+
 export interface RulebenchHostCapabilityProfileDto {
   readonly adapterId: string;
   readonly storageMode: string;
@@ -525,6 +534,7 @@ export interface RulebenchCapabilityManifestDto {
   readonly protocolId: string;
   readonly protocolVersion: number;
   readonly host: RulebenchHostCapabilityProfileDto;
+  readonly providers: readonly RulebenchRulesetProviderDto[];
   readonly rulesets: readonly RulebenchCapabilityIdentityDto[];
   readonly packages: readonly RulebenchCapabilityIdentityDto[];
   readonly scenarios: readonly RulebenchCapabilityIdentityDto[];
@@ -1515,7 +1525,9 @@ export interface RulebenchSelectedActionDto {
   readonly range: number;
   readonly lineOfSightRequired: boolean;
   readonly visibleTargetIds: readonly string[];
-  readonly attack: RulebenchAttackSpecDto;
+  readonly attack: RulebenchAttackSpecDto | null;
+  readonly savingThrow: RulebenchSavingThrowSpecDto | null;
+  readonly contested: RulebenchContestedCheckSpecDto | null;
   readonly hit: RulebenchHitEffectDto;
   readonly actionText: string;
   readonly effectText: string;
@@ -1525,6 +1537,16 @@ export interface RulebenchAttackSpecDto {
   readonly modifier: number;
   readonly defenseId: string;
   readonly defenseLabel: string;
+}
+
+export interface RulebenchSavingThrowSpecDto {
+  readonly saveStatId: string;
+  readonly difficultyClass: number;
+}
+
+export interface RulebenchContestedCheckSpecDto {
+  readonly actorStatId: string;
+  readonly targetStatId: string;
 }
 
 export interface RulebenchHitEffectDto {

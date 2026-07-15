@@ -11,6 +11,7 @@ mod conformance;
 mod content_import;
 mod goldens;
 mod package;
+mod providers;
 mod registry;
 mod regression;
 mod replay_review;
@@ -34,6 +35,11 @@ pub use package::{
     ScenarioPackageEvidenceExpectation, ScenarioPackageEvidenceKind, ScenarioPackageIdentity,
     ScenarioPackageInitialState, ScenarioPackageRulesetReference, ScenarioPackageScript,
     ScenarioPackageValidationError,
+};
+pub use providers::{
+    compiled_ruleset_provider_catalog, hexing_bolt_ruleset, turn_control_ruleset,
+    HEXING_BOLT_PROVIDER_ID, HEXING_BOLT_RULESET_ID, HEXING_BOLT_RULESET_VERSION,
+    TURN_CONTROL_PROVIDER_ID, TURN_CONTROL_RULESET_ID, TURN_CONTROL_RULESET_VERSION,
 };
 pub use registry::{
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRegistry,

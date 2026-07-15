@@ -37,7 +37,7 @@
     },
     {
       "file": "README.md",
-      "text": "1 ruleset identity, 3 registered packages, 10 scenario cases, 1 automation policy"
+      "text": "2 compiled providers, 2 ruleset identities, 4 registered packages, 11 scenario cases, 1 automation policy"
     }
   ],
   "requiredNonClaims": [
@@ -72,10 +72,6 @@
     {
       "id": "trusted-local-process-host",
       "denHeading": "Trusted-local single-writer process host"
-    },
-    {
-      "id": "single-ruleset-identity",
-      "denHeading": "One current ruleset identity"
     },
     {
       "id": "checked-viewer-artifacts",

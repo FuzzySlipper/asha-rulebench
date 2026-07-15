@@ -51,7 +51,7 @@ mod tests {
 
         assert!(accepted_receipt.accepted);
         assert!(!rejected_receipt.accepted);
-        assert_eq!(scenario_catalog_cases().len(), 5);
+        assert_eq!(scenario_catalog_cases().len(), 4);
         assert_eq!(combat_session_transcripts().len(), 1);
     }
 

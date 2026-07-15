@@ -59,14 +59,14 @@ describe("RulebenchTransport fixtures", () => {
           name: "Hexing Bolt Fixture Rules",
           version: "0.0.0",
           summary:
-            "Local single-action fixture ruleset for authority incubation.",
+            "Local action-resolution rules for the Hexing Bolt package family.",
         },
         {
           id: "asha-rulebench.turn-control.v0",
-          name: "Turn Control Fixture Rules",
-          version: "0.0.0",
+          name: "Objective Turn Control Rules",
+          version: "0.1.0",
           summary:
-            "Minimal second ruleset proving static turn-control module selection.",
+            "Saving-throw actions under explicit turns and objective-side victory.",
         },
       ]);
     }
@@ -141,8 +141,9 @@ describe("RulebenchTransport fixtures", () => {
         "hexing-bolt-reaction",
         "hexing-bolt-miss",
         "hexing-bolt-self-target-rejected",
-        "turn-control-hit",
         "hexing-bolt-veteran-hit",
+        "binding-glyph-failed-save",
+        "binding-glyph-saved",
         "watchtower-skirmish",
         "watchtower-storm-pulse-area",
         "watchtower-storm-pulse-multiple",
@@ -152,7 +153,7 @@ describe("RulebenchTransport fixtures", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toBe(defaultScenarioReadout);
-      expect(result.value.selectedAction.attack.modifier).toBe(4);
+      expect(result.value.selectedAction.attack?.modifier).toBe(4);
       expect(result.value.domainEvents.map((event) => event.type)).toEqual([
         "ActionUsed",
         "AttackRolled",

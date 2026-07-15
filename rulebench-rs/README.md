@@ -111,9 +111,11 @@ migration contract.
 
 The executable manifest is assembled from the ruleset operation registry,
 combat execution and automation-policy registries, registered regression
-packages, and the concrete host's selected storage/recovery adapters. The
-current durable-host artifact reports 1 ruleset identity, 3 packages, 10
-scenarios, 1 policy, and the exact governed ASHA revision. The process host
+packages, the compiled provider catalog, and the concrete host's selected
+storage/recovery adapters. The current durable-host artifact reports 2 compiled
+providers, 2 ruleset identities, 4 packages, 11 scenarios, 1 policy, and the
+exact governed ASHA revision. Provider entries carry exact capability and
+operation/effect-vocabulary compatibility. The process host
 serves the same typed DTO at `GET /api/rulebench/v1/capabilities`; a memory-mode
 host therefore cannot inherit durable support merely because the checked
 artifact was emitted from a filesystem-mode host. See

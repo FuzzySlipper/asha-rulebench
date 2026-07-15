@@ -1165,7 +1165,7 @@
         </fieldset>
         @if (defaultRollMode() === "supplied") {
         <label>
-          Attack roll
+          {{ primaryRollLabel() }}
           <input
             #attackRoll
             type="number"
@@ -1175,7 +1175,7 @@
           />
         </label>
         <label>
-          Damage roll
+          {{ secondaryRollLabel() }}
           <input
             #damageRoll
             type="number"

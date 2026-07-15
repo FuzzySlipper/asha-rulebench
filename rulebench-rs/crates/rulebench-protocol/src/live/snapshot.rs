@@ -213,6 +213,7 @@ pub struct LiveActionOptionDto {
     pub action_id: String,
     pub ability_id: String,
     pub action_name: String,
+    pub check_kind: String,
     pub available: bool,
     pub unavailable_reason: Option<String>,
     pub resource_costs: Vec<LiveActionResourceCostDto>,
@@ -229,6 +230,7 @@ impl From<&CurrentActorActionOption> for LiveActionOptionDto {
             action_id: value.action_id.clone(),
             ability_id: value.ability_id.clone(),
             action_name: value.action_name.clone(),
+            check_kind: value.check_kind.code().to_string(),
             available: value.available,
             unavailable_reason: value.unavailable_reason.clone(),
             resource_costs: value

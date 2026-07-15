@@ -100,6 +100,9 @@ test("imports, activates, preserves, and selects Rust-owned authored content", a
   await contentDialog.getByRole("button", { name: "Close" }).click();
   await openMenuDialog(page, "Scenario", "Live combat setup");
   const liveDialog = page.getByRole("dialog", { name: "Live combat setup" });
+  await liveDialog
+    .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+    .click();
   await expect(
     liveDialog.getByRole("button", { name: `${packId}@1.0.0` }),
   ).toBeVisible();

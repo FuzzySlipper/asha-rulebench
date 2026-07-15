@@ -1,5 +1,6 @@
 use rulebench_rules::{
     CapabilityEntry, CapabilityIdentity, HostCapabilityProfile, RulebenchCapabilityManifest,
+    RulesetProviderManifestEntry,
 };
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +36,16 @@ pub struct CapabilityIdentityDto {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RulesetProviderDto {
+    pub provider: CapabilityIdentityDto,
+    pub ruleset: CapabilityIdentityDto,
+    pub operation_vocabulary_version: String,
+    pub effect_operation_vocabulary_version: String,
+    pub capabilities: Vec<CapabilityIdentityDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostCapabilityProfileDto {
     pub adapter_id: String,
     pub storage_mode: String,
@@ -56,6 +67,7 @@ pub struct RulebenchCapabilityManifestDto {
     pub protocol_id: String,
     pub protocol_version: u32,
     pub host: HostCapabilityProfileDto,
+    pub providers: Vec<RulesetProviderDto>,
     pub rulesets: Vec<CapabilityIdentityDto>,
     pub packages: Vec<CapabilityIdentityDto>,
     pub scenarios: Vec<CapabilityIdentityDto>,
@@ -74,6 +86,11 @@ impl From<&RulebenchCapabilityManifest> for RulebenchCapabilityManifestDto {
             protocol_id: crate::PROTOCOL_ID.to_string(),
             protocol_version: crate::PROTOCOL_VERSION,
             host: HostCapabilityProfileDto::from(&value.host),
+            providers: value
+                .providers
+                .iter()
+                .map(RulesetProviderDto::from)
+                .collect(),
             rulesets: value
                 .rulesets
                 .iter()
@@ -93,6 +110,22 @@ impl From<&RulebenchCapabilityManifest> for RulebenchCapabilityManifestDto {
                 .capabilities
                 .iter()
                 .map(CapabilityEntryDto::from)
+                .collect(),
+        }
+    }
+}
+
+impl From<&RulesetProviderManifestEntry> for RulesetProviderDto {
+    fn from(value: &RulesetProviderManifestEntry) -> Self {
+        Self {
+            provider: CapabilityIdentityDto::from(&value.provider),
+            ruleset: CapabilityIdentityDto::from(&value.ruleset),
+            operation_vocabulary_version: value.operation_vocabulary_version.clone(),
+            effect_operation_vocabulary_version: value.effect_operation_vocabulary_version.clone(),
+            capabilities: value
+                .capabilities
+                .iter()
+                .map(CapabilityIdentityDto::from)
                 .collect(),
         }
     }
@@ -153,6 +186,7 @@ mod tests {
     fn mapping_preserves_support_levels_and_protocol_identity() {
         let manifest = assemble_capability_manifest(
             CapabilityRegistryInput {
+                providers: Vec::new(),
                 rulesets: Vec::new(),
                 packages: Vec::new(),
                 scenarios: Vec::new(),

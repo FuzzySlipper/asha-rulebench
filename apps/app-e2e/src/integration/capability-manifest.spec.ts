@@ -21,9 +21,17 @@ test("renders the current Rust host capability manifest", async ({ page }) => {
   await expect(
     dialog.getByText("rulebench-process-host · filesystem"),
   ).toBeVisible();
-  await expect(dialog.getByText("pipeline 2 · effects 1")).toBeVisible();
   await expect(
-    dialog.getByText("1 ruleset · 3 packages · 10 scenarios"),
+    dialog.getByText("pipeline 2 · effects 1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("2 providers · 2 rulesets · 4 packages · 11 scenarios"),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText(/provider\.asha-rulebench\.turn-control@1/),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText(/asha-rulebench\.turn-control\.v0@0\.1\.0/),
   ).toBeVisible();
 
   const supportMatrix = dialog.getByRole("table", {
@@ -49,9 +57,11 @@ test("keeps the capability evidence inspectable at mobile width", async ({
   await page.goto("/");
 
   const dialog = await openCapabilityManifest(page);
-  await expect(
-    dialog.getByRole("region", { name: "Scrollable capability matrix" }),
-  ).toBeInViewport();
+  const matrix = dialog.getByRole("region", {
+    name: "Scrollable capability matrix",
+  });
+  await matrix.scrollIntoViewIfNeeded();
+  await expect(matrix).toBeInViewport();
   const dimensions = await page.evaluate(() => ({
     body: document.body.scrollWidth,
     viewport: document.documentElement.clientWidth,

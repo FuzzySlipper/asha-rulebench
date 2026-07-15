@@ -81,6 +81,31 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             ],
         },
         Interface {
+            name: "RulebenchRulesetProviderDto",
+            fields: &[
+                Field {
+                    name: "provider",
+                    ty: "RulebenchCapabilityIdentityDto",
+                },
+                Field {
+                    name: "ruleset",
+                    ty: "RulebenchCapabilityIdentityDto",
+                },
+                Field {
+                    name: "operationVocabularyVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "effectOperationVocabularyVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "capabilities",
+                    ty: "readonly RulebenchCapabilityIdentityDto[]",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchHostCapabilityProfileDto",
             fields: &[
                 Field {
@@ -147,6 +172,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "host",
                     ty: "RulebenchHostCapabilityProfileDto",
+                },
+                Field {
+                    name: "providers",
+                    ty: "readonly RulebenchRulesetProviderDto[]",
                 },
                 Field {
                     name: "rulesets",
@@ -3320,7 +3349,15 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "attack",
-                    ty: "RulebenchAttackSpecDto",
+                    ty: "RulebenchAttackSpecDto | null",
+                },
+                Field {
+                    name: "savingThrow",
+                    ty: "RulebenchSavingThrowSpecDto | null",
+                },
+                Field {
+                    name: "contested",
+                    ty: "RulebenchContestedCheckSpecDto | null",
                 },
                 Field {
                     name: "hit",
@@ -3349,6 +3386,32 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 },
                 Field {
                     name: "defenseLabel",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchSavingThrowSpecDto",
+            fields: &[
+                Field {
+                    name: "saveStatId",
+                    ty: "string",
+                },
+                Field {
+                    name: "difficultyClass",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContestedCheckSpecDto",
+            fields: &[
+                Field {
+                    name: "actorStatId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetStatId",
                     ty: "string",
                 },
             ],

@@ -16,8 +16,8 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             seed_label: "roll-stream:17,5".to_string(),
         },
         content_pack_set: None,
-        rulesets: vec![hexing_bolt_ruleset()],
-        selected_ruleset_id: "asha-rulebench.hexing-bolt.v0".to_string(),
+        rulesets: vec![crate::hexing_bolt_ruleset()],
+        selected_ruleset_id: crate::HEXING_BOLT_RULESET_ID.to_string(),
         grid: Grid {
             width: 6,
             height: 4,
@@ -73,21 +73,9 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
 
 pub fn turn_control_fixture_scenario() -> RulebenchScenario {
     let mut scenario = hexing_bolt_fixture_scenario();
-    let ruleset_id = "asha-rulebench.turn-control.v0".to_string();
-    scenario.rulesets[0] = RulesetMetadata {
-        id: ruleset_id.clone(),
-        name: "Turn Control Fixture Rules".to_string(),
-        version: "0.0.0".to_string(),
-        summary: "Minimal second ruleset proving static turn-control module selection.".to_string(),
-        modules: vec![
-            RuleModuleDeclaration::action_resolution(
-                ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight(),
-            ),
-            RuleModuleDeclaration::turn_control(
-                TurnControlModuleConfiguration::explicit_turn_order(),
-            ),
-        ],
-    };
+    let ruleset = crate::turn_control_ruleset();
+    let ruleset_id = ruleset.id.clone();
+    scenario.rulesets[0] = ruleset;
     scenario.selected_ruleset_id = ruleset_id.clone();
     for action in &mut scenario.actions {
         action.ruleset_id = ruleset_id.clone();
@@ -256,22 +244,10 @@ fn evidence(id: &str, kind: ScenarioPackageEvidenceKind) -> ScenarioPackageEvide
     }
 }
 
-fn hexing_bolt_ruleset() -> RulesetMetadata {
-    RulesetMetadata {
-        id: "asha-rulebench.hexing-bolt.v0".to_string(),
-        name: "Hexing Bolt Fixture Rules".to_string(),
-        version: "0.0.0".to_string(),
-        summary: "Local single-action fixture ruleset for authority incubation.".to_string(),
-        modules: vec![RuleModuleDeclaration::action_resolution(
-            ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight(),
-        )],
-    }
-}
-
 fn hexing_bolt_action() -> ActionDefinition {
     ActionDefinition {
         id: "hexing_bolt".to_string(),
-        ruleset_id: "asha-rulebench.hexing-bolt.v0".to_string(),
+        ruleset_id: crate::HEXING_BOLT_RULESET_ID.to_string(),
         ability_id: "ability.hexing-bolt".to_string(),
         name: "Hexing Bolt".to_string(),
         actor_id: "entity-adept".to_string(),
@@ -363,7 +339,7 @@ fn basic_attack_action(
         .collect::<Vec<_>>();
     ActionDefinition {
         id: format!("basic-attack.{actor_id}"),
-        ruleset_id: "asha-rulebench.hexing-bolt.v0".to_string(),
+        ruleset_id: crate::HEXING_BOLT_RULESET_ID.to_string(),
         ability_id: "ability.basic-attack".to_string(),
         name: name.to_string(),
         actor_id: actor_id.to_string(),

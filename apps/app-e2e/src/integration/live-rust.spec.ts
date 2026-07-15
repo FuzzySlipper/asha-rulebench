@@ -520,6 +520,127 @@ test("resolves a bounded area target set and renders every v2 result @live", asy
   await invokeApplicationCommand(page, "Run", "Close session");
 });
 
+test("runs and archives the second compiled ruleset through the visible workbench @live", async ({
+  page,
+}) => {
+  const sessionId = `e2e-turn-control-manual-${Date.now()}`;
+  await page.goto("/");
+  const workspace = await openLiveCombatWorkspace(page);
+  await workspace
+    .getByRole("button", { name: "Binding Glyph Failed Save", exact: true })
+    .click();
+  await expect(workspace.getByLabel("Scenario setup")).toContainText(
+    "asha-rulebench.turn-control.v0",
+  );
+  await expect(workspace.getByLabel("Scenario setup")).toContainText(
+    "Warden · wardens · initiative 20",
+  );
+  await expect(workspace.getByLabel("Scenario setup")).toContainText(
+    "Scout · wardens · initiative 15",
+  );
+  await expect(workspace.getByLabel("Scenario setup")).toContainText(
+    "Saboteur · invaders · initiative 10",
+  );
+  await workspace.getByLabel("Session", { exact: true }).fill(sessionId);
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
+
+  await invokeApplicationCommand(page, "Run", "Start combat");
+  const actionsPanel = page.getByRole("region", {
+    name: "6. Available actions",
+  });
+  const unitsPanel = page.getByRole("region", { name: "7. Active units" });
+  await actionsPanel
+    .getByRole("button", { name: "Select Binding Glyph", exact: true })
+    .click();
+  await expect(actionsPanel.getByLabel("Saving throw roll")).toBeVisible();
+  await actionsPanel.getByLabel("Saving throw roll").fill("5");
+  await actionsPanel.getByLabel("Damage roll").fill("4");
+  await unitsPanel
+    .getByRole("button", { name: "Select Saboteur as target" })
+    .click();
+  await actionsPanel
+    .getByRole("button", { name: "Preflight", exact: true })
+    .click();
+  const commandEvidence = actionsPanel.getByRole("region", {
+    name: "Command decision evidence",
+  });
+  await expect(commandEvidence).toContainText("Accepted");
+  await actionsPanel
+    .getByRole("button", { name: "Submit", exact: true })
+    .click();
+  await expect(commandEvidence).toContainText("Saving Throw Resolved");
+  await expect(commandEvidence).toContainText("Modifier Applied");
+  await expect(
+    unitsPanel.getByRole("listitem", { name: /Saboteur, Active/ }),
+  ).toContainText("12/18 HP");
+  await page.screenshot({
+    path: "dist/.playwright/second-ruleset-manual.png",
+    fullPage: true,
+  });
+
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await invokeApplicationCommand(page, "Run", "Close session");
+  await invokeApplicationCommand(page, "Replay", "Replay archive");
+  const replayWorkspace = page
+    .getByRole("dialog", { name: "Replay archive" })
+    .getByRole("region", { name: "Replay archive controls" });
+  const liveReplay = replayWorkspace
+    .getByLabel("Archived replay packages")
+    .getByRole("button", { name: new RegExp(`live-${sessionId} ·`) });
+  await expect(liveReplay).toBeVisible();
+  await liveReplay.click();
+  await expect(
+    replayWorkspace.getByRole("region", { name: "Replay verification" }),
+  ).toContainText("Verified · Finalized");
+});
+
+test("runs the second compiled ruleset through automatic policy controls @live", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const workspace = await openLiveCombatWorkspace(page);
+  await workspace
+    .getByRole("button", { name: "Binding Glyph Failed Save", exact: true })
+    .click();
+  await workspace
+    .getByLabel("Session", { exact: true })
+    .fill(`e2e-turn-control-automatic-${Date.now()}`);
+  await workspace.getByRole("button", { name: "Create session" }).click();
+  await page
+    .getByRole("dialog", { name: "Live combat setup" })
+    .getByLabel("Close", { exact: true })
+    .click();
+  await invokeApplicationCommand(page, "Run", "Start combat");
+  await invokeApplicationCommand(page, "Run", "Configure automatic run");
+  const configuration = page.getByRole("dialog", {
+    name: "Automatic run configuration",
+  });
+  await configuration.getByLabel("Max steps").fill("1");
+  await configuration.getByRole("radio", { name: /Supplied rolls/ }).check();
+  await configuration.getByLabel("Roll stream").fill("5,4");
+  await configuration.getByLabel("Close", { exact: true }).click();
+  await invokeApplicationCommand(page, "Run", "Run bounded combat");
+
+  const evidencePanel = page.getByRole("region", { name: "5. Evidence log" });
+  await evidencePanel.getByRole("tab", { name: "Audit" }).click();
+  await expect(evidencePanel.getByRole("tabpanel")).toContainText(
+    "Stopped At Max Steps",
+  );
+  await expect(
+    page.getByRole("region", { name: "7. Active units" }),
+  ).toContainText("12/18 HP");
+  await page.screenshot({
+    path: "dist/.playwright/second-ruleset-automatic.png",
+    fullPage: true,
+  });
+  await invokeApplicationCommand(page, "Run", "End combat");
+  await invokeApplicationCommand(page, "Run", "Close session");
+});
+
 test("completes and archives a Rust-owned gameplay-fabric reaction @live", async ({
   page,
 }) => {

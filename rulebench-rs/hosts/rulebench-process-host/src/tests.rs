@@ -52,9 +52,18 @@ fn capability_route_reports_registry_and_actual_host_composition() {
 
     assert_eq!(manifest.host.storage_mode, "memory");
     assert_eq!(manifest.host.session_recovery_mode, "none");
-    assert_eq!(manifest.rulesets.len(), 1);
-    assert_eq!(manifest.packages.len(), 3);
-    assert_eq!(manifest.scenarios.len(), 10);
+    assert_eq!(manifest.providers.len(), 2);
+    assert_eq!(manifest.rulesets.len(), 2);
+    assert_eq!(manifest.packages.len(), 4);
+    assert_eq!(manifest.scenarios.len(), 11);
+    assert!(manifest.providers.iter().any(|provider| {
+        provider.provider.id == "provider.asha-rulebench.turn-control"
+            && provider.ruleset.id == "asha-rulebench.turn-control.v0"
+            && provider
+                .capabilities
+                .iter()
+                .any(|capability| capability.id == "check.savingThrow")
+    }));
     assert!(manifest.capabilities.iter().any(|capability| {
         capability.id == "targeting.multipleCombatants"
             && capability.support.runtime_executable
@@ -86,7 +95,11 @@ fn router_serializes_lifecycle_and_isolates_multiple_sessions() {
     let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
     let scenarios: Vec<ScenarioOptionDto> =
         serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
-    let scenario_id = &scenarios.first().expect("fixture scenario exists").id;
+    let scenario_id = &scenarios
+        .iter()
+        .find(|scenario| scenario.id == "hexing-bolt-hit")
+        .expect("Hexing Bolt fixture scenario exists")
+        .id;
 
     for session_id in ["first", "second"] {
         let created = router.handle(&json_request(
@@ -183,7 +196,7 @@ fn router_exposes_rust_replay_review_verification_and_comparison() {
     assert_eq!(listed.status, 200);
     let packages: Vec<ReplayArchiveMetadataDto> =
         serde_json::from_slice(&listed.body).expect("replay archive list is JSON");
-    assert_eq!(packages.len(), 2);
+    assert_eq!(packages.len(), 3);
 
     let expected_id = &packages
         .iter()
@@ -245,7 +258,7 @@ fn durable_router_reports_repository_state_and_reloads_a_finalized_live_replay()
     ));
     let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
     assert_eq!(router.repository_status().mode, "filesystem");
-    assert_eq!(router.repository_status().replay_artifact_count, 2);
+    assert_eq!(router.repository_status().replay_artifact_count, 3);
     assert!(router.content_storage().is_some());
 
     let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
@@ -405,6 +418,29 @@ fn authored_content_survives_restart_binds_a_session_and_replay_to_the_exact_pac
     assert_eq!(workspace.packs.len(), 1);
     assert!(workspace.packs[0].active);
     assert_eq!(workspace.packs[0].reference, reference);
+
+    let second_ruleset_scenario = scenarios
+        .iter()
+        .find(|candidate| candidate.id == "binding-glyph-failed-save")
+        .expect("second provider scenario exists");
+    let incompatible = restarted.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: "incompatible-authored-content-session".to_string(),
+            scenario_id: second_ruleset_scenario.id.clone(),
+            participant_order: Vec::new(),
+            content_pack: Some(reference.clone()),
+        },
+    ));
+    assert_eq!(incompatible.status, 422);
+    let incompatible: serde_json::Value =
+        serde_json::from_slice(&incompatible.body).expect("compatibility error is JSON");
+    assert_eq!(incompatible["code"], "incompatibleSessionRuleset");
+    let sessions = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/sessions"));
+    let sessions: Vec<LiveSessionSnapshotDto> =
+        serde_json::from_slice(&sessions.body).expect("session list is JSON");
+    assert!(sessions.is_empty());
 
     let session_id = "authored-content-session";
     let created = restarted.handle(&json_request(

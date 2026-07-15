@@ -1,9 +1,23 @@
 use rulebench_rules::*;
 
 fn main() {
+    let scenario = scenario();
+    let providers = portable_provider_catalog(
+        scenario
+            .selected_ruleset()
+            .expect("portable scenario selects a ruleset")
+            .clone(),
+    );
+    providers
+        .validate_ruleset(
+            scenario
+                .selected_ruleset()
+                .expect("portable scenario selects a ruleset"),
+        )
+        .expect("portable provider accepts its exact ruleset definition");
     let mut api = CombatSessionApi::new();
     let created = api
-        .create_session(CombatSessionCreateRequest::new("consumer-session", scenario()))
+        .create_session(CombatSessionCreateRequest::new("consumer-session", scenario))
         .expect("consumer-authored scenario validates");
     let session = created.session;
     api.start_session(&session).expect("session starts");
@@ -32,6 +46,35 @@ fn main() {
     assert_eq!(snapshot.combat_log.len(), 1);
     assert_eq!(snapshot.current_state.board.width, 6);
     assert_eq!(snapshot.current_state.combatants[0].position, GridPosition { x: 0, y: 0 });
+}
+
+fn portable_provider_catalog(ruleset: RulesetMetadata) -> RulesetProviderCatalog {
+    RulesetProviderCatalog::new(vec![RulesetProviderDescriptor {
+        provider_id: "provider.portable-consumer".to_string(),
+        provider_version: "1".to_string(),
+        ruleset,
+        operation_vocabulary_version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+        effect_operation_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+        capabilities: vec![
+            RulesetProviderCapability {
+                id: "check.attackVsDefense".to_string(),
+                version: "1".to_string(),
+            },
+            RulesetProviderCapability {
+                id: "operation.applyModifier".to_string(),
+                version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+            },
+            RulesetProviderCapability {
+                id: "operation.damage".to_string(),
+                version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+            },
+            RulesetProviderCapability {
+                id: "targeting.multipleCombatants".to_string(),
+                version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+            },
+        ],
+    }])
+    .expect("portable provider metadata is compatible")
 }
 
 fn scenario() -> RulebenchScenario {

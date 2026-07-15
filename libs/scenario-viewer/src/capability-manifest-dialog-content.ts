@@ -111,9 +111,24 @@ import { LiveCombatStore } from "@asha-rulebench/store";
             </dd>
             <dt>Registry</dt>
             <dd>
-              {{ capabilities().value.rulesetLabels.length }} ruleset ·
+              {{ capabilities().value.providers.length }} providers ·
+              {{ capabilities().value.rulesetLabels.length }} rulesets ·
               {{ capabilities().value.packageLabels.length }} packages ·
               {{ capabilities().value.scenarioCount }} scenarios
+            </dd>
+            <dt>Providers</dt>
+            <dd>
+              @for (
+                provider of capabilities().value.providers;
+                track provider.providerLabel
+              ) {
+                <div>
+                  <span class="capability-id">{{ provider.providerLabel }}</span>
+                  → {{ provider.rulesetLabel }} ·
+                  {{ provider.compatibilityLabel }} ·
+                  {{ provider.capabilityCount }} capabilities
+                </div>
+              }
             </dd>
           </dl>
           <div

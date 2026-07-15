@@ -29,7 +29,7 @@ pub use bridge::{
 };
 pub use capabilities::{
     CapabilityEntryDto, CapabilityIdentityDto, CapabilitySupportDto, HostCapabilityProfileDto,
-    RulebenchCapabilityManifestDto,
+    RulebenchCapabilityManifestDto, RulesetProviderDto,
 };
 pub use content::{
     AuthoredContentCatalogsDto, AuthoredContentDecodeError, AuthoredContentPackDocumentDto,

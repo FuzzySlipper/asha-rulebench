@@ -48,6 +48,22 @@ Unknown capability ids and owner/case version drift are classified failures.
 Declared or validated capabilities that are not runtime-executable remain
 honest incubation rows and do not require executable conformance evidence.
 
+## Compiled ruleset providers
+
+Provider types live in the portable `rulebench-ruleset` owner and are re-exported
+by `rulebench-rules`; the concrete closed catalog lives in `providers.rs`.
+Adding a provider requires an exact provider id/version, exact ruleset metadata,
+module configuration, operation/effect vocabulary versions, and a sorted
+capability set. Register a separate package with independently owned content,
+scenarios, goldens, automatic evidence, and replay evidence. The strict package
+registry rejects provider collisions, unknown versions, vocabulary drift,
+missing capabilities, and cross-ruleset actions before execution.
+
+Do not add a resolver switch on provider or fixture identity. New behavior must
+enter through an existing Rust module/operation seam or a separately reviewed
+Rust vocabulary addition. Run `regression:check` with package/ruleset filters for
+both identities, then run the unfiltered gate.
+
 ## Non-Claims
 
 This crate does not define gameplay behavior, accept TypeScript callbacks, or

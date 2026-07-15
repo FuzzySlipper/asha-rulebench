@@ -26,6 +26,13 @@ export interface RulebenchCapabilityEntryView {
   readonly evidence: readonly string[];
 }
 
+export interface RulebenchRulesetProviderView {
+  readonly providerLabel: string;
+  readonly rulesetLabel: string;
+  readonly compatibilityLabel: string;
+  readonly capabilityCount: number;
+}
+
 export interface RulebenchCapabilityManifestView {
   readonly manifestId: string;
   readonly manifestVersion: number;
@@ -36,6 +43,7 @@ export interface RulebenchCapabilityManifestView {
   readonly protocolLabel: string;
   readonly hostLabel: string;
   readonly recoveryLabel: string;
+  readonly providers: readonly RulebenchRulesetProviderView[];
   readonly rulesetLabels: readonly string[];
   readonly packageLabels: readonly string[];
   readonly scenarioCount: number;
@@ -55,6 +63,12 @@ export function projectCapabilityManifest(
     protocolLabel: `${dto.protocolId} v${dto.protocolVersion}`,
     hostLabel: `${dto.host.adapterId} · ${dto.host.storageMode}`,
     recoveryLabel: `Replay: ${dto.host.replayRecoveryMode}; session: ${dto.host.sessionRecoveryMode}`,
+    providers: dto.providers.map((provider) => ({
+      providerLabel: identityLabel(provider.provider),
+      rulesetLabel: identityLabel(provider.ruleset),
+      compatibilityLabel: `pipeline ${provider.operationVocabularyVersion} · effects ${provider.effectOperationVocabularyVersion}`,
+      capabilityCount: provider.capabilities.length,
+    })),
     rulesetLabels: dto.rulesets.map(identityLabel),
     packageLabels: dto.packages.map(identityLabel),
     scenarioCount: dto.scenarios.length,

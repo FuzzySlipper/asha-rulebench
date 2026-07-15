@@ -23,7 +23,8 @@ pub use capabilities::{
     assemble_capability_manifest, executable_conformance_capabilities, CapabilityEntry,
     CapabilityIdentity, CapabilityKind, CapabilityManifestError, CapabilityRegistryInput,
     CapabilitySupport, HostCapabilityProfile, RulebenchCapabilityManifest,
-    CAPABILITY_ARTIFACT_SCHEMA, CAPABILITY_MANIFEST_ID, CAPABILITY_MANIFEST_VERSION,
+    RulesetProviderManifestEntry, CAPABILITY_ARTIFACT_SCHEMA, CAPABILITY_MANIFEST_ID,
+    CAPABILITY_MANIFEST_VERSION,
 };
 
 pub use rulebench_combat::model::*;
@@ -62,7 +63,8 @@ pub use rulebench_content::{
     ContentPackMetadataChangeKind, ContentPackProvenance, ContentPackReference,
     ContentPackSetReference, ContentPackSourceKind, ContentPackStorage, ContentStorageError,
     ContentStorageRecord, ContentStorageStartupIssue, EntityDefinition, ImportedContentPack,
-    StorageReplacementPolicy, StoredContentPayload,
+    StorageReplacementPolicy, StoredContentPayload, CONTENT_PACK_FINGERPRINT_ALGORITHM,
+    CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
 pub use rulebench_core::Team;
 pub use rulebench_replay::{
@@ -80,7 +82,9 @@ pub use rulebench_replay::{
 };
 pub use rulebench_ruleset::{
     CombatEndPolicy, EffectOperationId, OperationPipelineV2, RuleModuleId,
-    RulesetArtifactProvenance, RulesetModuleProvenance, TargetingOperationId,
+    RulesetArtifactProvenance, RulesetModuleProvenance, RulesetProviderCapability,
+    RulesetProviderCatalog, RulesetProviderCatalogError, RulesetProviderCompatibilityError,
+    RulesetProviderDescriptor, TargetingOperationId,
 };
 
 #[cfg(test)]

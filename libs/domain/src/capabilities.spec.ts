@@ -6,8 +6,8 @@ describe("projectCapabilityManifest", () => {
   it("keeps owner support levels explicit instead of collapsing them into one boolean", () => {
     const view = projectCapabilityManifest({
       manifestId: "asha-rulebench.capabilities",
-      manifestVersion: 1,
-      generatedArtifactSchema: "asha-rulebench.capabilities.ts@1",
+      manifestVersion: 2,
+      generatedArtifactSchema: "asha-rulebench.capabilities.ts@2",
       governedAshaRevision: "0123456789abcdef",
       operationVocabularyVersion: "2",
       effectVocabularyVersion: "1",
@@ -21,6 +21,15 @@ describe("projectCapabilityManifest", () => {
         replayRecoveryMode: "finalizedArchive",
         sessionRecoveryMode: "none",
       },
+      providers: [
+        {
+          provider: { id: "provider.one", version: "1" },
+          ruleset: { id: "ruleset.one", version: "1" },
+          operationVocabularyVersion: "2",
+          effectOperationVocabularyVersion: "1",
+          capabilities: [{ id: "operation.damage", version: "1" }],
+        },
+      ],
       rulesets: [{ id: "ruleset.one", version: "1" }],
       packages: [{ id: "package.one", version: "1" }],
       scenarios: [{ id: "scenario.one", version: "registered" }],
@@ -49,5 +58,13 @@ describe("projectCapabilityManifest", () => {
       "UI exposed, regression gap",
     );
     expect(view.rulesetLabels).toEqual(["ruleset.one@1"]);
+    expect(view.providers).toEqual([
+      {
+        providerLabel: "provider.one@1",
+        rulesetLabel: "ruleset.one@1",
+        compatibilityLabel: "pipeline 2 · effects 1",
+        capabilityCount: 1,
+      },
+    ]);
   });
 });

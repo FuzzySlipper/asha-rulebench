@@ -14,6 +14,7 @@ pub fn replay_review_packages() -> Vec<ReplayPackage> {
             "replay-session-actual",
             true,
         ),
+        crate::scenarios::turn_control::replay_package(),
     ]
 }
 

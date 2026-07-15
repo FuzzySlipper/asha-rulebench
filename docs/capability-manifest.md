@@ -7,12 +7,13 @@ from the same registries and host composition that own runtime behavior.
 ## Authority inputs
 
 - `rulebench-ruleset` owns the versioned effect-operation and targeting
-  declarations.
+  declarations plus the validated compiled-provider catalog contract.
 - `rulebench-combat` owns the executable operation registries and the closed
   automation-policy registry.
-- `rulebench-fixtures` derives package, ruleset, scenario, and regression
-  evidence from executed registered conformance cases. Declaration metadata or
-  a test name is not coverage.
+- `rulebench-fixtures` composes the concrete provider catalog and derives
+  package, ruleset, scenario, and regression evidence from provider-validated,
+  executed registered cases. Declaration metadata or a test name is not
+  coverage.
 - `rulebench-gameplay-module` exposes the exact governed ASHA Git revision
   compiled from the workspace lockfile.
 - `rulebench-process-host` adds the selected content, replay, and active-session
@@ -41,6 +42,12 @@ transport, `LiveCombatStore`, domain projector, and Runtime capabilities dialog
 consume that generated DTO. They do not fall back to the checked durable-host
 artifact when the live route is unavailable, because that would turn build
 evidence into a false runtime claim.
+
+Manifest v2 adds compiled provider entries. Each entry names exact provider and
+ruleset identities, accepted operation/effect vocabulary versions, and the
+closed capability set available to packages. The ruleset inventory is derived
+from this catalog, not inferred from scenario metadata. See
+`ruleset-providers.md` for registration and compatibility rules.
 
 ## Evolution procedure
 

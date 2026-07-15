@@ -81,6 +81,276 @@ pub struct RulesetModuleProvenance {
     pub version: String,
 }
 
+/// One versioned authority capability exposed by a compiled ruleset provider.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RulesetProviderCapability {
+    pub id: String,
+    pub version: String,
+}
+
+/// Deployment-time metadata for one closed, compiled ruleset provider.
+///
+/// Providers are data-only registrations over Rust-owned modules and operation
+/// vocabularies. They do not carry callbacks or dynamically loaded rule code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetProviderDescriptor {
+    pub provider_id: String,
+    pub provider_version: String,
+    pub ruleset: RulesetMetadata,
+    pub operation_vocabulary_version: String,
+    pub effect_operation_vocabulary_version: String,
+    pub capabilities: Vec<RulesetProviderCapability>,
+}
+
+impl RulesetProviderDescriptor {
+    pub fn capability(&self, capability_id: &str) -> Option<&RulesetProviderCapability> {
+        self.capabilities
+            .iter()
+            .find(|capability| capability.id == capability_id)
+    }
+}
+
+/// Validated closed catalog used by a concrete Rulebench runtime composition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetProviderCatalog {
+    providers: Vec<RulesetProviderDescriptor>,
+}
+
+impl RulesetProviderCatalog {
+    pub fn new(
+        mut providers: Vec<RulesetProviderDescriptor>,
+    ) -> Result<Self, Vec<RulesetProviderCatalogError>> {
+        providers.sort_by(|left, right| {
+            left.provider_id
+                .cmp(&right.provider_id)
+                .then_with(|| left.provider_version.cmp(&right.provider_version))
+        });
+
+        let mut errors = Vec::new();
+        let mut provider_identities = std::collections::BTreeSet::new();
+        let mut ruleset_identities = std::collections::BTreeSet::new();
+        for provider in &mut providers {
+            provider.capabilities.sort();
+            let provider_identity =
+                format!("{}@{}", provider.provider_id, provider.provider_version);
+            if !provider_identities.insert(provider_identity.clone()) {
+                errors.push(RulesetProviderCatalogError::DuplicateProviderIdentity {
+                    identity: provider_identity,
+                });
+            }
+            let ruleset_identity = format!("{}@{}", provider.ruleset.id, provider.ruleset.version);
+            if !ruleset_identities.insert(ruleset_identity.clone()) {
+                errors.push(RulesetProviderCatalogError::RulesetProviderCollision {
+                    identity: ruleset_identity,
+                });
+            }
+            if provider.provider_id.is_empty()
+                || provider.provider_version.is_empty()
+                || provider.ruleset.id.is_empty()
+                || provider.ruleset.version.is_empty()
+            {
+                errors.push(RulesetProviderCatalogError::EmptyProviderIdentity);
+            }
+            if provider.ruleset.validate_modules().is_err() {
+                errors.push(RulesetProviderCatalogError::InvalidRulesetModules {
+                    ruleset_id: provider.ruleset.id.clone(),
+                });
+            }
+            if provider.operation_vocabulary_version != OperationPipelineV2::VOCABULARY_VERSION {
+                errors.push(
+                    RulesetProviderCatalogError::IncompatibleOperationVocabulary {
+                        provider_id: provider.provider_id.clone(),
+                        expected_version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+                        actual_version: provider.operation_vocabulary_version.clone(),
+                    },
+                );
+            }
+            if provider.effect_operation_vocabulary_version != EffectOperationId::VOCABULARY_VERSION
+            {
+                errors.push(
+                    RulesetProviderCatalogError::IncompatibleEffectOperationVocabulary {
+                        provider_id: provider.provider_id.clone(),
+                        expected_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+                        actual_version: provider.effect_operation_vocabulary_version.clone(),
+                    },
+                );
+            }
+            let mut capability_identities = std::collections::BTreeSet::new();
+            for capability in &provider.capabilities {
+                let identity = format!("{}@{}", capability.id, capability.version);
+                if capability.id.is_empty() || capability.version.is_empty() {
+                    errors.push(RulesetProviderCatalogError::EmptyCapabilityIdentity {
+                        provider_id: provider.provider_id.clone(),
+                    });
+                } else if !capability_identities.insert(identity.clone()) {
+                    errors.push(RulesetProviderCatalogError::DuplicateCapabilityIdentity {
+                        provider_id: provider.provider_id.clone(),
+                        identity,
+                    });
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(Self { providers })
+        } else {
+            Err(errors)
+        }
+    }
+
+    pub fn providers(&self) -> &[RulesetProviderDescriptor] {
+        &self.providers
+    }
+
+    pub fn select_ruleset(
+        &self,
+        ruleset_id: &str,
+        ruleset_version: &str,
+    ) -> Result<&RulesetProviderDescriptor, RulesetProviderCompatibilityError> {
+        if let Some(provider) = self.providers.iter().find(|provider| {
+            provider.ruleset.id == ruleset_id && provider.ruleset.version == ruleset_version
+        }) {
+            return Ok(provider);
+        }
+        if let Some(provider) = self
+            .providers
+            .iter()
+            .find(|provider| provider.ruleset.id == ruleset_id)
+        {
+            return Err(
+                RulesetProviderCompatibilityError::IncompatibleRulesetVersion {
+                    ruleset_id: ruleset_id.to_string(),
+                    expected_version: provider.ruleset.version.clone(),
+                    actual_version: ruleset_version.to_string(),
+                },
+            );
+        }
+        Err(RulesetProviderCompatibilityError::ProviderUnavailable {
+            ruleset_id: ruleset_id.to_string(),
+            ruleset_version: ruleset_version.to_string(),
+        })
+    }
+
+    pub fn validate_ruleset(
+        &self,
+        ruleset: &RulesetMetadata,
+    ) -> Result<&RulesetProviderDescriptor, RulesetProviderCompatibilityError> {
+        let provider = self.select_ruleset(&ruleset.id, &ruleset.version)?;
+        if provider.ruleset != *ruleset {
+            return Err(
+                RulesetProviderCompatibilityError::RulesetDefinitionMismatch {
+                    ruleset_id: ruleset.id.clone(),
+                    ruleset_version: ruleset.version.clone(),
+                },
+            );
+        }
+        Ok(provider)
+    }
+
+    pub fn validate_artifact_provenance(
+        &self,
+        provenance: &RulesetArtifactProvenance,
+    ) -> Result<&RulesetProviderDescriptor, RulesetProviderCompatibilityError> {
+        let provider = self.select_ruleset(&provenance.ruleset_id, &provenance.ruleset_version)?;
+        provider
+            .ruleset
+            .validate_artifact_provenance(provenance)
+            .map_err(
+                |error| RulesetProviderCompatibilityError::ArtifactIncompatible {
+                    code: error.code().to_string(),
+                },
+            )?;
+        Ok(provider)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RulesetProviderCatalogError {
+    EmptyProviderIdentity,
+    DuplicateProviderIdentity {
+        identity: String,
+    },
+    RulesetProviderCollision {
+        identity: String,
+    },
+    InvalidRulesetModules {
+        ruleset_id: String,
+    },
+    IncompatibleOperationVocabulary {
+        provider_id: String,
+        expected_version: String,
+        actual_version: String,
+    },
+    IncompatibleEffectOperationVocabulary {
+        provider_id: String,
+        expected_version: String,
+        actual_version: String,
+    },
+    EmptyCapabilityIdentity {
+        provider_id: String,
+    },
+    DuplicateCapabilityIdentity {
+        provider_id: String,
+        identity: String,
+    },
+}
+
+impl RulesetProviderCatalogError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::EmptyProviderIdentity => "emptyRulesetProviderIdentity",
+            Self::DuplicateProviderIdentity { .. } => "duplicateRulesetProviderIdentity",
+            Self::RulesetProviderCollision { .. } => "rulesetProviderCollision",
+            Self::InvalidRulesetModules { .. } => "invalidRulesetProviderModules",
+            Self::IncompatibleOperationVocabulary { .. } => {
+                "incompatibleProviderOperationVocabulary"
+            }
+            Self::IncompatibleEffectOperationVocabulary { .. } => {
+                "incompatibleProviderEffectOperationVocabulary"
+            }
+            Self::EmptyCapabilityIdentity { .. } => "emptyRulesetProviderCapability",
+            Self::DuplicateCapabilityIdentity { .. } => "duplicateRulesetProviderCapability",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RulesetProviderCompatibilityError {
+    ProviderUnavailable {
+        ruleset_id: String,
+        ruleset_version: String,
+    },
+    IncompatibleRulesetVersion {
+        ruleset_id: String,
+        expected_version: String,
+        actual_version: String,
+    },
+    RulesetDefinitionMismatch {
+        ruleset_id: String,
+        ruleset_version: String,
+    },
+    MissingCapability {
+        provider_id: String,
+        capability_id: String,
+        capability_version: String,
+    },
+    ArtifactIncompatible {
+        code: String,
+    },
+}
+
+impl RulesetProviderCompatibilityError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::ProviderUnavailable { .. } => "rulesetProviderUnavailable",
+            Self::IncompatibleRulesetVersion { .. } => "incompatibleProviderRulesetVersion",
+            Self::RulesetDefinitionMismatch { .. } => "rulesetProviderDefinitionMismatch",
+            Self::MissingCapability { .. } => "rulesetProviderCapabilityMissing",
+            Self::ArtifactIncompatible { .. } => "rulesetProviderArtifactIncompatible",
+        }
+    }
+}
+
 /// Stable compatibility failures for loading previously authored artifacts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RulesetCompatibilityError {

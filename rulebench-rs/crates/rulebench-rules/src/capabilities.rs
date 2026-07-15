@@ -7,8 +7,8 @@ use rulebench_combat::{
 use rulebench_ruleset::{EffectOperationId, OperationPipelineV2, TargetingOperationId};
 
 pub const CAPABILITY_MANIFEST_ID: &str = "asha-rulebench.capabilities";
-pub const CAPABILITY_MANIFEST_VERSION: u32 = 1;
-pub const CAPABILITY_ARTIFACT_SCHEMA: &str = "asha-rulebench.capabilities.ts@1";
+pub const CAPABILITY_MANIFEST_VERSION: u32 = 2;
+pub const CAPABILITY_ARTIFACT_SCHEMA: &str = "asha-rulebench.capabilities.ts@2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CapabilityKind {
@@ -126,6 +126,15 @@ pub struct CapabilityIdentity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulesetProviderManifestEntry {
+    pub provider: CapabilityIdentity,
+    pub ruleset: CapabilityIdentity,
+    pub operation_vocabulary_version: String,
+    pub effect_operation_vocabulary_version: String,
+    pub capabilities: Vec<CapabilityIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostCapabilityProfile {
     pub adapter_id: String,
     pub storage_mode: String,
@@ -143,6 +152,7 @@ pub struct HostCapabilityProfile {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilityRegistryInput {
+    pub providers: Vec<RulesetProviderManifestEntry>,
     pub rulesets: Vec<CapabilityIdentity>,
     pub packages: Vec<CapabilityIdentity>,
     pub scenarios: Vec<CapabilityIdentity>,
@@ -158,6 +168,7 @@ pub struct RulebenchCapabilityManifest {
     pub operation_vocabulary_version: String,
     pub effect_vocabulary_version: String,
     pub host: HostCapabilityProfile,
+    pub providers: Vec<RulesetProviderManifestEntry>,
     pub rulesets: Vec<CapabilityIdentity>,
     pub packages: Vec<CapabilityIdentity>,
     pub scenarios: Vec<CapabilityIdentity>,
@@ -182,6 +193,14 @@ pub fn assemble_capability_manifest(
     sort_and_deduplicate_identities(&mut input.rulesets);
     sort_and_deduplicate_identities(&mut input.packages);
     sort_and_deduplicate_identities(&mut input.scenarios);
+    input.providers.sort_by(|left, right| {
+        left.provider
+            .cmp(&right.provider)
+            .then_with(|| left.ruleset.cmp(&right.ruleset))
+    });
+    for provider in &mut input.providers {
+        sort_and_deduplicate_identities(&mut provider.capabilities);
+    }
     let regression = input
         .regression_capability_ids
         .into_iter()
@@ -216,6 +235,7 @@ pub fn assemble_capability_manifest(
         operation_vocabulary_version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
         effect_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
         host,
+        providers: input.providers,
         rulesets: input.rulesets,
         packages: input.packages,
         scenarios: input.scenarios,
@@ -464,6 +484,7 @@ mod tests {
     fn manifest_uses_the_owner_operation_and_policy_registries() {
         let manifest = assemble_capability_manifest(
             CapabilityRegistryInput {
+                providers: Vec::new(),
                 rulesets: Vec::new(),
                 packages: Vec::new(),
                 scenarios: Vec::new(),

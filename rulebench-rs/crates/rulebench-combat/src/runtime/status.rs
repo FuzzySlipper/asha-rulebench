@@ -741,6 +741,7 @@ fn current_actor_action_option(
         action_id: action.id.clone(),
         ability_id: action.ability_id.clone(),
         action_name: action.name.clone(),
+        check_kind: CheckHandlerKind::for_declaration(&action.check),
         available,
         unavailable_reason,
         resource_costs: action.resource_costs.clone(),

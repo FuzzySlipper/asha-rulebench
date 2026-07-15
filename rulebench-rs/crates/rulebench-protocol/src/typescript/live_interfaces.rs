@@ -112,6 +112,10 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                     field("actionId", "string"),
                     field("abilityId", "string"),
                     field("actionName", "string"),
+                    field(
+                        "checkKind",
+                        "'attackVsDefense' | 'savingThrow' | 'contested'",
+                    ),
                     field("available", "boolean"),
                     field("unavailableReason", "string | null"),
                     field(

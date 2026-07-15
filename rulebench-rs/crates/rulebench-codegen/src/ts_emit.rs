@@ -1,7 +1,7 @@
 use rulebench_fixtures::{
-    AttackOutcome, Combatant, DomainEvent, FinalCombatantState, RulebenchScenario,
-    ScenarioProjection, TargetLegality, Team, TraceEntry, TracePhase, TraceStatus,
-    VisibilityRequirement,
+    AttackOutcome, CheckDeclaration, Combatant, DomainEvent, FinalCombatantState,
+    RulebenchScenario, ScenarioProjection, TargetLegality, Team, TraceEntry, TracePhase,
+    TraceStatus, VisibilityRequirement,
 };
 
 pub(crate) fn render_scenario_readout(
@@ -208,9 +208,6 @@ fn render_combatant(
 
 fn render_action(scenario: &RulebenchScenario, indent: &str) -> String {
     let action = &scenario.selected_action;
-    let attack = action
-        .attack_check()
-        .expect("catalog fixture action uses an attack check");
     let mut out = String::from("");
     out.push_str(&format!("{indent}  selectedAction: {{\n"));
     out.push_str(&format!("{indent}    id: {},\n", ts_string(&action.id)));
@@ -235,17 +232,51 @@ fn render_action(scenario: &RulebenchScenario, indent: &str) -> String {
         "{indent}    visibleTargetIds: {},\n",
         ts_string_array(&action.targeting.visible_target_ids)
     ));
-    out.push_str(&format!("{indent}    attack: {{\n"));
-    out.push_str(&format!("{indent}      modifier: {},\n", attack.modifier));
-    out.push_str(&format!(
-        "{indent}      defenseId: {},\n",
-        ts_string(&attack.defense.id)
-    ));
-    out.push_str(&format!(
-        "{indent}      defenseLabel: {},\n",
-        ts_string(&attack.defense.label)
-    ));
-    out.push_str(&format!("{indent}    }},\n"));
+    match &action.check {
+        CheckDeclaration::Attack(attack) => {
+            out.push_str(&format!("{indent}    attack: {{\n"));
+            out.push_str(&format!("{indent}      modifier: {},\n", attack.modifier));
+            out.push_str(&format!(
+                "{indent}      defenseId: {},\n",
+                ts_string(&attack.defense.id)
+            ));
+            out.push_str(&format!(
+                "{indent}      defenseLabel: {},\n",
+                ts_string(&attack.defense.label)
+            ));
+            out.push_str(&format!("{indent}    }},\n"));
+            out.push_str(&format!("{indent}    savingThrow: null,\n"));
+            out.push_str(&format!("{indent}    contested: null,\n"));
+        }
+        CheckDeclaration::SavingThrow(save) => {
+            out.push_str(&format!("{indent}    attack: null,\n"));
+            out.push_str(&format!("{indent}    savingThrow: {{\n"));
+            out.push_str(&format!(
+                "{indent}      saveStatId: {},\n",
+                ts_string(&save.save_stat_id)
+            ));
+            out.push_str(&format!(
+                "{indent}      difficultyClass: {},\n",
+                save.difficulty_class
+            ));
+            out.push_str(&format!("{indent}    }},\n"));
+            out.push_str(&format!("{indent}    contested: null,\n"));
+        }
+        CheckDeclaration::Contested(contested) => {
+            out.push_str(&format!("{indent}    attack: null,\n"));
+            out.push_str(&format!("{indent}    savingThrow: null,\n"));
+            out.push_str(&format!("{indent}    contested: {{\n"));
+            out.push_str(&format!(
+                "{indent}      actorStatId: {},\n",
+                ts_string(&contested.actor_stat_id)
+            ));
+            out.push_str(&format!(
+                "{indent}      targetStatId: {},\n",
+                ts_string(&contested.target_stat_id)
+            ));
+            out.push_str(&format!("{indent}    }},\n"));
+        }
+    }
     out.push_str(&format!("{indent}    hit: {{\n"));
     out.push_str(&format!(
         "{indent}      damageBonus: {},\n",

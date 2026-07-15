@@ -68,6 +68,8 @@ export const twoCombatantScenarioReadout: RulebenchScenarioReadoutDto = {
       defenseId: 'nerve',
       defenseLabel: 'Nerve',
     },
+    savingThrow: null,
+    contested: null,
     hit: {
       damageBonus: 4,
       damageType: 'psychic',

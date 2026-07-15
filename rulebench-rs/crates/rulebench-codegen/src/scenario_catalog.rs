@@ -1,7 +1,7 @@
 use rulebench_fixtures::{
     aggregated_content_validation_readouts, aggregated_ruleset_catalog_readout,
-    aggregated_scenario_catalog_cases, resolve_catalog_scenario, AttackOutcome, Combatant,
-    ContentDiagnostic, ContentDiagnosticSeverity, ContentImportExampleOutcome,
+    aggregated_scenario_catalog_cases, resolve_catalog_scenario, AttackOutcome, CheckDeclaration,
+    Combatant, ContentDiagnostic, ContentDiagnosticSeverity, ContentImportExampleOutcome,
     ContentValidationReadout, ContentValidationReport, DomainEvent, FinalCombatantState,
     RulebenchScenario, RulesetCatalogReadout, RulesetMetadata, ScenarioCatalogSummary,
     ScenarioOutcomeClass, ScenarioProjection, TargetLegality, Team, TraceEntry, TracePhase,
@@ -391,9 +391,6 @@ fn render_combatant(combatant: &Combatant, final_state: &FinalCombatantState) ->
 
 fn render_action(scenario: &RulebenchScenario) -> String {
     let action = &scenario.selected_action;
-    let attack = action
-        .attack_check()
-        .expect("catalog fixture action uses an attack check");
     let mut out = String::from("      selectedAction: {\n");
     out.push_str(&format!("        id: {},\n", ts_string(&action.id)));
     out.push_str(&format!("        name: {},\n", ts_string(&action.name)));
@@ -417,17 +414,51 @@ fn render_action(scenario: &RulebenchScenario) -> String {
         "        visibleTargetIds: {},\n",
         ts_string_array(&action.targeting.visible_target_ids)
     ));
-    out.push_str("        attack: {\n");
-    out.push_str(&format!("          modifier: {},\n", attack.modifier));
-    out.push_str(&format!(
-        "          defenseId: {},\n",
-        ts_string(&attack.defense.id)
-    ));
-    out.push_str(&format!(
-        "          defenseLabel: {},\n",
-        ts_string(&attack.defense.label)
-    ));
-    out.push_str("        },\n");
+    match &action.check {
+        CheckDeclaration::Attack(attack) => {
+            out.push_str("        attack: {\n");
+            out.push_str(&format!("          modifier: {},\n", attack.modifier));
+            out.push_str(&format!(
+                "          defenseId: {},\n",
+                ts_string(&attack.defense.id)
+            ));
+            out.push_str(&format!(
+                "          defenseLabel: {},\n",
+                ts_string(&attack.defense.label)
+            ));
+            out.push_str("        },\n");
+            out.push_str("        savingThrow: null,\n");
+            out.push_str("        contested: null,\n");
+        }
+        CheckDeclaration::SavingThrow(save) => {
+            out.push_str("        attack: null,\n");
+            out.push_str("        savingThrow: {\n");
+            out.push_str(&format!(
+                "          saveStatId: {},\n",
+                ts_string(&save.save_stat_id)
+            ));
+            out.push_str(&format!(
+                "          difficultyClass: {},\n",
+                save.difficulty_class
+            ));
+            out.push_str("        },\n");
+            out.push_str("        contested: null,\n");
+        }
+        CheckDeclaration::Contested(contested) => {
+            out.push_str("        attack: null,\n");
+            out.push_str("        savingThrow: null,\n");
+            out.push_str("        contested: {\n");
+            out.push_str(&format!(
+                "          actorStatId: {},\n",
+                ts_string(&contested.actor_stat_id)
+            ));
+            out.push_str(&format!(
+                "          targetStatId: {},\n",
+                ts_string(&contested.target_stat_id)
+            ));
+            out.push_str("        },\n");
+        }
+    }
     out.push_str("        hit: {\n");
     out.push_str(&format!(
         "          damageBonus: {},\n",

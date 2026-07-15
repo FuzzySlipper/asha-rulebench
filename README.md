@@ -251,18 +251,21 @@ initiative, encounter status, available actions, participants, and evidence.
 The focused tools configure or select authority behavior, while panel view models
 display Rust-owned outcomes.
 
-The current surface proves one developed Hexing Bolt rules fixture through
-deterministic cases, live commands, bounded automatic control, and replay
-inspection. With an artifact root configured, the content tool imports,
+The current surface proves two compiled ruleset providers: Hexing Bolt's
+attack-versus-defense package family and Objective Turn Control's
+three-participant saving-throw package. Both use deterministic cases, live
+commands, bounded automatic control, and replay inspection. With an artifact
+root configured, the content tool imports,
 reviews, compares, activates, deactivates, and safely deletes authored packs;
 authored packs and finalized replays survive host restart. Active sessions
 remain process-local. Live session snapshots do not yet expose authoritative
 positions, so panel 1 labels its board as selected scenario setup evidence
 rather than live movement state.
 
-The executable capability manifest currently reports 1 ruleset identity, 3
-registered packages, 10 scenario cases, 1 automation policy, and operation
-pipeline v2. Its checked TypeScript projection records the exact governed ASHA
-revision and the configured durable-host support matrix; the live workbench
-always reads the current process-host manifest instead. See
-`docs/capability-manifest.md` for its authority and evolution contract.
+The executable capability manifest currently reports 2 compiled providers, 2
+ruleset identities, 4 registered packages, 11 scenario cases, 1 automation
+policy, and operation pipeline v2. Its checked TypeScript projection records
+provider capability/vocabulary compatibility, the exact governed ASHA revision,
+and the configured durable-host support matrix; the live workbench always reads
+the current process-host manifest instead. See `docs/capability-manifest.md`
+and `docs/ruleset-providers.md` for the authority and evolution contracts.

@@ -978,8 +978,9 @@ fn catalog_enumerates_stable_scenario_summaries() {
             "hexing-bolt-reaction",
             "hexing-bolt-miss",
             "hexing-bolt-self-target-rejected",
-            "turn-control-hit",
             "hexing-bolt-veteran-hit",
+            "binding-glyph-failed-save",
+            "binding-glyph-saved",
             "watchtower-skirmish",
             "watchtower-storm-pulse-area",
             "watchtower-storm-pulse-multiple",
@@ -998,6 +999,7 @@ fn catalog_enumerates_stable_scenario_summaries() {
             "rejectedTargetLegality",
             "acceptedHit",
             "acceptedHit",
+            "acceptedMiss",
             "acceptedHit",
             "acceptedHit",
             "acceptedHit",
@@ -1093,7 +1095,7 @@ fn catalog_rejects_unknown_scenario_id() {
 fn combat_session_enumerates_stable_summary_and_steps() {
     let summaries = combat_session_summaries();
 
-    assert_eq!(summaries.len(), 2);
+    assert_eq!(summaries.len(), 3);
     assert_eq!(summaries[0].id, "hexing-bolt-opening-exchange");
     assert_eq!(
         summaries[0]
@@ -1118,6 +1120,9 @@ fn combat_session_enumerates_stable_summary_and_steps() {
     assert_eq!(summaries[1].id, "hexing-bolt-veteran-opening");
     assert_eq!(summaries[1].steps.len(), 1);
     assert_eq!(summaries[1].steps[0].id, "veteran-hexing-bolt-hit");
+    assert_eq!(summaries[2].id, "objective-turn-control-opening");
+    assert_eq!(summaries[2].steps.len(), 1);
+    assert_eq!(summaries[2].steps[0].id, "warden-binding-glyph");
 }
 
 #[test]

@@ -122,6 +122,7 @@ export interface RulebenchLiveActionOptionView {
   readonly actionId: string;
   readonly abilityId: string;
   readonly name: string;
+  readonly checkKind: "attackVsDefense" | "savingThrow" | "contested";
   readonly available: boolean;
   readonly unavailableReason: string | null;
   readonly resourceCostLabels: readonly string[];
@@ -358,6 +359,7 @@ export function projectLiveOptions(
       actionId: action.actionId,
       abilityId: action.abilityId,
       name: action.actionName,
+      checkKind: action.checkKind,
       available: action.available,
       unavailableReason: action.unavailableReason,
       resourceCostLabels: action.resourceCosts.map(
