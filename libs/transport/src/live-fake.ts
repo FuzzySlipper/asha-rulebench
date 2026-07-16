@@ -63,6 +63,27 @@ export function createFakeRulebenchLiveTransport(
     getCapabilities: (requestOptions) =>
       handlers.getCapabilities?.(requestOptions) ??
       unavailable("getCapabilities"),
+    listAutomationPolicies: (requestOptions) =>
+      handlers.listAutomationPolicies?.(requestOptions) ??
+      unavailable("listAutomationPolicies"),
+    listExperiments: (requestOptions) =>
+      handlers.listExperiments?.(requestOptions) ??
+      unavailable("listExperiments"),
+    createExperiment: (matrix, requestOptions) =>
+      handlers.createExperiment?.(matrix, requestOptions) ??
+      unavailable("createExperiment"),
+    getExperiment: (experimentId, requestOptions) =>
+      handlers.getExperiment?.(experimentId, requestOptions) ??
+      unavailable("getExperiment"),
+    advanceExperiment: (experimentId, requestOptions) =>
+      handlers.advanceExperiment?.(experimentId, requestOptions) ??
+      unavailable("advanceExperiment"),
+    cancelExperiment: (experimentId, requestOptions) =>
+      handlers.cancelExperiment?.(experimentId, requestOptions) ??
+      unavailable("cancelExperiment"),
+    compareExperimentTrials: (comparison, requestOptions) =>
+      handlers.compareExperimentTrials?.(comparison, requestOptions) ??
+      unavailable("compareExperimentTrials"),
     listScenarios: (requestOptions) =>
       handlers.listScenarios?.(requestOptions) ?? unavailable("listScenarios"),
     listViewerScenarios: (requestOptions) =>

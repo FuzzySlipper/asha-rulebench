@@ -83,12 +83,13 @@ impl BridgeScenario {
 }
 
 pub struct RulebenchBridge {
-    scenarios: BTreeMap<String, BridgeScenario>,
+    pub(crate) scenarios: BTreeMap<String, BridgeScenario>,
     viewer_sessions: BTreeMap<String, ViewerSessionTranscriptDto>,
-    sessions: CombatSessionApi,
-    replays: ReplayArchive<Box<dyn ReplayArchiveStorage>>,
-    recovery: Box<dyn SessionRecoveryStorage>,
-    recordings: BTreeMap<String, LiveReplayRecording>,
+    pub(crate) sessions: CombatSessionApi,
+    pub(crate) replays: ReplayArchive<Box<dyn ReplayArchiveStorage>>,
+    pub(crate) recovery: Box<dyn SessionRecoveryStorage>,
+    pub(crate) recordings: BTreeMap<String, LiveReplayRecording>,
+    pub(crate) experiments: BTreeMap<String, crate::experiment::ExperimentRecord>,
 }
 
 impl std::fmt::Debug for RulebenchBridge {
@@ -103,10 +104,10 @@ impl std::fmt::Debug for RulebenchBridge {
 }
 
 #[derive(Debug, Clone)]
-struct LiveReplayRecording {
-    initial_session: rulebench_rules::CombatSessionCreateRequest,
-    commands: Vec<ReplayCommandRecordingSpec>,
-    origin: String,
+pub(crate) struct LiveReplayRecording {
+    pub(crate) initial_session: rulebench_rules::CombatSessionCreateRequest,
+    pub(crate) commands: Vec<ReplayCommandRecordingSpec>,
+    pub(crate) origin: String,
 }
 
 impl Default for RulebenchBridge {
@@ -118,6 +119,7 @@ impl Default for RulebenchBridge {
             replays: ReplayArchive::new(Box::new(InMemoryReplayArchiveStorage::new())),
             recovery: Box::new(InMemorySessionRecoveryStorage::new()),
             recordings: BTreeMap::new(),
+            experiments: crate::experiment::empty_experiment_registry(),
         }
     }
 }
@@ -173,6 +175,7 @@ impl RulebenchBridge {
             replays,
             recovery: Box::new(InMemorySessionRecoveryStorage::new()),
             recordings: BTreeMap::new(),
+            experiments: crate::experiment::empty_experiment_registry(),
         })
     }
 
@@ -750,7 +753,10 @@ impl RulebenchBridge {
         )))
     }
 
-    fn check_version(&self, context: &ProtocolRequestContextDto) -> Result<(), BridgeError> {
+    pub(crate) fn check_version(
+        &self,
+        context: &ProtocolRequestContextDto,
+    ) -> Result<(), BridgeError> {
         if context.protocol_version == PROTOCOL_VERSION {
             return Ok(());
         }

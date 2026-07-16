@@ -57,7 +57,7 @@ liveScenario(
     ).toBeVisible();
     await expect(
       capabilityMatrix.getByRole("row", { name: /session\.active-recovery/ }),
-    ).toContainText("Restart durable");
+    ).toContainText("Durable and regression covered");
     await collector.milestone("live rust capability manifest desktop", {
       screenshot: true,
       layerSnapshot: {

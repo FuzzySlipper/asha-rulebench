@@ -6,7 +6,7 @@ use rulebench_rules::{
 use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

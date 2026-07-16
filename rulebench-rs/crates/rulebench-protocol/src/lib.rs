@@ -10,6 +10,7 @@ mod authoring;
 mod bridge;
 mod capabilities;
 mod content;
+mod experiment;
 mod live;
 mod reaction;
 mod recovery;
@@ -44,6 +45,12 @@ pub use content::{
     ContentPayloadRequestDto, ContentReferenceRequestDto, ContentReplacementPolicyDto,
     ContentWorkspaceDto, StoredContentPackSummaryDto, AUTHORED_CONTENT_PACK_FORMAT,
     AUTHORED_CONTENT_PACK_VERSION,
+};
+pub use experiment::{
+    AutomationPolicyCatalogEntryDto, ExperimentComparisonReadoutDto,
+    ExperimentComparisonRequestDto, ExperimentDecisionEvidenceDto, ExperimentMatrixRequestDto,
+    ExperimentMetricsDto, ExperimentReadoutDto, ExperimentTrialReadoutDto,
+    PolicyRulesetCompatibilityDto,
 };
 pub use live::{
     LiveActionOptionDto, LiveActionResourceCostDto, LiveActionResourceStateDto, LiveAuditEntryDto,

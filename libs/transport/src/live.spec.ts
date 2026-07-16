@@ -26,7 +26,7 @@ describe("live Rulebench transport", () => {
     }> = [];
     const responseBodies: unknown[] = [
       handshake,
-      ...Array.from({ length: 32 }, () => ({})),
+      ...Array.from({ length: 39 }, () => ({})),
     ];
     const fetchRequest: typeof fetch = async (input, init) => {
       calls.push({
@@ -132,6 +132,26 @@ describe("live Rulebench transport", () => {
     await transport.loadReplayVerification("replay/one");
     await transport.compareReplayPackages("expected", "actual");
     await transport.getCapabilities();
+    const experimentMatrix = {
+      id: "lab/one",
+      scenarioIds: ["hexing-bolt-hit"],
+      policies: [policy],
+      seeds: [7],
+      maxSteps: 8,
+    };
+    await transport.listAutomationPolicies();
+    await transport.listExperiments();
+    await transport.createExperiment(experimentMatrix);
+    await transport.getExperiment("lab/one");
+    await transport.advanceExperiment("lab/one");
+    await transport.cancelExperiment("lab/one");
+    const experimentComparison = {
+      expectedExperimentId: "lab/one",
+      expectedTrialId: "trial/one",
+      actualExperimentId: "lab/one",
+      actualTrialId: "trial/two",
+    };
+    await transport.compareExperimentTrials(experimentComparison);
 
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toEqual([
       "GET http://rulebench.test/api/rulebench/v1/handshake",
@@ -167,8 +187,15 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/replays/replay%2Fone/verify",
       "POST http://rulebench.test/api/rulebench/v1/replays/compare",
       "GET http://rulebench.test/api/rulebench/v1/capabilities",
+      "GET http://rulebench.test/api/rulebench/v1/automation-policies",
+      "GET http://rulebench.test/api/rulebench/v1/experiments",
+      "POST http://rulebench.test/api/rulebench/v1/experiments",
+      "GET http://rulebench.test/api/rulebench/v1/experiments/lab%2Fone",
+      "POST http://rulebench.test/api/rulebench/v1/experiments/lab%2Fone/advance",
+      "POST http://rulebench.test/api/rulebench/v1/experiments/lab%2Fone/cancel",
+      "POST http://rulebench.test/api/rulebench/v1/experiments/compare",
     ]);
-    expect(calls.every((call) => call.version === "4")).toBe(true);
+    expect(calls.every((call) => call.version === "5")).toBe(true);
     expect(calls[9]?.body).toBe(
       JSON.stringify({ newSessionId: "fork/session" }),
     );
@@ -184,6 +211,8 @@ describe("live Rulebench transport", () => {
         actualPackageId: "actual",
       }),
     );
+    expect(calls[35]?.body).toBe(JSON.stringify(experimentMatrix));
+    expect(calls[39]?.body).toBe(JSON.stringify(experimentComparison));
   });
 
   it("tracks a verified handshake and rejects a mismatched protocol without repairing it", async () => {
@@ -199,7 +228,7 @@ describe("live Rulebench transport", () => {
     });
 
     const mismatched = createLiveRulebenchTransport({
-      fetch: async () => Response.json({ ...handshake, protocolVersion: 5 }),
+      fetch: async () => Response.json({ ...handshake, protocolVersion: 6 }),
     });
     const mismatchResult = await mismatched.connect();
 
@@ -209,7 +238,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v4; received asha-rulebench.protocol v5.",
+          "Expected asha-rulebench.protocol v5; received asha-rulebench.protocol v6.",
         retryable: false,
       },
     });

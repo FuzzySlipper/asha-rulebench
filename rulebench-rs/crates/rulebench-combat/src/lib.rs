@@ -28,9 +28,11 @@ pub use modifiers::{
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
 pub use runtime::{
-    validate_combat_automation_policy, CombatAutomationCandidateEvidence,
-    CombatAutomationNoCandidateBehavior, CombatAutomationPolicyDecisionEvidence,
-    CombatAutomationPolicyRegistration, CombatAutomationPolicySpec,
+    validate_combat_automation_policy, validate_combat_automation_policy_for_context,
+    CombatAutomationCandidateEvidence, CombatAutomationNoCandidateBehavior,
+    CombatAutomationPolicyContext, CombatAutomationPolicyDecisionEvidence,
+    CombatAutomationPolicyRegistration, CombatAutomationPolicyRequirement,
+    CombatAutomationPolicySelector, CombatAutomationPolicySpec,
     CombatAutomationPolicyValidationCode, CombatAutomationPolicyValidationReadout,
     CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
     CombatSessionAutoCandidateExecutionReadout, CombatSessionAutoCandidatePlanReadout,
@@ -44,7 +46,9 @@ pub use runtime::{
     CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
     CombatSessionState, COMBAT_AUTOMATION_POLICY_REGISTRY, FIRST_ACCEPTED_CANDIDATE_POLICY_ID,
-    FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
+    FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION, LOWEST_VITALITY_TARGET_POLICY_ID,
+    LOWEST_VITALITY_TARGET_POLICY_VERSION, OBJECTIVE_SIDE_PRESSURE_POLICY_ID,
+    OBJECTIVE_SIDE_PRESSURE_POLICY_VERSION,
 };
 pub use state::CombatState;
 

@@ -112,6 +112,22 @@ export class WorkbenchShellComponent {
   protected readonly automaticRun = computed(() =>
     this.liveStore.automaticRun(),
   );
+  protected readonly automationPolicies = computed(() =>
+    this.liveStore.automationPolicies(),
+  );
+  protected readonly selectedAutomationPolicyId = signal("");
+  protected readonly selectedAutomationPolicy = computed(() => {
+    const policies = this.automationPolicies();
+    if (policies.kind !== "data") return null;
+    return (
+      policies.value.find(
+        (policy) => policy.id === this.selectedAutomationPolicyId(),
+      ) ??
+      policies.value.find((policy) => policy.id === "firstAcceptedCandidate") ??
+      policies.value[0] ??
+      null
+    );
+  });
   protected readonly deterministicStep = computed(() =>
     this.sessionStore.sessionStep(),
   );
@@ -686,6 +702,7 @@ export class WorkbenchShellComponent {
     switch (commandId) {
       case "configure-automation":
         this.automationConfigOpen.set(true);
+        void this.liveStore.loadAutomationPolicies();
         this.menuStatus.set("Opened automatic run configuration");
         return true;
       case "run-policy-step":
@@ -797,9 +814,10 @@ export class WorkbenchShellComponent {
     readonly version: number;
     readonly noCandidateBehavior: "advanceTurn" | "stopRun";
   } {
+    const selected = this.selectedAutomationPolicy();
     return {
-      id: "firstAcceptedCandidate",
-      version: 1,
+      id: selected?.id ?? "firstAcceptedCandidate",
+      version: selected?.version ?? 1,
       noCandidateBehavior: this.noCandidateBehavior(),
     };
   }

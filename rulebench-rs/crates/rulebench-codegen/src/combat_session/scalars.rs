@@ -65,6 +65,9 @@ pub(crate) fn automation_policy_validation_code(
         CombatAutomationPolicyValidationCode::UnsupportedPolicyVersion => {
             "unsupportedPolicyVersion"
         }
+        CombatAutomationPolicyValidationCode::IncompatibleRulesetCapability => {
+            "incompatibleRulesetCapability"
+        }
     }
 }
 
@@ -88,6 +91,7 @@ pub(crate) fn automatic_step_decision_kind(
         CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
         CombatSessionAutomaticStepDecisionKind::RejectedByPolicy => "rejectedByPolicy",
         CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
+        CombatSessionAutomaticStepDecisionKind::StoppedReactionWindow => "stoppedReactionWindow",
     }
 }
 
@@ -101,6 +105,7 @@ pub(crate) fn automatic_run_decision_kind(
         CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit => "rejectedByStepLimit",
         CombatSessionAutomaticRunDecisionKind::RejectedByPolicy => "rejectedByPolicy",
         CombatSessionAutomaticRunDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
+        CombatSessionAutomaticRunDecisionKind::StoppedReactionWindow => "stoppedReactionWindow",
     }
 }
 

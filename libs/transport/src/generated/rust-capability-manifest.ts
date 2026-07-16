@@ -10,7 +10,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
   "operationVocabularyVersion": "2",
   "effectVocabularyVersion": "1",
   "protocolId": "asha-rulebench.protocol",
-  "protocolVersion": 4,
+  "protocolVersion": 5,
   "host": {
     "adapterId": "rulebench-process-host",
     "storageMode": "filesystem",
@@ -70,6 +70,10 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
           "version": "1"
         },
         {
+          "id": "policy.lowestVitalityTarget",
+          "version": "1"
+        },
+        {
           "id": "targeting.cellMovement",
           "version": "2"
         },
@@ -117,6 +121,14 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         },
         {
           "id": "policy.firstAcceptedCandidate",
+          "version": "1"
+        },
+        {
+          "id": "policy.lowestVitalityTarget",
+          "version": "1"
+        },
+        {
+          "id": "policy.objectiveSidePressure",
           "version": "1"
         },
         {
@@ -412,6 +424,42 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
     },
     {
       "id": "policy.firstAcceptedCandidate",
+      "kind": "policy",
+      "version": "1",
+      "support": {
+        "declared": true,
+        "validationSupported": true,
+        "runtimeExecutable": true,
+        "protocolExposed": true,
+        "liveHostExposed": true,
+        "uiExposed": true,
+        "regressionCovered": true,
+        "durableAcrossRestart": true
+      },
+      "evidence": [
+        "rulebench-combat.automation-policy-registry"
+      ]
+    },
+    {
+      "id": "policy.lowestVitalityTarget",
+      "kind": "policy",
+      "version": "1",
+      "support": {
+        "declared": true,
+        "validationSupported": true,
+        "runtimeExecutable": true,
+        "protocolExposed": true,
+        "liveHostExposed": true,
+        "uiExposed": true,
+        "regressionCovered": true,
+        "durableAcrossRestart": true
+      },
+      "evidence": [
+        "rulebench-combat.automation-policy-registry"
+      ]
+    },
+    {
+      "id": "policy.objectiveSidePressure",
       "kind": "policy",
       "version": "1",
       "support": {

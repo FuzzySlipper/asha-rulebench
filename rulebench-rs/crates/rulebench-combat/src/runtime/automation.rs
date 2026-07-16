@@ -238,6 +238,7 @@ pub enum CombatSessionAutomaticStepDecisionKind {
     RejectedByLifecycle,
     RejectedByPolicy,
     StoppedNoCandidate,
+    StoppedReactionWindow,
 }
 
 impl CombatSessionAutomaticStepDecisionKind {
@@ -249,6 +250,9 @@ impl CombatSessionAutomaticStepDecisionKind {
             CombatSessionAutomaticStepDecisionKind::RejectedByLifecycle => "rejectedByLifecycle",
             CombatSessionAutomaticStepDecisionKind::RejectedByPolicy => "rejectedByPolicy",
             CombatSessionAutomaticStepDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
+            CombatSessionAutomaticStepDecisionKind::StoppedReactionWindow => {
+                "stoppedReactionWindow"
+            }
         }
     }
 }
@@ -324,6 +328,7 @@ pub enum CombatSessionAutomaticRunDecisionKind {
     RejectedByStepLimit,
     RejectedByPolicy,
     StoppedNoCandidate,
+    StoppedReactionWindow,
 }
 
 impl CombatSessionAutomaticRunDecisionKind {
@@ -335,6 +340,7 @@ impl CombatSessionAutomaticRunDecisionKind {
             CombatSessionAutomaticRunDecisionKind::RejectedByStepLimit => "rejectedByStepLimit",
             CombatSessionAutomaticRunDecisionKind::RejectedByPolicy => "rejectedByPolicy",
             CombatSessionAutomaticRunDecisionKind::StoppedNoCandidate => "stoppedNoCandidate",
+            CombatSessionAutomaticRunDecisionKind::StoppedReactionWindow => "stoppedReactionWindow",
         }
     }
 }
@@ -388,13 +394,15 @@ pub(super) fn combat_session_automatic_run_readout(
 
 pub(super) fn plan_automatic_step(
     policy: CombatAutomationPolicySpec,
+    policy_context: &CombatAutomationPolicyContext,
     state_before_fingerprint: StateFingerprint,
     lifecycle_phase: CombatLifecyclePhase,
     current_actor_id: Option<String>,
+    reaction_window_open: bool,
     combat_end_condition: CombatEndConditionReadout,
     auto_candidate_plan: impl FnOnce() -> CombatSessionAutoCandidatePlanReadout,
 ) -> CombatSessionAutomaticStepPlanReadout {
-    let policy_validation = validate_combat_automation_policy(&policy);
+    let policy_validation = validate_combat_automation_policy_for_context(&policy, policy_context);
     if !policy_validation.accepted {
         let reason = policy_validation.reason.clone();
         return automatic_step_plan_readout(
@@ -424,6 +432,21 @@ pub(super) fn plan_automatic_step(
             None,
             policy_validation,
             "Automatic combat step rejected because combat is already ended.",
+        );
+    }
+    if reaction_window_open {
+        return automatic_step_plan_readout(
+            policy,
+            state_before_fingerprint,
+            true,
+            CombatSessionAutomaticStepDecisionKind::StoppedReactionWindow,
+            None,
+            lifecycle_phase,
+            current_actor_id,
+            combat_end_condition,
+            None,
+            policy_validation,
+            "Automatic combat step stopped at an open reaction window for explicit response.",
         );
     }
 
@@ -629,9 +652,10 @@ pub(super) fn plan_candidate_command(
 pub(super) fn plan_auto_candidate_command(
     spec: CombatSessionAutoCandidateCommandSpec,
     candidates: CommandCandidateSummary,
+    policy_context: &CombatAutomationPolicyContext,
 ) -> CombatSessionAutoCandidatePlanReadout {
     let policy = spec.policy.clone();
-    let policy_validation = validate_combat_automation_policy(&policy);
+    let policy_validation = validate_combat_automation_policy_for_context(&policy, policy_context);
     let candidate_count = candidates.candidates.len();
     let accepted_candidate_count = candidates
         .candidates
@@ -642,12 +666,21 @@ pub(super) fn plan_auto_candidate_command(
         .candidates
         .iter()
         .enumerate()
-        .map(|(index, candidate)| CombatAutomationCandidateEvidence {
-            index,
-            action_id: candidate.action_id.clone(),
-            target_id: candidate.target_id.clone(),
-            accepted: candidate.accepted,
-            decision_kind: candidate.decision_kind,
+        .map(|(index, candidate)| {
+            let (policy_score, policy_reason) =
+                candidate_policy_score(&policy, policy_context, index, candidate);
+            CombatAutomationCandidateEvidence {
+                index,
+                action_id: candidate.action_id.clone(),
+                target_id: candidate.target_id.clone(),
+                target_side_id: candidate.target_side_id.clone(),
+                target_current_hit_points: candidate.target_current_hit_points,
+                target_max_hit_points: candidate.target_max_hit_points,
+                accepted: candidate.accepted,
+                decision_kind: candidate.decision_kind,
+                policy_score,
+                policy_reason,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -689,13 +722,18 @@ pub(super) fn plan_auto_candidate_command(
         };
     }
 
-    let Some((selected_candidate_index, candidate)) = candidates
-        .candidates
+    let selected_candidate_index = candidate_order
         .iter()
-        .enumerate()
-        .find(|(_, candidate)| candidate.accepted)
-        .map(|(index, candidate)| (index, candidate.clone()))
-    else {
+        .filter(|candidate| candidate.accepted)
+        .min_by_key(|candidate| (candidate.policy_score, candidate.index))
+        .map(|candidate| candidate.index);
+    let Some((selected_candidate_index, candidate)) = selected_candidate_index.and_then(|index| {
+        candidates
+            .candidates
+            .get(index)
+            .cloned()
+            .map(|candidate| (index, candidate))
+    }) else {
         return CombatSessionAutoCandidatePlanReadout {
             policy,
             policy_validation,
@@ -732,6 +770,11 @@ pub(super) fn plan_auto_candidate_command(
         CommandRollMode::RecordedGenerated { seed } => selection_spec.with_generated_rolls(seed),
     };
     let selection = plan_candidate_command(selection_spec, candidates);
+    let selected_score = candidate_order[selected_candidate_index].policy_score;
+    let reason = format!(
+        "Policy {} selected candidate {} with deterministic score {}.",
+        policy.id, selected_candidate_index, selected_score
+    );
 
     CombatSessionAutoCandidatePlanReadout {
         policy,
@@ -746,9 +789,47 @@ pub(super) fn plan_auto_candidate_command(
         selected_candidate_index: Some(selected_candidate_index),
         candidate_order,
         unavailable_reason: None,
-        reason: "First accepted command candidate planned for deterministic auto submission."
-            .to_string(),
+        reason,
         selection: Some(selection),
+    }
+}
+
+fn candidate_policy_score(
+    policy: &CombatAutomationPolicySpec,
+    context: &CombatAutomationPolicyContext,
+    index: usize,
+    candidate: &CommandCandidateEntry,
+) -> (i64, String) {
+    let vitality_score = if candidate.target_max_hit_points <= 0 {
+        i64::MAX / 4
+    } else {
+        i64::from(candidate.target_current_hit_points).saturating_mul(1_000_000)
+            / i64::from(candidate.target_max_hit_points)
+    };
+    match policy.id.as_str() {
+        LOWEST_VITALITY_TARGET_POLICY_ID => (
+            vitality_score,
+            format!(
+                "Remaining vitality score is {vitality_score} for target {}.",
+                candidate.target_id
+            ),
+        ),
+        OBJECTIVE_SIDE_PRESSURE_POLICY_ID => {
+            let objective_penalty = if context.objective_side_id.as_deref()
+                == Some(candidate.target_side_id.as_str())
+            {
+                0
+            } else {
+                1_000_000_000
+            };
+            (
+                objective_penalty + vitality_score,
+                format!(
+                    "Objective-side penalty is {objective_penalty}; remaining vitality score is {vitality_score}."
+                ),
+            )
+        }
+        _ => (index as i64, format!("Registry order score is {index}.")),
     }
 }
 

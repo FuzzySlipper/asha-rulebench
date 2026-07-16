@@ -85,6 +85,10 @@ quarantined instead of becoming live state. The setup tool distinguishes new,
 restored, and explicitly forked sessions and provides explicit fork and discard
 actions. See `docs/session-recovery.md` for the recovery, migration, and
 non-claim boundaries.
+The deterministic policy laboratory executes bounded scenario × policy × seed
+matrices one trial at a time, archives every trial through the same replay
+repository, and exposes cancellation and first-divergence comparison. See
+`docs/policy-laboratory.md` for its registration path and non-claims.
 Stored authored packs are re-decoded and re-imported on every host start before
 their exact activation can be used. A new session may select a compatible
 activated pack set; its exact references and set fingerprint are then retained
@@ -276,8 +280,8 @@ survive host restart. Live session snapshots expose authoritative board and
 participant positions to the workbench.
 
 The executable capability manifest currently reports 2 compiled providers, 2
-ruleset identities, 4 registered packages, 11 scenario cases, 1 automation
-policy, and operation pipeline v2. Its checked TypeScript projection records
+ruleset identities, 4 registered packages, 11 scenario cases, 3 automation
+policies, and operation pipeline v2. Its checked TypeScript projection records
 provider capability/vocabulary compatibility, the exact governed ASHA revision,
 and the configured durable-host support matrix; the live workbench always reads
 the current process-host manifest instead. See `docs/capability-manifest.md`

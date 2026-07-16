@@ -13,6 +13,7 @@ import { ContentPacksDialogContentComponent } from "./content-packs-dialog-conte
 import { CapabilityManifestDialogContentComponent } from "./capability-manifest-dialog-content";
 import { LiveCombatSetupDialogContentComponent } from "./live-combat-setup-dialog-content";
 import { ReplayArchiveDialogContentComponent } from "./replay-archive-dialog-content";
+import { PolicyLaboratoryDialogContentComponent } from "./policy-laboratory-dialog-content";
 import { WorkbenchShellComponent } from "./workbench-shell.component";
 
 @Component({
@@ -21,6 +22,7 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
     CapabilityManifestDialogContentComponent,
     ContentPacksDialogContentComponent,
     LiveCombatSetupDialogContentComponent,
+    PolicyLaboratoryDialogContentComponent,
     ReplayArchiveDialogContentComponent,
     WorkbenchShellComponent,
   ],
@@ -163,6 +165,16 @@ import { WorkbenchShellComponent } from "./workbench-shell.component";
       </arb-application-dialog>
 
       <arb-application-dialog
+        dialogId="policy-laboratory-dialog"
+        dialogTitle="Deterministic policy laboratory"
+        dialogDescription="Configure bounded Rust policy matrices, monitor trials, cancel work, compare evidence, and open archived replays."
+        [open]="activeDialog() === 'laboratory'"
+        (closeRequested)="closeDialog()"
+      >
+        <arb-policy-laboratory-dialog-content />
+      </arb-application-dialog>
+
+      <arb-application-dialog
         dialogId="replay-review-dialog"
         dialogTitle="Replay archive"
         dialogDescription="Select, verify, and compare Rust replay packages."
@@ -287,7 +299,7 @@ export class ScenarioViewerFeatureComponent implements OnInit {
   private readonly sessionStore = inject(SessionStore);
   private readonly liveStore = inject(LiveCombatStore);
   protected readonly activeDialog = signal<
-    "capabilities" | "content" | "scenario" | "live" | "replay" | null
+    "capabilities" | "content" | "scenario" | "live" | "replay" | "laboratory" | null
   >(null);
   protected readonly applicationMenuGroups: readonly ApplicationMenuGroup[] = [
     {
@@ -311,7 +323,10 @@ export class ScenarioViewerFeatureComponent implements OnInit {
     {
       id: "replay",
       label: "Replay",
-      items: [{ id: "open-replay-review", label: "Replay archive" }],
+      items: [
+        { id: "open-replay-review", label: "Replay archive" },
+        { id: "open-policy-laboratory", label: "Policy laboratory" },
+      ],
     },
   ];
   protected readonly viewerMode = signal<"session" | "scenario">("session");
@@ -346,6 +361,14 @@ export class ScenarioViewerFeatureComponent implements OnInit {
         return;
       case "open-replay-review":
         this.activeDialog.set("replay");
+        return;
+      case "open-policy-laboratory":
+        this.activeDialog.set("laboratory");
+        void Promise.all([
+          this.liveStore.loadScenarios(),
+          this.liveStore.loadAutomationPolicies(),
+          this.liveStore.loadExperiments(),
+        ]);
         return;
       case "open-runtime-capabilities":
         this.activeDialog.set("capabilities");

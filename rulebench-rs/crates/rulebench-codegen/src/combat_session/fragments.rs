@@ -46,12 +46,17 @@ pub(crate) fn render_automation_candidate_evidence(
     indent: &str,
 ) -> String {
     format!(
-        "{indent}{{\n{indent}  index: {},\n{indent}  actionId: {},\n{indent}  targetId: {},\n{indent}  accepted: {},\n{indent}  decisionKind: {},\n{indent}}},\n",
+        "{indent}{{\n{indent}  index: {},\n{indent}  actionId: {},\n{indent}  targetId: {},\n{indent}  targetSideId: {},\n{indent}  targetCurrentHitPoints: {},\n{indent}  targetMaxHitPoints: {},\n{indent}  accepted: {},\n{indent}  decisionKind: {},\n{indent}  policyScore: {},\n{indent}  policyReason: {},\n{indent}}},\n",
         candidate.index,
         ts_string(&candidate.action_id),
         ts_string(&candidate.target_id),
+        ts_string(&candidate.target_side_id),
+        candidate.target_current_hit_points,
+        candidate.target_max_hit_points,
         candidate.accepted,
-        ts_string(preflight_decision_kind(candidate.decision_kind))
+        ts_string(preflight_decision_kind(candidate.decision_kind)),
+        candidate.policy_score,
+        ts_string(&candidate.policy_reason)
     )
 }
 

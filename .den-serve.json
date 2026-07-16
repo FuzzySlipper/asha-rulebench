@@ -1,7 +1,7 @@
 {
   "project": "asha-rulebench",
   "serve": {
-    "command": "pnpm dev -- --port {port}",
+    "command": "env RULEBENCH_EPHEMERAL_ARTIFACTS=1 pnpm dev -- --port {port}",
     "healthUrl": "/",
     "readyText": "ASHA Rulebench",
     "reusePolicy": "broker_owned",

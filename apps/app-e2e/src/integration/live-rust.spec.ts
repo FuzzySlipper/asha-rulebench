@@ -48,7 +48,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 4,
+        protocolVersion: 5,
         authoritySurface: "asha-rulebench.local-authority.v0",
       },
     });
@@ -272,7 +272,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       error: {
         kind: "bridge",
         code: "protocolVersionMismatch",
-        message: "Unsupported protocol version 999; expected 4.",
+        message: "Unsupported protocol version 999; expected 5.",
         retryable: false,
       },
     });
@@ -858,6 +858,78 @@ test("shows Rust automatic step and bounded-run decisions", async ({
   ).toContainText("Not selected");
 });
 
+test("configures, monitors, cancels, compares, and opens policy laboratory trials", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await invokeApplicationCommand(page, "Replay", "Policy laboratory");
+  const dialog = page.getByRole("dialog", {
+    name: "Deterministic policy laboratory",
+  });
+  const laboratory = dialog.getByRole("region", {
+    name: "Deterministic policy laboratory",
+  });
+  await expect(laboratory).toBeVisible();
+  await laboratory
+    .getByLabel("Scenario and ruleset")
+    .selectOption("watchtower-vitality-operations");
+  await laboratory
+    .getByLabel("Primary policy")
+    .selectOption("firstAcceptedCandidate");
+  await laboratory
+    .getByLabel("Comparison policy")
+    .selectOption("lowestVitalityTarget");
+  await laboratory.getByLabel("Roll seeds").fill("7");
+  await laboratory.getByLabel("Max steps per trial").fill("8");
+  await laboratory.getByRole("button", { name: "Create bounded matrix" }).click();
+
+  const experiment = laboratory.locator("article").last();
+  await expect(experiment).toContainText("0 / 2 trials");
+  await experiment.getByRole("button", { name: "Run next trial" }).click();
+  await expect(experiment).toContainText("1 / 2 trials");
+  await experiment.getByRole("button", { name: "Run next trial" }).click();
+  await expect(experiment).toContainText("2 / 2 trials");
+  await expect(experiment).toContainText("replay verified");
+  await laboratory
+    .getByRole("button", { name: "Compare first and latest trial" })
+    .click();
+  await expect(laboratory).toContainText("First divergence found");
+  await experiment
+    .getByRole("button", { name: "Open trial replay" })
+    .first()
+    .click();
+  await expect(laboratory).toContainText(/Replay experiment-.* is open/);
+  await page.screenshot({
+    path: testInfo.outputPath("policy-laboratory-desktop.png"),
+    fullPage: true,
+  });
+
+  await laboratory.getByLabel("Comparison policy").selectOption("");
+  await laboratory.getByLabel("Roll seeds").fill("3,5");
+  await laboratory.getByRole("button", { name: "Create bounded matrix" }).click();
+  const cancellable = laboratory.locator("article").last();
+  await expect(cancellable).toContainText("0 / 2 trials");
+  await cancellable.getByRole("button", { name: "Cancel" }).click();
+  await expect(cancellable).toContainText("cancelled");
+
+  await laboratory
+    .getByLabel("Scenario and ruleset")
+    .selectOption("hexing-bolt-reaction");
+  await laboratory.getByLabel("Roll seeds").fill("7");
+  await laboratory.getByRole("button", { name: "Create bounded matrix" }).click();
+  await expect(laboratory.getByRole("alert")).toContainText(
+    "requires the explicit manual reaction workflow",
+  );
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).focus();
+  await page.screenshot({
+    path: testInfo.outputPath("policy-laboratory-mobile.png"),
+    fullPage: true,
+  });
+});
+
 test("configures participants from Rust scenario readbacks", async ({
   page,
 }) => {
@@ -962,6 +1034,10 @@ test("reviews and compares archived Rust replay evidence", async ({ page }) => {
   const comparison = workspace.getByRole("region", {
     name: "Replay comparison",
   });
+  await comparison
+    .getByLabel("Actual")
+    .selectOption("hexing-bolt-replay-explicit-start");
+  await comparison.getByRole("button", { name: "Compare" }).click();
   await expect(comparison).toContainText("Differences found");
   await expect(comparison).toContainText(
     "First difference · Replay Command Count Mismatch",

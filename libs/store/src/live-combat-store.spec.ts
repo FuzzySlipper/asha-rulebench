@@ -46,7 +46,7 @@ describe("LiveCombatStore", () => {
           operationVocabularyVersion: "2",
           effectVocabularyVersion: "1",
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 4,
+          protocolVersion: 5,
           host: {
             adapterId: "rulebench-process-host",
             storageMode: "filesystem",
@@ -99,6 +99,95 @@ describe("LiveCombatStore", () => {
     });
   });
 
+  it("owns policy catalog, bounded experiment progress, cancellation, and comparison as AsyncState", async () => {
+    const matrix = {
+      id: "policy-lab-1",
+      status: "planned",
+      plannedTrialCount: 2,
+      completedTrialCount: 0,
+      maxStepsPerTrial: 8,
+      trials: [],
+      reason: "Ready.",
+    };
+    let experiments = [matrix];
+    const transport = createFakeRulebenchLiveTransport({
+      listAutomationPolicies: async () => ({
+        ok: true,
+        value: [
+          {
+            id: "lowestVitalityTarget",
+            version: 1,
+            title: "Lowest vitality target",
+            summary: "Prefer the weakest target.",
+            selector: "lowestVitalityTarget",
+            requirement: "anyCombatRuleset",
+            compatibility: [
+              {
+                rulesetId: "rules",
+                rulesetVersion: "1",
+                compatible: true,
+                code: "accepted",
+                reason: "Compatible.",
+              },
+            ],
+          },
+        ],
+      }),
+      listExperiments: async () => ({ ok: true, value: experiments }),
+      createExperiment: async () => ({ ok: true, value: matrix }),
+      advanceExperiment: async () => {
+        experiments = [{ ...matrix, status: "running", completedTrialCount: 1 }];
+        return { ok: true, value: experiments[0] };
+      },
+      cancelExperiment: async () => {
+        experiments = [{ ...matrix, status: "cancelled", reason: "Cancelled." }];
+        return { ok: true, value: experiments[0] };
+      },
+      compareExperimentTrials: async () => ({
+        ok: true,
+        value: {
+          identical: false,
+          firstDivergenceIndex: 0,
+          expectedTrialId: "trial-1",
+          actualTrialId: "trial-2",
+          expectedEvidence: null,
+          actualEvidence: null,
+          reason: "First decision diverged.",
+        },
+      }),
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+
+    await store.loadAutomationPolicies();
+    await store.loadExperiments();
+    await store.advanceExperiment("policy-lab-1");
+    await store.compareExperimentTrials({
+      expectedExperimentId: "policy-lab-1",
+      expectedTrialId: "trial-1",
+      actualExperimentId: "policy-lab-1",
+      actualTrialId: "trial-2",
+    });
+
+    expect(store.automationPolicies()).toMatchObject({
+      kind: "data",
+      value: [{ id: "lowestVitalityTarget" }],
+    });
+    expect(store.experiments()).toMatchObject({
+      kind: "data",
+      value: [{ status: "running", completedTrialCount: 1 }],
+    });
+    expect(store.experimentComparison()).toMatchObject({
+      kind: "data",
+      value: { identical: false, firstDivergenceIndex: 0 },
+    });
+
+    await store.cancelExperiment("policy-lab-1");
+    expect(store.experiments()).toMatchObject({
+      kind: "data",
+      value: [{ status: "cancelled" }],
+    });
+  });
+
   it("loads connection, scenarios, snapshot, options, candidates, and preflight through injected transport", async () => {
     const snapshot = makeLiveSessionSnapshot();
     const transport = createFakeRulebenchLiveTransport({
@@ -106,7 +195,7 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 4,
+          protocolVersion: 5,
           authoritySurface: "test-authority",
         },
       }),
@@ -533,7 +622,7 @@ describe("LiveCombatStore", () => {
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 4,
+        protocolVersion: 5,
         authoritySurface: "late",
       },
     });

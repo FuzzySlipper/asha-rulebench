@@ -1,0 +1,121 @@
+<section class="policy-lab" aria-label="Deterministic policy laboratory">
+  <header>
+    <div>
+      <p class="eyebrow">Rust authority · bounded observations</p>
+      <h2>Policy laboratory</h2>
+    </div>
+    <button type="button" (click)="refresh()">Refresh catalog</button>
+  </header>
+
+  <p class="non-claim">
+    Metrics are review observations, not gameplay truth. Policies select only
+    from Rust-projected legal candidates; this is not AI or mutable UI logic.
+  </p>
+
+  <div class="matrix">
+    <label>
+      Scenario and ruleset
+      <select #scenario [value]="effectiveScenarioId()" (change)="selectScenario(scenario.value)">
+        @if (scenarios().kind === "data") {
+          @for (option of scenarios().value; track option.id) {
+            <option [value]="option.id">
+              {{ option.title }} · {{ option.rulesetId }} {{ option.rulesetVersion }}
+            </option>
+          }
+        }
+      </select>
+    </label>
+
+    <label>
+      Primary policy
+      <select #primary [value]="effectivePrimaryPolicyId()" (change)="primaryPolicy.set(primary.value)">
+        @for (policy of compatiblePolicies(); track policy.id) {
+          <option [value]="policy.id">{{ policy.title }} · v{{ policy.version }}</option>
+        }
+      </select>
+    </label>
+
+    <label>
+      Comparison policy
+      <select #secondary [value]="comparisonPolicy()" (change)="comparisonPolicy.set(secondary.value)">
+        <option value="">None</option>
+        @for (policy of compatiblePolicies(); track policy.id) {
+          @if (policy.id !== effectivePrimaryPolicyId()) {
+            <option [value]="policy.id">{{ policy.title }} · v{{ policy.version }}</option>
+          }
+        }
+      </select>
+    </label>
+
+    <label>
+      Roll seeds
+      <input #seeds [value]="seedInput()" (input)="setSeedInput(seeds.value)" />
+    </label>
+
+    <label>
+      Max steps per trial
+      <input #steps type="number" min="1" max="64" [value]="maxStepsInput()" (input)="setMaxStepsInput(steps.value)" />
+    </label>
+
+    <fieldset>
+      <legend>No-candidate behavior</legend>
+      <label><input type="radio" name="lab-no-candidate" [checked]="noCandidateBehavior() === 'advanceTurn'" (change)="noCandidateBehavior.set('advanceTurn')" /> Advance turn</label>
+      <label><input type="radio" name="lab-no-candidate" [checked]="noCandidateBehavior() === 'stopRun'" (change)="noCandidateBehavior.set('stopRun')" /> Stop trial</label>
+    </fieldset>
+  </div>
+
+  @if (validationMessage(); as validation) {
+    <p class="error" role="alert">{{ validation }}</p>
+  }
+  <button type="button" [disabled]="validationMessage() !== null" (click)="createExperiment()">
+    Create bounded matrix
+  </button>
+
+  @switch (experiments().kind) {
+    @case ("loading") { <p role="status">Loading laboratory progress…</p> }
+    @case ("error") { <p class="error" role="alert">{{ experiments().error.message }}</p> }
+    @case ("data") {
+      <div class="experiments">
+        @for (experiment of experiments().value; track experiment.id) {
+          <article [class.selected]="activeExperiment()?.id === experiment.id" (click)="selectedExperimentId.set(experiment.id)">
+            <header>
+              <div><h3>{{ experiment.id }}</h3><p>{{ experiment.reason }}</p></div>
+              <span class="status">{{ experiment.status }}</span>
+            </header>
+            <progress [value]="experiment.completedTrialCount" [max]="experiment.plannedTrialCount"></progress>
+            <p>{{ experiment.completedTrialCount }} / {{ experiment.plannedTrialCount }} trials · max {{ experiment.maxStepsPerTrial }} steps</p>
+            <div class="actions">
+              <button type="button" [disabled]="experiment.status === 'completed' || experiment.status === 'cancelled'" (click)="$event.stopPropagation(); advanceExperiment(experiment.id)">Run next trial</button>
+              <button type="button" [disabled]="experiment.status === 'completed' || experiment.status === 'cancelled'" (click)="$event.stopPropagation(); cancelExperiment(experiment.id)">Cancel</button>
+            </div>
+            <div class="trials">
+              @for (trial of experiment.trials; track trial.id) {
+                <section>
+                  <h4>{{ trial.policyId }} · seed {{ trial.seed }}</h4>
+                  <p>{{ trial.stopReason }} · {{ trial.metrics.executedStepCount }} steps · ΔHP {{ trial.metrics.observedHitPointDelta }}</p>
+                  <p>Materialized rolls: {{ trial.materializedRolls.join(', ') || 'none consumed' }}</p>
+                  <p>{{ trial.rulesetId }} {{ trial.rulesetVersion }} · replay {{ trial.replayVerified ? 'verified' : 'not verified' }}</p>
+                  <button type="button" (click)="$event.stopPropagation(); openReplay(trial.replayPackageId)">Open trial replay</button>
+                </section>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+
+  @if ((activeExperiment()?.trials?.length ?? 0) >= 2) {
+    <button type="button" (click)="compareCompletedTrials()">Compare first and latest trial</button>
+  }
+  @if (comparison().kind === "data") {
+    <section class="comparison" aria-live="polite">
+      <h3>{{ comparison().value.identical ? 'Evidence matches' : 'First divergence found' }}</h3>
+      <p>{{ comparison().value.reason }}</p>
+    </section>
+  }
+  @if (replayReview().kind === "data") {
+    <p class="comparison">Replay {{ replayReview().value.packageId }} is open with {{ replayReview().value.commands.length }} recorded commands.</p>
+  }
+  <p role="status" aria-live="polite">{{ statusMessage() }}</p>
+</section>

@@ -578,6 +578,12 @@ fn current_actor_id_command_candidates(
                         ability_id: action.ability_id.clone(),
                         target_id: target.target_id.clone(),
                         target_name: target_set.target_ids.join(", "),
+                        target_side_id: scenario
+                            .combatants
+                            .iter()
+                            .find(|combatant| combatant.id == target.target_id)
+                            .map(|combatant| combatant.side_id.clone())
+                            .unwrap_or_default(),
                         target_current_hit_points: target.current_hit_points,
                         target_max_hit_points: target.max_hit_points,
                         accepted: preflight.accepted,
@@ -616,6 +622,12 @@ fn current_actor_id_command_candidates(
                         ability_id: action.ability_id.clone(),
                         target_id: target.target_id.clone(),
                         target_name: target.target_name.clone(),
+                        target_side_id: scenario
+                            .combatants
+                            .iter()
+                            .find(|combatant| combatant.id == target.target_id)
+                            .map(|combatant| combatant.side_id.clone())
+                            .unwrap_or_default(),
                         target_current_hit_points: target.current_hit_points,
                         target_max_hit_points: target.max_hit_points,
                         accepted: preflight.accepted,

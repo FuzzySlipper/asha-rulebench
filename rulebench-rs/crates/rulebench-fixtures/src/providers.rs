@@ -61,6 +61,7 @@ fn hexing_bolt_provider() -> RulesetProviderDescriptor {
         effect_operation_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
         capabilities: executable_conformance_capabilities()
             .into_iter()
+            .filter(|identity| identity.id != "policy.objectiveSidePressure")
             .map(|identity| RulesetProviderCapability {
                 id: identity.id,
                 version: identity.version,
@@ -91,6 +92,14 @@ fn turn_control_provider() -> RulesetProviderDescriptor {
             capability(
                 "policy.firstAcceptedCandidate",
                 &FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION.to_string(),
+            ),
+            capability(
+                "policy.lowestVitalityTarget",
+                &LOWEST_VITALITY_TARGET_POLICY_VERSION.to_string(),
+            ),
+            capability(
+                "policy.objectiveSidePressure",
+                &OBJECTIVE_SIDE_PRESSURE_POLICY_VERSION.to_string(),
             ),
             capability(
                 "targeting.singleCombatant",

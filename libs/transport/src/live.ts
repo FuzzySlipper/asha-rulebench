@@ -1,6 +1,7 @@
 import type {
   RulebenchAutomaticRunSpecDto,
   RulebenchAutomaticStepSpecDto,
+  RulebenchAutomationPolicyCatalogEntryDto,
   RulebenchCapabilityManifestDto,
   RulebenchCombatControlCommandDto,
   RulebenchCombatSessionCreateRequestDto,
@@ -11,6 +12,10 @@ import type {
   RulebenchContentPackReviewDto,
   RulebenchContentReplacementPolicyDto,
   RulebenchContentWorkspaceDto,
+  RulebenchExperimentComparisonReadoutDto,
+  RulebenchExperimentComparisonRequestDto,
+  RulebenchExperimentMatrixRequestDto,
+  RulebenchExperimentReadoutDto,
   RulebenchLiveAutomaticRunDto,
   RulebenchLiveAutomaticStepDto,
   RulebenchLiveCandidateSummaryDto,
@@ -42,7 +47,7 @@ import type {
 } from "./replay-review";
 
 export const RULEBENCH_PROTOCOL_ID = "asha-rulebench.protocol";
-export const RULEBENCH_PROTOCOL_VERSION = 4;
+export const RULEBENCH_PROTOCOL_VERSION = 5;
 
 const DEFAULT_API_BASE_URL = "/api/rulebench/v1";
 
@@ -75,6 +80,40 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
   readonly getCapabilities: (
     options?: RulebenchLiveRequestOptions,
   ) => Promise<RulebenchLiveTransportResult<RulebenchCapabilityManifestDto>>;
+  readonly listAutomationPolicies: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<
+    RulebenchLiveTransportResult<
+      readonly RulebenchAutomationPolicyCatalogEntryDto[]
+    >
+  >;
+  readonly listExperiments: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<
+    RulebenchLiveTransportResult<readonly RulebenchExperimentReadoutDto[]>
+  >;
+  readonly createExperiment: (
+    matrix: RulebenchExperimentMatrixRequestDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchExperimentReadoutDto>>;
+  readonly getExperiment: (
+    experimentId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchExperimentReadoutDto>>;
+  readonly advanceExperiment: (
+    experimentId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchExperimentReadoutDto>>;
+  readonly cancelExperiment: (
+    experimentId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchExperimentReadoutDto>>;
+  readonly compareExperimentTrials: (
+    comparison: RulebenchExperimentComparisonRequestDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<
+    RulebenchLiveTransportResult<RulebenchExperimentComparisonReadoutDto>
+  >;
   readonly listScenarios: (
     options?: RulebenchLiveRequestOptions,
   ) => Promise<
@@ -311,6 +350,8 @@ export function createLiveRulebenchTransport(
     `/session-recovery/${encodeURIComponent(sessionId)}`;
   const replayPath = (packageId: string): string =>
     `/replays/${encodeURIComponent(packageId)}`;
+  const experimentPath = (experimentId: string): string =>
+    `/experiments/${encodeURIComponent(experimentId)}`;
   const replayRequest = async <T>(
     method: "GET" | "POST",
     path: string,
@@ -361,6 +402,30 @@ export function createLiveRulebenchTransport(
     },
     getCapabilities: (requestOptions) =>
       request("GET", "/capabilities", undefined, requestOptions),
+    listAutomationPolicies: (requestOptions) =>
+      request("GET", "/automation-policies", undefined, requestOptions),
+    listExperiments: (requestOptions) =>
+      request("GET", "/experiments", undefined, requestOptions),
+    createExperiment: (matrix, requestOptions) =>
+      request("POST", "/experiments", matrix, requestOptions),
+    getExperiment: (experimentId, requestOptions) =>
+      request("GET", experimentPath(experimentId), undefined, requestOptions),
+    advanceExperiment: (experimentId, requestOptions) =>
+      request(
+        "POST",
+        `${experimentPath(experimentId)}/advance`,
+        undefined,
+        requestOptions,
+      ),
+    cancelExperiment: (experimentId, requestOptions) =>
+      request(
+        "POST",
+        `${experimentPath(experimentId)}/cancel`,
+        undefined,
+        requestOptions,
+      ),
+    compareExperimentTrials: (comparison, requestOptions) =>
+      request("POST", "/experiments/compare", comparison, requestOptions),
     listScenarios: (requestOptions) =>
       request("GET", "/scenarios", undefined, requestOptions),
     listViewerScenarios: (requestOptions) =>

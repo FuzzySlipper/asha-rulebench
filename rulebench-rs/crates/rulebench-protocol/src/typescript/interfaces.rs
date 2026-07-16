@@ -1043,12 +1043,32 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "string",
                 },
                 Field {
+                    name: "targetSideId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targetCurrentHitPoints",
+                    ty: "number",
+                },
+                Field {
+                    name: "targetMaxHitPoints",
+                    ty: "number",
+                },
+                Field {
                     name: "accepted",
                     ty: "boolean",
                 },
                 Field {
                     name: "decisionKind",
                     ty: "RulebenchCommandPreflightDecisionKindDto",
+                },
+                Field {
+                    name: "policyScore",
+                    ty: "number",
+                },
+                Field {
+                    name: "policyReason",
+                    ty: "string",
                 },
             ],
         },
@@ -3932,6 +3952,339 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "retryable",
                     ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchPolicyRulesetCompatibilityDto",
+            fields: &[
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "compatible",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "code",
+                    ty: "string",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAutomationPolicyCatalogEntryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "number",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "selector",
+                    ty: "string",
+                },
+                Field {
+                    name: "requirement",
+                    ty: "string",
+                },
+                Field {
+                    name: "compatibility",
+                    ty: "readonly RulebenchPolicyRulesetCompatibilityDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentMatrixRequestDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "policies",
+                    ty: "readonly RulebenchCombatAutomationPolicySpecDto[]",
+                },
+                Field {
+                    name: "seeds",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "maxSteps",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentDecisionEvidenceDto",
+            fields: &[
+                Field {
+                    name: "index",
+                    ty: "number",
+                },
+                Field {
+                    name: "stateBeforeFingerprint",
+                    ty: "string",
+                },
+                Field {
+                    name: "operationKind",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "selectedActionId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "selectedTargetId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "selectedCandidateIndex",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "candidateCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "acceptedCandidateCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentMetricsDto",
+            fields: &[
+                Field {
+                    name: "executedStepCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "acceptedCommandCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "initialTotalHitPoints",
+                    ty: "number",
+                },
+                Field {
+                    name: "finalTotalHitPoints",
+                    ty: "number",
+                },
+                Field {
+                    name: "observedHitPointDelta",
+                    ty: "number",
+                },
+                Field {
+                    name: "auditEntryCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "combatLogEntryCount",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentTrialReadoutDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "contentPackId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "contentPackVersion",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "policyId",
+                    ty: "string",
+                },
+                Field {
+                    name: "policyVersion",
+                    ty: "number",
+                },
+                Field {
+                    name: "policyNoCandidateBehavior",
+                    ty: "string",
+                },
+                Field {
+                    name: "seed",
+                    ty: "number",
+                },
+                Field {
+                    name: "maxSteps",
+                    ty: "number",
+                },
+                Field {
+                    name: "accepted",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "stopReason",
+                    ty: "string",
+                },
+                Field {
+                    name: "finalizationOutcome",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "initialStateFingerprint",
+                    ty: "string",
+                },
+                Field {
+                    name: "finalStateFingerprint",
+                    ty: "string",
+                },
+                Field {
+                    name: "materializedRolls",
+                    ty: "readonly number[]",
+                },
+                Field {
+                    name: "decisions",
+                    ty: "readonly RulebenchExperimentDecisionEvidenceDto[]",
+                },
+                Field {
+                    name: "metrics",
+                    ty: "RulebenchExperimentMetricsDto",
+                },
+                Field {
+                    name: "replayPackageId",
+                    ty: "string",
+                },
+                Field {
+                    name: "replayVerified",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentReadoutDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "status",
+                    ty: "string",
+                },
+                Field {
+                    name: "plannedTrialCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "completedTrialCount",
+                    ty: "number",
+                },
+                Field {
+                    name: "maxStepsPerTrial",
+                    ty: "number",
+                },
+                Field {
+                    name: "trials",
+                    ty: "readonly RulebenchExperimentTrialReadoutDto[]",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentComparisonRequestDto",
+            fields: &[
+                Field {
+                    name: "expectedExperimentId",
+                    ty: "string",
+                },
+                Field {
+                    name: "expectedTrialId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actualExperimentId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actualTrialId",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchExperimentComparisonReadoutDto",
+            fields: &[
+                Field {
+                    name: "identical",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "firstDivergenceIndex",
+                    ty: "number | null",
+                },
+                Field {
+                    name: "expectedTrialId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actualTrialId",
+                    ty: "string",
+                },
+                Field {
+                    name: "expectedEvidence",
+                    ty: "RulebenchExperimentDecisionEvidenceDto | null",
+                },
+                Field {
+                    name: "actualEvidence",
+                    ty: "RulebenchExperimentDecisionEvidenceDto | null",
+                },
+                Field {
+                    name: "reason",
+                    ty: "string",
                 },
             ],
         },

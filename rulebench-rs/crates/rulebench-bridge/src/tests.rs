@@ -1,7 +1,8 @@
 use rulebench_protocol::{
-    CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
-    CombatSessionHandleDto, CombatSessionIntentCommandDto, CommandRollModeDto,
-    ProtocolRequestContextDto, UseActionIntentDto, PROTOCOL_VERSION,
+    CombatAutomationNoCandidateBehaviorDto, CombatAutomationPolicyDto, CombatControlCommandDto,
+    CombatControlCommandKindDto, CombatSessionCreateRequestDto, CombatSessionHandleDto,
+    CombatSessionIntentCommandDto, CommandRollModeDto, ExperimentComparisonRequestDto,
+    ExperimentMatrixRequestDto, ProtocolRequestContextDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
 use rulebench_rules::*;
 use std::collections::BTreeMap;
@@ -580,4 +581,157 @@ fn bridge_exposes_setup_metadata_and_validates_participant_order() {
     assert!(invalid
         .message
         .contains("include all 2 scenario participants"));
+}
+
+#[test]
+fn policy_catalog_reports_real_ruleset_compatibility() {
+    let bridge = bridge();
+    let catalog = bridge
+        .automation_policy_catalog(&context())
+        .expect("policy catalog loads");
+
+    assert_eq!(catalog.len(), 3);
+    let objective = catalog
+        .iter()
+        .find(|policy| policy.id == OBJECTIVE_SIDE_PRESSURE_POLICY_ID)
+        .expect("objective policy is registered");
+    assert_eq!(objective.requirement, "objectiveSidePolicy");
+    assert_eq!(objective.compatibility.len(), 1);
+    assert!(!objective.compatibility[0].compatible);
+    assert_eq!(
+        objective.compatibility[0].code,
+        "incompatibleRulesetCapability"
+    );
+}
+
+#[test]
+fn experiment_matrix_advances_one_trial_at_a_time_and_archives_verified_replays() {
+    let mut bridge = bridge();
+    let created = bridge
+        .create_experiment(&context(), &experiment_request("bounded-lab", vec![7, 7]))
+        .expect("compatible bounded matrix is created");
+    assert_eq!(created.status, "planned");
+    assert_eq!(created.planned_trial_count, 2);
+    assert!(created.trials.is_empty());
+
+    let first = bridge
+        .advance_experiment(&context(), "bounded-lab")
+        .expect("first trial advances");
+    assert_eq!(first.status, "running");
+    assert_eq!(first.completed_trial_count, 1);
+    assert!(first.trials[0].replay_verified);
+    assert!(!first.trials[0].decisions.is_empty());
+    assert!(!first.trials[0].materialized_rolls.is_empty());
+
+    let completed = bridge
+        .advance_experiment(&context(), "bounded-lab")
+        .expect("second trial completes matrix");
+    assert_eq!(completed.status, "completed");
+    assert_eq!(completed.completed_trial_count, 2);
+    assert_eq!(
+        completed.trials[0].final_state_fingerprint,
+        completed.trials[1].final_state_fingerprint
+    );
+    assert_eq!(completed.trials[0].decisions, completed.trials[1].decisions);
+    let replay_ids = bridge
+        .list_replay_packages(&context())
+        .expect("archived experiment replay list");
+    assert!(replay_ids
+        .iter()
+        .any(|replay| replay.package_id == completed.trials[0].replay_package_id));
+}
+
+#[test]
+fn experiment_comparison_classifies_identical_and_divergent_evidence() {
+    let mut bridge = bridge();
+    bridge
+        .create_experiment(&context(), &experiment_request("compare-a", vec![7]))
+        .expect("first matrix");
+    let first = bridge
+        .advance_experiment(&context(), "compare-a")
+        .expect("first trial");
+    bridge
+        .create_experiment(&context(), &experiment_request("compare-b", vec![7]))
+        .expect("second matrix");
+    let second = bridge
+        .advance_experiment(&context(), "compare-b")
+        .expect("second trial");
+    let identical = bridge
+        .compare_experiment_trials(
+            &context(),
+            &ExperimentComparisonRequestDto {
+                expected_experiment_id: "compare-a".to_string(),
+                expected_trial_id: first.trials[0].id.clone(),
+                actual_experiment_id: "compare-b".to_string(),
+                actual_trial_id: second.trials[0].id.clone(),
+            },
+        )
+        .expect("identical trials compare");
+    assert!(identical.identical);
+    assert_eq!(identical.first_divergence_index, None);
+
+    bridge
+        .create_experiment(&context(), &experiment_request("compare-c", vec![11]))
+        .expect("third matrix");
+    let third = bridge
+        .advance_experiment(&context(), "compare-c")
+        .expect("third trial");
+    let divergent = bridge
+        .compare_experiment_trials(
+            &context(),
+            &ExperimentComparisonRequestDto {
+                expected_experiment_id: "compare-a".to_string(),
+                expected_trial_id: first.trials[0].id.clone(),
+                actual_experiment_id: "compare-c".to_string(),
+                actual_trial_id: third.trials[0].id.clone(),
+            },
+        )
+        .expect("different seed trials compare");
+    assert!(!divergent.identical);
+    assert!(divergent.first_divergence_index.is_some());
+}
+
+#[test]
+fn experiment_matrix_rejects_incompatible_policy_and_supports_cancellation() {
+    let mut bridge = bridge();
+    let mut incompatible = experiment_request("incompatible-lab", vec![7]);
+    incompatible.policies[0] = policy(OBJECTIVE_SIDE_PRESSURE_POLICY_ID);
+    let rejected = bridge
+        .create_experiment(&context(), &incompatible)
+        .expect_err("incompatible matrix fails before state creation");
+    assert_eq!(rejected.kind, BridgeErrorKind::InvalidRequest);
+    assert!(bridge
+        .list_experiments(&context())
+        .expect("experiment list")
+        .is_empty());
+
+    bridge
+        .create_experiment(&context(), &experiment_request("cancelled-lab", vec![3, 5]))
+        .expect("cancellable matrix");
+    let cancelled = bridge
+        .cancel_experiment(&context(), "cancelled-lab")
+        .expect("matrix cancellation");
+    assert_eq!(cancelled.status, "cancelled");
+    let unchanged = bridge
+        .advance_experiment(&context(), "cancelled-lab")
+        .expect("cancelled matrix is stable");
+    assert!(unchanged.trials.is_empty());
+}
+
+fn experiment_request(id: &str, seeds: Vec<u32>) -> ExperimentMatrixRequestDto {
+    ExperimentMatrixRequestDto {
+        id: id.to_string(),
+        scenario_ids: vec!["hexing-bolt".to_string()],
+        policies: vec![policy(FIRST_ACCEPTED_CANDIDATE_POLICY_ID)],
+        seeds,
+        max_steps: 8,
+    }
+}
+
+fn policy(id: &str) -> CombatAutomationPolicyDto {
+    CombatAutomationPolicyDto {
+        id: id.to_string(),
+        version: 1,
+        no_candidate_behavior: CombatAutomationNoCandidateBehaviorDto::AdvanceTurn,
+    }
 }

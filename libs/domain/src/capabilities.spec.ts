@@ -12,7 +12,7 @@ describe("projectCapabilityManifest", () => {
       operationVocabularyVersion: "2",
       effectVocabularyVersion: "1",
       protocolId: "asha-rulebench.protocol",
-      protocolVersion: 4,
+      protocolVersion: 5,
       host: {
         adapterId: "rulebench-process-host",
         storageMode: "filesystem",

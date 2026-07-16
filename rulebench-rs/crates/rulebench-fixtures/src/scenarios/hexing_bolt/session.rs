@@ -14,26 +14,47 @@ pub fn combat_session_script_readouts() -> Vec<CombatSessionScriptReadout> {
 }
 
 pub fn combat_session_automatic_run_readouts() -> Vec<CombatSessionAutomaticRunReadout> {
-    vec![hexing_bolt_bounded_automatic_run_readout()]
+    vec![
+        hexing_bolt_bounded_automatic_run_readout(
+            "hexing-bolt-bounded-automatic-run",
+            CombatAutomationPolicySpec::first_accepted_candidate(),
+        ),
+        hexing_bolt_bounded_automatic_run_readout(
+            "hexing-bolt-lowest-vitality-automatic-run",
+            CombatAutomationPolicySpec::lowest_vitality_target(),
+        ),
+    ]
 }
 
 pub fn combat_session_automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayReadout>
 {
-    vec![hexing_bolt_bounded_automatic_run_replay_readout()]
+    combat_session_automatic_run_readouts()
+        .into_iter()
+        .enumerate()
+        .map(|(index, run)| hexing_bolt_bounded_automatic_run_replay_readout(index, run))
+        .collect()
 }
 
-fn hexing_bolt_bounded_automatic_run_replay_readout() -> CombatSessionAutomaticRunReplayReadout {
-    let run_readout = hexing_bolt_bounded_automatic_run_readout();
+fn hexing_bolt_bounded_automatic_run_replay_readout(
+    index: usize,
+    run_readout: CombatSessionAutomaticRunReadout,
+) -> CombatSessionAutomaticRunReplayReadout {
+    let replay_id = if index == 0 {
+        "hexing-bolt-bounded-automatic-run-replay".to_string()
+    } else {
+        format!("{}-replay", run_readout.id)
+    };
     let run_spec = CombatSessionAutomaticRunSpec::new(
         run_readout.id.clone(),
         run_readout.title.clone(),
         run_readout.summary.clone(),
         run_readout.max_steps,
         vec![17, 5],
-    );
+    )
+    .with_policy(run_readout.policy.clone());
 
     verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
-        "hexing-bolt-bounded-automatic-run-replay",
+        replay_id,
         "Hexing Bolt Bounded Automatic Run Replay",
         "A generated Rust replay verification readout for the bounded automatic run fixture.",
         "hexing-bolt-bounded-automatic-run-replay-session",
@@ -54,20 +75,19 @@ fn hexing_bolt_bounded_automatic_run_replay_readout() -> CombatSessionAutomaticR
     ))
 }
 
-fn hexing_bolt_bounded_automatic_run_readout() -> CombatSessionAutomaticRunReadout {
-    let session_id = "hexing-bolt-bounded-automatic-run";
+fn hexing_bolt_bounded_automatic_run_readout(
+    session_id: &str,
+    policy: CombatAutomationPolicySpec,
+) -> CombatSessionAutomaticRunReadout {
     let title = "Hexing Bolt Bounded Automatic Run";
     let summary = "A generated Rust automatic run readout that drives the fixture to ended combat within a max-step guard.";
 
     let mut session_state = CombatSessionState::new(session_id, hexing_bolt_fixture_scenario());
 
-    session_state.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
-        session_id,
-        title,
-        summary,
-        8,
-        vec![17, 5],
-    ))
+    session_state.run_automatic_combat(
+        CombatSessionAutomaticRunSpec::new(session_id, title, summary, 8, vec![17, 5])
+            .with_policy(policy),
+    )
 }
 
 fn hexing_bolt_opening_exchange_session() -> CombatSessionTranscript {

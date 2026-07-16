@@ -391,6 +391,7 @@ pub struct CommandCandidateEntry {
     pub ability_id: String,
     pub target_id: String,
     pub target_name: String,
+    pub target_side_id: String,
     pub target_current_hit_points: i32,
     pub target_max_hit_points: i32,
     pub accepted: bool,

@@ -7,9 +7,12 @@ use std::thread;
 use std::time::Duration;
 
 use rulebench_protocol::{
-    CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
-    CombatSessionIntentCommandDto, CommandRollModeDto, ContentImportAttemptDto,
-    ContentWorkspaceDto, LiveCommandExecutionDto, LiveControlExecutionDto,
+    AutomaticRunRequestDto, AutomationPolicyCatalogEntryDto,
+    CombatAutomationNoCandidateBehaviorDto, CombatAutomationPolicyDto, CombatControlCommandDto,
+    CombatControlCommandKindDto, CombatSessionCreateRequestDto, CombatSessionIntentCommandDto,
+    CommandRollModeDto, ContentImportAttemptDto, ContentWorkspaceDto,
+    ExperimentComparisonReadoutDto, ExperimentComparisonRequestDto, ExperimentMatrixRequestDto,
+    ExperimentReadoutDto, LiveAutomaticRunDto, LiveCommandExecutionDto, LiveControlExecutionDto,
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
     ReactionResponseKindDto, ReplayArchiveMetadataDto, ReplayComparisonReadoutDto,
     ReplayComparisonRequestDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
@@ -71,6 +74,37 @@ fn capability_route_reports_registry_and_actual_host_composition() {
                 .iter()
                 .any(|capability| capability.id == "check.savingThrow")
     }));
+    let hexing_provider = manifest
+        .providers
+        .iter()
+        .find(|provider| provider.provider.id == "provider.asha-rulebench.hexing-bolt")
+        .expect("hexing provider is present");
+    assert!(hexing_provider
+        .capabilities
+        .iter()
+        .any(|capability| capability.id == "policy.lowestVitalityTarget"));
+    assert!(!hexing_provider
+        .capabilities
+        .iter()
+        .any(|capability| capability.id == "policy.objectiveSidePressure"));
+    let turn_provider = manifest
+        .providers
+        .iter()
+        .find(|provider| provider.provider.id == "provider.asha-rulebench.turn-control")
+        .expect("turn-control provider is present");
+    assert!(turn_provider
+        .capabilities
+        .iter()
+        .any(|capability| capability.id == "policy.objectiveSidePressure"));
+    for capability_id in [
+        "policy.firstAcceptedCandidate",
+        "policy.lowestVitalityTarget",
+        "policy.objectiveSidePressure",
+    ] {
+        assert!(manifest.capabilities.iter().any(|capability| {
+            capability.id == capability_id && capability.support.regression_covered
+        }));
+    }
     assert!(manifest.capabilities.iter().any(|capability| {
         capability.id == "targeting.multipleCombatants"
             && capability.support.runtime_executable
@@ -96,6 +130,146 @@ fn capability_route_reports_registry_and_actual_host_composition() {
             && capability.support.regression_covered
             && !capability.support.durable_across_restart
     }));
+}
+
+#[test]
+fn policy_laboratory_routes_validate_advance_compare_cancel_and_archive() {
+    let mut router = router();
+    let catalog = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/automation-policies",
+    ));
+    assert_eq!(catalog.status, 200);
+    let catalog: Vec<AutomationPolicyCatalogEntryDto> =
+        serde_json::from_slice(&catalog.body).expect("policy catalog is JSON");
+    assert_eq!(catalog.len(), 3);
+    let objective = catalog
+        .iter()
+        .find(|policy| policy.id == "objectiveSidePressure")
+        .expect("objective policy registration");
+    assert!(objective.compatibility.iter().any(|compatibility| {
+        compatibility.ruleset_id == "asha-rulebench.turn-control.v0" && compatibility.compatible
+    }));
+    assert!(objective.compatibility.iter().any(|compatibility| {
+        compatibility.ruleset_id == "asha-rulebench.hexing-bolt.v0" && !compatibility.compatible
+    }));
+
+    let matrix = ExperimentMatrixRequestDto {
+        id: "host-policy-lab".to_string(),
+        scenario_ids: vec!["hexing-bolt-hit".to_string()],
+        policies: vec![CombatAutomationPolicyDto {
+            id: "lowestVitalityTarget".to_string(),
+            version: 1,
+            no_candidate_behavior: CombatAutomationNoCandidateBehaviorDto::AdvanceTurn,
+        }],
+        seeds: vec![7, 7],
+        max_steps: 8,
+    };
+    let created = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/experiments",
+        &matrix,
+    ));
+    assert_eq!(created.status, 200);
+    let created: ExperimentReadoutDto =
+        serde_json::from_slice(&created.body).expect("experiment creation is JSON");
+    assert_eq!(created.planned_trial_count, 2);
+
+    let first = router.handle(&request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/experiments/host-policy-lab/advance",
+    ));
+    assert_eq!(first.status, 200);
+    let first: ExperimentReadoutDto =
+        serde_json::from_slice(&first.body).expect("first progress readout is JSON");
+    assert_eq!(first.status, "running");
+    assert!(first.trials[0].replay_verified);
+
+    let completed = router.handle(&request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/experiments/host-policy-lab/advance",
+    ));
+    let completed: ExperimentReadoutDto =
+        serde_json::from_slice(&completed.body).expect("completed experiment is JSON");
+    assert_eq!(completed.status, "completed");
+    let comparison = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/experiments/compare",
+        &ExperimentComparisonRequestDto {
+            expected_experiment_id: completed.id.clone(),
+            expected_trial_id: completed.trials[0].id.clone(),
+            actual_experiment_id: completed.id.clone(),
+            actual_trial_id: completed.trials[1].id.clone(),
+        },
+    ));
+    let comparison: ExperimentComparisonReadoutDto =
+        serde_json::from_slice(&comparison.body).expect("comparison is JSON");
+    assert!(comparison.identical);
+
+    let replay = router.handle(&request(
+        HttpMethod::Get,
+        &format!(
+            "/api/rulebench/v1/replays/{}",
+            completed.trials[0].replay_package_id
+        ),
+    ));
+    assert_eq!(replay.status, 200);
+}
+
+#[test]
+fn completed_experiment_trial_replay_survives_durable_host_restart() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-policy-lab-restart-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let matrix = ExperimentMatrixRequestDto {
+        id: "restart-policy-lab".to_string(),
+        scenario_ids: vec!["hexing-bolt-hit".to_string()],
+        policies: vec![CombatAutomationPolicyDto {
+            id: "firstAcceptedCandidate".to_string(),
+            version: 1,
+            no_candidate_behavior: CombatAutomationNoCandidateBehaviorDto::AdvanceTurn,
+        }],
+        seeds: vec![7],
+        max_steps: 8,
+    };
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/experiments",
+                &matrix,
+            ))
+            .status,
+        200
+    );
+    let completed = router.handle(&request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/experiments/restart-policy-lab/advance",
+    ));
+    let completed: ExperimentReadoutDto =
+        serde_json::from_slice(&completed.body).expect("completed trial is JSON");
+    let replay_id = completed.trials[0].replay_package_id.clone();
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("durable router restarts");
+    let replay = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/{replay_id}"),
+    ));
+    assert_eq!(replay.status, 200);
+    let verified = restarted.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/{replay_id}/verify"),
+    ));
+    let verified: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&verified.body).expect("replay verification is JSON");
+    assert!(verified.accepted);
+
+    fs::remove_dir_all(&directory).expect("durable policy lab directory is removed");
 }
 
 #[test]
@@ -843,6 +1017,34 @@ fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
         .current_reaction_window
         .expect("reaction window is open");
     assert_eq!(opened.current_reactor_id.as_deref(), Some("entity-adept"));
+
+    let stopped = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/automatic-run"),
+        &AutomaticRunRequestDto {
+            id: "reaction-paused-automatic-run".to_string(),
+            title: "Reaction-paused run".to_string(),
+            summary: "Automation must yield to explicit reaction response.".to_string(),
+            max_steps: 8,
+            roll_stream: vec![17, 5],
+            policy: CombatAutomationPolicyDto {
+                id: "firstAcceptedCandidate".to_string(),
+                version: 1,
+                no_candidate_behavior: CombatAutomationNoCandidateBehaviorDto::AdvanceTurn,
+            },
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
+        },
+    ));
+    let stopped: LiveAutomaticRunDto =
+        serde_json::from_slice(&stopped.body).expect("reaction stop is JSON");
+    assert!(stopped.accepted);
+    assert_eq!(stopped.decision_kind, "stoppedReactionWindow");
+    assert_eq!(stopped.executed_step_count, 1);
+    assert_eq!(
+        stopped.final_snapshot.state_fingerprint,
+        submitted.snapshot.state_fingerprint
+    );
 
     let pass = ReactionCommandSpecDto {
         window_id: opened.id.clone(),

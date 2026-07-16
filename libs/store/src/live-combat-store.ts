@@ -24,6 +24,7 @@ import { browserClock, type ClockPort } from "@asha-rulebench/platform";
 import type {
   RulebenchAutomaticRunSpecDto,
   RulebenchAutomaticStepSpecDto,
+  RulebenchAutomationPolicyCatalogEntryDto,
   RulebenchCombatControlCommandKindDto,
   RulebenchLiveTransportErrorDto,
   RulebenchUseActionIntentDto,
@@ -31,6 +32,10 @@ import type {
   RulebenchScenarioOptionDto,
   RulebenchSessionRecoveryCatalogDto,
   RulebenchContentPackReferenceDto,
+  RulebenchExperimentComparisonReadoutDto,
+  RulebenchExperimentComparisonRequestDto,
+  RulebenchExperimentMatrixRequestDto,
+  RulebenchExperimentReadoutDto,
 } from "@asha-rulebench/protocol";
 import {
   createLiveRulebenchTransport,
@@ -75,6 +80,18 @@ export class LiveCombatStore {
   >({ kind: "idle" });
   readonly capabilities: Signal<LiveState<RulebenchCapabilityManifestView>> =
     this._capabilities.asReadonly();
+  private readonly _automationPolicies = signal<
+    LiveState<readonly RulebenchAutomationPolicyCatalogEntryDto[]>
+  >({ kind: "idle" });
+  readonly automationPolicies = this._automationPolicies.asReadonly();
+  private readonly _experiments = signal<
+    LiveState<readonly RulebenchExperimentReadoutDto[]>
+  >({ kind: "idle" });
+  readonly experiments = this._experiments.asReadonly();
+  private readonly _experimentComparison = signal<
+    LiveState<RulebenchExperimentComparisonReadoutDto>
+  >({ kind: "idle" });
+  readonly experimentComparison = this._experimentComparison.asReadonly();
   private readonly _sessions = signal<
     LiveState<readonly RulebenchLiveSessionView[]>
   >({ kind: "idle" });
@@ -187,6 +204,81 @@ export class LiveCombatStore {
     this._capabilities.set(
       result.ok
         ? { kind: "data", value: projectCapabilityManifest(result.value) }
+        : { kind: "error", error: result.error },
+    );
+    this.clock.now();
+  }
+
+  async loadAutomationPolicies(): Promise<void> {
+    const generation = this.lifecycleGeneration;
+    this._automationPolicies.set({ kind: "loading" });
+    const result = await this.transport.listAutomationPolicies();
+    if (generation !== this.lifecycleGeneration) return;
+    this._automationPolicies.set(
+      result.ok
+        ? { kind: "data", value: result.value }
+        : { kind: "error", error: result.error },
+    );
+    this.clock.now();
+  }
+
+  async loadExperiments(): Promise<void> {
+    const generation = this.lifecycleGeneration;
+    this._experiments.set({ kind: "loading" });
+    const result = await this.transport.listExperiments();
+    if (generation !== this.lifecycleGeneration) return;
+    this._experiments.set(
+      result.ok
+        ? { kind: "data", value: result.value }
+        : { kind: "error", error: result.error },
+    );
+    this.clock.now();
+  }
+
+  async createExperiment(matrix: RulebenchExperimentMatrixRequestDto): Promise<void> {
+    this._experiments.set({ kind: "loading" });
+    const result = await this.transport.createExperiment(matrix);
+    if (result.ok) {
+      await this.loadExperiments();
+    } else {
+      this._experiments.set({ kind: "error", error: result.error });
+      this.clock.now();
+    }
+  }
+
+  async advanceExperiment(experimentId: string): Promise<void> {
+    this._experiments.set({ kind: "loading" });
+    const result = await this.transport.advanceExperiment(experimentId);
+    if (result.ok) {
+      await this.loadExperiments();
+      if (result.value.trials.length > 0) {
+        await (this.replayStore?.loadPackages() ?? Promise.resolve());
+      }
+    } else {
+      this._experiments.set({ kind: "error", error: result.error });
+      this.clock.now();
+    }
+  }
+
+  async cancelExperiment(experimentId: string): Promise<void> {
+    this._experiments.set({ kind: "loading" });
+    const result = await this.transport.cancelExperiment(experimentId);
+    if (result.ok) {
+      await this.loadExperiments();
+    } else {
+      this._experiments.set({ kind: "error", error: result.error });
+      this.clock.now();
+    }
+  }
+
+  async compareExperimentTrials(
+    comparison: RulebenchExperimentComparisonRequestDto,
+  ): Promise<void> {
+    this._experimentComparison.set({ kind: "loading" });
+    const result = await this.transport.compareExperimentTrials(comparison);
+    this._experimentComparison.set(
+      result.ok
+        ? { kind: "data", value: result.value }
         : { kind: "error", error: result.error },
     );
     this.clock.now();
@@ -593,6 +685,9 @@ export class LiveCombatStore {
     this.sessionGeneration += 1;
     this._connection.set({ kind: "idle" });
     this._capabilities.set({ kind: "idle" });
+    this._automationPolicies.set({ kind: "idle" });
+    this._experiments.set({ kind: "idle" });
+    this._experimentComparison.set({ kind: "idle" });
     this._scenarios.set({ kind: "idle" });
     this._sessions.set({ kind: "idle" });
     this._recovery.set({ kind: "idle" });

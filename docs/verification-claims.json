@@ -37,7 +37,7 @@
     },
     {
       "file": "README.md",
-      "text": "2 compiled providers, 2 ruleset identities, 4 registered packages, 11 scenario cases, 1 automation policy"
+      "text": "2 compiled providers, 2 ruleset identities, 4 registered packages, 11 scenario cases, 3 automation policies"
     },
     {
       "file": "docs/replay-archive-identity.md",

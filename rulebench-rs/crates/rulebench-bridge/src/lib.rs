@@ -8,6 +8,7 @@
 
 mod content_invocation;
 mod error;
+mod experiment;
 mod invocation;
 
 pub use content_invocation::{import_authored_content, ContentInvocationError};

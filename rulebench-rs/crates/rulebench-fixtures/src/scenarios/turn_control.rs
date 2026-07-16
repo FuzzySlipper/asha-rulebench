@@ -175,40 +175,57 @@ pub fn script_readouts() -> Vec<CombatSessionScriptReadout> {
 }
 
 pub fn automatic_run_readouts() -> Vec<CombatSessionAutomaticRunReadout> {
-    vec![automatic_run_readout()]
+    vec![
+        automatic_run_readout(
+            AUTOMATIC_RUN_ID,
+            CombatAutomationPolicySpec::first_accepted_candidate(),
+        ),
+        automatic_run_readout(
+            "objective-turn-control-lowest-vitality-run",
+            CombatAutomationPolicySpec::lowest_vitality_target(),
+        ),
+        automatic_run_readout(
+            "objective-turn-control-objective-pressure-run",
+            CombatAutomationPolicySpec::objective_side_pressure(),
+        ),
+    ]
 }
 
 pub fn automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayReadout> {
-    let run = automatic_run_readout();
-    let spec = CombatSessionAutomaticRunSpec::new(
-        run.id.clone(),
-        run.title.clone(),
-        run.summary.clone(),
-        run.max_steps,
-        vec![5, 4],
-    );
-    vec![verify_automatic_run_replay(
-        CombatSessionAutomaticRunReplaySpec::new(
-            AUTOMATIC_REPLAY_ID,
-            "Objective Turn Control Automatic Replay",
-            "Replay verification for the second compiled provider's automatic path.",
-            "objective-turn-control-automatic-replay-session",
-            scenario(),
-            spec,
-            run.final_snapshot.current_state_fingerprint,
-            run.final_snapshot.finalization,
-            run.decision_kind,
-            run.executed_step_count,
-            run.policy_decisions,
-            run.final_snapshot.action_resource_transition_log,
-            run.final_snapshot.equipment_ledger,
-            run.final_snapshot.class_build_ledger,
-            run.final_snapshot.equipment_transition_log,
-            run.final_snapshot.reaction_window_lifecycle_log,
-            run.final_snapshot.reaction_audit_log,
-            run.final_snapshot.modifier_duration_expiration_log,
-        ),
-    )]
+    automatic_run_readouts()
+        .into_iter()
+        .enumerate()
+        .map(|(index, run)| {
+            let spec = CombatSessionAutomaticRunSpec::new(
+                run.id.clone(),
+                run.title.clone(),
+                run.summary.clone(),
+                run.max_steps,
+                vec![5, 4],
+            )
+            .with_policy(run.policy.clone());
+            verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+                format!("{AUTOMATIC_REPLAY_ID}-{index}"),
+                "Objective Turn Control Automatic Replay",
+                "Replay verification for the second compiled provider's automatic path.",
+                "objective-turn-control-automatic-replay-session",
+                scenario(),
+                spec,
+                run.final_snapshot.current_state_fingerprint,
+                run.final_snapshot.finalization,
+                run.decision_kind,
+                run.executed_step_count,
+                run.policy_decisions,
+                run.final_snapshot.action_resource_transition_log,
+                run.final_snapshot.equipment_ledger,
+                run.final_snapshot.class_build_ledger,
+                run.final_snapshot.equipment_transition_log,
+                run.final_snapshot.reaction_window_lifecycle_log,
+                run.final_snapshot.reaction_audit_log,
+                run.final_snapshot.modifier_duration_expiration_log,
+            ))
+        })
+        .collect()
 }
 
 pub fn accepted_receipt() -> RulebenchReceipt {
@@ -424,15 +441,21 @@ fn intent() -> UseActionIntent {
     UseActionIntent::new("entity-warden", "binding_glyph", "entity-saboteur")
 }
 
-fn automatic_run_readout() -> CombatSessionAutomaticRunReadout {
-    let mut state = CombatSessionState::new(AUTOMATIC_RUN_ID, scenario());
-    state.run_automatic_combat(CombatSessionAutomaticRunSpec::new(
-        AUTOMATIC_RUN_ID,
-        "Objective Turn Control Automatic Run",
-        "The generic policy executes the second provider's first accepted command.",
-        4,
-        vec![5, 4],
-    ))
+fn automatic_run_readout(
+    run_id: &str,
+    policy: CombatAutomationPolicySpec,
+) -> CombatSessionAutomaticRunReadout {
+    let mut state = CombatSessionState::new(run_id, scenario());
+    state.run_automatic_combat(
+        CombatSessionAutomaticRunSpec::new(
+            run_id,
+            "Objective Turn Control Automatic Run",
+            "The generic policy executes the second provider's first accepted command.",
+            16,
+            vec![5, 4],
+        )
+        .with_policy(policy),
+    )
 }
 
 fn evidence(id: &str, kind: ScenarioPackageEvidenceKind) -> ScenarioPackageEvidenceExpectation {

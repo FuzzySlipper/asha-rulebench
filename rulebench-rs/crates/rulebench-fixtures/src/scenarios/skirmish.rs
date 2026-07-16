@@ -395,6 +395,12 @@ fn vitality_operations_conformance_scenario() -> RulebenchScenario {
         .expect("raider exists");
     target.hit_points.current = 16;
     target.temporary_vitality = 4;
+    let alternate_target = scenario
+        .combatants
+        .iter_mut()
+        .find(|combatant| combatant.id == "entity-bruiser")
+        .expect("bruiser exists");
+    alternate_target.hit_points.current = 12;
     let action = scenario
         .actions
         .iter_mut()

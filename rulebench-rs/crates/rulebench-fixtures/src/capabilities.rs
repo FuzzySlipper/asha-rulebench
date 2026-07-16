@@ -97,5 +97,11 @@ mod tests {
         assert!(input
             .regression_capability_ids
             .contains(&"policy.firstAcceptedCandidate".to_string()));
+        assert!(input
+            .regression_capability_ids
+            .contains(&"policy.lowestVitalityTarget".to_string()));
+        assert!(input
+            .regression_capability_ids
+            .contains(&"policy.objectiveSidePressure".to_string()));
     }
 }

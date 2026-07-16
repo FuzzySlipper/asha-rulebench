@@ -19,7 +19,8 @@ use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
     ContentImportRequestDto, ContentPayloadRequestDto, ContentReferenceRequestDto,
-    LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
+    ExperimentComparisonRequestDto, ExperimentMatrixRequestDto, LiveAutomaticRunDto,
+    LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
     LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
     LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
     ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, SessionRecoveryCatalogDto,
@@ -321,6 +322,35 @@ impl ProcessHostRouter {
         match (request.method, segments.as_slice()) {
             (HttpMethod::Get, ["handshake"]) => bridge_result(self.bridge.handshake(&context)),
             (HttpMethod::Get, ["capabilities"]) => json_ok(&self.capability_manifest),
+            (HttpMethod::Get, ["automation-policies"]) => {
+                bridge_result(self.bridge.automation_policy_catalog(&context))
+            }
+            (HttpMethod::Get, ["experiments"]) => {
+                bridge_result(self.bridge.list_experiments(&context))
+            }
+            (HttpMethod::Post, ["experiments"]) => {
+                let matrix = match decode_body::<ExperimentMatrixRequestDto>(request) {
+                    Ok(matrix) => matrix,
+                    Err(response) => return response,
+                };
+                bridge_result(self.bridge.create_experiment(&context, &matrix))
+            }
+            (HttpMethod::Post, ["experiments", "compare"]) => {
+                let comparison = match decode_body::<ExperimentComparisonRequestDto>(request) {
+                    Ok(comparison) => comparison,
+                    Err(response) => return response,
+                };
+                bridge_result(self.bridge.compare_experiment_trials(&context, &comparison))
+            }
+            (HttpMethod::Get, ["experiments", experiment_id]) => {
+                bridge_result(self.bridge.get_experiment(&context, experiment_id))
+            }
+            (HttpMethod::Post, ["experiments", experiment_id, "advance"]) => {
+                bridge_result(self.bridge.advance_experiment(&context, experiment_id))
+            }
+            (HttpMethod::Post, ["experiments", experiment_id, "cancel"]) => {
+                bridge_result(self.bridge.cancel_experiment(&context, experiment_id))
+            }
             (HttpMethod::Get, ["viewer", "scenarios"]) => {
                 bridge_result(self.bridge.list_viewer_scenarios(&context))
             }

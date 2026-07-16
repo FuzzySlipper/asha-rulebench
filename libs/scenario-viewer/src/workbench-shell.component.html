@@ -1396,11 +1396,23 @@
     class="automation-config"
     aria-label="Automatic run configuration fields"
   >
-    <p><strong>firstAcceptedCandidate v1</strong></p>
-    <p>
-      Rust selects deterministic operations from accepted candidates. This is
-      not AI.
-    </p>
+    @switch (automationPolicies().kind) {
+      @case ("data") {
+        <label>
+          Rust policy
+          <select #policy [value]="selectedAutomationPolicy()?.id ?? 'firstAcceptedCandidate'" (change)="selectedAutomationPolicyId.set(policy.value)">
+            @for (registration of automationPolicies().value; track registration.id) {
+              <option [value]="registration.id">{{ registration.title }} · v{{ registration.version }}</option>
+            }
+          </select>
+        </label>
+        <p>{{ selectedAutomationPolicy()?.summary }}</p>
+      }
+      @case ("loading") { <p>Loading Rust policy catalog…</p> }
+      @case ("error") { <p role="alert">{{ automationPolicies().error.message }}</p> }
+      @default { <p>Open this configuration to load the Rust policy catalog.</p> }
+    }
+    <p>Rust selects deterministic operations from accepted candidates. This is not AI.</p>
     <fieldset>
       <legend>No candidate behavior</legend>
       <label

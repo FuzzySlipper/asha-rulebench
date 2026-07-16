@@ -1012,7 +1012,7 @@ fn session_runtime_auto_candidate_plan_selects_first_accepted_candidate_read_onl
     assert_eq!(plan.unavailable_reason, None);
     assert_eq!(
         plan.reason,
-        "First accepted command candidate planned for deterministic auto submission."
+        "Policy firstAcceptedCandidate selected candidate 0 with deterministic score 0."
     );
 
     let selection = plan
@@ -1534,6 +1534,110 @@ fn session_runtime_automatic_policy_is_deterministic_and_rejects_unsupported_inp
     assert_eq!(
         rejected_version.policy_validation.code,
         CombatAutomationPolicyValidationCode::UnsupportedPolicyVersion
+    );
+}
+
+#[test]
+fn lowest_vitality_policy_selects_the_weakest_accepted_target_with_stable_evidence() {
+    let mut scenario = hexing_bolt_fixture_scenario();
+    let mut weaker_entity = scenario.entities[1].clone();
+    weaker_entity.id = "entity-weakened-raider".to_string();
+    weaker_entity.name = "Weakened Raider".to_string();
+    scenario.entities.push(weaker_entity);
+
+    let mut weaker_target = scenario.combatants[1].clone();
+    weaker_target.id = "entity-weakened-raider".to_string();
+    weaker_target.entity_id = "entity-weakened-raider".to_string();
+    weaker_target.name = "Weakened Raider".to_string();
+    weaker_target.position = GridPosition { x: 2, y: 2 };
+    weaker_target.initiative = 1;
+    weaker_target.hit_points.current = 3;
+    scenario.combatants.push(weaker_target);
+
+    for action in scenario.actions.iter_mut().filter(|action| {
+        action.actor_id == "entity-adept" && !action.targeting.target_ids.is_empty()
+    }) {
+        action
+            .targeting
+            .target_ids
+            .push("entity-weakened-raider".to_string());
+        action
+            .targeting
+            .visible_target_ids
+            .push("entity-weakened-raider".to_string());
+    }
+
+    let session = CombatSessionState::new("policy-lowest-vitality", scenario);
+    let before = session.snapshot();
+    let plan = session.plan_auto_candidate_command(
+        CombatSessionAutoCandidateCommandSpec::new(
+            "policy-lowest-vitality-step",
+            "Choose weakest target",
+            "Rust ranks all accepted candidates by target vitality.",
+            vec![17, 5],
+        )
+        .with_policy(CombatAutomationPolicySpec::lowest_vitality_target()),
+    );
+
+    assert!(plan.accepted);
+    assert_eq!(plan.selected_candidate_index, Some(1));
+    assert_eq!(
+        plan.selected_target_id.as_deref(),
+        Some("entity-weakened-raider")
+    );
+    assert_eq!(plan.candidate_order[0].target_current_hit_points, 18);
+    assert_eq!(plan.candidate_order[1].target_current_hit_points, 3);
+    assert!(plan.candidate_order[1].policy_score < plan.candidate_order[0].policy_score);
+    assert_eq!(plan.candidate_order[1].target_side_id, "enemy");
+    assert_eq!(session.snapshot(), before);
+}
+
+#[test]
+fn objective_side_policy_rejects_incompatible_rulesets_before_mutation() {
+    let hexing = CombatSessionState::new("policy-objective-hexing", hexing_bolt_fixture_scenario());
+    let before = hexing.snapshot();
+    let rejected = hexing.plan_automatic_step(
+        CombatSessionAutomaticStepSpec::new(
+            "policy-objective-rejected",
+            "Reject missing objective",
+            "The policy requires an objective-side ruleset declaration.",
+            vec![17, 5],
+        )
+        .with_policy(CombatAutomationPolicySpec::objective_side_pressure()),
+    );
+
+    assert_eq!(
+        rejected.decision_kind,
+        CombatSessionAutomaticStepDecisionKind::RejectedByPolicy
+    );
+    assert_eq!(
+        rejected.policy_validation.code,
+        CombatAutomationPolicyValidationCode::IncompatibleRulesetCapability
+    );
+    assert_eq!(hexing.snapshot(), before);
+
+    let turn_control = CombatSessionState::new(
+        "policy-objective-turn-control",
+        turn_control_fixture_scenario(),
+    );
+    let accepted = turn_control.plan_automatic_step(
+        CombatSessionAutomaticStepSpec::new(
+            "policy-objective-accepted",
+            "Use declared objective",
+            "The turn-control ruleset declares an objective side.",
+            vec![17, 5],
+        )
+        .with_policy(CombatAutomationPolicySpec::objective_side_pressure()),
+    );
+
+    assert!(accepted.accepted);
+    assert_eq!(
+        accepted.policy_validation.code,
+        CombatAutomationPolicyValidationCode::Accepted
+    );
+    assert_eq!(
+        accepted.policy_decision.policy.id,
+        OBJECTIVE_SIDE_PRESSURE_POLICY_ID
     );
 }
 

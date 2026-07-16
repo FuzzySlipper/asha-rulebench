@@ -31,9 +31,12 @@ pub use rulebench_combat::model::*;
 pub use rulebench_combat::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
     evaluate_effective_stats_for_combatant, fingerprint_projected_state, fingerprint_projection,
-    resolve_use_action, validate_combat_automation_policy, validate_intent_shape,
+    resolve_use_action, validate_combat_automation_policy,
+    validate_combat_automation_policy_for_context, validate_intent_shape,
     CombatAutomationCandidateEvidence, CombatAutomationNoCandidateBehavior,
-    CombatAutomationPolicyDecisionEvidence, CombatAutomationPolicySpec,
+    CombatAutomationPolicyContext, CombatAutomationPolicyDecisionEvidence,
+    CombatAutomationPolicyRegistration, CombatAutomationPolicyRequirement,
+    CombatAutomationPolicySelector, CombatAutomationPolicySpec,
     CombatAutomationPolicyValidationCode, CombatAutomationPolicyValidationReadout,
     CombatSessionApi, CombatSessionApiError, CombatSessionArchive,
     CombatSessionAutoCandidateCommandSpec, CombatSessionAutoCandidateDecisionKind,
@@ -49,8 +52,11 @@ pub use rulebench_combat::{
     CombatSessionScriptCommandSpec, CombatSessionScriptDecisionKind, CombatSessionScriptReadout,
     CombatSessionScriptSpec, CombatSessionScriptStepReadout, CombatSessionScriptStepSpec,
     CombatSessionState, CombatState, EffectiveStatEvaluationError,
-    FIRST_ACCEPTED_CANDIDATE_POLICY_ID, FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION,
-    PROJECTION_FINGERPRINT_ALGORITHM, STATE_FINGERPRINT_ALGORITHM,
+    COMBAT_AUTOMATION_POLICY_REGISTRY, FIRST_ACCEPTED_CANDIDATE_POLICY_ID,
+    FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION, LOWEST_VITALITY_TARGET_POLICY_ID,
+    LOWEST_VITALITY_TARGET_POLICY_VERSION, OBJECTIVE_SIDE_PRESSURE_POLICY_ID,
+    OBJECTIVE_SIDE_PRESSURE_POLICY_VERSION, PROJECTION_FINGERPRINT_ALGORITHM,
+    STATE_FINGERPRINT_ALGORITHM,
 };
 pub use rulebench_content::{
     canonicalize_content_pack, compare_content_packs, fingerprint_content_pack_set,
