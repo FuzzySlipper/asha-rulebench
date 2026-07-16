@@ -2,7 +2,7 @@
 
 ASHA Rulebench is an Angular/Nx workbench for experimenting with RPG-shaped gameplay rules on top of ASHA/ECRP architecture.
 
-It is not trying to become a full game. It is a place to author, run, inspect, and regression-test rules and scenario fixtures while the underlying authority model stays clean enough to promote useful pieces upstream.
+It is not trying to become a full game. It is a place to author, run, inspect, and test rules and scenarios while the underlying authority model stays clean enough to be useful in downstream games.
 
 The name is intentional: this is a bench for rules, not an RPG product shell.
 
