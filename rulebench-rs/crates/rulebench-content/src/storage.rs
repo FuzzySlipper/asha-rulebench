@@ -10,8 +10,9 @@ use crate::{
 mod codec;
 
 use codec::{
-    decode_activation_index, decode_record, encode_activation_index, encode_record,
-    fingerprint_payload, record_file_stem,
+    decode_activation_index, decode_record, decode_replacement_transaction,
+    encode_activation_index, encode_record, encode_replacement_transaction, fingerprint_payload,
+    record_file_stem,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +91,14 @@ pub struct ContentPackStorage {
     definition_index: BTreeMap<(ContentDefinitionKind, String), Vec<ContentPackReference>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ContentReplacementTransaction {
+    replacement: ContentPackReference,
+    replaced: Vec<ContentPackReference>,
+    previous_active: BTreeSet<ContentPackReference>,
+    next_active: BTreeSet<ContentPackReference>,
+}
+
 impl ContentPackStorage {
     pub fn open(root: impl Into<PathBuf>) -> Result<Self, ContentStorageError> {
         let root = root.into();
@@ -97,6 +106,7 @@ impl ContentPackStorage {
             operation: "createStorageDirectory",
             path: root.clone(),
         })?;
+        recover_interrupted_replacement(&root)?;
 
         let mut records = BTreeMap::new();
         let entries = fs::read_dir(&root).map_err(|_| ContentStorageError::Io {
@@ -167,6 +177,7 @@ impl ContentPackStorage {
             operation: "createStorageDirectory",
             path: root.clone(),
         })?;
+        let replacement_recovery_issue = recover_interrupted_replacement(&root)?;
         let entries = fs::read_dir(&root).map_err(|_| ContentStorageError::Io {
             operation: "readStorageDirectory",
             path: root.clone(),
@@ -176,15 +187,18 @@ impl ContentPackStorage {
             .map(|entry| entry.path())
             .collect::<Vec<_>>();
         paths.sort();
-        let mut issues = paths
-            .iter()
-            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("tmp"))
-            .map(|path| ContentStorageStartupIssue {
-                code: "partialContentCommitQuarantined".to_string(),
-                path: path.clone(),
-                reason: "An uncommitted content temporary file was ignored.".to_string(),
-            })
-            .collect::<Vec<_>>();
+        let mut issues = replacement_recovery_issue.into_iter().collect::<Vec<_>>();
+        issues.extend(
+            paths
+                .iter()
+                .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("tmp"))
+                .map(|path| ContentStorageStartupIssue {
+                    code: "partialContentCommitQuarantined".to_string(),
+                    path: path.clone(),
+                    reason: "An uncommitted content temporary file was ignored.".to_string(),
+                })
+                .collect::<Vec<_>>(),
+        );
         let record_paths = paths
             .into_iter()
             .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("record"))
@@ -317,30 +331,49 @@ impl ContentPackStorage {
         }
 
         let record = record_from_pack(&imported.pack, authored_payload);
-        let staged_replacements = stage_replacements(&self.root, &same_identity)?;
+        let mut next_active = self.active.clone();
+        for replaced in &same_identity {
+            next_active.remove(replaced);
+        }
+        let transaction = ContentReplacementTransaction {
+            replacement: record.reference.clone(),
+            replaced: same_identity.clone(),
+            previous_active: self.active.clone(),
+            next_active: next_active.clone(),
+        };
+        if !same_identity.is_empty() {
+            write_replacement_transaction(&self.root, &transaction)?;
+        }
+        let staged_replacements = match stage_replacements(&self.root, &same_identity) {
+            Ok(staged_replacements) => staged_replacements,
+            Err(error) => {
+                remove_replacement_transaction(&self.root);
+                return Err(error);
+            }
+        };
         if let Err(error) = write_record(&self.root, &record, authored_payload) {
             discard_staged_replacements(&staged_replacements);
+            remove_replacement_transaction(&self.root);
             return Err(error);
         }
         if let Err(error) = remove_staged_originals(&staged_replacements) {
             remove_committed_files(&self.root, &record.reference);
             restore_staged_replacements(&staged_replacements);
             discard_staged_replacements(&staged_replacements);
+            remove_replacement_transaction(&self.root);
             return Err(error);
         }
-        let mut next_active = self.active.clone();
-        for replaced in &same_identity {
-            next_active.remove(replaced);
-        }
-        if next_active != self.active {
+        if !same_identity.is_empty() {
             if let Err(error) = write_activation_index(&self.root, &next_active) {
                 remove_committed_files(&self.root, &record.reference);
                 restore_staged_replacements(&staged_replacements);
                 discard_staged_replacements(&staged_replacements);
+                remove_replacement_transaction(&self.root);
                 return Err(error);
             }
         }
         discard_staged_replacements(&staged_replacements);
+        remove_replacement_transaction(&self.root);
         for replaced in same_identity {
             self.records.remove(&replaced);
         }
@@ -523,6 +556,122 @@ fn activation_index_path(root: &Path) -> PathBuf {
     root.join("activation.index")
 }
 
+fn replacement_transaction_path(root: &Path) -> PathBuf {
+    root.join("content-replacement.transaction")
+}
+
+fn write_replacement_transaction(
+    root: &Path,
+    transaction: &ContentReplacementTransaction,
+) -> Result<(), ContentStorageError> {
+    let path = replacement_transaction_path(root);
+    let temporary = root.join("content-replacement.transaction.tmp");
+    fs::write(&temporary, encode_replacement_transaction(transaction)).map_err(|_| {
+        ContentStorageError::Io {
+            operation: "writeContentReplacementTransaction",
+            path: temporary.clone(),
+        }
+    })?;
+    fs::rename(&temporary, &path).map_err(|_| {
+        let _ = fs::remove_file(&temporary);
+        ContentStorageError::Io {
+            operation: "commitContentReplacementTransaction",
+            path,
+        }
+    })
+}
+
+fn remove_replacement_transaction(root: &Path) {
+    let _ = fs::remove_file(replacement_transaction_path(root));
+}
+
+fn recover_interrupted_replacement(
+    root: &Path,
+) -> Result<Option<ContentStorageStartupIssue>, ContentStorageError> {
+    let path = replacement_transaction_path(root);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(&path).map_err(|_| ContentStorageError::Io {
+        operation: "readContentReplacementTransaction",
+        path: path.clone(),
+    })?;
+    let transaction = decode_replacement_transaction(&bytes).map_err(|reason| {
+        ContentStorageError::CorruptRecord {
+            path: path.clone(),
+            reason,
+        }
+    })?;
+    let replacements = replacement_paths(root, &transaction.replaced);
+    let current_active = read_activation_index(root)?;
+    let replacement_complete = replacement_is_complete(root, &transaction.replacement);
+    let originals_absent = replacements.iter().all(|replacement| {
+        replacement
+            .original_paths
+            .iter()
+            .all(|original| !original.exists())
+    });
+    let committed =
+        replacement_complete && originals_absent && current_active == transaction.next_active;
+
+    let (code, reason) = if committed {
+        discard_staged_replacements(&replacements);
+        remove_replacement_transaction(root);
+        (
+            "interruptedContentReplacementCompleted",
+            "A committed content replacement was completed during startup.",
+        )
+    } else {
+        remove_committed_files(root, &transaction.replacement);
+        restore_staged_replacements(&replacements);
+        let missing_original = replacements.iter().find_map(|replacement| {
+            replacement
+                .original_paths
+                .iter()
+                .find(|original| !original.exists())
+        });
+        if let Some(missing_original) = missing_original {
+            return Err(ContentStorageError::CorruptRecord {
+                path,
+                reason: format!(
+                    "interrupted replacement cannot restore missing artifact {}",
+                    missing_original.display()
+                ),
+            });
+        }
+        write_activation_index(root, &transaction.previous_active)?;
+        discard_staged_replacements(&replacements);
+        remove_replacement_transaction(root);
+        (
+            "interruptedContentReplacementRolledBack",
+            "An uncommitted content replacement was rolled back during startup.",
+        )
+    };
+    Ok(Some(ContentStorageStartupIssue {
+        code: code.to_string(),
+        path,
+        reason: reason.to_string(),
+    }))
+}
+
+fn replacement_is_complete(root: &Path, reference: &ContentPackReference) -> bool {
+    let stem = record_file_stem(reference);
+    let record_path = root.join(format!("{stem}.record"));
+    let Ok(bytes) = fs::read(record_path) else {
+        return false;
+    };
+    let Ok(record) = decode_record(&bytes) else {
+        return false;
+    };
+    if record.reference != *reference {
+        return false;
+    }
+    let Ok(payload) = read_payload(root, &record) else {
+        return false;
+    };
+    validate_payload(&record, &payload).is_ok()
+}
+
 fn read_activation_index(
     root: &Path,
 ) -> Result<BTreeSet<ContentPackReference>, ContentStorageError> {
@@ -570,23 +719,9 @@ fn stage_replacements(
     references: &[ContentPackReference],
 ) -> Result<Vec<StagedContentReplacement>, ContentStorageError> {
     let mut staged = Vec::new();
-    for reference in references {
-        let stem = record_file_stem(reference);
-        let original_paths = ["record", "payload"]
-            .into_iter()
-            .map(|extension| root.join(format!("{stem}.{extension}")))
-            .collect::<Vec<_>>();
-        let backup_paths = original_paths
-            .iter()
-            .map(|path| {
-                path.with_extension(format!(
-                    "{}.replace-backup.tmp",
-                    path.extension()
-                        .and_then(|value| value.to_str())
-                        .unwrap_or("artifact")
-                ))
-            })
-            .collect::<Vec<_>>();
+    for replacement in replacement_paths(root, references) {
+        let original_paths = replacement.original_paths;
+        let backup_paths = replacement.backup_paths;
         for (original, backup) in original_paths.iter().zip(&backup_paths) {
             if fs::copy(original, backup).is_err() {
                 for copied in &backup_paths {
@@ -605,6 +740,37 @@ fn stage_replacements(
         });
     }
     Ok(staged)
+}
+
+fn replacement_paths(
+    root: &Path,
+    references: &[ContentPackReference],
+) -> Vec<StagedContentReplacement> {
+    references
+        .iter()
+        .map(|reference| {
+            let stem = record_file_stem(reference);
+            let original_paths = ["record", "payload"]
+                .into_iter()
+                .map(|extension| root.join(format!("{stem}.{extension}")))
+                .collect::<Vec<_>>();
+            let backup_paths = original_paths
+                .iter()
+                .map(|path| {
+                    path.with_extension(format!(
+                        "{}.replace-backup.tmp",
+                        path.extension()
+                            .and_then(|value| value.to_str())
+                            .unwrap_or("artifact")
+                    ))
+                })
+                .collect::<Vec<_>>();
+            StagedContentReplacement {
+                original_paths,
+                backup_paths,
+            }
+        })
+        .collect()
 }
 
 fn restore_staged_replacements(replacements: &[StagedContentReplacement]) {

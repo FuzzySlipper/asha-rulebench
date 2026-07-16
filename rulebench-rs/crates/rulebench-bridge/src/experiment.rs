@@ -10,7 +10,8 @@ use rulebench_protocol::{
 };
 use rulebench_rules::{
     record_replay_package, verify_replay_package, CombatSessionAutomaticStepSpec,
-    CombatSessionState, HitEffectOperation, COMBAT_AUTOMATION_POLICY_REGISTRY,
+    CombatSessionState, HitEffectOperation, ReplayArchiveError, ReplayPackage,
+    COMBAT_AUTOMATION_POLICY_REGISTRY,
 };
 
 use crate::{BridgeError, BridgeErrorKind, RulebenchBridge};
@@ -356,174 +357,210 @@ impl RulebenchBridge {
                 content_pack: None,
             },
         )?;
-        let run = self.automatic_run(
-            context,
-            &CombatSessionHandleDto {
-                id: session_id.clone(),
-            },
-            &AutomaticRunRequestDto {
-                id: format!("{trial_id}-automatic-run"),
-                title: format!("Experiment trial {index}"),
-                summary: "Bounded deterministic policy laboratory trial.".to_string(),
-                max_steps: record.max_steps,
-                roll_stream: Vec::new(),
-                policy: planned.policy.clone(),
-                roll_mode: CommandRollModeDto::AuthorityGenerated,
-                generated_seed: Some(planned.seed),
-            },
-        )?;
-        let session_handle = CombatSessionHandleDto {
-            id: session_id.clone(),
-        };
-        if run.final_snapshot.finalization.is_none() {
-            self.submit_control(
+        let result = (|| {
+            let run = self.automatic_run(
                 context,
-                &session_handle,
-                &CombatControlCommandDto {
-                    kind: CombatControlCommandKindDto::ExplicitEnd,
+                &CombatSessionHandleDto {
+                    id: session_id.clone(),
+                },
+                &AutomaticRunRequestDto {
+                    id: format!("{trial_id}-automatic-run"),
+                    title: format!("Experiment trial {index}"),
+                    summary: "Bounded deterministic policy laboratory trial.".to_string(),
+                    max_steps: record.max_steps,
+                    roll_stream: Vec::new(),
+                    policy: planned.policy.clone(),
+                    roll_mode: CommandRollModeDto::AuthorityGenerated,
+                    generated_seed: Some(planned.seed),
                 },
             )?;
-        }
-        let final_snapshot = self.get_session(context, &session_handle)?;
+            let session_handle = CombatSessionHandleDto {
+                id: session_id.clone(),
+            };
+            if run.final_snapshot.finalization.is_none() {
+                self.submit_control(
+                    context,
+                    &session_handle,
+                    &CombatControlCommandDto {
+                        kind: CombatControlCommandKindDto::ExplicitEnd,
+                    },
+                )?;
+            }
+            let final_snapshot = self.get_session(context, &session_handle)?;
 
-        let recording = self.recordings.get(&session_id).cloned().ok_or_else(|| {
-            BridgeError::new(
-                BridgeErrorKind::InvalidRequest,
-                "Experiment session recording does not exist.",
-            )
-        })?;
-        let ruleset = recording
-            .initial_session
-            .scenario
-            .selected_ruleset()
-            .ok_or_else(|| {
+            let recording = self.recordings.get(&session_id).cloned().ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    "Experiment session recording does not exist.",
+                )
+            })?;
+            let ruleset = recording
+                .initial_session
+                .scenario
+                .selected_ruleset()
+                .ok_or_else(|| {
+                    BridgeError::new(
+                        BridgeErrorKind::InvalidScenario,
+                        "Experiment scenario ruleset does not exist.",
+                    )
+                })?
+                .artifact_provenance();
+            let replay_package_id = format!("experiment-{trial_id}");
+            let package = record_replay_package(
+                &replay_package_id,
+                recording.initial_session.clone(),
+                ruleset,
+                recording.commands.clone(),
+            );
+            let verification = verify_replay_package(&package);
+            self.save_experiment_replay(package, &record.id)?;
+
+            let scenario = self.scenarios.get(&planned.scenario_id).ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::UnknownScenario,
+                    "Experiment scenario disappeared.",
+                )
+            })?;
+            let selected_ruleset = scenario.scenario.selected_ruleset().ok_or_else(|| {
                 BridgeError::new(
                     BridgeErrorKind::InvalidScenario,
-                    "Experiment scenario ruleset does not exist.",
+                    "Experiment ruleset disappeared.",
                 )
-            })?
-            .artifact_provenance();
-        let replay_package_id = format!("experiment-{trial_id}");
-        let package = record_replay_package(
-            &replay_package_id,
-            recording.initial_session.clone(),
-            ruleset,
-            recording.commands.clone(),
-        );
-        let verification = verify_replay_package(&package);
-        self.replays
-            .save(package, format!("experiment:{}", record.id))
-            .map_err(BridgeError::from_replay_error)?;
-        self.recovery
-            .delete(&session_id)
-            .map_err(BridgeError::from_recovery_storage_error)?;
-        self.sessions
-            .close_session(&rulebench_rules::CombatSessionHandle::new(&session_id))
-            .map_err(BridgeError::from_session_error)?;
-        self.recordings.remove(&session_id);
+            })?;
+            let decisions = run
+                .policy_decisions
+                .iter()
+                .enumerate()
+                .map(|(decision_index, decision)| ExperimentDecisionEvidenceDto {
+                    index: decision_index,
+                    state_before_fingerprint: decision.state_before_fingerprint.value.clone(),
+                    operation_kind: decision.operation_kind.map(|kind| kind.code().to_string()),
+                    selected_action_id: decision.selected_action_id.clone(),
+                    selected_target_id: decision.selected_target_id.clone(),
+                    selected_candidate_index: decision.selected_candidate_index,
+                    candidate_count: decision.candidate_count,
+                    accepted_candidate_count: decision.accepted_candidate_count,
+                    reason: decision.reason.clone(),
+                })
+                .collect();
+            let initial_total_hit_points = created
+                .snapshot
+                .current_state
+                .combatants
+                .iter()
+                .map(|combatant| combatant.hit_points.current)
+                .sum::<i32>();
+            let final_total_hit_points = final_snapshot
+                .current_state
+                .combatants
+                .iter()
+                .map(|combatant| combatant.hit_points.current)
+                .sum::<i32>();
+            let accepted_command_count = run
+                .steps
+                .iter()
+                .filter(|step| {
+                    step.auto_candidate
+                        .as_ref()
+                        .and_then(|execution| execution.submitted_step.as_ref())
+                        .is_some_and(|submitted| submitted.receipt.accepted)
+                })
+                .count();
+            let materialized_rolls = run
+                .steps
+                .iter()
+                .filter_map(|step| {
+                    step.auto_candidate
+                        .as_ref()
+                        .and_then(|execution| execution.submitted_step.as_ref())
+                })
+                .flat_map(|submitted| submitted.command.roll_stream.iter().copied())
+                .collect();
+            let trial = ExperimentTrialReadoutDto {
+                id: trial_id,
+                scenario_id: planned.scenario_id.clone(),
+                ruleset_id: selected_ruleset.id.clone(),
+                ruleset_version: selected_ruleset.version.clone(),
+                content_pack_id: scenario.option.content_pack_id.clone(),
+                content_pack_version: scenario.option.content_pack_version.clone(),
+                policy_id: planned.policy.id.clone(),
+                policy_version: planned.policy.version,
+                policy_no_candidate_behavior: match planned.policy.no_candidate_behavior {
+                    rulebench_protocol::CombatAutomationNoCandidateBehaviorDto::AdvanceTurn => {
+                        "advanceTurn".to_string()
+                    }
+                    rulebench_protocol::CombatAutomationNoCandidateBehaviorDto::StopRun => {
+                        "stopRun".to_string()
+                    }
+                },
+                seed: planned.seed,
+                max_steps: record.max_steps,
+                accepted: run.accepted,
+                stop_reason: run.decision_kind.code().to_string(),
+                finalization_outcome: final_snapshot
+                    .finalization
+                    .as_ref()
+                    .map(|finalization| finalization.outcome_kind.code().to_string()),
+                initial_state_fingerprint: created.snapshot.current_state_fingerprint.value,
+                final_state_fingerprint: final_snapshot.current_state_fingerprint.value.clone(),
+                materialized_rolls,
+                decisions,
+                metrics: ExperimentMetricsDto {
+                    executed_step_count: run.executed_step_count,
+                    accepted_command_count,
+                    initial_total_hit_points,
+                    final_total_hit_points,
+                    observed_hit_point_delta: initial_total_hit_points - final_total_hit_points,
+                    audit_entry_count: final_snapshot.audit_log.len(),
+                    combat_log_entry_count: final_snapshot.combat_log.len(),
+                },
+                replay_package_id,
+                replay_verified: verification.accepted,
+            };
+            self.recovery
+                .delete(&session_id)
+                .map_err(BridgeError::from_recovery_storage_error)?;
+            self.sessions
+                .discard_session(&rulebench_rules::CombatSessionHandle::new(&session_id))
+                .map_err(BridgeError::from_session_error)?;
+            self.recordings.remove(&session_id);
+            Ok(trial)
+        })();
+        if result.is_err() {
+            self.cleanup_failed_experiment_trial(&session_id);
+        }
+        result
+    }
 
-        let scenario = self.scenarios.get(&planned.scenario_id).ok_or_else(|| {
-            BridgeError::new(
-                BridgeErrorKind::UnknownScenario,
-                "Experiment scenario disappeared.",
-            )
-        })?;
-        let selected_ruleset = scenario.scenario.selected_ruleset().ok_or_else(|| {
-            BridgeError::new(
-                BridgeErrorKind::InvalidScenario,
-                "Experiment ruleset disappeared.",
-            )
-        })?;
-        let decisions = run
-            .policy_decisions
-            .iter()
-            .enumerate()
-            .map(|(decision_index, decision)| ExperimentDecisionEvidenceDto {
-                index: decision_index,
-                state_before_fingerprint: decision.state_before_fingerprint.value.clone(),
-                operation_kind: decision.operation_kind.map(|kind| kind.code().to_string()),
-                selected_action_id: decision.selected_action_id.clone(),
-                selected_target_id: decision.selected_target_id.clone(),
-                selected_candidate_index: decision.selected_candidate_index,
-                candidate_count: decision.candidate_count,
-                accepted_candidate_count: decision.accepted_candidate_count,
-                reason: decision.reason.clone(),
-            })
-            .collect();
-        let initial_total_hit_points = created
-            .snapshot
-            .current_state
-            .combatants
-            .iter()
-            .map(|combatant| combatant.hit_points.current)
-            .sum::<i32>();
-        let final_total_hit_points = final_snapshot
-            .current_state
-            .combatants
-            .iter()
-            .map(|combatant| combatant.hit_points.current)
-            .sum::<i32>();
-        let accepted_command_count = run
-            .steps
-            .iter()
-            .filter(|step| {
-                step.auto_candidate
-                    .as_ref()
-                    .and_then(|execution| execution.submitted_step.as_ref())
-                    .is_some_and(|submitted| submitted.receipt.accepted)
-            })
-            .count();
-        let materialized_rolls = run
-            .steps
-            .iter()
-            .filter_map(|step| {
-                step.auto_candidate
-                    .as_ref()
-                    .and_then(|execution| execution.submitted_step.as_ref())
-            })
-            .flat_map(|submitted| submitted.command.roll_stream.iter().copied())
-            .collect();
-        Ok(ExperimentTrialReadoutDto {
-            id: trial_id,
-            scenario_id: planned.scenario_id.clone(),
-            ruleset_id: selected_ruleset.id.clone(),
-            ruleset_version: selected_ruleset.version.clone(),
-            content_pack_id: scenario.option.content_pack_id.clone(),
-            content_pack_version: scenario.option.content_pack_version.clone(),
-            policy_id: planned.policy.id.clone(),
-            policy_version: planned.policy.version,
-            policy_no_candidate_behavior: match planned.policy.no_candidate_behavior {
-                rulebench_protocol::CombatAutomationNoCandidateBehaviorDto::AdvanceTurn => {
-                    "advanceTurn".to_string()
-                }
-                rulebench_protocol::CombatAutomationNoCandidateBehaviorDto::StopRun => {
-                    "stopRun".to_string()
-                }
-            },
-            seed: planned.seed,
-            max_steps: record.max_steps,
-            accepted: run.accepted,
-            stop_reason: run.decision_kind.code().to_string(),
-            finalization_outcome: final_snapshot
-                .finalization
-                .as_ref()
-                .map(|finalization| finalization.outcome_kind.code().to_string()),
-            initial_state_fingerprint: created.snapshot.current_state_fingerprint.value,
-            final_state_fingerprint: final_snapshot.current_state_fingerprint.value.clone(),
-            materialized_rolls,
-            decisions,
-            metrics: ExperimentMetricsDto {
-                executed_step_count: run.executed_step_count,
-                accepted_command_count,
-                initial_total_hit_points,
-                final_total_hit_points,
-                observed_hit_point_delta: initial_total_hit_points - final_total_hit_points,
-                audit_entry_count: final_snapshot.audit_log.len(),
-                combat_log_entry_count: final_snapshot.combat_log.len(),
-            },
-            replay_package_id,
-            replay_verified: verification.accepted,
-        })
+    fn save_experiment_replay(
+        &mut self,
+        package: ReplayPackage,
+        experiment_id: &str,
+    ) -> Result<(), BridgeError> {
+        match self.replays.retrieve(&package.id) {
+            Ok(existing) if existing == package => Ok(()),
+            Ok(_) => Err(BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                format!(
+                    "Experiment replay id already contains different evidence: {}.",
+                    package.id
+                ),
+            )),
+            Err(ReplayArchiveError::UnknownPackage { .. }) => self
+                .replays
+                .save(package, format!("experiment:{experiment_id}"))
+                .map(|_| ())
+                .map_err(BridgeError::from_replay_error),
+            Err(error) => Err(BridgeError::from_replay_error(error)),
+        }
+    }
+
+    fn cleanup_failed_experiment_trial(&mut self, session_id: &str) {
+        let _ = self.recovery.delete(session_id);
+        let _ = self
+            .sessions
+            .discard_session(&rulebench_rules::CombatSessionHandle::new(session_id));
+        self.recordings.remove(session_id);
     }
 
     fn find_trial(

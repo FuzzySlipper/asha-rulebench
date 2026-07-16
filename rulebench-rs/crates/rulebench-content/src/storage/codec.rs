@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::ContentStorageRecord;
+use super::{ContentReplacementTransaction, ContentStorageRecord};
 use crate::{
     ContentDefinitionKind, ContentDefinitionReference, ContentFingerprint, ContentPackProvenance,
     ContentPackReference, ContentPackSourceKind,
@@ -8,6 +8,7 @@ use crate::{
 
 const STORAGE_FORMAT: &str = "rulebench-content-storage.v1";
 const ACTIVATION_FORMAT: &str = "rulebench-content-activation.v1";
+const REPLACEMENT_TRANSACTION_FORMAT: &str = "rulebench-content-replacement-transaction.v1";
 const PAYLOAD_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-payload.v0";
 
 pub(super) fn record_file_stem(reference: &ContentPackReference) -> String {
@@ -176,6 +177,93 @@ pub(super) fn decode_activation_index(
         return Err("unsupported activation index format".to_string());
     }
     Ok(active)
+}
+
+pub(super) fn encode_replacement_transaction(
+    transaction: &ContentReplacementTransaction,
+) -> Vec<u8> {
+    let mut lines = vec![
+        pair("format", REPLACEMENT_TRANSACTION_FORMAT),
+        pair("replacement", &encode_reference(&transaction.replacement)),
+    ];
+    lines.extend(
+        transaction
+            .replaced
+            .iter()
+            .map(|reference| pair("replaced", &encode_reference(reference))),
+    );
+    lines.extend(
+        transaction
+            .previous_active
+            .iter()
+            .map(|reference| pair("previousActive", &encode_reference(reference))),
+    );
+    lines.extend(
+        transaction
+            .next_active
+            .iter()
+            .map(|reference| pair("nextActive", &encode_reference(reference))),
+    );
+    lines.push(String::new());
+    lines.join("\n").into_bytes()
+}
+
+pub(super) fn decode_replacement_transaction(
+    bytes: &[u8],
+) -> Result<ContentReplacementTransaction, String> {
+    let source = std::str::from_utf8(bytes)
+        .map_err(|_| "replacement transaction is not UTF-8".to_string())?;
+    let mut format = None;
+    let mut replacement = None;
+    let mut replaced = Vec::new();
+    let mut previous_active = BTreeSet::new();
+    let mut next_active = BTreeSet::new();
+    for line in source.lines() {
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| "replacement transaction line has no field separator".to_string())?;
+        match key {
+            "format" if format.replace(value).is_none() => {}
+            "format" => return Err("duplicate replacement transaction format".to_string()),
+            "replacement" if replacement.is_none() => {
+                replacement = Some(decode_reference(value)?);
+            }
+            "replacement" => return Err("duplicate replacement reference".to_string()),
+            "replaced" => replaced.push(decode_reference(value)?),
+            "previousActive" => {
+                if !previous_active.insert(decode_reference(value)?) {
+                    return Err("duplicate previous active reference".to_string());
+                }
+            }
+            "nextActive" => {
+                if !next_active.insert(decode_reference(value)?) {
+                    return Err("duplicate next active reference".to_string());
+                }
+            }
+            _ => return Err(format!("unknown replacement transaction field {key}")),
+        }
+    }
+    if format != Some(REPLACEMENT_TRANSACTION_FORMAT) {
+        return Err("unsupported replacement transaction format".to_string());
+    }
+    replaced.sort();
+    if replaced.is_empty() {
+        return Err("replacement transaction has no replaced references".to_string());
+    }
+    if replaced.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("duplicate replaced reference".to_string());
+    }
+    let replacement = replacement
+        .ok_or_else(|| "replacement transaction has no replacement reference".to_string())?;
+    if replaced.contains(&replacement) {
+        return Err("replacement transaction replaces the same exact reference".to_string());
+    }
+    Ok(ContentReplacementTransaction {
+        replacement,
+        replaced,
+        previous_active,
+        next_active,
+    })
 }
 
 fn encode_reference(reference: &ContentPackReference) -> String {

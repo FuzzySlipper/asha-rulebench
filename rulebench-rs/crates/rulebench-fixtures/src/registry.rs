@@ -40,6 +40,16 @@ impl ScenarioPackageRegistration {
     pub fn scenario_catalog_cases(&self) -> Vec<ScenarioCatalogCase> {
         (self.factories.catalog_cases)()
     }
+
+    pub(crate) fn automatic_run_readouts(&self) -> Vec<CombatSessionAutomaticRunReadout> {
+        (self.factories.automatic_run_readouts)()
+    }
+
+    pub(crate) fn automatic_run_replay_readouts(
+        &self,
+    ) -> Vec<CombatSessionAutomaticRunReplayReadout> {
+        (self.factories.automatic_run_replay_readouts)()
+    }
 }
 
 #[derive(Clone)]

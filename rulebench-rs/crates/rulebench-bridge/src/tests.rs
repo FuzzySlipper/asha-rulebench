@@ -62,7 +62,104 @@ impl SessionRecoveryStorage for FailOnWriteRecoveryStorage {
     }
 }
 
+#[derive(Debug)]
+struct FailOnceReplayStorage {
+    fail_next_write: bool,
+    entries: BTreeMap<String, ReplayArchiveEntry>,
+}
+
+impl FailOnceReplayStorage {
+    fn new() -> Self {
+        Self {
+            fail_next_write: true,
+            entries: BTreeMap::new(),
+        }
+    }
+}
+
+impl ReplayArchiveStorage for FailOnceReplayStorage {
+    fn write(&mut self, entry: ReplayArchiveEntry) -> Result<(), ReplayArchiveStorageError> {
+        if self.fail_next_write {
+            self.fail_next_write = false;
+            return Err(ReplayArchiveStorageError::WriteFailed {
+                package_id: entry.metadata.package_id,
+            });
+        }
+        self.entries
+            .insert(entry.metadata.package_id.clone(), entry);
+        Ok(())
+    }
+
+    fn read(
+        &self,
+        package_id: &str,
+    ) -> Result<Option<ReplayArchiveEntry>, ReplayArchiveStorageError> {
+        Ok(self.entries.get(package_id).cloned())
+    }
+
+    fn list(&self) -> Result<Vec<ReplayArchiveMetadata>, ReplayArchiveStorageError> {
+        Ok(self
+            .entries
+            .values()
+            .map(|entry| entry.metadata.clone())
+            .collect())
+    }
+
+    fn clear(&mut self) -> Result<(), ReplayArchiveStorageError> {
+        self.entries.clear();
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct FailOnceDeleteRecoveryStorage {
+    fail_next_delete: bool,
+    packages: BTreeMap<String, SessionRecoveryPackage>,
+}
+
+impl FailOnceDeleteRecoveryStorage {
+    fn new() -> Self {
+        Self {
+            fail_next_delete: true,
+            packages: BTreeMap::new(),
+        }
+    }
+}
+
+impl SessionRecoveryStorage for FailOnceDeleteRecoveryStorage {
+    fn write(
+        &mut self,
+        package: SessionRecoveryPackage,
+    ) -> Result<(), SessionRecoveryStorageError> {
+        self.packages
+            .insert(package.session_id().to_string(), package);
+        Ok(())
+    }
+
+    fn list(&self) -> Result<Vec<SessionRecoveryPackage>, SessionRecoveryStorageError> {
+        Ok(self.packages.values().cloned().collect())
+    }
+
+    fn delete(&mut self, session_id: &str) -> Result<(), SessionRecoveryStorageError> {
+        if self.fail_next_delete {
+            self.fail_next_delete = false;
+            return Err(SessionRecoveryStorageError::DeleteFailed {
+                session_id: session_id.to_string(),
+            });
+        }
+        self.packages.remove(session_id);
+        Ok(())
+    }
+}
+
 fn bridge_with_recovery_storage(recovery: Box<dyn SessionRecoveryStorage>) -> RulebenchBridge {
+    bridge_with_storages(Box::new(InMemoryReplayArchiveStorage::new()), recovery)
+}
+
+fn bridge_with_storages(
+    replay: Box<dyn ReplayArchiveStorage>,
+    recovery: Box<dyn SessionRecoveryStorage>,
+) -> RulebenchBridge {
     RulebenchBridge::new_with_durable_storage(
         [BridgeScenario::new(
             "hexing-bolt",
@@ -70,7 +167,7 @@ fn bridge_with_recovery_storage(recovery: Box<dyn SessionRecoveryStorage>) -> Ru
             "Bridge contract fixture.",
             minimal_scenario(),
         )],
-        Box::new(InMemoryReplayArchiveStorage::new()),
+        replay,
         recovery,
         Vec::new(),
     )
@@ -639,6 +736,108 @@ fn experiment_matrix_advances_one_trial_at_a_time_and_archives_verified_replays(
     assert!(replay_ids
         .iter()
         .any(|replay| replay.package_id == completed.trials[0].replay_package_id));
+}
+
+#[test]
+fn failed_experiment_checkpoint_cleans_up_and_the_same_trial_retries() {
+    let mut bridge = bridge_with_recovery_storage(Box::new(FailOnWriteRecoveryStorage::new(2)));
+    bridge
+        .create_experiment(&context(), &experiment_request("checkpoint-retry", vec![7]))
+        .expect("matrix creates");
+
+    bridge
+        .advance_experiment(&context(), "checkpoint-retry")
+        .expect_err("automatic-run checkpoint fails once");
+    assert_experiment_trial_cleanup(&bridge);
+
+    let completed = bridge
+        .advance_experiment(&context(), "checkpoint-retry")
+        .expect("same deterministic trial retries");
+    assert_eq!(completed.status, "completed");
+    assert_experiment_trial_cleanup(&bridge);
+}
+
+#[test]
+fn failed_experiment_replay_save_cleans_up_and_the_same_trial_retries() {
+    let mut bridge = bridge_with_storages(
+        Box::new(FailOnceReplayStorage::new()),
+        Box::new(InMemorySessionRecoveryStorage::new()),
+    );
+    bridge
+        .create_experiment(&context(), &experiment_request("replay-retry", vec![7]))
+        .expect("matrix creates");
+
+    bridge
+        .advance_experiment(&context(), "replay-retry")
+        .expect_err("replay save fails once");
+    assert_experiment_trial_cleanup(&bridge);
+    assert!(bridge
+        .replays
+        .list(&ReplayArchiveQuery::default())
+        .expect("archive lists")
+        .is_empty());
+
+    let completed = bridge
+        .advance_experiment(&context(), "replay-retry")
+        .expect("same deterministic trial retries");
+    assert_eq!(completed.status, "completed");
+    assert_eq!(
+        bridge
+            .replays
+            .list(&ReplayArchiveQuery::default())
+            .expect("archive lists")
+            .len(),
+        1
+    );
+    assert_experiment_trial_cleanup(&bridge);
+}
+
+#[test]
+fn failed_experiment_recovery_delete_preserves_replay_and_retries_idempotently() {
+    let mut bridge = bridge_with_storages(
+        Box::new(InMemoryReplayArchiveStorage::new()),
+        Box::new(FailOnceDeleteRecoveryStorage::new()),
+    );
+    bridge
+        .create_experiment(&context(), &experiment_request("delete-retry", vec![7]))
+        .expect("matrix creates");
+
+    bridge
+        .advance_experiment(&context(), "delete-retry")
+        .expect_err("recovery deletion fails once");
+    assert_experiment_trial_cleanup(&bridge);
+    assert_eq!(
+        bridge
+            .replays
+            .list(&ReplayArchiveQuery::default())
+            .expect("committed replay lists")
+            .len(),
+        1
+    );
+
+    let completed = bridge
+        .advance_experiment(&context(), "delete-retry")
+        .expect("same trial accepts its exact committed replay");
+    assert_eq!(completed.status, "completed");
+    assert_eq!(
+        bridge
+            .replays
+            .list(&ReplayArchiveQuery::default())
+            .expect("archive remains singular")
+            .len(),
+        1
+    );
+    assert_experiment_trial_cleanup(&bridge);
+}
+
+fn assert_experiment_trial_cleanup(bridge: &RulebenchBridge) {
+    assert!(bridge.sessions.list_active_sessions().is_empty());
+    assert!(bridge.recordings.is_empty());
+    assert!(bridge
+        .recovery
+        .list()
+        .expect("recovery storage lists")
+        .is_empty());
 }
 
 #[test]

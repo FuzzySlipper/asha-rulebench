@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rulebench_rules::{
     executable_conformance_capabilities, fingerprint_projected_state, record_replay_package,
-    resolve_use_action, verify_replay_package, CapabilityIdentity, CombatSessionCreateRequest,
+    resolve_use_action, verify_automatic_run_replay, verify_replay_package, CapabilityIdentity,
+    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunReplayReadout,
+    CombatSessionAutomaticRunReplaySpec, CombatSessionAutomaticRunSpec, CombatSessionCreateRequest,
     CombatSessionIntentCommandSpec, CombatSessionState, DomainEvent, EffectOperationId,
     HitEffectOperation, ReplayCommand, ReplayCommandRecordingSpec, RulebenchReceipt,
     RulebenchRejection, TargetKind, TargetSelection, TargetingOperationId, UseActionIntent,
@@ -735,42 +737,119 @@ fn append_policy_cases(
     cases: &mut Vec<CapabilityConformanceCaseReadout>,
     failures: &mut Vec<CapabilityConformanceFailure>,
 ) {
-    if filter.package_id.is_some() || filter.ruleset_id.is_some() || filter.scenario_id.is_some() {
-        return;
-    }
-    let replay_readouts = registry.combat_session_automatic_run_replay_readouts();
-    for readout in registry.combat_session_automatic_run_readouts() {
-        let capability = CapabilityIdentity {
-            id: format!("policy.{}", readout.policy.id),
-            version: readout.policy.version.to_string(),
-        };
-        if !matches_filter(filter.capability_id.as_deref(), &capability.id) {
+    for registration in registry.registrations() {
+        let package = &registration.package;
+        if !matches_filter(filter.package_id.as_deref(), &package.identity.id)
+            || !matches_filter(filter.ruleset_id.as_deref(), &package.ruleset.id)
+        {
             continue;
         }
-        let replay_verified = replay_readouts.iter().any(|replay| replay.accepted);
-        let accepted = readout.accepted
-            && readout.executed_step_count > 0
-            && !readout.policy_decisions.is_empty()
-            && replay_verified;
-        let case = CapabilityConformanceCaseReadout {
-            case_id: format!("{}@1", readout.id),
-            package_id: "registered-automation-readout".to_string(),
-            package_version: "1".to_string(),
-            ruleset_id: "registered".to_string(),
-            ruleset_version: "registered".to_string(),
-            scenario_id: readout.id,
-            capabilities: vec![capability],
-            accepted,
-            event_count: readout.steps.len(),
-            trace_count: readout.policy_decisions.len(),
-            final_state_fingerprint: readout.final_snapshot.current_state_fingerprint.value,
-            replay_verified,
-            replay_mismatch_classified: true,
-            rejection_codes: Vec::new(),
-        };
-        validate_case_references(&case, executable_by_id, failures);
-        cases.push(case);
+        let replay_readouts = registration.automatic_run_replay_readouts();
+        for readout in registration.automatic_run_readouts() {
+            let capability = CapabilityIdentity {
+                id: format!("policy.{}", readout.policy.id),
+                version: readout.policy.version.to_string(),
+            };
+            if !matches_filter(filter.capability_id.as_deref(), &capability.id)
+                || !matches_filter(filter.scenario_id.as_deref(), &readout.id)
+            {
+                continue;
+            }
+            let matching_replay = replay_readouts.iter().find(|replay| {
+                replay.replayed_run.id == readout.id && replay.replayed_run.policy == readout.policy
+            });
+            let replay_verified = matching_replay.is_some_and(|replay| replay.accepted);
+            let replay_mismatch_classified = matching_replay.is_some_and(|replay| {
+                execute_policy_replay_mismatch(&package.initial_state.scenario, replay)
+            });
+            let accepted = readout.accepted
+                && readout.executed_step_count > 0
+                && !readout.policy_decisions.is_empty()
+                && replay_verified
+                && replay_mismatch_classified;
+            let case = CapabilityConformanceCaseReadout {
+                case_id: format!("{}@1", readout.id),
+                package_id: package.identity.id.clone(),
+                package_version: package.identity.version.clone(),
+                ruleset_id: package.ruleset.id.clone(),
+                ruleset_version: package.ruleset.version.clone(),
+                scenario_id: readout.id,
+                capabilities: vec![capability.clone()],
+                accepted,
+                event_count: readout.steps.len(),
+                trace_count: readout.policy_decisions.len(),
+                final_state_fingerprint: readout.final_snapshot.current_state_fingerprint.value,
+                replay_verified,
+                replay_mismatch_classified,
+                rejection_codes: Vec::new(),
+            };
+            validate_case_references(&case, executable_by_id, failures);
+            if !case.accepted {
+                failures.push(CapabilityConformanceFailure {
+                    kind: CapabilityConformanceFailureKind::CaseEvidenceMismatch,
+                    case_id: Some(case.case_id.clone()),
+                    capability,
+                    detail: "policy authority execution lacks its own verified replay or an executed replay mismatch classification".to_string(),
+                });
+            }
+            cases.push(case);
+        }
     }
+}
+
+fn execute_policy_replay_mismatch(
+    scenario: &rulebench_rules::RulebenchScenario,
+    replay: &CombatSessionAutomaticRunReplayReadout,
+) -> bool {
+    let run = &replay.replayed_run;
+    if run.policy_decisions.is_empty() {
+        return false;
+    }
+    let materialized_rolls = automatic_run_materialized_rolls(run);
+    let run_spec = CombatSessionAutomaticRunSpec::new(
+        run.id.clone(),
+        run.title.clone(),
+        run.summary.clone(),
+        run.max_steps,
+        materialized_rolls,
+    )
+    .with_policy(run.policy.clone());
+    let mut mismatched_policy_decisions = run.policy_decisions.clone();
+    mismatched_policy_decisions.clear();
+    let mismatch = verify_automatic_run_replay(CombatSessionAutomaticRunReplaySpec::new(
+        format!("{}-policy-mismatch", replay.id),
+        "Policy conformance mismatch probe",
+        "Re-executes the exact policy run against deliberately changed expected decision evidence.",
+        format!("{}-policy-mismatch-session", replay.id),
+        scenario.clone(),
+        run_spec,
+        run.final_snapshot.current_state_fingerprint.clone(),
+        run.final_snapshot.finalization.clone(),
+        run.decision_kind,
+        run.executed_step_count,
+        mismatched_policy_decisions,
+        run.final_snapshot.action_resource_transition_log.clone(),
+        run.final_snapshot.equipment_ledger.clone(),
+        run.final_snapshot.class_build_ledger.clone(),
+        run.final_snapshot.equipment_transition_log.clone(),
+        run.final_snapshot.reaction_window_lifecycle_log.clone(),
+        run.final_snapshot.reaction_audit_log.clone(),
+        run.final_snapshot.modifier_duration_expiration_log.clone(),
+    ));
+    !mismatch.accepted && !mismatch.policy_decisions_match
+}
+
+fn automatic_run_materialized_rolls(readout: &CombatSessionAutomaticRunReadout) -> Vec<i32> {
+    readout
+        .steps
+        .iter()
+        .filter_map(|step| {
+            step.auto_candidate
+                .as_ref()
+                .and_then(|execution| execution.submitted_step.as_ref())
+        })
+        .flat_map(|submitted| submitted.command.roll_stream.iter().copied())
+        .collect()
 }
 
 fn validate_case_references(
@@ -810,6 +889,33 @@ fn matches_filter(filter: Option<&str>, value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn first_hexing_policy_replay_only() -> Vec<CombatSessionAutomaticRunReplayReadout> {
+        let mut readouts =
+            crate::scenarios::hexing_bolt::combat_session_automatic_run_replay_readouts();
+        readouts.truncate(1);
+        readouts
+    }
+
+    fn registry_missing_lowest_vitality_replay() -> ScenarioPackageRegistry {
+        ScenarioPackageRegistry::new(vec![crate::ScenarioPackageRegistration::new(
+            crate::scenarios::hexing_bolt::hexing_bolt_scenario_package(),
+            crate::ScenarioPackageReadbackFactories {
+                catalog_cases: crate::scenarios::hexing_bolt::scenario_catalog_cases,
+                ruleset_catalog_readout: crate::scenarios::hexing_bolt::ruleset_catalog_readout,
+                content_validation_readouts:
+                    crate::scenarios::hexing_bolt::content_validation_readouts,
+                session_transcripts: crate::scenarios::hexing_bolt::combat_session_transcripts,
+                control_history_readouts:
+                    crate::scenarios::hexing_bolt::combat_session_control_history_readouts,
+                script_readouts: crate::scenarios::hexing_bolt::combat_session_script_readouts,
+                automatic_run_readouts:
+                    crate::scenarios::hexing_bolt::combat_session_automatic_run_readouts,
+                automatic_run_replay_readouts: first_hexing_policy_replay_only,
+            },
+        )])
+        .expect("isolated package registry is valid")
+    }
 
     #[test]
     fn executed_cases_cover_every_owner_registry_capability() {
@@ -892,5 +998,37 @@ mod tests {
             missing_report.failures[0].kind,
             CapabilityConformanceFailureKind::UnknownCapabilityReference
         );
+    }
+
+    #[test]
+    fn policy_coverage_requires_the_matching_policy_replay_and_mismatch_probe() {
+        let registry = registry_missing_lowest_vitality_replay();
+        let first = run_capability_conformance(
+            &registry,
+            &CapabilityConformanceFilter {
+                capability_id: Some("policy.firstAcceptedCandidate".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(first.accepted, "{:?}", first.failures);
+        assert_eq!(first.cases.len(), 1);
+        assert!(first.cases[0].replay_verified);
+        assert!(first.cases[0].replay_mismatch_classified);
+
+        let lowest = run_capability_conformance(
+            &registry,
+            &CapabilityConformanceFilter {
+                capability_id: Some("policy.lowestVitalityTarget".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(!lowest.accepted);
+        assert_eq!(lowest.cases.len(), 1);
+        assert!(!lowest.cases[0].replay_verified);
+        assert!(!lowest.cases[0].replay_mismatch_classified);
+        assert!(lowest.failures.iter().any(|failure| {
+            failure.kind == CapabilityConformanceFailureKind::CaseEvidenceMismatch
+                && failure.capability.id == "policy.lowestVitalityTarget"
+        }));
     }
 }

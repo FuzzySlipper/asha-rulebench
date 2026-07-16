@@ -255,6 +255,114 @@ fn failed_replacement_restores_the_last_known_good_content() {
     cleanup(&directory);
 }
 
+#[test]
+fn restart_rolls_back_replacement_interrupted_before_activation_commit() {
+    let directory = test_directory("replacement-crash-before-activation");
+    let original = imported_pack("pack.interrupted", "entity.original");
+    let original_reference = original.pack.exact_reference();
+    let replacement = imported_pack("pack.interrupted", "entity.replacement");
+    let replacement_reference = replacement.pack.exact_reference();
+    let mut storage = ContentPackStorage::open(&directory).expect("storage should open");
+    storage
+        .store(&original, b"original", StorageReplacementPolicy::Reject)
+        .expect("original stores");
+    storage
+        .activate(&original_reference)
+        .expect("original activates");
+
+    prepare_interrupted_replacement(&storage, &original_reference, &replacement, b"replacement");
+    drop(storage);
+
+    let (reopened, issues) = ContentPackStorage::open_quarantining(&directory)
+        .expect("startup should roll the interrupted replacement back");
+    assert_eq!(
+        reopened
+            .retrieve(&original_reference)
+            .expect("last good artifact survives")
+            .bytes,
+        b"original"
+    );
+    assert!(reopened.is_active(&original_reference));
+    assert!(matches!(
+        reopened.retrieve(&replacement_reference),
+        Err(ContentStorageError::NotFound { .. })
+    ));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.code == "interruptedContentReplacementRolledBack"));
+    cleanup(&directory);
+}
+
+#[test]
+fn restart_finishes_replacement_interrupted_after_activation_commit() {
+    let directory = test_directory("replacement-crash-after-activation");
+    let original = imported_pack("pack.committed", "entity.original");
+    let original_reference = original.pack.exact_reference();
+    let replacement = imported_pack("pack.committed", "entity.replacement");
+    let replacement_reference = replacement.pack.exact_reference();
+    let mut storage = ContentPackStorage::open(&directory).expect("storage should open");
+    storage
+        .store(&original, b"original", StorageReplacementPolicy::Reject)
+        .expect("original stores");
+    storage
+        .activate(&original_reference)
+        .expect("original activates");
+
+    let next_active = prepare_interrupted_replacement(
+        &storage,
+        &original_reference,
+        &replacement,
+        b"replacement",
+    );
+    write_activation_index(&directory, &next_active).expect("activation commit succeeds");
+    drop(storage);
+
+    let (reopened, issues) = ContentPackStorage::open_quarantining(&directory)
+        .expect("startup should finish the committed replacement");
+    assert!(matches!(
+        reopened.retrieve(&original_reference),
+        Err(ContentStorageError::NotFound { .. })
+    ));
+    assert_eq!(
+        reopened
+            .retrieve(&replacement_reference)
+            .expect("committed replacement survives")
+            .bytes,
+        b"replacement"
+    );
+    assert!(!reopened.is_active(&original_reference));
+    assert!(!reopened.is_active(&replacement_reference));
+    assert!(issues
+        .iter()
+        .any(|issue| issue.code == "interruptedContentReplacementCompleted"));
+    assert!(!replacement_transaction_path(&directory).exists());
+    cleanup(&directory);
+}
+
+fn prepare_interrupted_replacement(
+    storage: &ContentPackStorage,
+    original_reference: &ContentPackReference,
+    replacement: &ImportedContentPack,
+    payload: &[u8],
+) -> BTreeSet<ContentPackReference> {
+    let replacement_record = record_from_pack(&replacement.pack, payload);
+    let mut next_active = storage.active.clone();
+    next_active.remove(original_reference);
+    let transaction = ContentReplacementTransaction {
+        replacement: replacement_record.reference.clone(),
+        replaced: vec![original_reference.clone()],
+        previous_active: storage.active.clone(),
+        next_active: next_active.clone(),
+    };
+    write_replacement_transaction(storage.root(), &transaction)
+        .expect("replacement transaction persists");
+    let staged = stage_replacements(storage.root(), std::slice::from_ref(original_reference))
+        .expect("original artifacts stage");
+    write_record(storage.root(), &replacement_record, payload).expect("replacement commits");
+    remove_staged_originals(&staged).expect("old originals are removed");
+    next_active
+}
+
 fn imported_pack(pack_id: &str, entity_id: &str) -> ImportedContentPack {
     let ruleset = ruleset();
     import_content_pack(
