@@ -249,6 +249,12 @@ Verify the workspace:
 pnpm run verify
 ```
 
+The measured current verification inventory and approved target tier contract
+are documented in [docs/validation-tiers.md](docs/validation-tiers.md). The
+focused and certification command names in that document are implementation
+targets for Den tasks #5869 and #5870; until they land, `pnpm run verify`
+remains the blocking project gate.
+
 For opt-in live evidence:
 
 ```bash
