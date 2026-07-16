@@ -11,15 +11,15 @@ use rulebench_protocol::{
     ViewerSessionTranscriptDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 use rulebench_rules::{
-    compare_replay_packages, record_replay_package, verify_replay_package, CombatControlReadout,
-    CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
+    bind_authored_action, compare_replay_packages, record_replay_package, verify_replay_package,
+    CombatControlReadout, CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    ContentPackSetReference, CurrentActorOptionSummary, InMemoryReplayArchiveStorage,
-    InMemorySessionRecoveryStorage, ReactionCommandReadout, ReplayArchive, ReplayArchiveQuery,
-    ReplayArchiveStorage, ReplayCommand, ReplayCommandRecordingSpec, ReplayPackage,
-    RulebenchScenario, RulesetArtifactProvenance, SessionRecoveryPackage, SessionRecoveryStorage,
-    AUTHORITY_SURFACE,
+    ContentPackSetReference, CurrentActorOptionSummary, ImportedContentPack,
+    InMemoryReplayArchiveStorage, InMemorySessionRecoveryStorage, ReactionCommandReadout,
+    ReplayArchive, ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand,
+    ReplayCommandRecordingSpec, ReplayPackage, RulebenchScenario, RulesetArtifactProvenance,
+    SessionRecoveryPackage, SessionRecoveryStorage, AUTHORITY_SURFACE,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -329,6 +329,41 @@ impl RulebenchBridge {
         content_pack_set: Option<ContentPackSetReference>,
         content_ruleset: Option<RulesetArtifactProvenance>,
     ) -> Result<CombatSessionCreateReadout, BridgeError> {
+        self.create_configured_session(context, request, content_pack_set, content_ruleset, None)
+    }
+
+    pub fn create_session_with_authored_action(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        request: &CombatSessionCreateRequestDto,
+        imported: &ImportedContentPack,
+    ) -> Result<CombatSessionCreateReadout, BridgeError> {
+        let binding = request.authored_action_binding.as_ref().ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "An authored-action session requires a binding request.",
+            )
+        })?;
+        self.create_configured_session(
+            context,
+            request,
+            Some(imported.resolved_set.reference.clone()),
+            Some(imported.pack.ruleset.clone()),
+            Some((imported, binding.to_authority())),
+        )
+    }
+
+    fn create_configured_session(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        request: &CombatSessionCreateRequestDto,
+        content_pack_set: Option<ContentPackSetReference>,
+        content_ruleset: Option<RulesetArtifactProvenance>,
+        authored_action: Option<(
+            &ImportedContentPack,
+            rulebench_rules::AuthoredActionBindingRequest,
+        )>,
+    ) -> Result<CombatSessionCreateReadout, BridgeError> {
         self.check_version(context)?;
         if request.session_id.is_empty() || request.scenario_id.is_empty() {
             return Err(BridgeError::new(
@@ -360,7 +395,10 @@ impl RulebenchBridge {
                     )
                 })?;
         }
-        if let Some(content_pack_set) = content_pack_set {
+        if let Some((imported, binding)) = authored_action {
+            configured_scenario = bind_authored_action(configured_scenario, imported, &binding)
+                .map_err(BridgeError::from_authored_action_binding_error)?;
+        } else if let Some(content_pack_set) = content_pack_set {
             configured_scenario.content_pack_set = Some(content_pack_set);
         }
         let initial_session = rulebench_rules::CombatSessionCreateRequest::new(

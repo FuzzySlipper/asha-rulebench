@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { createLiveRulebenchTransport } from "@asha-rulebench/transport";
 
 test.describe.configure({ mode: "serial" });
@@ -48,7 +49,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 7,
+        protocolVersion: 8,
         authoritySurface: "asha-rulebench.local-authority.v0",
       },
     });
@@ -272,11 +273,159 @@ test("invokes live Rust authority through the Angular origin", async ({
       error: {
         kind: "protocol",
         code: "protocolVersionMismatch",
-        message: "Unsupported protocol version 999; expected 7.",
+        message: "Unsupported protocol version 999; expected 8.",
         retryable: false,
       },
     });
     mismatched.disconnect();
+  } finally {
+    if (sessionExists) {
+      await transport.submitControl(sessionId, { kind: "explicitEnd" });
+      await transport.closeSession(sessionId);
+    }
+    transport.disconnect();
+  }
+});
+
+test("executes the exact active authored action through the live Rust host @live", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const apiBaseUrl = new URL("/api/rulebench/v1", page.url()).toString();
+  const transport = createLiveRulebenchTransport({ apiBaseUrl });
+  const nonce = Date.now().toString();
+  const sessionId = `e2e-authored-action-${nonce}`;
+  const fixture = await readFile(
+    new URL(
+      "../../../../rulebench-rs/hosts/rulebench-process-host/src/fixtures/authored-content-v3.json",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const authoredPayload = fixture
+    .replace("pack.fixture.authored.v3", `pack.e2e.authored.v3-${nonce}`)
+    .replace(
+      "fixture:authored-content-v3",
+      `fixture:e2e-authored-content-v3-${nonce}`,
+    );
+  let sessionExists = false;
+
+  try {
+    const connected = await transport.connect();
+    expect(connected.ok).toBe(true);
+    const imported = await transport.importContent(authoredPayload, "reject");
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
+    expect(imported.value.accepted).toBe(true);
+    const reference = imported.value.outcome?.review.pack.reference;
+    expect(reference).toBeDefined();
+    if (reference === undefined) return;
+    const activated = await transport.activateContent(reference);
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(
+      activated.value.packs.find(
+        (pack) => pack.reference.fingerprint.value === reference.fingerprint.value,
+      )?.active,
+    ).toBe(true);
+
+    const created = await transport.createSession({
+      sessionId,
+      scenarioId: "binding-glyph-failed-save",
+      participantOrder: [],
+      authoredActionBinding: {
+        contentPack: reference,
+        actionId: "action.binding-glyph",
+        actorId: "entity-warden",
+      },
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    sessionExists = true;
+    const receipt = created.value.authoredActionBinding;
+    expect(receipt).toEqual(
+      expect.objectContaining({
+        contentPackRoot: reference,
+        actionId: "action.binding-glyph",
+        abilityId: "ability.binding-glyph",
+        actorId: "entity-warden",
+        grant: {
+          grantKind: "sessionLocalBaseAbility",
+          actorId: "entity-warden",
+          abilityId: "ability.binding-glyph",
+        },
+      }),
+    );
+
+    const started = await transport.submitControl(sessionId, {
+      kind: "explicitStart",
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    expect(started.value.snapshot.options.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionId: "action.binding-glyph",
+          checkKind: "savingThrow",
+          available: true,
+          targets: [
+            expect.objectContaining({ targetId: "entity-saboteur" }),
+          ],
+        }),
+      ]),
+    );
+
+    const executed = await transport.submitIntent(sessionId, {
+      id: "e2e-execute-authored-binding-glyph",
+      title: "Execute authored Binding Glyph",
+      summary: "Resolve exact active authored content through Rust authority.",
+      intent: {
+        actorId: "entity-warden",
+        actionId: "action.binding-glyph",
+        targetId: "entity-saboteur",
+        targetIds: [],
+        targetCell: null,
+        destinationCell: null,
+        observedOrigin: null,
+      },
+      rollStream: [5, 4],
+    });
+    expect(executed.ok).toBe(true);
+    if (!executed.ok) return;
+    expect(executed.value.step.accepted).toBe(true);
+    expect(executed.value.step.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "savingThrowResolved" }),
+        expect.objectContaining({ kind: "damageApplied" }),
+        expect.objectContaining({ kind: "modifierApplied" }),
+      ]),
+    );
+    expect(executed.value.step.trace).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: "Authored action binding verified.",
+        }),
+      ]),
+    );
+    expect(executed.value.snapshot.authoredActionBinding).toEqual(receipt);
+
+    const ended = await transport.submitControl(sessionId, {
+      kind: "explicitEnd",
+    });
+    expect(ended.ok).toBe(true);
+    const closed = await transport.closeSession(sessionId);
+    expect(closed.ok).toBe(true);
+    sessionExists = false;
+    const replay = await transport.loadReplayPackage(`live-${sessionId}`);
+    expect(replay.ok).toBe(true);
+    if (replay.ok) {
+      expect(replay.value.authoredActionBinding).toEqual(receipt);
+      expect(
+        replay.value.commands.every(
+          (command) => command.snapshot.authoredActionBinding?.actionId === "action.binding-glyph",
+        ),
+      ).toBe(true);
+    }
   } finally {
     if (sessionExists) {
       await transport.submitControl(sessionId, { kind: "explicitEnd" });

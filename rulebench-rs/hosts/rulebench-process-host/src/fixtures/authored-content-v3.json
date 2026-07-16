@@ -58,7 +58,7 @@
         {
           "id": "modifier.binding-glyph.anchored",
           "label": "Anchored",
-          "summary": "Reduces mobility until the temporary tenure expires.",
+          "summary": "Reduces bodily force until the temporary tenure expires.",
           "defaultTenure": "temporary",
           "stackingGroup": "binding-glyph-anchor",
           "stackingPolicy": "refresh",
@@ -68,8 +68,8 @@
           },
           "statAdjustments": [
             {
-              "statId": "mobility",
-              "statLabel": "Mobility",
+              "statId": "body",
+              "statLabel": "Body",
               "delta": -1
             }
           ]

@@ -198,9 +198,19 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
             ));
         }
     }
+    let (content, content_issues) = ContentPackStorage::open_quarantining(root.join("content"))
+        .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
+    let (content, workspace_issues) =
+        ContentWorkspace::open(content, compiled_ruleset_provider_catalog());
+    let content_artifact_count = content.storage().list().len();
+    let binding_sources = content.binding_sources();
     let replay_root = root.join("replays");
-    let report = FileReplayArchiveStorage::open(replay_root, storage_scenarios.clone())
-        .map_err(|issue| issue.message)?;
+    let report = FileReplayArchiveStorage::open_with_content_bindings(
+        replay_root,
+        storage_scenarios.clone(),
+        binding_sources.clone(),
+    )
+    .map_err(|issue| issue.message)?;
     let mut storage = report.storage;
     for (index, package) in replay_packages.into_iter().enumerate() {
         storage
@@ -214,14 +224,12 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         .list()
         .map_err(|error| format!("Could not list durable replay repository: {error:?}"))?
         .len();
-    let recovery_report =
-        FileSessionRecoveryStorage::open(root.join("session-recovery"), storage_scenarios.clone())
-            .map_err(|issue| issue.message)?;
-    let (content, content_issues) = ContentPackStorage::open_quarantining(root.join("content"))
-        .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
-    let (content, workspace_issues) =
-        ContentWorkspace::open(content, compiled_ruleset_provider_catalog());
-    let content_artifact_count = content.storage().list().len();
+    let recovery_report = FileSessionRecoveryStorage::open_with_content_bindings(
+        root.join("session-recovery"),
+        storage_scenarios.clone(),
+        binding_sources,
+    )
+    .map_err(|issue| issue.message)?;
     let mut issues = report.issues;
     issues.extend(recovery_report.issues);
     issues.extend(
@@ -423,7 +431,21 @@ impl ProcessHostRouter {
                     Ok(request) => request,
                     Err(response) => return response,
                 };
-                let selected_content = match &request.content_pack {
+                if request.content_pack.is_some() && request.authored_action_binding.is_some() {
+                    return error_response(
+                        400,
+                        "protocol",
+                        "ambiguousSessionContentSelection",
+                        "Select either provenance-only content or one authored-action binding, not both.",
+                        false,
+                    );
+                }
+                let selected_reference = request
+                    .authored_action_binding
+                    .as_ref()
+                    .map(|binding| &binding.content_pack)
+                    .or(request.content_pack.as_ref());
+                let selected_content = match selected_reference {
                     Some(reference) => {
                         let reference = reference.to_authority();
                         let Some(workspace) = self.content_workspace.as_ref() else {
@@ -473,25 +495,38 @@ impl ProcessHostRouter {
                             Ok(provenance) => provenance,
                             Err(error) => return content_error(error),
                         };
+                        let imported = if request.authored_action_binding.is_some() {
+                            match workspace.active_imported_pack(&reference) {
+                                Ok(imported) => Some(imported),
+                                Err(error) => return content_error(error),
+                            }
+                        } else {
+                            None
+                        };
                         match workspace.active_pack_set(&reference) {
-                            Ok(set) => Some((reference, set, provenance)),
+                            Ok(set) => Some((reference, set, provenance, imported)),
                             Err(error) => return content_error(error),
                         }
                     }
                     None => None,
                 };
                 let created = match &selected_content {
-                    Some((_, set, provenance)) => self.bridge.create_session_with_content_pack_set(
-                        &context,
-                        &request,
-                        Some(set.clone()),
-                        Some(provenance.clone()),
-                    ),
+                    Some((_, _, _, Some(imported))) => self
+                        .bridge
+                        .create_session_with_authored_action(&context, &request, imported),
+                    Some((_, set, provenance, None)) => {
+                        self.bridge.create_session_with_content_pack_set(
+                            &context,
+                            &request,
+                            Some(set.clone()),
+                            Some(provenance.clone()),
+                        )
+                    }
                     None => self.bridge.create_session(&context, &request),
                 };
                 match created {
                     Ok(created) => {
-                        if let (Some((reference, _, _)), Some(workspace)) =
+                        if let (Some((reference, _, _, _)), Some(workspace)) =
                             (selected_content, self.content_workspace.as_mut())
                         {
                             if let Err(error) =
@@ -806,10 +841,16 @@ where
 }
 
 fn bridge_error(error: BridgeError) -> HttpResponse {
+    let transport_kind = match error.kind {
+        BridgeErrorKind::AuthoredActionBinding => "authoredActionBinding",
+        _ => "bridge",
+    };
     let status = match error.kind {
         BridgeErrorKind::ProtocolVersionMismatch | BridgeErrorKind::DuplicateSession => 409,
         BridgeErrorKind::UnknownScenario | BridgeErrorKind::UnknownSession => 404,
-        BridgeErrorKind::InvalidScenario | BridgeErrorKind::InvalidLifecycle => 422,
+        BridgeErrorKind::InvalidScenario
+        | BridgeErrorKind::AuthoredActionBinding
+        | BridgeErrorKind::InvalidLifecycle => 422,
         BridgeErrorKind::InvalidRequest => 400,
         BridgeErrorKind::ReplayArchive if error.code == "unknownReplayPackage" => 404,
         BridgeErrorKind::ReplayArchive if error.retryable => 503,
@@ -817,7 +858,13 @@ fn bridge_error(error: BridgeError) -> HttpResponse {
         BridgeErrorKind::SessionRecovery if error.retryable => 503,
         BridgeErrorKind::SessionRecovery => 422,
     };
-    error_response(status, "bridge", error.code, error.message, error.retryable)
+    error_response(
+        status,
+        transport_kind,
+        error.code,
+        error.message,
+        error.retryable,
+    )
 }
 
 fn content_repository_required() -> HttpResponse {

@@ -7,6 +7,7 @@
 
 mod active_modifier;
 mod authored_action;
+mod binding;
 mod canonical;
 mod diagnostics;
 mod diff;
@@ -24,7 +25,15 @@ pub use authored_action::{
     AuthoredReactionHookEffectOperation, AuthoredReactionOptionDeclaration,
     AuthoredTargetingDeclaration, ReactionParticipantSelector,
 };
-pub use canonical::{canonicalize_content_pack, fingerprint_content_pack_set};
+pub use binding::{
+    bind_authored_action, AuthoredActionAbilityGrantReceipt, AuthoredActionBindingError,
+    AuthoredActionBindingReceipt, AuthoredActionBindingRequest, AUTHORED_ACTION_BINDING_VERSION,
+    AUTHORED_ACTION_CHECK_VOCABULARY_VERSION, AUTHORED_ACTION_REACTION_EXPANSION_LIMIT,
+};
+pub use canonical::{
+    canonicalize_content_pack, fingerprint_authored_action, fingerprint_content_pack_set,
+    AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM,
+};
 pub use diagnostics::{
     ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity, ContentValidationReport,
     ScenarioMetadata,
@@ -127,6 +136,7 @@ mod tests {
                 seed_label: "content-validation".to_string(),
             },
             content_pack_set: None,
+            authored_action_binding: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "missing-ruleset".to_string(),
             grid: Grid {

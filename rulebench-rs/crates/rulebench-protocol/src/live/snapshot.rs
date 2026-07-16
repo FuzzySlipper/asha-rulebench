@@ -447,6 +447,7 @@ impl From<&CombatFinalizationReadout> for LiveFinalizationDto {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LiveSessionSnapshotDto {
     pub session_id: String,
+    pub authored_action_binding: Option<crate::AuthoredActionBindingReceiptDto>,
     pub next_step_index: u32,
     pub lifecycle_phase: String,
     pub started_at_step: Option<u32>,
@@ -474,6 +475,10 @@ impl From<&CombatSessionSnapshot> for LiveSessionSnapshotDto {
     fn from(value: &CombatSessionSnapshot) -> Self {
         Self {
             session_id: value.session_id.clone(),
+            authored_action_binding: value
+                .authored_action_binding
+                .as_ref()
+                .map(crate::AuthoredActionBindingReceiptDto::from),
             next_step_index: value.next_step_index,
             lifecycle_phase: value.lifecycle.phase.code().to_string(),
             started_at_step: value.lifecycle.started_at_step,

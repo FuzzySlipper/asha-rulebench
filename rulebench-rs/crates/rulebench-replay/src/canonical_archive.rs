@@ -150,6 +150,23 @@ fn feed_scenario(encoder: &mut CanonicalEncoder, scenario: &RulebenchScenario) {
     encoder.optional_string(scenario.selected_item_id.as_deref());
     encoder.sequence(&scenario.actions, feed_action);
     feed_action(encoder, &scenario.selected_action);
+    if let Some(binding) = &scenario.authored_action_binding {
+        encoder.string("authoredActionBinding.v1");
+        encoder.string(&binding.binding_version);
+        feed_content_reference(encoder, &binding.content_pack_set.root);
+        encoder.sequence(&binding.content_pack_set.packs, feed_content_reference);
+        feed_content_fingerprint(encoder, &binding.content_pack_set.fingerprint);
+        encoder.string(&binding.action_id);
+        feed_content_fingerprint(encoder, &binding.action_definition_fingerprint);
+        encoder.string(&binding.ability_id);
+        encoder.string(&binding.scenario_id);
+        encoder.string(&binding.actor_id);
+        encoder.string(&binding.grant.actor_id);
+        encoder.string(&binding.grant.ability_id);
+        encoder.string(&binding.targeting_operation_vocabulary_version);
+        encoder.string(&binding.check_vocabulary_version);
+        encoder.string(&binding.effect_operation_vocabulary_version);
+    }
 }
 
 pub fn canonical_replay_archive_payload_fingerprint(entry: &ReplayArchiveEntry) -> String {
@@ -969,6 +986,33 @@ mod tests {
                 .fingerprint
                 .value
                 .push_str("-changed")
+        });
+        assert_changed(&entry, &expected, |value| {
+            let scenario = &mut value.package.initial_session.scenario;
+            let content_pack_set = scenario
+                .content_pack_set
+                .clone()
+                .expect("test package has content provenance");
+            scenario.authored_action_binding =
+                Some(rulebench_combat::AuthoredActionBindingReceipt {
+                    binding_version: "1".to_string(),
+                    content_pack_set,
+                    action_id: scenario.selected_action.id.clone(),
+                    action_definition_fingerprint: rulebench_combat::ContentFingerprint {
+                        algorithm: "action".to_string(),
+                        value: "exact".to_string(),
+                    },
+                    ability_id: scenario.selected_action.ability_id.clone(),
+                    scenario_id: scenario.metadata.id.clone(),
+                    actor_id: scenario.selected_action.actor_id.clone(),
+                    grant: rulebench_combat::AuthoredActionAbilityGrantReceipt {
+                        actor_id: scenario.selected_action.actor_id.clone(),
+                        ability_id: scenario.selected_action.ability_id.clone(),
+                    },
+                    targeting_operation_vocabulary_version: "2".to_string(),
+                    check_vocabulary_version: "1".to_string(),
+                    effect_operation_vocabulary_version: "1".to_string(),
+                });
         });
         assert_changed(&entry, &expected, |value| {
             value.package.initial_session.scenario.grid.width += 1

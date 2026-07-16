@@ -62,6 +62,7 @@ pub struct ReplayPackageReviewDto {
     pub content_pack_root: Option<crate::ContentPackReferenceDto>,
     pub content_pack_set_fingerprint: Option<crate::ContentFingerprintDto>,
     pub content_pack_references: Vec<crate::ContentPackReferenceDto>,
+    pub authored_action_binding: Option<crate::AuthoredActionBindingReceiptDto>,
     pub command_count: u32,
     pub final_state_fingerprint: ReplayStateFingerprintDto,
     pub fingerprint_kind: String,
@@ -106,6 +107,12 @@ impl From<&ReplayPackage> for ReplayPackageReviewDto {
                         .collect()
                 })
                 .unwrap_or_default(),
+            authored_action_binding: value
+                .initial_session
+                .scenario
+                .authored_action_binding
+                .as_ref()
+                .map(crate::AuthoredActionBindingReceiptDto::from),
             command_count: value.commands.len() as u32,
             final_state_fingerprint: (&value.final_state_fingerprint).into(),
             fingerprint_kind: value.fingerprint_kind.clone(),

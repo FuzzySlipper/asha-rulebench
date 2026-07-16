@@ -16,6 +16,7 @@ pub fn hexing_bolt_fixture_scenario() -> RulebenchScenario {
             seed_label: "roll-stream:17,5".to_string(),
         },
         content_pack_set: None,
+        authored_action_binding: None,
         rulesets: vec![crate::hexing_bolt_ruleset()],
         selected_ruleset_id: crate::HEXING_BOLT_RULESET_ID.to_string(),
         grid: Grid {

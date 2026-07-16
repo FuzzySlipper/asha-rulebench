@@ -45,6 +45,15 @@ describe("live Rulebench transport", () => {
       sessionId: "session/one",
       scenarioId: "hexing-bolt-hit",
       participantOrder: ["entity-adept", "entity-raider"],
+      authoredActionBinding: {
+        contentPack: {
+          id: "pack.authored.v3",
+          version: "3.0.0",
+          fingerprint: { algorithm: "pack", value: "exact" },
+        },
+        actionId: "action.binding-glyph",
+        actorId: "entity-adept",
+      },
     };
     const intent = {
       actorId: "adept",
@@ -197,7 +206,7 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/experiments/lab%2Fone/cancel",
       "POST http://rulebench.test/api/rulebench/v1/experiments/compare",
     ]);
-    expect(calls.every((call) => call.version === "7")).toBe(true);
+    expect(calls.every((call) => call.version === "8")).toBe(true);
     expect(calls[9]?.body).toBe(
       JSON.stringify({ newSessionId: "fork/session" }),
     );
@@ -240,7 +249,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v7; received asha-rulebench.protocol v6.",
+          "Expected asha-rulebench.protocol v8; received asha-rulebench.protocol v6.",
         retryable: false,
       },
     });
@@ -348,7 +357,7 @@ describe("fake live Rulebench transport", () => {
             version: "3.0.0",
             fingerprint: {
               algorithm: "fnv1a64.rulebench-content-pack.v1",
-              value: "85329f7475287f69",
+              value: "86bbc06adfd914a2",
             },
           },
           outcome: null,

@@ -37,6 +37,7 @@ export interface RulebenchLiveAutomaticRunView {
 
 export interface RulebenchLiveSessionView {
   readonly sessionId: string;
+  readonly authoredActionBinding: RulebenchAuthoredActionBindingView | null;
   readonly lifecycleLabel: string;
   readonly roundLabel: string;
   readonly turnLabel: string;
@@ -55,6 +56,17 @@ export interface RulebenchLiveSessionView {
   readonly reactionWindow: RulebenchLiveReactionWindowView | null;
   readonly reactionLifecycleLabels: readonly string[];
   readonly reactionAuditLabels: readonly string[];
+}
+
+export interface RulebenchAuthoredActionBindingView {
+  readonly actionId: string;
+  readonly abilityId: string;
+  readonly actorId: string;
+  readonly scenarioId: string;
+  readonly contentPackRootLabel: string;
+  readonly actionFingerprintLabel: string;
+  readonly grantLabel: string;
+  readonly vocabularyLabel: string;
 }
 
 export interface RulebenchLiveReactionWindowView {
@@ -245,6 +257,19 @@ export function projectLiveSessionSnapshot(
 ): RulebenchLiveSessionView {
   return {
     sessionId: snapshot.sessionId,
+    authoredActionBinding:
+      snapshot.authoredActionBinding === null
+        ? null
+        : {
+            actionId: snapshot.authoredActionBinding.actionId,
+            abilityId: snapshot.authoredActionBinding.abilityId,
+            actorId: snapshot.authoredActionBinding.actorId,
+            scenarioId: snapshot.authoredActionBinding.scenarioId,
+            contentPackRootLabel: `${snapshot.authoredActionBinding.contentPackRoot.id}@${snapshot.authoredActionBinding.contentPackRoot.version}`,
+            actionFingerprintLabel: `${snapshot.authoredActionBinding.actionDefinitionFingerprint.algorithm}:${snapshot.authoredActionBinding.actionDefinitionFingerprint.value}`,
+            grantLabel: `${snapshot.authoredActionBinding.grant.actorId} · ${snapshot.authoredActionBinding.grant.abilityId}`,
+            vocabularyLabel: `targeting ${snapshot.authoredActionBinding.targetingOperationVocabularyVersion} · check ${snapshot.authoredActionBinding.checkVocabularyVersion} · effects ${snapshot.authoredActionBinding.effectOperationVocabularyVersion}`,
+          },
     lifecycleLabel: labelCode(snapshot.lifecyclePhase),
     roundLabel: String(snapshot.roundNumber),
     turnLabel: String(snapshot.turnIndex + 1),

@@ -1220,6 +1220,7 @@ mod tests {
                 seed_label: "combat-api".to_string(),
             },
             content_pack_set: None,
+            authored_action_binding: None,
             rulesets: vec![RulesetMetadata {
                 id: "combat-api.v0".to_string(),
                 name: "Combat API Rules".to_string(),

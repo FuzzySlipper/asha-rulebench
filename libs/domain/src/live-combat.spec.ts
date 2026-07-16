@@ -13,6 +13,12 @@ describe("live combat domain projections", () => {
     const view = projectLiveSessionSnapshot(snapshot(9, "state-1"));
 
     expect(view.lifecycleLabel).toBe("In Progress");
+    expect(view.authoredActionBinding).toMatchObject({
+      actionId: "action.binding-glyph",
+      actorId: "entity-adept",
+      contentPackRootLabel: "pack.authored.v3@3.0.0",
+      actionFingerprintLabel: "action:exact-action",
+    });
     expect(view.fingerprintLabel).toBe("test:state-1");
     expect(view.participants[1]).toEqual({
       id: "entity-raider",
@@ -69,6 +75,32 @@ function snapshot(
 ): RulebenchLiveSessionSnapshotDto {
   return {
     sessionId: "live-session",
+    authoredActionBinding: {
+      bindingVersion: "1",
+      contentPackRoot: {
+        id: "pack.authored.v3",
+        version: "3.0.0",
+        fingerprint: { algorithm: "pack", value: "exact-pack" },
+      },
+      contentPackReferences: [],
+      contentPackSetFingerprint: { algorithm: "set", value: "exact-set" },
+      actionId: "action.binding-glyph",
+      actionDefinitionFingerprint: {
+        algorithm: "action",
+        value: "exact-action",
+      },
+      abilityId: "ability.binding-glyph",
+      scenarioId: "scenario",
+      actorId: "entity-adept",
+      grant: {
+        grantKind: "sessionLocalBaseAbility",
+        actorId: "entity-adept",
+        abilityId: "ability.binding-glyph",
+      },
+      targetingOperationVocabularyVersion: "2",
+      checkVocabularyVersion: "1",
+      effectOperationVocabularyVersion: "1",
+    },
     nextStepIndex: 0,
     lifecyclePhase: "inProgress",
     startedAtStep: 0,

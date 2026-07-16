@@ -1,4 +1,7 @@
-use crate::{ActiveModifier, ContentPackSetReference, ScenarioMetadata, StatBlock, StatDefinition};
+use crate::{
+    ActiveModifier, AuthoredActionBindingReceipt, ContentPackSetReference, ScenarioMetadata,
+    StatBlock, StatDefinition,
+};
 use rulebench_core::{BoundedValue, GridPosition, NamedNumber, Team};
 use rulebench_ruleset::{
     AbilityDefinition, ActionDefinition, ActionResourcePool, ModifierTenure, RulesetMetadata,
@@ -50,6 +53,7 @@ impl Combatant {
 pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
     pub content_pack_set: Option<ContentPackSetReference>,
+    pub authored_action_binding: Option<AuthoredActionBindingReceipt>,
     pub rulesets: Vec<RulesetMetadata>,
     pub selected_ruleset_id: String,
     pub grid: Grid,

@@ -7,10 +7,10 @@ use std::thread;
 use std::time::Duration;
 
 use rulebench_protocol::{
-    AutomaticRunRequestDto, AutomationPolicyCatalogEntryDto,
+    AuthoredActionBindingRequestDto, AutomaticRunRequestDto, AutomationPolicyCatalogEntryDto,
     CombatAutomationNoCandidateBehaviorDto, CombatAutomationPolicyDto, CombatControlCommandDto,
     CombatControlCommandKindDto, CombatSessionCreateRequestDto, CombatSessionIntentCommandDto,
-    CommandRollModeDto, ContentImportAttemptDto, ContentWorkspaceDto,
+    CommandRollModeDto, ContentImportAttemptDto, ContentPackReferenceDto, ContentWorkspaceDto,
     ExperimentComparisonReadoutDto, ExperimentComparisonRequestDto, ExperimentMatrixRequestDto,
     ExperimentReadoutDto, LiveAutomaticRunDto, LiveCommandExecutionDto, LiveControlExecutionDto,
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
@@ -370,6 +370,7 @@ fn router_serializes_lifecycle_and_isolates_multiple_sessions() {
                 scenario_id: scenario_id.clone(),
                 participant_order: Vec::new(),
                 content_pack: None,
+                authored_action_binding: None,
             },
         ));
         assert_eq!(created.status, 200);
@@ -453,6 +454,7 @@ fn router_classifies_version_serialization_handle_and_lifecycle_errors() {
             scenario_id: scenarios[0].id.clone(),
             participant_order: Vec::new(),
             content_pack: None,
+            authored_action_binding: None,
         },
     ));
     assert_eq!(created.status, 200);
@@ -555,6 +557,7 @@ fn durable_router_reports_repository_state_and_reloads_a_finalized_live_replay()
                     scenario_id,
                     participant_order: Vec::new(),
                     content_pack: None,
+                    authored_action_binding: None,
                 },
             ))
             .status,
@@ -642,6 +645,7 @@ fn durable_router_reconstructs_an_active_session_and_continues_it_exactly() {
                     scenario_id,
                     participant_order: Vec::new(),
                     content_pack: None,
+                    authored_action_binding: None,
                 },
             ))
             .status,
@@ -837,6 +841,7 @@ fn authored_content_survives_restart_binds_a_session_and_replay_to_the_exact_pac
             scenario_id: second_ruleset_scenario.id.clone(),
             participant_order: Vec::new(),
             content_pack: Some(reference.clone()),
+            authored_action_binding: None,
         },
     ));
     assert_eq!(incompatible.status, 422);
@@ -857,6 +862,7 @@ fn authored_content_survives_restart_binds_a_session_and_replay_to_the_exact_pac
             scenario_id: scenario.id.clone(),
             participant_order: Vec::new(),
             content_pack: Some(reference.clone()),
+            authored_action_binding: None,
         },
     ));
     assert_eq!(
@@ -976,7 +982,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
         v3.reference.fingerprint.algorithm,
         "fnv1a64.rulebench-content-pack.v1"
     );
-    assert_eq!(v3.reference.fingerprint.value, "85329f7475287f69");
+    assert_eq!(v3.reference.fingerprint.value, "86bbc06adfd914a2");
     assert!(v3.definitions.iter().any(|definition| {
         definition.kind == "modifier" && definition.id == "modifier.binding-glyph.anchored"
     }));
@@ -1108,6 +1114,577 @@ fn authored_content_validation_returns_a_receipt_without_mutating_the_workspace(
 }
 
 #[test]
+fn active_authored_action_executes_and_rebinds_across_recovery_fork_and_replay_restart() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-action-binding-{}-{sequence}",
+        std::process::id()
+    ));
+    let session_id = "authored-action-live-session";
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": include_str!("fixtures/authored-content-v3.json"),
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("v3 import is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .expect("accepted v3 import has an outcome")
+        .review
+        .pack
+        .reference;
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/content/activate",
+                &serde_json::json!({ "reference": reference }),
+            ))
+            .status,
+        200
+    );
+
+    let missing_actor = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: "rejected-authored-action-session".to_string(),
+            scenario_id: "binding-glyph-failed-save".to_string(),
+            participant_order: Vec::new(),
+            content_pack: None,
+            authored_action_binding: Some(AuthoredActionBindingRequestDto {
+                content_pack: reference.clone(),
+                action_id: "action.binding-glyph".to_string(),
+                actor_id: "entity-missing".to_string(),
+            }),
+        },
+    ));
+    assert_eq!(missing_actor.status, 422);
+    let missing_actor: serde_json::Value =
+        serde_json::from_slice(&missing_actor.body).expect("binding rejection is JSON");
+    assert_eq!(missing_actor["kind"], "authoredActionBinding");
+    assert_eq!(missing_actor["code"], "unknownAuthoredActionActor");
+
+    let mut stale_reference = reference.clone();
+    stale_reference.fingerprint.value = "0000000000000000".to_string();
+    let stale = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: "stale-authored-action-session".to_string(),
+            scenario_id: "binding-glyph-failed-save".to_string(),
+            participant_order: Vec::new(),
+            content_pack: None,
+            authored_action_binding: Some(AuthoredActionBindingRequestDto {
+                content_pack: stale_reference,
+                action_id: "action.binding-glyph".to_string(),
+                actor_id: "entity-warden".to_string(),
+            }),
+        },
+    ));
+    assert_eq!(stale.status, 404);
+    let stale: serde_json::Value =
+        serde_json::from_slice(&stale.body).expect("stale rejection is JSON");
+    assert_eq!(stale["kind"], "content");
+    assert_eq!(stale["code"], "contentPackNotFound");
+
+    let mut missing_resource_payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    missing_resource_payload["pack"]["id"] =
+        serde_json::json!("pack.fixture.authored.missing-resource-v3");
+    missing_resource_payload["pack"]["version"] = serde_json::json!("3.1.0");
+    missing_resource_payload["pack"]["catalogs"]["actions"][0]["resourceCosts"][0]["resourceId"] =
+        serde_json::json!("mana");
+    let missing_resource_reference =
+        import_and_activate_authored_payload(&mut router, &missing_resource_payload);
+    let missing_resource = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: "missing-resource-authored-action-session".to_string(),
+            scenario_id: "binding-glyph-failed-save".to_string(),
+            participant_order: Vec::new(),
+            content_pack: None,
+            authored_action_binding: Some(AuthoredActionBindingRequestDto {
+                content_pack: missing_resource_reference,
+                action_id: "action.binding-glyph".to_string(),
+                actor_id: "entity-warden".to_string(),
+            }),
+        },
+    ));
+    assert_eq!(missing_resource.status, 422);
+    let missing_resource: serde_json::Value =
+        serde_json::from_slice(&missing_resource.body).expect("missing-resource rejection is JSON");
+    assert_eq!(
+        missing_resource["code"],
+        "missingAuthoredActionResourcePool"
+    );
+
+    let mut target_exhausted_payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    target_exhausted_payload["pack"]["id"] =
+        serde_json::json!("pack.fixture.authored.target-exhausted-v3");
+    target_exhausted_payload["pack"]["version"] = serde_json::json!("3.2.0");
+    target_exhausted_payload["pack"]["catalogs"]["actions"][0]["targeting"]["maximumRange"] =
+        serde_json::json!(0);
+    let target_exhausted_reference =
+        import_and_activate_authored_payload(&mut router, &target_exhausted_payload);
+    let target_exhausted = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: "target-exhausted-authored-action-session".to_string(),
+            scenario_id: "binding-glyph-failed-save".to_string(),
+            participant_order: Vec::new(),
+            content_pack: None,
+            authored_action_binding: Some(AuthoredActionBindingRequestDto {
+                content_pack: target_exhausted_reference,
+                action_id: "action.binding-glyph".to_string(),
+                actor_id: "entity-warden".to_string(),
+            }),
+        },
+    ));
+    assert_eq!(target_exhausted.status, 422);
+    let target_exhausted: serde_json::Value =
+        serde_json::from_slice(&target_exhausted.body).expect("target-exhausted rejection is JSON");
+    assert_eq!(target_exhausted["code"], "authoredActionTargetExhausted");
+
+    let created = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: session_id.to_string(),
+            scenario_id: "binding-glyph-failed-save".to_string(),
+            participant_order: Vec::new(),
+            content_pack: None,
+            authored_action_binding: Some(AuthoredActionBindingRequestDto {
+                content_pack: reference.clone(),
+                action_id: "action.binding-glyph".to_string(),
+                actor_id: "entity-warden".to_string(),
+            }),
+        },
+    ));
+    assert_eq!(
+        created.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&created.body)
+    );
+    let created: LiveSessionSnapshotDto =
+        serde_json::from_slice(&created.body).expect("bound session snapshot is JSON");
+    let receipt = created
+        .authored_action_binding
+        .clone()
+        .expect("bound session exposes its receipt");
+    assert_eq!(receipt.content_pack_root, reference);
+    assert_eq!(receipt.action_id, "action.binding-glyph");
+    assert_eq!(receipt.ability_id, "ability.binding-glyph");
+    assert_eq!(receipt.actor_id, "entity-warden");
+    assert_eq!(receipt.grant.grant_kind, "sessionLocalBaseAbility");
+    assert_eq!(
+        receipt.action_definition_fingerprint.algorithm,
+        "fnv1a64.rulebench-authored-action.v1"
+    );
+
+    let started = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+        &CombatControlCommandDto {
+            kind: CombatControlCommandKindDto::ExplicitStart,
+        },
+    ));
+    let started: LiveControlExecutionDto =
+        serde_json::from_slice(&started.body).expect("start execution is JSON");
+    let option = started
+        .snapshot
+        .options
+        .actions
+        .iter()
+        .find(|option| option.action_id == "action.binding-glyph")
+        .expect("authored action is independently selectable");
+    assert_eq!(option.ability_id, "ability.binding-glyph");
+    assert_eq!(option.check_kind, "savingThrow");
+    assert!(option.available);
+    assert!(option
+        .targets
+        .iter()
+        .any(|target| target.target_id == "entity-saboteur"));
+    assert!(option
+        .resource_costs
+        .iter()
+        .any(|cost| { cost.resource_id == "standard-action" && cost.amount == 1 }));
+
+    let executed = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/intents"),
+        &CombatSessionIntentCommandDto {
+            id: "execute-authored-binding-glyph".to_string(),
+            title: "Execute authored Binding Glyph".to_string(),
+            summary: "Resolve the exact active authored action through Rust authority.".to_string(),
+            intent: UseActionIntentDto {
+                actor_id: "entity-warden".to_string(),
+                action_id: "action.binding-glyph".to_string(),
+                target_id: "entity-saboteur".to_string(),
+                target_ids: Vec::new(),
+                target_cell: None,
+                destination_cell: None,
+                observed_origin: None,
+            },
+            roll_stream: vec![5, 4],
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
+        },
+    ));
+    assert_eq!(
+        executed.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&executed.body)
+    );
+    let executed: LiveCommandExecutionDto =
+        serde_json::from_slice(&executed.body).expect("authored execution is JSON");
+    assert!(executed.step.accepted);
+    assert_eq!(
+        executed.snapshot.authored_action_binding,
+        Some(receipt.clone())
+    );
+    assert!(executed
+        .step
+        .events
+        .iter()
+        .any(|event| event.kind == "savingThrowResolved"));
+    assert!(executed
+        .step
+        .events
+        .iter()
+        .any(|event| event.kind == "damageApplied"));
+    assert!(executed
+        .step
+        .events
+        .iter()
+        .any(|event| event.kind == "modifierApplied"));
+    assert!(executed.step.trace.iter().any(|entry| {
+        entry.message == "Authored action binding verified."
+            && entry.detail.contains("action.binding-glyph")
+            && entry
+                .detail
+                .contains(&receipt.action_definition_fingerprint.value)
+    }));
+    assert!(executed.step.events.iter().any(|event| {
+        event.kind == "damageApplied" && event.summary.contains("took 8 arcane damage")
+    }));
+    assert!(executed
+        .snapshot
+        .participants
+        .iter()
+        .find(|participant| participant.id == "entity-saboteur")
+        .expect("authored target remains present")
+        .conditions
+        .iter()
+        .any(|condition| condition == "Anchored"));
+    let before_restart = executed.snapshot;
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("authored session rebinds on restart");
+    let restored = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    assert_eq!(restored.status, 200);
+    let restored: LiveSessionSnapshotDto =
+        serde_json::from_slice(&restored.body).expect("restored authored session is JSON");
+    assert_eq!(restored, before_restart);
+
+    let forked = restarted.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/session-recovery/{session_id}/fork"),
+        &SessionRecoveryForkRequestDto {
+            new_session_id: "authored-action-fork".to_string(),
+        },
+    ));
+    assert_eq!(forked.status, 200);
+    let forked: LiveSessionSnapshotDto =
+        serde_json::from_slice(&forked.body).expect("authored fork is JSON");
+    assert_eq!(forked.authored_action_binding, Some(receipt.clone()));
+    assert_eq!(forked.state_fingerprint, restored.state_fingerprint);
+    assert_eq!(
+        restarted
+            .handle(&request(
+                HttpMethod::Delete,
+                "/api/rulebench/v1/session-recovery/authored-action-fork",
+            ))
+            .status,
+        200
+    );
+
+    assert_eq!(
+        restarted
+            .handle(&json_request(
+                HttpMethod::Post,
+                &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                &CombatControlCommandDto {
+                    kind: CombatControlCommandKindDto::ExplicitEnd,
+                },
+            ))
+            .status,
+        200
+    );
+    assert_eq!(
+        restarted
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/sessions/{session_id}"),
+            ))
+            .status,
+        200
+    );
+    drop(restarted);
+
+    let mut finalized =
+        build_durable_rulebench_router(&directory).expect("authored replay rebinds on restart");
+    let replay = finalized.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/live-{session_id}"),
+    ));
+    assert_eq!(replay.status, 200);
+    let replay: ReplayPackageReviewDto =
+        serde_json::from_slice(&replay.body).expect("authored replay review is JSON");
+    assert_eq!(replay.authored_action_binding, Some(receipt.clone()));
+    assert!(replay
+        .commands
+        .iter()
+        .all(|command| { command.snapshot.authored_action_binding.as_ref() == Some(&receipt) }));
+    let verified = finalized.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/live-{session_id}/verify"),
+    ));
+    let verified: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&verified.body).expect("authored replay verification is JSON");
+    assert!(verified.accepted);
+    assert!(verified.finalized);
+    drop(finalized);
+
+    let package_id = format!("live-{session_id}");
+    let encoded_package_id = package_id
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let replay_path = directory
+        .join("replays")
+        .join(format!("{encoded_package_id}.replay.json"));
+    let mut envelope: serde_json::Value =
+        serde_json::from_slice(&fs::read(&replay_path).expect("bound replay artifact can be read"))
+            .expect("bound replay envelope is JSON");
+    envelope["payload"]["authoredActionBinding"]["actionId"] =
+        serde_json::json!("action.corrupted-after-commit");
+    fs::write(
+        &replay_path,
+        serde_json::to_vec_pretty(&envelope).expect("tampered envelope serializes"),
+    )
+    .expect("tampered replay is committed for restart probe");
+    let mut quarantined =
+        build_durable_rulebench_router(&directory).expect("corrupt bound replay is quarantined");
+    assert!(
+        quarantined.repository_status().issues.iter().any(|issue| {
+            issue.artifact_kind == "replay" && issue.code == "replayIntegrityMismatchQuarantined"
+        }),
+        "{:?}",
+        quarantined.repository_status().issues
+    );
+    assert_eq!(
+        quarantined
+            .handle(&request(
+                HttpMethod::Get,
+                &format!("/api/rulebench/v1/replays/{package_id}"),
+            ))
+            .status,
+        404
+    );
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
+fn authored_reaction_selectors_materialize_and_resume_through_the_normal_runtime() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-reaction-binding-{}-{sequence}",
+        std::process::id()
+    ));
+    let session_id = "authored-reaction-live-session";
+    let mut payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    payload["pack"]["id"] = serde_json::json!("pack.fixture.authored.reaction-v3");
+    payload["pack"]["version"] = serde_json::json!("3.1.0");
+    payload["pack"]["rulesetId"] = serde_json::json!("asha-rulebench.hexing-bolt.v0");
+    payload["pack"]["catalogs"]["rulesets"][0]["id"] =
+        serde_json::json!("asha-rulebench.hexing-bolt.v0");
+    payload["pack"]["catalogs"]["rulesets"][0]["version"] = serde_json::json!("0.0.0");
+    payload["pack"]["catalogs"]["rulesets"][0]["modules"] = serde_json::json!([{
+        "module": "actionResolution",
+        "version": "1",
+        "configuration": {
+            "module": "actionResolution",
+            "targetingPolicy": "declaredTargetsAndLineOfSight",
+            "supportedCheckHandlers": ["attackVsDefense"]
+        }
+    }]);
+    payload["pack"]["catalogs"]["abilities"][0]["id"] =
+        serde_json::json!("ability.authored-reaction");
+    let action = &mut payload["pack"]["catalogs"]["actions"][0];
+    action["id"] = serde_json::json!("action.authored-reaction");
+    action["abilityId"] = serde_json::json!("ability.authored-reaction");
+    action["targeting"]["maximumRange"] = serde_json::json!(10);
+    action["targeting"]["operationPipeline"] = serde_json::Value::Null;
+    action["check"] = serde_json::json!({
+        "kind": "attack",
+        "modifier": 4,
+        "modifierStatId": "mind",
+        "defense": { "id": "nerve", "label": "Nerve" }
+    });
+    action["effects"]
+        .as_array_mut()
+        .expect("effects are an array")
+        .push(serde_json::json!({
+            "operation": "openReactionWindow",
+            "hookId": "authored-counter-window",
+            "window": "beforeEffect",
+            "eligibleReactors": ["declaredTargets"],
+            "options": [{
+                "id": "counter",
+                "reactor": "declaredTargets",
+                "opensNestedWindow": false
+            }],
+            "maximumNestedDepth": 0
+        }));
+
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": serde_json::to_string(&payload).expect("payload serializes"),
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("reaction import is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .expect("accepted import has an outcome")
+        .review
+        .pack
+        .reference;
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/content/activate",
+                &serde_json::json!({ "reference": reference }),
+            ))
+            .status,
+        200
+    );
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/sessions",
+                &CombatSessionCreateRequestDto {
+                    session_id: session_id.to_string(),
+                    scenario_id: "hexing-bolt-hit".to_string(),
+                    participant_order: Vec::new(),
+                    content_pack: None,
+                    authored_action_binding: Some(AuthoredActionBindingRequestDto {
+                        content_pack: reference,
+                        action_id: "action.authored-reaction".to_string(),
+                        actor_id: "entity-adept".to_string(),
+                    }),
+                },
+            ))
+            .status,
+        200
+    );
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                &CombatControlCommandDto {
+                    kind: CombatControlCommandKindDto::ExplicitStart,
+                },
+            ))
+            .status,
+        200
+    );
+    let executed = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/intents"),
+        &CombatSessionIntentCommandDto {
+            id: "open-authored-reaction".to_string(),
+            title: "Open authored reaction".to_string(),
+            summary: "Resolve the canonical authored reaction hook.".to_string(),
+            intent: UseActionIntentDto {
+                actor_id: "entity-adept".to_string(),
+                action_id: "action.authored-reaction".to_string(),
+                target_id: "entity-raider".to_string(),
+                target_ids: Vec::new(),
+                target_cell: None,
+                destination_cell: None,
+                observed_origin: None,
+            },
+            roll_stream: vec![17, 4],
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
+        },
+    ));
+    assert_eq!(
+        executed.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&executed.body)
+    );
+    let executed: LiveCommandExecutionDto =
+        serde_json::from_slice(&executed.body).expect("reaction execution is JSON");
+    let window = executed
+        .snapshot
+        .current_reaction_window
+        .expect("authored reaction window opens");
+    assert_eq!(window.hook_id, "authored-counter-window");
+    assert_eq!(window.current_reactor_id.as_deref(), Some("entity-raider"));
+    assert_eq!(window.options[0].option_id, "counter@entity-raider");
+    assert_eq!(window.options[0].reactor_id, "entity-raider");
+
+    let resumed = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/reactions"),
+        &ReactionCommandSpecDto {
+            window_id: window.id,
+            reactor_id: "entity-raider".to_string(),
+            response_kind: ReactionResponseKindDto::Pass,
+            option_id: None,
+        },
+    ));
+    let resumed: LiveReactionExecutionDto =
+        serde_json::from_slice(&resumed.body).expect("reaction resume is JSON");
+    assert!(resumed.reaction.accepted);
+    assert!(resumed.reaction.resumed_pending_resolution);
+    assert!(resumed.snapshot.current_reaction_window.is_none());
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
 fn authored_ability_v2_survives_restart_and_binds_second_provider_replay() {
     let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let directory = std::env::temp_dir().join(format!(
@@ -1215,6 +1792,7 @@ fn authored_ability_v2_survives_restart_and_binds_second_provider_replay() {
             scenario_id: scenario.id.clone(),
             participant_order: Vec::new(),
             content_pack: Some(reference.clone()),
+            authored_action_binding: None,
         },
     ));
     assert_eq!(
@@ -1312,6 +1890,40 @@ fn authored_content_payload(
     .expect("authored fixture serializes")
 }
 
+fn import_and_activate_authored_payload(
+    router: &mut ProcessHostRouter,
+    payload: &serde_json::Value,
+) -> ContentPackReferenceDto {
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": serde_json::to_string(payload).expect("payload serializes"),
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("variant import is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .expect("accepted variant has an outcome")
+        .review
+        .pack
+        .reference;
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/content/activate",
+                &serde_json::json!({ "reference": reference }),
+            ))
+            .status,
+        200
+    );
+    reference
+}
+
 #[test]
 fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
     let mut router = router();
@@ -1335,6 +1947,7 @@ fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
                     scenario_id,
                     participant_order: Vec::new(),
                     content_pack: None,
+                    authored_action_binding: None,
                 },
             ))
             .status,
@@ -1539,6 +2152,7 @@ fn durable_router_reconstructs_a_suspended_reaction_before_resuming_it() {
                     scenario_id,
                     participant_order: Vec::new(),
                     content_pack: None,
+                    authored_action_binding: None,
                 },
             ))
             .status,
@@ -1661,6 +2275,7 @@ fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
                     scenario_id: scenario_id.clone(),
                     participant_order: Vec::new(),
                     content_pack: None,
+                    authored_action_binding: None,
                 },
             ));
             assert_eq!(created.status, 200);
@@ -1691,6 +2306,7 @@ fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
             scenario_id: scenario_id.clone(),
             participant_order: Vec::new(),
             content_pack: None,
+            authored_action_binding: None,
         },
     ));
     assert_eq!(retained_archive.status, 409);
@@ -1704,6 +2320,7 @@ fn router_closes_recreates_and_restarts_with_isolated_in_memory_state() {
             scenario_id,
             participant_order: Vec::new(),
             content_pack: None,
+            authored_action_binding: None,
         },
     ));
     assert_eq!(recreated.status, 200);

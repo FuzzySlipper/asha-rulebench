@@ -357,6 +357,7 @@ pub(crate) mod tests {
                 seed_label: "replay-test".to_string(),
             },
             content_pack_set: Some(content_pack_set()),
+            authored_action_binding: None,
             selected_ruleset_id: ruleset.id.clone(),
             rulesets: vec![ruleset],
             grid: Grid {

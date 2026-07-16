@@ -22,6 +22,7 @@ import {
 } from "@asha-rulebench/domain";
 import { browserClock, type ClockPort } from "@asha-rulebench/platform";
 import type {
+  RulebenchAuthoredActionBindingRequestDto,
   RulebenchAutomaticRunSpecDto,
   RulebenchAutomaticStepSpecDto,
   RulebenchAutomationPolicyCatalogEntryDto,
@@ -354,6 +355,7 @@ export class LiveCombatStore {
     scenarioId: string,
     participantOrder: readonly string[],
     contentPack: RulebenchContentPackReferenceDto | null = null,
+    authoredActionBinding: RulebenchAuthoredActionBindingRequestDto | null = null,
   ): Promise<void> {
     this.selectSessionIdentity(sessionId);
     const generation = this.sessionGeneration;
@@ -363,6 +365,7 @@ export class LiveCombatStore {
       scenarioId,
       participantOrder,
       contentPack,
+      authoredActionBinding,
     });
     if (!this.isCurrent(sessionId, generation)) return;
     this._snapshot.set(

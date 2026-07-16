@@ -25,6 +25,7 @@ impl ContentDiagnosticSeverity {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentDiagnosticCode {
     InvalidContentPackSetReference,
+    InvalidAuthoredActionBindingReceipt,
     EmptyRulesetId,
     DuplicateRulesetId,
     SelectedRulesetMissingFromCatalog,
@@ -138,6 +139,9 @@ impl ContentDiagnosticCode {
         match self {
             ContentDiagnosticCode::InvalidContentPackSetReference => {
                 "invalidContentPackSetReference"
+            }
+            ContentDiagnosticCode::InvalidAuthoredActionBindingReceipt => {
+                "invalidAuthoredActionBindingReceipt"
             }
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
             ContentDiagnosticCode::DuplicateRulesetId => "duplicateRulesetId",

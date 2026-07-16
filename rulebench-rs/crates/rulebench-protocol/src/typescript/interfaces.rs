@@ -300,6 +300,101 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "contentPack?",
                     ty: "RulebenchContentPackReferenceDto | null",
                 },
+                Field {
+                    name: "authoredActionBinding?",
+                    ty: "RulebenchAuthoredActionBindingRequestDto | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredActionBindingRequestDto",
+            fields: &[
+                Field {
+                    name: "contentPack",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actorId",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredActionAbilityGrantReceiptDto",
+            fields: &[
+                Field {
+                    name: "grantKind",
+                    ty: "'sessionLocalBaseAbility'",
+                },
+                Field {
+                    name: "actorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredActionBindingReceiptDto",
+            fields: &[
+                Field {
+                    name: "bindingVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "contentPackRoot",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "contentPackReferences",
+                    ty: "readonly RulebenchContentPackReferenceDto[]",
+                },
+                Field {
+                    name: "contentPackSetFingerprint",
+                    ty: "RulebenchContentFingerprintDto",
+                },
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actionDefinitionFingerprint",
+                    ty: "RulebenchContentFingerprintDto",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actorId",
+                    ty: "string",
+                },
+                Field {
+                    name: "grant",
+                    ty: "RulebenchAuthoredActionAbilityGrantReceiptDto",
+                },
+                Field {
+                    name: "targetingOperationVocabularyVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "checkVocabularyVersion",
+                    ty: "string",
+                },
+                Field {
+                    name: "effectOperationVocabularyVersion",
+                    ty: "string",
+                },
             ],
         },
         Interface {
@@ -3971,6 +4066,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "contentPackReferences",
                     ty: "readonly RulebenchContentPackReferenceDto[]",
+                },
+                Field {
+                    name: "authoredActionBinding",
+                    ty: "RulebenchAuthoredActionBindingReceiptDto | null",
                 },
                 Field {
                     name: "commandCount",

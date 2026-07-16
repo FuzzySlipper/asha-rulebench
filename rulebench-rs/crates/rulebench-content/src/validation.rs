@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     Combatant, ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity,
     ContentValidationReport, ModifierDurationPolicy, RulebenchScenario, StatDefinitionKind,
+    AUTHORED_ACTION_BINDING_VERSION, AUTHORED_ACTION_CHECK_VOCABULARY_VERSION,
+    AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM,
 };
 use rulebench_ruleset::{
     ActionDefinition, ActionResourceRefreshPolicy, AttackCheckDeclaration, CheckDeclaration,
@@ -31,6 +33,8 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
             "Scenario content pack-set reference is not internally consistent.",
         ));
     }
+
+    validate_authored_action_binding(scenario, &mut diagnostics);
 
     validate_rulesets(scenario, &mut diagnostics);
     validate_entities(scenario, &mut diagnostics);
@@ -79,6 +83,46 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_authored_action_binding(
+    scenario: &RulebenchScenario,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let Some(binding) = &scenario.authored_action_binding else {
+        return;
+    };
+    let coherent = binding.binding_version == AUTHORED_ACTION_BINDING_VERSION
+        && scenario.content_pack_set.as_ref() == Some(&binding.content_pack_set)
+        && binding.content_pack_set.is_self_consistent()
+        && binding.action_definition_fingerprint.algorithm
+            == AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM
+        && !binding.action_definition_fingerprint.value.is_empty()
+        && binding.scenario_id == scenario.metadata.id
+        && binding.grant.actor_id == binding.actor_id
+        && binding.grant.ability_id == binding.ability_id
+        && binding.check_vocabulary_version == AUTHORED_ACTION_CHECK_VOCABULARY_VERSION
+        && binding.targeting_operation_vocabulary_version
+            == rulebench_ruleset::OperationPipelineV2::VOCABULARY_VERSION
+        && binding.effect_operation_vocabulary_version
+            == rulebench_ruleset::EffectOperationId::VOCABULARY_VERSION
+        && scenario.actions.iter().any(|action| {
+            action.id == binding.action_id
+                && action.ability_id == binding.ability_id
+                && action.actor_id == binding.actor_id
+        })
+        && scenario.combatants.iter().any(|combatant| {
+            combatant.id == binding.actor_id
+                && combatant.base_ability_ids.contains(&binding.ability_id)
+        })
+        && scenario.ability_by_id(&binding.ability_id).is_some();
+    if !coherent {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::InvalidAuthoredActionBindingReceipt,
+            Some(binding.action_id.clone()),
+            "The authored-action binding receipt does not match the materialized scenario.",
+        ));
+    }
 }
 
 fn validate_rulesets(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDiagnostic>) {

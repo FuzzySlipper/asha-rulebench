@@ -355,6 +355,7 @@ impl RulebenchBridge {
                 scenario_id: planned.scenario_id.clone(),
                 participant_order: Vec::new(),
                 content_pack: None,
+                authored_action_binding: None,
             },
         )?;
         let result = (|| {

@@ -1,13 +1,13 @@
 /// Session command, audit, and snapshot readbacks.
 use super::{
     ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
-    ClassBuildLedgerReadout, CombatControlHistoryEntry, CombatLifecycle, CombatLifecyclePhase,
-    CombatTurnOrder, CommandOutcomeClass, ContentPackSetReference, EquipmentLedgerReadout,
-    EquipmentTransitionEntry, GridPosition, LifecycleTransitionEntry, LifecycleTransitionTrigger,
-    ModifierDurationExpirationEntry, ReactionAuditEntry, ReactionWindowLifecycleEntry,
-    ReactionWindowReadout, RollConsumptionEntry, RollRequestKind, RulebenchReceipt,
-    RulebenchRejection, RulebenchScenario, ScenarioProjection, StateFingerprint, TargetKind,
-    TargetLegality, TurnTransitionEntry, UseActionIntent,
+    AuthoredActionBindingReceipt, ClassBuildLedgerReadout, CombatControlHistoryEntry,
+    CombatLifecycle, CombatLifecyclePhase, CombatTurnOrder, CommandOutcomeClass,
+    ContentPackSetReference, EquipmentLedgerReadout, EquipmentTransitionEntry, GridPosition,
+    LifecycleTransitionEntry, LifecycleTransitionTrigger, ModifierDurationExpirationEntry,
+    ReactionAuditEntry, ReactionWindowLifecycleEntry, ReactionWindowReadout, RollConsumptionEntry,
+    RollRequestKind, RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection,
+    StateFingerprint, TargetKind, TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
 use rulebench_gameplay_module::RulebenchGameplayFabricReadout;
 use rulebench_ruleset::{ActionResourceCost, CheckHandlerKind, CombatEndPolicy};
@@ -458,6 +458,7 @@ pub struct CombatSessionStepReadout {
 pub struct CombatSessionSnapshot {
     pub session_id: String,
     pub content_pack_set: Option<ContentPackSetReference>,
+    pub authored_action_binding: Option<AuthoredActionBindingReceipt>,
     pub next_step_index: u32,
     pub lifecycle: CombatLifecycle,
     pub lifecycle_transition_log: Vec<LifecycleTransitionEntry>,

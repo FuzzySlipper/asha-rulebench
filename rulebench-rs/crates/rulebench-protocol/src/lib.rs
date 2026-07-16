@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod authored_action;
+mod authored_action_binding;
 mod authoring;
 mod bridge;
 mod capabilities;
@@ -32,6 +33,10 @@ pub use authored_action::{
     AuthoredTargetFailurePolicyDto, AuthoredTargetKindDto, AuthoredTargetOrderPolicyDto,
     AuthoredTargetSelectionDto, AuthoredTargetTeamConstraintDto, AuthoredTargetingDeclarationDto,
     AuthoredVisibilityRequirementDto,
+};
+pub use authored_action_binding::{
+    AuthoredActionAbilityGrantReceiptDto, AuthoredActionBindingReceiptDto,
+    AuthoredActionBindingRequestDto,
 };
 pub use authoring::{
     validate_ruleset_definition, RuleModuleConfigurationDto, RuleModuleDeclarationDto,

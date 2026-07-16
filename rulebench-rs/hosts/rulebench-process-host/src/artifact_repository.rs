@@ -2,9 +2,12 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use rulebench_bridge::content_storage::ImportedContentPack;
 use rulebench_bridge::replay_storage::{
-    record_replay_package, CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec,
-    CombatControlCommandSpec, CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
+    bind_authored_action, record_replay_package, AuthoredActionAbilityGrantReceipt,
+    AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
+    CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
+    CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
     CombatSessionCandidateSelectionSpec, CombatSessionCreateRequest,
     CombatSessionIntentCommandSpec, CommandRollMode, ContentFingerprint, ContentPackReference,
     ContentPackSetReference, EquipmentCommandKind, EquipmentCommandSpec, GridPosition,
@@ -44,6 +47,7 @@ pub struct ReplayStorageOpenReport {
 pub struct FileReplayArchiveStorage {
     root: PathBuf,
     scenarios: BTreeMap<String, BridgeScenario>,
+    binding_sources: BTreeMap<ContentPackReference, ImportedContentPack>,
     entries: BTreeMap<String, ReplayArchiveEntry>,
 }
 
@@ -57,6 +61,7 @@ pub struct SessionRecoveryOpenReport {
 pub struct FileSessionRecoveryStorage {
     root: PathBuf,
     scenarios: BTreeMap<String, BridgeScenario>,
+    binding_sources: BTreeMap<ContentPackReference, ImportedContentPack>,
     packages: BTreeMap<String, SessionRecoveryPackage>,
 }
 
@@ -64,6 +69,14 @@ impl FileSessionRecoveryStorage {
     pub fn open(
         root: impl Into<PathBuf>,
         scenarios: impl IntoIterator<Item = BridgeScenario>,
+    ) -> Result<SessionRecoveryOpenReport, ArtifactRepositoryIssue> {
+        Self::open_with_content_bindings(root, scenarios, BTreeMap::new())
+    }
+
+    pub fn open_with_content_bindings(
+        root: impl Into<PathBuf>,
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        binding_sources: BTreeMap<ContentPackReference, ImportedContentPack>,
     ) -> Result<SessionRecoveryOpenReport, ArtifactRepositoryIssue> {
         let root = root.into();
         fs::create_dir_all(&root).map_err(|_| {
@@ -81,6 +94,7 @@ impl FileSessionRecoveryStorage {
         let mut storage = Self {
             root,
             scenarios,
+            binding_sources,
             packages: BTreeMap::new(),
         };
         let issues = storage.load_packages()?;
@@ -181,7 +195,12 @@ impl FileSessionRecoveryStorage {
         let frame = envelope.frame.to_authority();
         let package = envelope
             .payload
-            .to_recovery(envelope.generation, frame, &self.scenarios)
+            .to_recovery(
+                envelope.generation,
+                frame,
+                &self.scenarios,
+                &self.binding_sources,
+            )
             .map_err(|message| {
                 issue(
                     "sessionRecovery",
@@ -249,6 +268,14 @@ impl FileReplayArchiveStorage {
         root: impl Into<PathBuf>,
         scenarios: impl IntoIterator<Item = BridgeScenario>,
     ) -> Result<ReplayStorageOpenReport, ArtifactRepositoryIssue> {
+        Self::open_with_content_bindings(root, scenarios, BTreeMap::new())
+    }
+
+    pub fn open_with_content_bindings(
+        root: impl Into<PathBuf>,
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        binding_sources: BTreeMap<ContentPackReference, ImportedContentPack>,
+    ) -> Result<ReplayStorageOpenReport, ArtifactRepositoryIssue> {
         let root = root.into();
         fs::create_dir_all(&root).map_err(|_| {
             issue(
@@ -265,6 +292,7 @@ impl FileReplayArchiveStorage {
         let mut storage = Self {
             root,
             scenarios,
+            binding_sources,
             entries: BTreeMap::new(),
         };
         let mut issues = storage.load_entries()?;
@@ -397,7 +425,7 @@ impl FileReplayArchiveStorage {
         }
         let entry = envelope
             .payload
-            .to_entry(&self.scenarios)
+            .to_entry(&self.scenarios, &self.binding_sources)
             .map_err(|message| {
                 issue(
                     "replay",
@@ -511,10 +539,11 @@ impl ReplayArchiveStorage for FileReplayArchiveStorage {
     fn write(&mut self, entry: ReplayArchiveEntry) -> Result<(), ReplayArchiveStorageError> {
         let package_id = entry.metadata.package_id.clone();
         let envelope = StoredReplayEnvelope::from_entry(&entry);
-        let reconstructs_exactly = envelope
-            .payload
-            .to_entry(&self.scenarios)
-            .is_ok_and(|rebuilt| rebuilt == entry);
+        let reconstructs_exactly = envelope.payload.authored_action_binding.is_some()
+            || envelope
+                .payload
+                .to_entry(&self.scenarios, &self.binding_sources)
+                .is_ok_and(|rebuilt| rebuilt == entry);
         if !reconstructs_exactly {
             return Err(ReplayArchiveStorageError::WriteFailed { package_id });
         }
@@ -631,6 +660,8 @@ struct StoredReplayPayload {
     scenario_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     content_pack_set: Option<StoredContentPackSet>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    authored_action_binding: Option<StoredAuthoredActionBindingReceipt>,
     participants: Vec<StoredParticipant>,
     ruleset: StoredRulesetProvenance,
     completed_at: String,
@@ -652,6 +683,12 @@ impl StoredReplayPayload {
                 .content_pack_set
                 .as_ref()
                 .map(StoredContentPackSet::from_authority),
+            authored_action_binding: package
+                .initial_session
+                .scenario
+                .authored_action_binding
+                .as_ref()
+                .map(StoredAuthoredActionBindingReceipt::from_authority),
             participants: package
                 .initial_session
                 .scenario
@@ -692,6 +729,7 @@ impl StoredReplayPayload {
     fn to_entry(
         &self,
         scenarios: &BTreeMap<String, BridgeScenario>,
+        binding_sources: &BTreeMap<ContentPackReference, ImportedContentPack>,
     ) -> Result<ReplayArchiveEntry, String> {
         let bridge_scenario = scenarios.get(&self.scenario_id).ok_or_else(|| {
             format!(
@@ -702,7 +740,38 @@ impl StoredReplayPayload {
         let mut scenario = bridge_scenario.scenario.clone();
         apply_participant_configuration(&mut scenario.combatants, &self.participants)?;
         let mut scenario = prepare_replay_scenario(scenario);
-        if let Some(content_pack_set) = &self.content_pack_set {
+        if let Some(stored_binding) = &self.authored_action_binding {
+            let expected_binding = stored_binding.to_authority()?;
+            let imported = binding_sources
+                .get(&expected_binding.content_pack_set.root)
+                .ok_or_else(|| {
+                    format!(
+                        "Authored action content is unavailable for exact root {}@{}.",
+                        expected_binding.content_pack_set.root.id,
+                        expected_binding.content_pack_set.root.version
+                    )
+                })?;
+            scenario = bind_authored_action(
+                scenario,
+                imported,
+                &AuthoredActionBindingRequest {
+                    content_pack: expected_binding.content_pack_set.root.clone(),
+                    action_id: expected_binding.action_id.clone(),
+                    actor_id: expected_binding.actor_id.clone(),
+                },
+            )
+            .map_err(|error| {
+                format!(
+                    "Authored action rebinding failed with {}: {}",
+                    error.code, error.message
+                )
+            })?;
+            if scenario.authored_action_binding.as_ref() != Some(&expected_binding) {
+                return Err(
+                    "Authored action binding receipt no longer reconstructs exactly.".to_string(),
+                );
+            }
+        } else if let Some(content_pack_set) = &self.content_pack_set {
             scenario.content_pack_set = Some(content_pack_set.to_authority()?);
         }
         let ruleset = scenario
@@ -751,8 +820,9 @@ impl StoredReplayPayload {
         generation: u64,
         expected_frame: SessionRecoveryFrame,
         scenarios: &BTreeMap<String, BridgeScenario>,
+        binding_sources: &BTreeMap<ContentPackReference, ImportedContentPack>,
     ) -> Result<SessionRecoveryPackage, String> {
-        let entry = self.to_entry(scenarios)?;
+        let entry = self.to_entry(scenarios, binding_sources)?;
         let commands = entry
             .package
             .commands
@@ -846,6 +916,67 @@ struct StoredContentPackSet {
     root: StoredContentPackReference,
     packs: Vec<StoredContentPackReference>,
     fingerprint: StoredContentFingerprint,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredAuthoredActionBindingReceipt {
+    binding_version: String,
+    content_pack_set: StoredContentPackSet,
+    action_id: String,
+    action_definition_fingerprint: StoredContentFingerprint,
+    ability_id: String,
+    scenario_id: String,
+    actor_id: String,
+    grant_actor_id: String,
+    grant_ability_id: String,
+    targeting_operation_vocabulary_version: String,
+    check_vocabulary_version: String,
+    effect_operation_vocabulary_version: String,
+}
+
+impl StoredAuthoredActionBindingReceipt {
+    fn from_authority(value: &AuthoredActionBindingReceipt) -> Self {
+        Self {
+            binding_version: value.binding_version.clone(),
+            content_pack_set: StoredContentPackSet::from_authority(&value.content_pack_set),
+            action_id: value.action_id.clone(),
+            action_definition_fingerprint: StoredContentFingerprint::from_authority(
+                &value.action_definition_fingerprint,
+            ),
+            ability_id: value.ability_id.clone(),
+            scenario_id: value.scenario_id.clone(),
+            actor_id: value.actor_id.clone(),
+            grant_actor_id: value.grant.actor_id.clone(),
+            grant_ability_id: value.grant.ability_id.clone(),
+            targeting_operation_vocabulary_version: value
+                .targeting_operation_vocabulary_version
+                .clone(),
+            check_vocabulary_version: value.check_vocabulary_version.clone(),
+            effect_operation_vocabulary_version: value.effect_operation_vocabulary_version.clone(),
+        }
+    }
+
+    fn to_authority(&self) -> Result<AuthoredActionBindingReceipt, String> {
+        Ok(AuthoredActionBindingReceipt {
+            binding_version: self.binding_version.clone(),
+            content_pack_set: self.content_pack_set.to_authority()?,
+            action_id: self.action_id.clone(),
+            action_definition_fingerprint: self.action_definition_fingerprint.to_authority(),
+            ability_id: self.ability_id.clone(),
+            scenario_id: self.scenario_id.clone(),
+            actor_id: self.actor_id.clone(),
+            grant: AuthoredActionAbilityGrantReceipt {
+                actor_id: self.grant_actor_id.clone(),
+                ability_id: self.grant_ability_id.clone(),
+            },
+            targeting_operation_vocabulary_version: self
+                .targeting_operation_vocabulary_version
+                .clone(),
+            check_vocabulary_version: self.check_vocabulary_version.clone(),
+            effect_operation_vocabulary_version: self.effect_operation_vocabulary_version.clone(),
+        })
+    }
 }
 
 impl StoredContentPackSet {
@@ -1665,7 +1796,7 @@ mod tests {
             .map(|scenario| (scenario.scenario.metadata.id.clone(), scenario))
             .collect::<BTreeMap<_, _>>();
         let rebuilt = StoredReplayPayload::from_entry(&expected)
-            .to_entry(&scenario_map)
+            .to_entry(&scenario_map, &BTreeMap::new())
             .expect("fixture reconstructs");
         assert_eq!(
             rebuilt.package.initial_session,

@@ -34,7 +34,6 @@ pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
         "UseActionIntent received.",
         "Structural intent validation started.",
     )];
-
     if intent.actor_id.is_empty() {
         return rejected(intent.clone(), RulebenchRejection::EmptyActorId, trace);
     }
@@ -63,7 +62,7 @@ pub fn resolve_use_action(
     intent: UseActionIntent,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
-    let trace = vec![TraceEntry::new(
+    let mut trace = vec![TraceEntry::new(
         1,
         TracePhase::Proposal,
         TraceStatus::Info,
@@ -73,6 +72,27 @@ pub fn resolve_use_action(
             intent.actor_id, intent.action_id, intent.target_id
         ),
     )];
+    if let Some(binding) = scenario
+        .authored_action_binding
+        .as_ref()
+        .filter(|binding| binding.action_id == intent.action_id)
+    {
+        trace.push(TraceEntry::new(
+            trace.len() as u32 + 1,
+            TracePhase::Validation,
+            TraceStatus::Info,
+            "Authored action binding verified.",
+            format!(
+                "Pack {}@{} action {} ({}) granted ability {} to actor {}.",
+                binding.content_pack_set.root.id,
+                binding.content_pack_set.root.version,
+                binding.action_id,
+                binding.action_definition_fingerprint.value,
+                binding.ability_id,
+                binding.actor_id
+            ),
+        ));
+    }
 
     if intent.actor_id.is_empty() {
         return rejected_with_projection(

@@ -8,6 +8,9 @@ use rulebench_ruleset::{
     MovementKind, RuleModuleConfiguration, RulesetArtifactProvenance,
 };
 
+pub const AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM: &str =
+    "fnv1a64.rulebench-authored-action.v1";
+
 pub fn canonicalize_content_pack(definition: ContentPackDefinition) -> CanonicalContentPack {
     let mut pack = CanonicalContentPack {
         canonical_version: definition.canonical_version,
@@ -41,6 +44,17 @@ pub fn fingerprint_content_pack_set(
     let mut sorted_packs = packs.to_vec();
     sorted_packs.sort();
     fingerprint_pack_set_fields(root, &sorted_packs)
+}
+
+pub fn fingerprint_authored_action(action: &AuthoredActionDefinition) -> ContentFingerprint {
+    let mut encoder = FingerprintEncoder::new();
+    encoder.feed_str(AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM);
+    encoder.feed_str("authoredActionDefinition");
+    feed_action(&mut encoder, action);
+    ContentFingerprint {
+        algorithm: AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM.to_string(),
+        value: encoder.finish_hex(),
+    }
 }
 
 fn canonicalize_pack_fields(pack: &mut CanonicalContentPack) {

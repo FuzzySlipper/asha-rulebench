@@ -10,6 +10,21 @@ describe("ReplayReviewStore", () => {
       contentPackRoot: { id: "pack.authored", version: "2.0.0", fingerprint: { algorithm: "pack", value: "root" } },
       contentPackSetFingerprint: { algorithm: "set", value: "exact" },
       contentPackReferences: [{ id: "pack.authored", version: "2.0.0", fingerprint: { algorithm: "pack", value: "root" } }],
+      authoredActionBinding: {
+        bindingVersion: "1",
+        contentPackRoot: { id: "pack.authored", version: "2.0.0", fingerprint: { algorithm: "pack", value: "root" } },
+        contentPackReferences: [{ id: "pack.authored", version: "2.0.0", fingerprint: { algorithm: "pack", value: "root" } }],
+        contentPackSetFingerprint: { algorithm: "set", value: "exact" },
+        actionId: "action.binding-glyph",
+        actionDefinitionFingerprint: { algorithm: "action", value: "exact-action" },
+        abilityId: "ability.binding-glyph",
+        scenarioId: "scenario",
+        actorId: "entity-warden",
+        grant: { grantKind: "sessionLocalBaseAbility", actorId: "entity-warden", abilityId: "ability.binding-glyph" },
+        targetingOperationVocabularyVersion: "2",
+        checkVocabularyVersion: "1",
+        effectOperationVocabularyVersion: "1",
+      },
       finalStateFingerprint: { algorithm: "test", value: "final" }, fingerprintKind: "deterministicNonCryptographic", narrationTitle: null, narrationSummary: null, commands: [],
     };
     const verification: RulebenchReplayVerificationReadoutDto = {
@@ -31,6 +46,7 @@ describe("ReplayReviewStore", () => {
       contentPackRootLabel: "pack.authored@2.0.0 · pack:root",
       contentPackSetFingerprintLabel: "set:exact",
       contentPackReferenceLabels: ["pack.authored@2.0.0 · pack:root"],
+      authoredActionBindingLabel: "action.binding-glyph · entity-warden · action:exact-action",
       finalFingerprintLabel: "test:final", commands: [],
     } });
     expect(store.verification()).toEqual({ kind: "data", value: {

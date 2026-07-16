@@ -438,6 +438,26 @@ impl ContentWorkspace {
         Ok(imported.resolved_set.reference.clone())
     }
 
+    pub fn active_imported_pack(
+        &self,
+        reference: &ContentPackReference,
+    ) -> Result<ImportedContentPack, ContentWorkspaceError> {
+        self.active_pack_set(reference)?;
+        self.imported
+            .get(reference)
+            .cloned()
+            .ok_or_else(|| ContentWorkspaceError {
+                code: "contentPackNotRevalidated".to_string(),
+                message: "The exact active content pack has no revalidated authority source."
+                    .to_string(),
+                retryable: false,
+            })
+    }
+
+    pub fn binding_sources(&self) -> BTreeMap<ContentPackReference, ImportedContentPack> {
+        self.imported.clone()
+    }
+
     pub fn ruleset_for(
         &self,
         reference: &ContentPackReference,

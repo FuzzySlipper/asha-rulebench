@@ -59,8 +59,10 @@ pub use rulebench_combat::{
     STATE_FINGERPRINT_ALGORITHM,
 };
 pub use rulebench_content::{
-    canonicalize_content_pack, compare_content_packs, fingerprint_content_pack_set,
-    import_content_pack, validate_scenario_content, validate_scenario_content_report,
+    bind_authored_action, canonicalize_content_pack, compare_content_packs,
+    fingerprint_authored_action, fingerprint_content_pack_set, import_content_pack,
+    validate_scenario_content, validate_scenario_content_report, AuthoredActionAbilityGrantReceipt,
+    AuthoredActionBindingError, AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
     AuthoredActionDefinition, AuthoredContentPack, AuthoredEffectOperation,
     AuthoredModifierEffectOperation, AuthoredReactionHookEffectOperation,
     AuthoredReactionOptionDeclaration, AuthoredTargetingDeclaration, CanonicalContentPack,
@@ -73,6 +75,8 @@ pub use rulebench_content::{
     ContentPackSetReference, ContentPackSourceKind, ContentPackStorage, ContentStorageError,
     ContentStorageRecord, ContentStorageStartupIssue, EntityDefinition, ImportedContentPack,
     ReactionParticipantSelector, StorageReplacementPolicy, StoredContentPayload,
+    AUTHORED_ACTION_BINDING_VERSION, AUTHORED_ACTION_CHECK_VOCABULARY_VERSION,
+    AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM, AUTHORED_ACTION_REACTION_EXPANSION_LIMIT,
     CONTENT_PACK_FINGERPRINT_ALGORITHM, CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
     CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };

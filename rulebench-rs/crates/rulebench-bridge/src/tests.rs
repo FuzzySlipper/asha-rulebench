@@ -184,6 +184,7 @@ fn minimal_scenario() -> RulebenchScenario {
             seed_label: "bridge-contract".to_string(),
         },
         content_pack_set: None,
+        authored_action_binding: None,
         rulesets: vec![RulesetMetadata {
             id: "bridge.v0".to_string(),
             name: "Bridge Rules".to_string(),
@@ -362,6 +363,7 @@ fn create(bridge: &mut RulebenchBridge, session_id: &str) -> CombatSessionHandle
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: Vec::new(),
                 content_pack: None,
+                authored_action_binding: None,
             },
         )
         .expect("fixture session is valid");
@@ -380,6 +382,7 @@ fn bridge_rolls_back_creation_when_the_initial_recovery_checkpoint_fails() {
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: Vec::new(),
                 content_pack: None,
+                authored_action_binding: None,
             },
         )
         .expect_err("failed initial checkpoint rejects the session");
@@ -618,6 +621,7 @@ fn bridge_rejects_duplicate_and_unknown_scenario_requests() {
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: Vec::new(),
                 content_pack: None,
+                authored_action_binding: None,
             },
         )
         .expect_err("duplicate session must fail");
@@ -631,6 +635,7 @@ fn bridge_rejects_duplicate_and_unknown_scenario_requests() {
                 scenario_id: "missing".to_string(),
                 participant_order: Vec::new(),
                 content_pack: None,
+                authored_action_binding: None,
             },
         )
         .expect_err("unknown scenario must fail");
@@ -655,6 +660,7 @@ fn bridge_exposes_setup_metadata_and_validates_participant_order() {
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: vec!["raider".to_string(), "adept".to_string()],
                 content_pack: None,
+                authored_action_binding: None,
             },
         )
         .expect("complete participant order is valid");
@@ -671,6 +677,7 @@ fn bridge_exposes_setup_metadata_and_validates_participant_order() {
                 scenario_id: "hexing-bolt".to_string(),
                 participant_order: vec!["adept".to_string()],
                 content_pack: None,
+                authored_action_binding: None,
             },
         )
         .expect_err("incomplete participant order is rejected");

@@ -21,8 +21,10 @@ pub use invocation::{prepare_replay_scenario, BridgeScenario, RulebenchBridge};
 /// should not depend on the portable authority facade directly.
 pub mod replay_storage {
     pub use rulebench_rules::{
-        record_replay_package, CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec,
-        CombatControlCommandSpec, CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
+        bind_authored_action, record_replay_package, AuthoredActionAbilityGrantReceipt,
+        AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
+        CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
+        CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
         CombatSessionCandidateSelectionSpec, CombatSessionCreateRequest,
         CombatSessionIntentCommandSpec, Combatant, CommandRollMode, ContentFingerprint,
         ContentPackReference, ContentPackSetReference, ContentPackStorage, EquipmentCommandKind,

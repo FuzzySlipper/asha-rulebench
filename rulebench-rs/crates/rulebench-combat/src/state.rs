@@ -544,6 +544,7 @@ mod tests {
                 seed_label: "state-test".to_string(),
             },
             content_pack_set: None,
+            authored_action_binding: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "test-rules".to_string(),
             grid: Grid {

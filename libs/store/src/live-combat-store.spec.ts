@@ -6,6 +6,7 @@ import type {
   RulebenchLiveAutomaticRunDto,
   RulebenchLiveAutomaticStepDto,
   RulebenchCombatAutomationPolicySpecDto,
+  RulebenchCombatSessionCreateRequestDto,
   RulebenchLivePreflightDto,
   RulebenchLiveSessionSnapshotDto,
   RulebenchUseActionIntentDto,
@@ -34,6 +35,76 @@ const intent = {
 };
 
 describe("LiveCombatStore", () => {
+  it("passes an exact authored-action binding through the store and projects its receipt", async () => {
+    const reference = {
+      id: "pack.authored.v3",
+      version: "3.0.0",
+      fingerprint: { algorithm: "pack", value: "exact-pack" },
+    };
+    const binding = {
+      contentPack: reference,
+      actionId: "action.binding-glyph",
+      actorId: "entity-adept",
+    };
+    let captured: RulebenchCombatSessionCreateRequestDto | null = null;
+    const snapshot = {
+      ...makeLiveSessionSnapshot(),
+      authoredActionBinding: {
+        bindingVersion: "1",
+        contentPackRoot: reference,
+        contentPackReferences: [reference],
+        contentPackSetFingerprint: { algorithm: "set", value: "exact-set" },
+        actionId: binding.actionId,
+        actionDefinitionFingerprint: {
+          algorithm: "action",
+          value: "exact-action",
+        },
+        abilityId: "ability.binding-glyph",
+        scenarioId: "scenario",
+        actorId: binding.actorId,
+        grant: {
+          grantKind: "sessionLocalBaseAbility" as const,
+          actorId: binding.actorId,
+          abilityId: "ability.binding-glyph",
+        },
+        targetingOperationVocabularyVersion: "2",
+        checkVocabularyVersion: "1",
+        effectOperationVocabularyVersion: "1",
+      },
+    };
+    const transport = createFakeRulebenchLiveTransport({
+      createSession: async (request) => {
+        captured = request;
+        return { ok: true, value: snapshot };
+      },
+      listSessions: async () => ({ ok: true, value: [snapshot] }),
+      getSessionRecovery: async () => ({
+        ok: true,
+        value: { sessions: [], issues: [] },
+      }),
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+
+    await store.createSession("live-session", "scenario", [], null, binding);
+
+    expect(captured).toEqual({
+      sessionId: "live-session",
+      scenarioId: "scenario",
+      participantOrder: [],
+      contentPack: null,
+      authoredActionBinding: binding,
+    });
+    expect(store.snapshot()).toMatchObject({
+      kind: "data",
+      value: {
+        authoredActionBinding: {
+          actionId: "action.binding-glyph",
+          actionFingerprintLabel: "action:exact-action",
+        },
+      },
+    });
+  });
+
   it("projects live capability levels without turning them into permissions", async () => {
     const transport = createFakeRulebenchLiveTransport({
       getCapabilities: async () => ({
@@ -46,7 +117,7 @@ describe("LiveCombatStore", () => {
           operationVocabularyVersion: "2",
           effectVocabularyVersion: "1",
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 7,
+          protocolVersion: 8,
           host: {
             adapterId: "rulebench-process-host",
             storageMode: "filesystem",
@@ -195,7 +266,7 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 7,
+          protocolVersion: 8,
           authoritySurface: "test-authority",
         },
       }),
@@ -622,7 +693,7 @@ describe("LiveCombatStore", () => {
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 7,
+        protocolVersion: 8,
         authoritySurface: "late",
       },
     });
@@ -856,6 +927,7 @@ function makeLiveSessionSnapshot(
   const fingerprint = options.fingerprint ?? "state-0";
   return {
     sessionId,
+    authoredActionBinding: null,
     nextStepIndex: 0,
     lifecyclePhase,
     startedAtStep: lifecyclePhase === "ready" ? null : 0,

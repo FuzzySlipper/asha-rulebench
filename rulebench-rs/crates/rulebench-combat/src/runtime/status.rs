@@ -125,6 +125,7 @@ impl CombatSessionState {
         CombatSessionSnapshot {
             session_id: self.session_id.clone(),
             content_pack_set: self.scenario.content_pack_set.clone(),
+            authored_action_binding: self.scenario.authored_action_binding.clone(),
             next_step_index: self.next_step_index,
             lifecycle: self.lifecycle.clone(),
             lifecycle_transition_log: self.lifecycle_transition_log.clone(),

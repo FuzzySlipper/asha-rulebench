@@ -6,7 +6,7 @@ use rulebench_rules::{
 use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";
-pub const PROTOCOL_VERSION: u32 = 7;
+pub const PROTOCOL_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -61,6 +61,8 @@ pub struct CombatSessionCreateRequestDto {
     pub participant_order: Vec<String>,
     #[serde(default)]
     pub content_pack: Option<crate::ContentPackReferenceDto>,
+    #[serde(default)]
+    pub authored_action_binding: Option<crate::AuthoredActionBindingRequestDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

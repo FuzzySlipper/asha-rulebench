@@ -276,6 +276,10 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 name: "RulebenchLiveSessionSnapshotDto",
                 fields: fields(vec![
                     field("sessionId", "string"),
+                    field(
+                        "authoredActionBinding",
+                        "RulebenchAuthoredActionBindingReceiptDto | null",
+                    ),
                     field("nextStepIndex", "number"),
                     field("lifecyclePhase", "RulebenchCombatLifecyclePhaseDto"),
                     field("startedAtStep", "number | null"),

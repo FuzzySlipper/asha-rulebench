@@ -1,5 +1,6 @@
 use rulebench_rules::{
-    CombatSessionApiError, ReplayArchiveError, SessionRecoveryError, SessionRecoveryStorageError,
+    AuthoredActionBindingError, CombatSessionApiError, ReplayArchiveError, SessionRecoveryError,
+    SessionRecoveryStorageError,
 };
 use std::fmt::{Display, Formatter};
 
@@ -11,6 +12,7 @@ pub enum BridgeErrorKind {
     DuplicateSession,
     UnknownSession,
     InvalidScenario,
+    AuthoredActionBinding,
     InvalidLifecycle,
     ReplayArchive,
     SessionRecovery,
@@ -25,6 +27,7 @@ impl BridgeErrorKind {
             BridgeErrorKind::DuplicateSession => "duplicateSession",
             BridgeErrorKind::UnknownSession => "unknownSession",
             BridgeErrorKind::InvalidScenario => "invalidScenario",
+            BridgeErrorKind::AuthoredActionBinding => "authoredActionBinding",
             BridgeErrorKind::InvalidLifecycle => "invalidLifecycle",
             BridgeErrorKind::ReplayArchive => "replayArchive",
             BridgeErrorKind::SessionRecovery => "sessionRecovery",
@@ -89,6 +92,20 @@ impl BridgeError {
             code: error.code().to_string(),
             message: format!("{error:?}"),
             retryable: matches!(error, ReplayArchiveError::Storage(_)),
+        }
+    }
+
+    pub(crate) fn from_authored_action_binding_error(error: AuthoredActionBindingError) -> Self {
+        let diagnostic_suffix = if error.diagnostic_codes.is_empty() {
+            String::new()
+        } else {
+            format!(" Diagnostics: {}.", error.diagnostic_codes.join(", "))
+        };
+        Self {
+            kind: BridgeErrorKind::AuthoredActionBinding,
+            code: error.code.to_string(),
+            message: format!("{}{}", error.message, diagnostic_suffix),
+            retryable: false,
         }
     }
 

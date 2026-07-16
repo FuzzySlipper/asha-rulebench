@@ -23,6 +23,7 @@ export interface RulebenchReplayReviewView {
   readonly contentPackRootLabel: string | null;
   readonly contentPackSetFingerprintLabel: string | null;
   readonly contentPackReferenceLabels: readonly string[];
+  readonly authoredActionBindingLabel: string | null;
   readonly finalFingerprintLabel: string;
   readonly commands: readonly RulebenchReplayCommandView[];
 }
@@ -115,6 +116,10 @@ export function projectReplayReview(
     contentPackReferenceLabels: review.contentPackReferences.map(
       contentPackReferenceLabel,
     ),
+    authoredActionBindingLabel:
+      review.authoredActionBinding === null
+        ? null
+        : `${review.authoredActionBinding.actionId} · ${review.authoredActionBinding.actorId} · ${review.authoredActionBinding.actionDefinitionFingerprint.algorithm}:${review.authoredActionBinding.actionDefinitionFingerprint.value}`,
     finalFingerprintLabel: `${review.finalStateFingerprint.algorithm}:${review.finalStateFingerprint.value}`,
     commands: review.commands.map((command) => ({
       sequence: command.sequence,
