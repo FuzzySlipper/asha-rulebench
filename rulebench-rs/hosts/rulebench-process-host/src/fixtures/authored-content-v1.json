@@ -1,0 +1,48 @@
+{
+  "format": "asha-rulebench.content-pack",
+  "formatVersion": 1,
+  "pack": {
+    "id": "pack.fixture.authored.v1",
+    "version": "1.0.0",
+    "title": "Committed Authored Content v1",
+    "summary": "Compatibility fixture for the original ruleset and entity vocabulary.",
+    "tags": ["fixture", "v1"],
+    "provenance": {
+      "sourceKind": "authoredFile",
+      "sourceId": "fixture:authored-content-v1",
+      "authoredBy": "Rulebench"
+    },
+    "rulesetId": "asha-rulebench.hexing-bolt.v0",
+    "dependencies": [],
+    "catalogs": {
+      "rulesets": [
+        {
+          "id": "asha-rulebench.hexing-bolt.v0",
+          "name": "Hexing Bolt Fixture Rules",
+          "version": "0.0.0",
+          "summary": "Compatibility declaration for the first compiled provider.",
+          "modules": [
+            {
+              "module": "actionResolution",
+              "version": "1",
+              "configuration": {
+                "module": "actionResolution",
+                "targetingPolicy": "declaredTargetsAndLineOfSight",
+                "supportedCheckHandlers": ["attackVsDefense"]
+              }
+            }
+          ]
+        }
+      ],
+      "entities": [
+        {
+          "id": "entity.fixture.authored-v1",
+          "name": "Authored v1 Fixture Entity",
+          "summary": "Proves the v1 reader remains committed and strict.",
+          "tags": ["fixture"],
+          "damageAdjustments": []
+        }
+      ]
+    }
+  }
+}

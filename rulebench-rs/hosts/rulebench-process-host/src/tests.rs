@@ -896,6 +896,215 @@ fn authored_content_survives_restart_binds_a_session_and_replay_to_the_exact_pac
     fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 
+#[test]
+fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-version-fixtures-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let fixtures = [
+        include_str!("fixtures/authored-content-v1.json"),
+        include_str!("fixtures/authored-content-v2.json"),
+    ];
+
+    for payload in fixtures {
+        let imported = router.handle(&json_request(
+            HttpMethod::Post,
+            "/api/rulebench/v1/content/import",
+            &serde_json::json!({
+                "authoredPayload": payload,
+                "replacementPolicy": "reject"
+            }),
+        ));
+        assert_eq!(
+            imported.status,
+            200,
+            "{}",
+            String::from_utf8_lossy(&imported.body)
+        );
+        let imported: ContentImportAttemptDto =
+            serde_json::from_slice(&imported.body).expect("fixture import is JSON");
+        assert!(imported.accepted, "{imported:?}");
+    }
+
+    let workspace = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let workspace: ContentWorkspaceDto =
+        serde_json::from_slice(&workspace.body).expect("workspace is JSON");
+    assert_eq!(workspace.packs.len(), 2);
+    let v1 = workspace
+        .packs
+        .iter()
+        .find(|pack| pack.reference.id == "pack.fixture.authored.v1")
+        .expect("v1 receipt exists");
+    assert!(v1
+        .definitions
+        .iter()
+        .any(|definition| definition.kind == "entity"));
+    let v2 = workspace
+        .packs
+        .iter()
+        .find(|pack| pack.reference.id == "pack.fixture.authored.v2")
+        .expect("v2 receipt exists");
+    assert!(v2.definitions.iter().any(|definition| {
+        definition.kind == "ability" && definition.id == "ability.binding-glyph"
+    }));
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
+fn authored_ability_v2_survives_restart_and_binds_second_provider_replay() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-ability-v2-{}-{sequence}",
+        std::process::id()
+    ));
+    let payload = include_str!("fixtures/authored-content-v2.json");
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": payload,
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("v2 import is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .as_ref()
+        .expect("accepted import has review")
+        .review
+        .pack
+        .reference
+        .clone();
+    assert!(imported
+        .outcome
+        .as_ref()
+        .expect("accepted import has review")
+        .review
+        .pack
+        .definitions
+        .iter()
+        .any(|definition| {
+            definition.kind == "ability" && definition.id == "ability.binding-glyph"
+        }));
+
+    let activated = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/activate",
+        &serde_json::json!({ "reference": reference }),
+    ));
+    assert_eq!(activated.status, 200);
+
+    let mut invalid_replacement: serde_json::Value =
+        serde_json::from_str(payload).expect("fixture is JSON");
+    invalid_replacement["pack"]["catalogs"]["abilities"][0]["summary"] =
+        serde_json::Value::String(String::new());
+    let rejected = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": serde_json::to_string_pretty(&invalid_replacement).expect("replacement serializes"),
+            "replacementPolicy": "replaceSameIdentity"
+        }),
+    ));
+    let rejected: ContentImportAttemptDto =
+        serde_json::from_slice(&rejected.body).expect("rejection is JSON");
+    assert!(!rejected.accepted);
+    assert_eq!(
+        rejected.error_code.as_deref(),
+        Some("emptyContentImportField")
+    );
+    assert!(rejected.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "emptyContentImportField"
+            && diagnostic.path == "catalogs.abilities[0].summary"
+            && diagnostic.definition_kind.as_deref() == Some("ability")
+            && diagnostic.reference_id.as_deref() == Some("ability.binding-glyph")
+    }));
+    let retained = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let retained: ContentWorkspaceDto =
+        serde_json::from_slice(&retained.body).expect("retained workspace is JSON");
+    assert_eq!(retained.packs.len(), 1);
+    assert!(retained.packs[0].active);
+    assert_eq!(retained.packs[0].reference, reference);
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("v2 repository reopens and revalidates");
+    let workspace = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let workspace: ContentWorkspaceDto =
+        serde_json::from_slice(&workspace.body).expect("restarted workspace is JSON");
+    assert_eq!(workspace.packs.len(), 1);
+    assert!(workspace.packs[0].active);
+    assert_eq!(workspace.packs[0].reference, reference);
+    assert!(workspace.packs[0].definitions.iter().any(|definition| {
+        definition.kind == "ability" && definition.id == "ability.binding-glyph"
+    }));
+
+    let scenarios = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "binding-glyph-failed-save")
+        .expect("second provider scenario exists");
+    let session_id = "authored-ability-v2-session";
+    let created = restarted.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: session_id.to_string(),
+            scenario_id: scenario.id.clone(),
+            participant_order: Vec::new(),
+            content_pack: Some(reference.clone()),
+        },
+    ));
+    assert_eq!(
+        created.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&created.body)
+    );
+    for kind in [
+        CombatControlCommandKindDto::ExplicitStart,
+        CombatControlCommandKindDto::ExplicitEnd,
+    ] {
+        assert_eq!(
+            restarted
+                .handle(&json_request(
+                    HttpMethod::Post,
+                    &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                    &CombatControlCommandDto { kind },
+                ))
+                .status,
+            200
+        );
+    }
+    assert_eq!(
+        restarted
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/sessions/{session_id}"),
+            ))
+            .status,
+        200
+    );
+    let replay = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/live-{session_id}"),
+    ));
+    let replay: ReplayPackageReviewDto =
+        serde_json::from_slice(&replay.body).expect("v2-bound replay is JSON");
+    assert_eq!(replay.content_pack_root, Some(reference.clone()));
+    assert_eq!(replay.content_pack_references, vec![reference]);
+    assert!(replay.content_pack_set_fingerprint.is_some());
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
 fn authored_content_payload(
     scenario: &ScenarioOptionDto,
     title: &str,

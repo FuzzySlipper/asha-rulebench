@@ -7,6 +7,9 @@ describe("ReplayReviewStore", () => {
   it("stores projected authority verification and comparison evidence", async () => {
     const review: RulebenchReplayPackageReviewDto = {
       packageVersion: "1.0.0", packageId: "replay", sessionId: "session", scenarioId: "scenario", rulesetId: "rules", rulesetVersion: "1.0.0", commandCount: 2,
+      contentPackRoot: { id: "pack.authored", version: "2.0.0", fingerprint: { algorithm: "pack", value: "root" } },
+      contentPackSetFingerprint: { algorithm: "set", value: "exact" },
+      contentPackReferences: [{ id: "pack.authored", version: "2.0.0", fingerprint: { algorithm: "pack", value: "root" } }],
       finalStateFingerprint: { algorithm: "test", value: "final" }, fingerprintKind: "deterministicNonCryptographic", narrationTitle: null, narrationSummary: null, commands: [],
     };
     const verification: RulebenchReplayVerificationReadoutDto = {
@@ -25,6 +28,9 @@ describe("ReplayReviewStore", () => {
     expect(store.review()).toEqual({ kind: "data", value: {
       packageId: "replay", title: "replay", summary: "No replay narration supplied.",
       provenanceLabel: "scenario · rules 1.0.0 · package 1.0.0",
+      contentPackRootLabel: "pack.authored@2.0.0 · pack:root",
+      contentPackSetFingerprintLabel: "set:exact",
+      contentPackReferenceLabels: ["pack.authored@2.0.0 · pack:root"],
       finalFingerprintLabel: "test:final", commands: [],
     } });
     expect(store.verification()).toEqual({ kind: "data", value: {

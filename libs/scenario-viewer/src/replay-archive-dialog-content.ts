@@ -189,6 +189,20 @@ import { ReplayReviewStore } from "@asha-rulebench/store";
               </p>
             </div>
             <p class="meta">{{ review().value.provenanceLabel }}</p>
+            @if (review().value.contentPackRootLabel !== null) {
+              <section aria-label="Replay content pack provenance">
+                <h4>Exact Content Pack Set</h4>
+                <p>{{ review().value.contentPackRootLabel }}</p>
+                <p class="fingerprint">{{ review().value.contentPackSetFingerprintLabel }}</p>
+                <ul class="evidence-list">
+                  @for (reference of review().value.contentPackReferenceLabels; track reference) {
+                    <li>{{ reference }}</li>
+                  }
+                </ul>
+              </section>
+            } @else {
+              <p class="meta">No authored content pack was bound to this replay.</p>
+            }
             <div class="choice-row" aria-label="Replay commands">
               @for (
                 command of review().value.commands;

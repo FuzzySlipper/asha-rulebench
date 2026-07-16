@@ -21,7 +21,9 @@ describe("replay review transport", () => {
 
 export const packageReview = (): RulebenchReplayPackageReviewDto => ({
   packageVersion: "1.0.0", packageId: "replay", sessionId: "session", scenarioId: "scenario", rulesetId: "rules", rulesetVersion: "1.0.0", commandCount: 2,
+  contentPackRoot: null, contentPackSetFingerprint: null, contentPackReferences: [],
   finalStateFingerprint: { algorithm: "test", value: "final" }, fingerprintKind: "deterministicNonCryptographic", narrationTitle: null, narrationSummary: null,
+  commands: [],
 });
 
 export const verificationReadout = (): RulebenchReplayVerificationReadoutDto => ({

@@ -18,11 +18,11 @@ declaration fixes all behavior that can change target or roll interpretation:
 
 Legacy single-target and movement declarations keep `operation_pipeline: None`
 and retain their existing fingerprints and replay behavior. Stateful `Move`
-and `ChangeResource` hit operations are rejected outside v2. The current
-content-pack v1 JSON vocabulary still imports rulesets and entities only; it
-does not claim a JSON action-authoring format. Rust scenario content and
-portable Rust consumers author v2 actions directly until a separately
-versioned content wire is designed.
+and `ChangeResource` hit operations are rejected outside v2. Authored
+content-pack v2 extends the strict v1 ruleset/entity vocabulary with ability
+identity and display metadata, but it deliberately does not claim a JSON
+action-authoring format. Rust scenario content and portable Rust consumers
+author v2 actions directly until a dependency-closed action wire is designed.
 
 ## Resolution contract
 

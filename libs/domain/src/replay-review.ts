@@ -20,6 +20,9 @@ export interface RulebenchReplayReviewView {
   readonly title: string;
   readonly summary: string;
   readonly provenanceLabel: string;
+  readonly contentPackRootLabel: string | null;
+  readonly contentPackSetFingerprintLabel: string | null;
+  readonly contentPackReferenceLabels: readonly string[];
   readonly finalFingerprintLabel: string;
   readonly commands: readonly RulebenchReplayCommandView[];
 }
@@ -101,6 +104,17 @@ export function projectReplayReview(
     title: review.narrationTitle ?? review.packageId,
     summary: review.narrationSummary ?? "No replay narration supplied.",
     provenanceLabel: `${review.scenarioId} · ${review.rulesetId} ${review.rulesetVersion} · package ${review.packageVersion}`,
+    contentPackRootLabel:
+      review.contentPackRoot === null
+        ? null
+        : contentPackReferenceLabel(review.contentPackRoot),
+    contentPackSetFingerprintLabel:
+      review.contentPackSetFingerprint === null
+        ? null
+        : `${review.contentPackSetFingerprint.algorithm}:${review.contentPackSetFingerprint.value}`,
+    contentPackReferenceLabels: review.contentPackReferences.map(
+      contentPackReferenceLabel,
+    ),
     finalFingerprintLabel: `${review.finalStateFingerprint.algorithm}:${review.finalStateFingerprint.value}`,
     commands: review.commands.map((command) => ({
       sequence: command.sequence,
@@ -117,6 +131,12 @@ export function projectReplayReview(
       snapshot: projectLiveSessionSnapshot(command.snapshot),
     })),
   };
+}
+
+function contentPackReferenceLabel(
+  reference: RulebenchReplayPackageReviewDto["contentPackReferences"][number],
+): string {
+  return `${reference.id}@${reference.version} · ${reference.fingerprint.algorithm}:${reference.fingerprint.value}`;
 }
 
 export function projectReplayVerification(

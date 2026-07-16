@@ -10,7 +10,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
   "operationVocabularyVersion": "2",
   "effectVocabularyVersion": "1",
   "protocolId": "asha-rulebench.protocol",
-  "protocolVersion": 5,
+  "protocolVersion": 6,
   "host": {
     "adapterId": "rulebench-process-host",
     "storageMode": "filesystem",

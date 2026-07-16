@@ -48,7 +48,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 5,
+        protocolVersion: 6,
         authoritySurface: "asha-rulebench.local-authority.v0",
       },
     });
@@ -272,7 +272,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       error: {
         kind: "bridge",
         code: "protocolVersionMismatch",
-        message: "Unsupported protocol version 999; expected 5.",
+        message: "Unsupported protocol version 999; expected 6.",
         retryable: false,
       },
     });

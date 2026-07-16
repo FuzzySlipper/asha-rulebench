@@ -4,7 +4,8 @@ use crate::{
     ContentPackSourceKind, EntityDefinition,
 };
 use rulebench_ruleset::{
-    ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata,
+    AbilityDefinition, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
+    RuleModuleDeclaration, RulesetMetadata,
 };
 
 #[test]
@@ -112,6 +113,39 @@ fn duplicate_tags_are_canonicalized_with_a_stable_warning() {
         imported.diagnostics[0].code,
         ContentImportDiagnosticCode::DuplicateTagCanonicalized
     );
+}
+
+#[test]
+fn authored_ability_validation_reports_stable_duplicate_and_field_paths() {
+    let ruleset = ruleset();
+    let mut authored = authored_pack(&ruleset, false);
+    let ability = AbilityDefinition {
+        id: "ability.binding-glyph".to_string(),
+        name: "Binding Glyph".to_string(),
+        kind: AbilityDefinitionKind::Spell,
+        summary: String::new(),
+        tags: vec!["control".to_string()],
+    };
+    authored.catalogs.abilities = vec![ability.clone(), ability];
+
+    let report = import_content_pack(
+        authored,
+        ContentImportLimits::default(),
+        ContentImportContext::empty(),
+    )
+    .expect_err("duplicate incomplete abilities fail before storage");
+
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentImportDiagnosticCode::DuplicateDefinition
+            && diagnostic.definition_kind == Some(ContentDefinitionKind::Ability)
+            && diagnostic.definition_id.as_deref() == Some("ability.binding-glyph")
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentImportDiagnosticCode::EmptyField
+            && diagnostic.path == "catalogs.abilities[0].summary"
+            && diagnostic.definition_kind == Some(ContentDefinitionKind::Ability)
+            && diagnostic.definition_id.as_deref() == Some("ability.binding-glyph")
+    }));
 }
 
 #[test]

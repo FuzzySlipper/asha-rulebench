@@ -53,7 +53,7 @@ test("imports, activates, preserves, and selects Rust-owned authored content", a
   await contentDialog.locator('input[type="file"]').setInputFiles({
     name: "authored-pack.json",
     mimeType: "application/json",
-    buffer: Buffer.from(authoredPack(packId, 1, "Live Authored Pack")),
+    buffer: Buffer.from(authoredPack(packId, 2, "Live Authored Pack")),
   });
   await contentDialog
     .getByRole("button", { name: "Import", exact: true })
@@ -75,6 +75,8 @@ test("imports, activates, preserves, and selects Rust-owned authored content", a
   await expect(
     selectedReview.getByText("Active", { exact: true }),
   ).toBeVisible();
+  await expect(selectedReview).toContainText("ability");
+  await expect(selectedReview).toContainText("ability.binding-glyph");
   await expect(
     contentDialog.getByText(/Content Activated/i).last(),
   ).toBeVisible();
@@ -101,7 +103,7 @@ test("imports, activates, preserves, and selects Rust-owned authored content", a
   await openMenuDialog(page, "Scenario", "Live combat setup");
   const liveDialog = page.getByRole("dialog", { name: "Live combat setup" });
   await liveDialog
-    .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+    .getByRole("button", { name: "Binding Glyph Failed Save", exact: true })
     .click();
   await expect(
     liveDialog.getByRole("button", { name: `${packId}@1.0.0` }),
@@ -151,15 +153,15 @@ function authoredPack(
         sourceId: `e2e:${packId}`,
         authoredBy: "Playwright",
       },
-      rulesetId: "asha-rulebench.hexing-bolt.v0",
+      rulesetId: "asha-rulebench.turn-control.v0",
       dependencies: [],
       catalogs: {
         rulesets: [
           {
-            id: "asha-rulebench.hexing-bolt.v0",
-            name: "E2E Compatible Ruleset",
-            version: "0.0.0",
-            summary: "Matches the visible Hexing Bolt scenario.",
+            id: "asha-rulebench.turn-control.v0",
+            name: "E2E Objective Turn Control Ruleset",
+            version: "0.1.0",
+            summary: "Matches the visible second-provider scenario.",
             modules: [
               {
                 module: "actionResolution",
@@ -167,7 +169,17 @@ function authoredPack(
                 configuration: {
                   module: "actionResolution",
                   targetingPolicy: "declaredTargetsAndLineOfSight",
-                  supportedCheckHandlers: ["attackVsDefense"],
+                  supportedCheckHandlers: ["attackVsDefense", "savingThrow"],
+                },
+              },
+              {
+                module: "turnControl",
+                version: "1",
+                configuration: {
+                  module: "turnControl",
+                  turnOrderPolicy: "explicit",
+                  combatEndPolicy: "objectiveSideVictory",
+                  objectiveSide: "wardens",
                 },
               },
             ],
@@ -180,6 +192,15 @@ function authoredPack(
             summary: "Generic definition review proof.",
             tags: ["e2e"],
             damageAdjustments: [],
+          },
+        ],
+        abilities: [
+          {
+            id: "ability.binding-glyph",
+            name: "Binding Glyph",
+            kind: "spell",
+            summary: "Forces a Body save, then damages and anchors on failure.",
+            tags: ["save", "control"],
           },
         ],
       },

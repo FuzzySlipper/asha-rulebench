@@ -2685,6 +2685,35 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "entities",
                     ty: "readonly RulebenchAuthoredEntityDefinitionDto[]",
                 },
+                Field {
+                    name: "abilities",
+                    ty: "readonly RulebenchAuthoredAbilityDefinitionDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredAbilityDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "kind",
+                    ty: "RulebenchAuthoredAbilityDefinitionKindDto",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tags",
+                    ty: "readonly string[]",
+                },
             ],
         },
         Interface {

@@ -78,8 +78,8 @@
       "denHeading": "Trusted-local single-writer process host"
     },
     {
-      "id": "authored-content-v1-vocabulary",
-      "denHeading": "Authored content wire remains intentionally narrow"
+      "id": "authored-content-v2-vocabulary",
+      "denHeading": "Authored content wire remains intentionally bounded"
     }
   ]
 }

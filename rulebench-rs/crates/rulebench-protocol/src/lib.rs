@@ -35,16 +35,17 @@ pub use capabilities::{
     RulebenchCapabilityManifestDto, RulesetProviderDto,
 };
 pub use content::{
-    AuthoredContentCatalogsDto, AuthoredContentDecodeError, AuthoredContentPackDocumentDto,
-    AuthoredContentPackDto, AuthoredContentProvenanceDto, AuthoredContentSourceKindDto,
-    AuthoredDamageAdjustmentDto, AuthoredDamageAdjustmentPolicyDto, AuthoredEntityDefinitionDto,
-    ContentAuditEntryDto, ContentDefinitionChangeDto, ContentDefinitionSummaryDto,
-    ContentFingerprintDto, ContentImportAttemptDto, ContentImportDiagnosticDto,
-    ContentImportOutcomeDto, ContentImportReadoutDto, ContentImportRequestDto, ContentPackDiffDto,
-    ContentPackIdentityDto, ContentPackReferenceDto, ContentPackReviewDto,
-    ContentPayloadRequestDto, ContentReferenceRequestDto, ContentReplacementPolicyDto,
-    ContentWorkspaceDto, StoredContentPackSummaryDto, AUTHORED_CONTENT_PACK_FORMAT,
-    AUTHORED_CONTENT_PACK_VERSION,
+    AuthoredAbilityDefinitionDto, AuthoredAbilityDefinitionKindDto, AuthoredContentCatalogsDto,
+    AuthoredContentDecodeError, AuthoredContentPackDocumentDto, AuthoredContentPackDto,
+    AuthoredContentProvenanceDto, AuthoredContentSourceKindDto, AuthoredDamageAdjustmentDto,
+    AuthoredDamageAdjustmentPolicyDto, AuthoredEntityDefinitionDto, ContentAuditEntryDto,
+    ContentDefinitionChangeDto, ContentDefinitionSummaryDto, ContentFingerprintDto,
+    ContentImportAttemptDto, ContentImportDiagnosticDto, ContentImportOutcomeDto,
+    ContentImportReadoutDto, ContentImportRequestDto, ContentPackDiffDto, ContentPackIdentityDto,
+    ContentPackReferenceDto, ContentPackReviewDto, ContentPayloadRequestDto,
+    ContentReferenceRequestDto, ContentReplacementPolicyDto, ContentWorkspaceDto,
+    StoredContentPackSummaryDto, AUTHORED_CONTENT_PACK_FORMAT, AUTHORED_CONTENT_PACK_VERSION,
+    AUTHORED_CONTENT_PACK_VERSION_V1,
 };
 pub use experiment::{
     AutomationPolicyCatalogEntryDto, ExperimentComparisonReadoutDto,

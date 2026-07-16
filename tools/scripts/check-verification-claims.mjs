@@ -30,7 +30,7 @@ const limitationIds = new Set(
 );
 for (const id of [
   "trusted-local-process-host",
-  "authored-content-v1-vocabulary",
+  "authored-content-v2-vocabulary",
 ]) {
   if (!limitationIds.has(id))
     failures.push(`verification review omits active limitation ${id}.`);

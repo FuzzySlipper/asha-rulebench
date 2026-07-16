@@ -38,17 +38,18 @@ pub(super) fn validate_authored_pack(
 
     for (path, value) in pack_strings(authored) {
         if value.len() > limits.maximum_string_bytes {
+            let message = format!(
+                "Content field {path} contains {} bytes; the limit is {}.",
+                value.len(),
+                limits.maximum_string_bytes
+            );
             diagnostics.push(ContentImportDiagnostic {
                 severity: ContentImportDiagnosticSeverity::Error,
                 code: ContentImportDiagnosticCode::LimitExceeded,
-                path: path.to_string(),
+                path,
                 definition_kind: None,
                 definition_id: None,
-                message: format!(
-                    "Content field {path} contains {} bytes; the limit is {}.",
-                    value.len(),
-                    limits.maximum_string_bytes
-                ),
+                message,
             });
         }
     }
@@ -73,6 +74,7 @@ pub(super) fn validate_authored_pack(
     for (kind, ids) in catalogs {
         validate_catalog(&mut diagnostics, kind, &ids, limits);
     }
+    validate_ability_definitions(&mut diagnostics, authored);
 
     for (index, dependency) in authored.dependencies.iter().enumerate() {
         validate_fingerprint(
@@ -83,6 +85,29 @@ pub(super) fn validate_authored_pack(
         );
     }
     diagnostics
+}
+
+fn validate_ability_definitions(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    authored: &AuthoredContentPack,
+) {
+    for (index, ability) in authored.catalogs.abilities.iter().enumerate() {
+        for (field, value) in [("name", &ability.name), ("summary", &ability.summary)] {
+            if value.is_empty() {
+                diagnostics.push(ContentImportDiagnostic {
+                    severity: ContentImportDiagnosticSeverity::Error,
+                    code: ContentImportDiagnosticCode::EmptyField,
+                    path: format!("catalogs.abilities[{index}].{field}"),
+                    definition_kind: Some(ContentDefinitionKind::Ability),
+                    definition_id: Some(ability.id.clone()),
+                    message: format!(
+                        "Authored ability {} field {field} must not be empty.",
+                        ability.id
+                    ),
+                });
+            }
+        }
+    }
 }
 
 fn validate_catalog(
@@ -212,24 +237,52 @@ fn validate_duplicate_tags(diagnostics: &mut Vec<ContentImportDiagnostic>, tags:
     }
 }
 
-fn pack_strings(authored: &AuthoredContentPack) -> Vec<(&'static str, &str)> {
+fn pack_strings(authored: &AuthoredContentPack) -> Vec<(String, &str)> {
     let mut strings = vec![
-        ("identity.id", authored.identity.id.as_str()),
-        ("identity.version", authored.identity.version.as_str()),
-        ("title", authored.title.as_str()),
-        ("summary", authored.summary.as_str()),
+        ("identity.id".to_string(), authored.identity.id.as_str()),
         (
-            "provenance.sourceId",
+            "identity.version".to_string(),
+            authored.identity.version.as_str(),
+        ),
+        ("title".to_string(), authored.title.as_str()),
+        ("summary".to_string(), authored.summary.as_str()),
+        (
+            "provenance.sourceId".to_string(),
             authored.provenance.source_id.as_str(),
         ),
-        ("ruleset.rulesetId", authored.ruleset.ruleset_id.as_str()),
         (
-            "ruleset.rulesetVersion",
+            "ruleset.rulesetId".to_string(),
+            authored.ruleset.ruleset_id.as_str(),
+        ),
+        (
+            "ruleset.rulesetVersion".to_string(),
             authored.ruleset.ruleset_version.as_str(),
         ),
     ];
     if let Some(authored_by) = authored.provenance.authored_by.as_deref() {
-        strings.push(("provenance.authoredBy", authored_by));
+        strings.push(("provenance.authoredBy".to_string(), authored_by));
+    }
+    for (index, ability) in authored.catalogs.abilities.iter().enumerate() {
+        strings.extend([
+            (
+                format!("catalogs.abilities[{index}].id"),
+                ability.id.as_str(),
+            ),
+            (
+                format!("catalogs.abilities[{index}].name"),
+                ability.name.as_str(),
+            ),
+            (
+                format!("catalogs.abilities[{index}].summary"),
+                ability.summary.as_str(),
+            ),
+        ]);
+        for (tag_index, tag) in ability.tags.iter().enumerate() {
+            strings.push((
+                format!("catalogs.abilities[{index}].tags[{tag_index}]"),
+                tag.as_str(),
+            ));
+        }
     }
     strings
 }

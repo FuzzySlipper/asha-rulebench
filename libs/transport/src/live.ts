@@ -47,7 +47,7 @@ import type {
 } from "./replay-review";
 
 export const RULEBENCH_PROTOCOL_ID = "asha-rulebench.protocol";
-export const RULEBENCH_PROTOCOL_VERSION = 5;
+export const RULEBENCH_PROTOCOL_VERSION = 6;
 
 const DEFAULT_API_BASE_URL = "/api/rulebench/v1";
 

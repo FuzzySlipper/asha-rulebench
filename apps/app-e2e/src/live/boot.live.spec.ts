@@ -86,7 +86,7 @@ liveScenario(
     await contentDialog.locator('input[type="file"]').setInputFiles({
       name: "live-authored-pack.json",
       mimeType: "application/json",
-      buffer: Buffer.from(authoredPack(livePackId, 1, "Live Evidence Pack")),
+      buffer: Buffer.from(authoredPack(livePackId, 2, "Live Evidence Pack")),
     });
     await contentDialog
       .getByRole("button", { name: "Import", exact: true })
@@ -103,6 +103,8 @@ liveScenario(
     await expect(
       selectedContent.getByText("Active", { exact: true }),
     ).toBeVisible();
+    await expect(selectedContent).toContainText("ability");
+    await expect(selectedContent).toContainText("ability.binding-glyph");
     await collector.milestone("authored content active desktop", {
       screenshot: true,
       layerSnapshot: {
@@ -156,7 +158,7 @@ liveScenario(
       liveSetup.controls.getByText("asha-rulebench.local-authority.v0"),
     ).toBeVisible();
     await liveSetup.controls
-      .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+      .getByRole("button", { name: "Binding Glyph Failed Save", exact: true })
       .click();
     await liveSetup.controls
       .getByRole("button", { name: `${livePackId}@1.0.0`, exact: true })
@@ -179,10 +181,12 @@ liveScenario(
     });
     await invokeApplicationCommand(page, "Run", "Start combat");
     await actionsPanel
-      .getByRole("button", { name: "Select Hexing Bolt" })
+      .getByRole("button", { name: "Select Binding Glyph" })
       .click();
+    await actionsPanel.getByLabel("Saving throw roll").fill("5");
+    await actionsPanel.getByLabel("Damage roll").fill("4");
     await unitsPanel
-      .getByRole("button", { name: "Select Raider as target" })
+      .getByRole("button", { name: "Select Saboteur as target" })
       .click();
     await actionsPanel
       .getByRole("button", { name: "Preflight", exact: true })
@@ -190,8 +194,8 @@ liveScenario(
     await actionsPanel
       .getByRole("button", { name: "Submit", exact: true })
       .click();
-    await expect(unitsPanel).toContainText("Raider");
-    await expect(unitsPanel).toContainText("9/18 HP");
+    await expect(unitsPanel).toContainText("Saboteur");
+    await expect(unitsPanel).toContainText("12/18 HP");
     await evidencePanel.getByRole("tab", { name: "Combat" }).click();
     await expect(evidencePanel.getByRole("tabpanel")).toContainText(
       "Manual command",
@@ -223,9 +227,41 @@ liveScenario(
     await invokeApplicationCommand(page, "Run", "Close session");
     await expect(statusPanel).toContainText("Not selected");
 
+    await invokeApplicationCommand(page, "Replay", "Replay archive");
+    const replayDialog = page.getByRole("dialog", { name: "Replay archive" });
+    const replayWorkspace = replayDialog.getByRole("region", {
+      name: "Replay archive controls",
+    });
+    const authoredReplay = replayWorkspace
+      .getByLabel("Archived replay packages")
+      .getByRole("button", { name: new RegExp(`live-${liveSessionId} ·`) });
+    await expect(authoredReplay).toBeVisible();
+    await authoredReplay.click();
+    const replayDetail = replayWorkspace.getByRole("region", {
+      name: "Replay package detail",
+    });
+    await expect(
+      replayDetail.getByRole("region", {
+        name: "Replay content pack provenance",
+      }),
+    ).toContainText(`${livePackId}@1.0.0`);
+    await expect(
+      replayWorkspace.getByRole("region", { name: "Replay verification" }),
+    ).toContainText("Verified · Finalized");
+    await collector.milestone("authored v2 replay provenance", {
+      screenshot: true,
+      layerSnapshot: {
+        replay: await replayDetail.innerText(),
+      },
+    });
+    await replayDialog.getByLabel("Close", { exact: true }).click();
+
     const automaticSetup = await openLiveSetup(page);
     await automaticSetup.controls
       .getByRole("button", { name: "Hexing Bolt Hit", exact: true })
+      .click();
+    await automaticSetup.controls
+      .getByRole("button", { name: "Built-in", exact: true })
       .click();
     await automaticSetup.controls
       .getByRole("textbox", { name: "Session" })
@@ -291,15 +327,15 @@ function authoredPack(
         sourceId: `live:${packId}`,
         authoredBy: "Rulebench live scenario",
       },
-      rulesetId: "asha-rulebench.hexing-bolt.v0",
+      rulesetId: "asha-rulebench.turn-control.v0",
       dependencies: [],
       catalogs: {
         rulesets: [
           {
-            id: "asha-rulebench.hexing-bolt.v0",
-            name: "Live Compatible Ruleset",
-            version: "0.0.0",
-            summary: "Matches the live Hexing Bolt authority modules.",
+            id: "asha-rulebench.turn-control.v0",
+            name: "Live Objective Turn Control Ruleset",
+            version: "0.1.0",
+            summary: "Matches the live second-provider authority modules.",
             modules: [
               {
                 module: "actionResolution",
@@ -307,7 +343,17 @@ function authoredPack(
                 configuration: {
                   module: "actionResolution",
                   targetingPolicy: "declaredTargetsAndLineOfSight",
-                  supportedCheckHandlers: ["attackVsDefense"],
+                  supportedCheckHandlers: ["attackVsDefense", "savingThrow"],
+                },
+              },
+              {
+                module: "turnControl",
+                version: "1",
+                configuration: {
+                  module: "turnControl",
+                  turnOrderPolicy: "explicit",
+                  combatEndPolicy: "objectiveSideVictory",
+                  objectiveSide: "wardens",
                 },
               },
             ],
@@ -320,6 +366,15 @@ function authoredPack(
             summary: "Generic definition projection evidence.",
             tags: ["live"],
             damageAdjustments: [],
+          },
+        ],
+        abilities: [
+          {
+            id: "ability.binding-glyph",
+            name: "Binding Glyph",
+            kind: "spell",
+            summary: "Forces a Body save, then damages and anchors on failure.",
+            tags: ["save", "control"],
           },
         ],
       },

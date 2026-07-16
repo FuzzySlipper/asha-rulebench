@@ -1,3 +1,4 @@
+use rulebench_rules::{AbilityDefinition, AbilityDefinitionKind};
 use rulebench_rules::{
     ContentDefinitionChangeKind, ContentImportDiagnostic, ContentImportDiagnosticSeverity,
     ContentImportReport, ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackDefinition,
@@ -10,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use crate::{validate_ruleset_definition, RulesetDefinitionDto};
 
 pub const AUTHORED_CONTENT_PACK_FORMAT: &str = "asha-rulebench.content-pack";
-pub const AUTHORED_CONTENT_PACK_VERSION: u32 = 1;
+pub const AUTHORED_CONTENT_PACK_VERSION_V1: u32 = 1;
+pub const AUTHORED_CONTENT_PACK_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -134,8 +136,7 @@ fn count_severity(
         .count()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoredContentPackDocumentDto {
     pub format: String,
     pub format_version: u32,
@@ -181,6 +182,251 @@ pub struct AuthoredContentCatalogsDto {
     pub rulesets: Vec<RulesetDefinitionDto>,
     #[serde(default)]
     pub entities: Vec<AuthoredEntityDefinitionDto>,
+    pub abilities: Vec<AuthoredAbilityDefinitionDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AuthoredAbilityDefinitionDto {
+    pub id: String,
+    pub name: String,
+    pub kind: AuthoredAbilityDefinitionKindDto,
+    pub summary: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AuthoredAbilityDefinitionKindDto {
+    Ability,
+    Spell,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+enum AuthoredContentPackDocumentWireDto {
+    V1(AuthoredContentPackDocumentV1Dto),
+    V2(AuthoredContentPackDocumentV2Dto),
+    Unsupported(UnsupportedAuthoredContentPackDocumentDto),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentPackDocumentV1Dto {
+    format: String,
+    format_version: u32,
+    pack: AuthoredContentPackV1Dto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentPackDocumentV2Dto {
+    format: String,
+    format_version: u32,
+    pack: AuthoredContentPackDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UnsupportedAuthoredContentPackDocumentDto {
+    format: String,
+    format_version: u32,
+    pack: UnsupportedAuthoredContentPackDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct UnsupportedAuthoredContentPackDocumentWireDto {
+    format: String,
+    format_version: u32,
+    pack: UnsupportedAuthoredContentPackDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UnsupportedAuthoredContentPackDto {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    version: String,
+}
+
+impl<'de> Deserialize<'de> for UnsupportedAuthoredContentPackDocumentDto {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let document = UnsupportedAuthoredContentPackDocumentWireDto::deserialize(deserializer)?;
+        if matches!(
+            document.format_version,
+            AUTHORED_CONTENT_PACK_VERSION_V1 | AUTHORED_CONTENT_PACK_VERSION
+        ) {
+            return Err(D::Error::custom(
+                "a shipped authored content version must match its exact catalog shape",
+            ));
+        }
+        Ok(Self {
+            format: document.format,
+            format_version: document.format_version,
+            pack: document.pack,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentPackV1Dto {
+    id: String,
+    version: String,
+    title: String,
+    summary: String,
+    #[serde(default)]
+    tags: Vec<String>,
+    provenance: AuthoredContentProvenanceDto,
+    ruleset_id: String,
+    #[serde(default)]
+    dependencies: Vec<ContentPackReferenceDto>,
+    catalogs: AuthoredContentCatalogsV1Dto,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentCatalogsV1Dto {
+    #[serde(default)]
+    rulesets: Vec<RulesetDefinitionDto>,
+    #[serde(default)]
+    entities: Vec<AuthoredEntityDefinitionDto>,
+}
+
+impl<'de> Deserialize<'de> for AuthoredContentPackDocumentDto {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        match AuthoredContentPackDocumentWireDto::deserialize(deserializer)? {
+            AuthoredContentPackDocumentWireDto::V1(document) => {
+                if document.format_version == AUTHORED_CONTENT_PACK_VERSION {
+                    return Err(D::Error::custom(format!(
+                        "authored content formatVersion {} requires the v2 catalog shape",
+                        AUTHORED_CONTENT_PACK_VERSION
+                    )));
+                }
+                Ok(Self {
+                    format: document.format,
+                    format_version: document.format_version,
+                    pack: document.pack.into_current(),
+                })
+            }
+            AuthoredContentPackDocumentWireDto::V2(document) => {
+                if document.format_version == AUTHORED_CONTENT_PACK_VERSION_V1 {
+                    return Err(D::Error::custom(
+                        "authored content formatVersion 1 must use the v1 catalog shape",
+                    ));
+                }
+                Ok(Self {
+                    format: document.format,
+                    format_version: document.format_version,
+                    pack: document.pack,
+                })
+            }
+            AuthoredContentPackDocumentWireDto::Unsupported(document) => Ok(Self {
+                format: document.format,
+                format_version: document.format_version,
+                pack: unsupported_authored_pack(document.pack),
+            }),
+        }
+    }
+}
+
+impl Serialize for AuthoredContentPackDocumentDto {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Error;
+
+        if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V1 {
+            if !self.pack.catalogs.abilities.is_empty() {
+                return Err(S::Error::custom(
+                    "authored ability definitions require formatVersion 2",
+                ));
+            }
+            return AuthoredContentPackDocumentV1Dto {
+                format: self.format.clone(),
+                format_version: self.format_version,
+                pack: self.pack.to_v1(),
+            }
+            .serialize(serializer);
+        }
+
+        AuthoredContentPackDocumentV2Dto {
+            format: self.format.clone(),
+            format_version: self.format_version,
+            pack: self.pack.clone(),
+        }
+        .serialize(serializer)
+    }
+}
+
+fn unsupported_authored_pack(pack: UnsupportedAuthoredContentPackDto) -> AuthoredContentPackDto {
+    AuthoredContentPackDto {
+        id: pack.id,
+        version: pack.version,
+        title: String::new(),
+        summary: String::new(),
+        tags: Vec::new(),
+        provenance: AuthoredContentProvenanceDto {
+            source_kind: AuthoredContentSourceKindDto::AuthoredFile,
+            source_id: String::new(),
+            authored_by: None,
+        },
+        ruleset_id: String::new(),
+        dependencies: Vec::new(),
+        catalogs: AuthoredContentCatalogsDto::default(),
+    }
+}
+
+impl AuthoredContentPackV1Dto {
+    fn into_current(self) -> AuthoredContentPackDto {
+        AuthoredContentPackDto {
+            id: self.id,
+            version: self.version,
+            title: self.title,
+            summary: self.summary,
+            tags: self.tags,
+            provenance: self.provenance,
+            ruleset_id: self.ruleset_id,
+            dependencies: self.dependencies,
+            catalogs: AuthoredContentCatalogsDto {
+                rulesets: self.catalogs.rulesets,
+                entities: self.catalogs.entities,
+                abilities: Vec::new(),
+            },
+        }
+    }
+}
+
+impl AuthoredContentPackDto {
+    fn to_v1(&self) -> AuthoredContentPackV1Dto {
+        AuthoredContentPackV1Dto {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            title: self.title.clone(),
+            summary: self.summary.clone(),
+            tags: self.tags.clone(),
+            provenance: self.provenance.clone(),
+            ruleset_id: self.ruleset_id.clone(),
+            dependencies: self.dependencies.clone(),
+            catalogs: AuthoredContentCatalogsV1Dto {
+                rulesets: self.catalogs.rulesets.clone(),
+                entities: self.catalogs.entities.clone(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,33 +472,33 @@ impl AuthoredContentPackDocumentDto {
                 message: format!("Unsupported authored content format: {}", self.format),
             });
         }
-        if self.format_version != AUTHORED_CONTENT_PACK_VERSION {
+        if !matches!(
+            self.format_version,
+            AUTHORED_CONTENT_PACK_VERSION_V1 | AUTHORED_CONTENT_PACK_VERSION
+        ) {
             return Err(AuthoredContentDecodeError {
                 code: "unsupportedAuthoredContentVersion",
                 path: "formatVersion".to_string(),
                 message: format!(
-                    "Authored content format version {} is unsupported; expected {}.",
-                    self.format_version, AUTHORED_CONTENT_PACK_VERSION
+                    "Authored content format version {} is unsupported; supported versions are {} and {}.",
+                    self.format_version,
+                    AUTHORED_CONTENT_PACK_VERSION_V1,
+                    AUTHORED_CONTENT_PACK_VERSION
                 ),
             });
         }
-        let rulesets = self
-            .pack
-            .catalogs
+        if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V1
+            && !self.pack.catalogs.abilities.is_empty()
+        {
+            return Err(AuthoredContentDecodeError {
+                code: "authoredDefinitionRequiresV2",
+                path: "pack.catalogs.abilities".to_string(),
+                message: "Authored ability definitions require formatVersion 2.".to_string(),
+            });
+        }
+        let catalogs = self.pack.catalogs.to_authority()?;
+        let selected_ruleset = catalogs
             .rulesets
-            .iter()
-            .enumerate()
-            .map(|(index, definition)| {
-                validate_ruleset_definition(definition).map_err(|error| {
-                    AuthoredContentDecodeError {
-                        code: error.code(),
-                        path: format!("pack.catalogs.rulesets[{index}]"),
-                        message: format!("Authored ruleset was rejected: {error:?}"),
-                    }
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let selected_ruleset = rulesets
             .iter()
             .find(|ruleset| ruleset.id == self.pack.ruleset_id)
             .ok_or_else(|| AuthoredContentDecodeError {
@@ -263,13 +509,6 @@ impl AuthoredContentPackDocumentDto {
                     self.pack.ruleset_id
                 ),
             })?;
-        let entities = self
-            .pack
-            .catalogs
-            .entities
-            .iter()
-            .map(AuthoredEntityDefinitionDto::to_authority)
-            .collect();
         Ok(ContentPackDefinition {
             identity: ContentPackIdentity::new(&self.pack.id, &self.pack.version),
             title: self.pack.title.clone(),
@@ -295,12 +534,59 @@ impl AuthoredContentPackDocumentDto {
                 .map(ContentPackReferenceDto::to_authority)
                 .collect(),
             collision_policy: ContentPackCollisionPolicy::Reject,
-            catalogs: ContentPackCatalogs {
-                rulesets,
-                entities,
-                ..ContentPackCatalogs::default()
-            },
+            catalogs,
         })
+    }
+}
+
+impl AuthoredContentCatalogsDto {
+    fn to_authority(&self) -> Result<ContentPackCatalogs, AuthoredContentDecodeError> {
+        let rulesets = self
+            .rulesets
+            .iter()
+            .enumerate()
+            .map(|(index, definition)| {
+                validate_ruleset_definition(definition).map_err(|error| {
+                    AuthoredContentDecodeError {
+                        code: error.code(),
+                        path: format!("pack.catalogs.rulesets[{index}]"),
+                        message: format!("Authored ruleset was rejected: {error:?}"),
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let entities = self
+            .entities
+            .iter()
+            .map(AuthoredEntityDefinitionDto::to_authority)
+            .collect();
+        let abilities = self
+            .abilities
+            .iter()
+            .map(AuthoredAbilityDefinitionDto::to_authority)
+            .collect();
+
+        Ok(ContentPackCatalogs {
+            rulesets,
+            entities,
+            abilities,
+            ..ContentPackCatalogs::default()
+        })
+    }
+}
+
+impl AuthoredAbilityDefinitionDto {
+    fn to_authority(&self) -> AbilityDefinition {
+        AbilityDefinition {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            kind: match self.kind {
+                AuthoredAbilityDefinitionKindDto::Ability => AbilityDefinitionKind::Ability,
+                AuthoredAbilityDefinitionKindDto::Spell => AbilityDefinitionKind::Spell,
+            },
+            summary: self.summary.clone(),
+            tags: self.tags.clone(),
+        }
     }
 }
 
@@ -518,6 +804,7 @@ pub struct ContentWorkspaceDto {
 mod tests {
     use super::*;
     use rulebench_rules::{ContentImportDiagnosticCode, ContentPackDiagnosticCode};
+    use serde_json::json;
 
     #[test]
     fn rejected_import_mapping_preserves_rust_diagnostic_identity() {
@@ -545,5 +832,126 @@ mod tests {
             dto.diagnostics[0].reference_id.as_deref(),
             Some("pack.missing")
         );
+    }
+
+    #[test]
+    fn authored_v1_reader_remains_strict_and_read_compatible() {
+        let document: AuthoredContentPackDocumentDto =
+            serde_json::from_value(authored_document(AUTHORED_CONTENT_PACK_VERSION_V1, None))
+                .expect("committed v1 shape remains readable");
+
+        let authority = document.to_authority().expect("v1 remains importable");
+        assert!(authority.catalogs.abilities.is_empty());
+        let encoded = serde_json::to_value(&document).expect("v1 remains writable");
+        assert_eq!(encoded["formatVersion"], AUTHORED_CONTENT_PACK_VERSION_V1);
+        assert!(encoded["pack"]["catalogs"].get("abilities").is_none());
+        serde_json::from_value::<AuthoredContentPackDocumentDto>(encoded)
+            .expect("written v1 remains readable");
+
+        let v1_with_v2_field = authored_document(
+            AUTHORED_CONTENT_PACK_VERSION_V1,
+            Some(json!([authored_ability()])),
+        );
+        serde_json::from_value::<AuthoredContentPackDocumentDto>(v1_with_v2_field)
+            .expect_err("v1 must not accept a v2 catalog field");
+    }
+
+    #[test]
+    fn authored_v2_converts_ability_definitions_without_ui_semantics() {
+        let document: AuthoredContentPackDocumentDto = serde_json::from_value(authored_document(
+            AUTHORED_CONTENT_PACK_VERSION,
+            Some(json!([authored_ability()])),
+        ))
+        .expect("v2 shape decodes");
+        let authority = document.to_authority().expect("v2 converts in Rust");
+
+        assert_eq!(authority.catalogs.abilities.len(), 1);
+        assert_eq!(authority.catalogs.abilities[0].id, "ability.binding-glyph");
+        assert_eq!(
+            authority.catalogs.abilities[0].kind,
+            AbilityDefinitionKind::Spell
+        );
+    }
+
+    #[test]
+    fn unknown_authored_version_reaches_the_classified_version_error() {
+        for abilities in [None, Some(json!([authored_ability()]))] {
+            let document: AuthoredContentPackDocumentDto =
+                serde_json::from_value(authored_document(99, abilities))
+                    .expect("unknown version shape remains classifiable without conversion");
+            let error = document
+                .to_authority()
+                .expect_err("unknown versions fail closed");
+
+            assert_eq!(error.code, "unsupportedAuthoredContentVersion");
+            assert_eq!(error.path, "formatVersion");
+        }
+    }
+
+    #[test]
+    fn authored_v2_requires_the_complete_v2_catalog_shape() {
+        serde_json::from_value::<AuthoredContentPackDocumentDto>(authored_document(
+            AUTHORED_CONTENT_PACK_VERSION,
+            None,
+        ))
+        .expect_err("v2 must not silently default its ability catalog");
+    }
+
+    fn authored_document(
+        format_version: u32,
+        abilities: Option<serde_json::Value>,
+    ) -> serde_json::Value {
+        let mut catalogs = json!({
+            "rulesets": [{
+                "id": "asha-rulebench.turn-control.v0",
+                "name": "Turn Control",
+                "version": "0.1.0",
+                "summary": "Authored v2 fixture.",
+                "modules": [{
+                    "module": "actionResolution",
+                    "version": "1",
+                    "configuration": {
+                        "module": "actionResolution",
+                        "targetingPolicy": "declaredTargetsAndLineOfSight",
+                        "supportedCheckHandlers": ["attackVsDefense"]
+                    }
+                }]
+            }],
+            "entities": []
+        });
+        if let Some(abilities) = abilities {
+            catalogs
+                .as_object_mut()
+                .expect("catalog fixture is an object")
+                .insert("abilities".to_string(), abilities);
+        }
+        json!({
+            "format": AUTHORED_CONTENT_PACK_FORMAT,
+            "formatVersion": format_version,
+            "pack": {
+                "id": "pack.authored.v2",
+                "version": "2.0.0",
+                "title": "Authored v2",
+                "summary": "Cross-version reader fixture.",
+                "tags": ["authored"],
+                "provenance": {
+                    "sourceKind": "authoredFile",
+                    "sourceId": "fixture:authored-v2"
+                },
+                "rulesetId": "asha-rulebench.turn-control.v0",
+                "dependencies": [],
+                "catalogs": catalogs
+            }
+        })
+    }
+
+    fn authored_ability() -> serde_json::Value {
+        json!({
+            "id": "ability.binding-glyph",
+            "name": "Binding Glyph",
+            "kind": "spell",
+            "summary": "Second-ruleset control spell authored through v2.",
+            "tags": ["control", "spell"]
+        })
     }
 }

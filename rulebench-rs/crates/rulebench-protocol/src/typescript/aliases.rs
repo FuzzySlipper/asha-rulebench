@@ -14,6 +14,7 @@ pub fn aliases() -> &'static [super::ProtocolAlias] {
         "export type RulebenchContentDefinitionKindDto = 'ruleset' | 'entity' | 'ability' | 'class' | 'stat' | 'modifier' | 'item' | 'action';",
         "export type RulebenchAuthoredContentSourceKindDto = 'authoredFile' | 'bridgeSubmission';",
         "export type RulebenchAuthoredDamageAdjustmentPolicyDto = 'resistance' | 'vulnerability' | 'immunity';",
+        "export type RulebenchAuthoredAbilityDefinitionKindDto = 'ability' | 'spell';",
         "export type RulebenchContentReplacementPolicyDto = 'reject' | 'replaceSameIdentity';",
         "export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';",
         "export type RulebenchCombatLifecyclePhaseDto = 'ready' | 'inProgress' | 'ended';",
