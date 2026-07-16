@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::content_workspace::{ContentWorkspace, ContentWorkspaceError};
-use crate::{ArtifactRepositoryIssue, FileReplayArchiveStorage};
+use crate::{ArtifactRepositoryIssue, FileReplayArchiveStorage, FileSessionRecoveryStorage};
 use crate::{HttpMethod, HttpRequest, HttpResponse};
 use rulebench_bridge::replay_storage::{
     ContentPackStorage, ReplayArchiveEntry, ReplayArchiveStorage,
@@ -22,7 +22,8 @@ use rulebench_protocol::{
     LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
     LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
     LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
-    ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, UseActionIntentDto,
+    ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, SessionRecoveryCatalogDto,
+    SessionRecoveryForkRequestDto, SessionRecoveryIssueDto, UseActionIntentDto,
     ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionTranscriptDto,
 };
 
@@ -92,6 +93,9 @@ fn process_host_capability_manifest(
     registry
         .regression_capability_ids
         .push("viewer.authority-readback".to_string());
+    registry
+        .regression_capability_ids
+        .push("session.active-recovery".to_string());
     let filesystem = repository_status.mode == "filesystem";
     let manifest = assemble_capability_manifest(
         registry,
@@ -109,7 +113,11 @@ fn process_host_capability_manifest(
                 "inMemory".to_string()
             },
             replay_recovery_mode: "finalizedArchive".to_string(),
-            session_recovery_mode: "none".to_string(),
+            session_recovery_mode: if filesystem {
+                "replayVerifiedCheckpoints".to_string()
+            } else {
+                "processLocalCheckpoints".to_string()
+            },
             authority_viewer_mode: "liveAuthorityReadback".to_string(),
             authored_content_enabled,
             exposes_capabilities_through_protocol: true,
@@ -117,6 +125,7 @@ fn process_host_capability_manifest(
             exposes_capabilities_in_ui: true,
             durable_content: filesystem && authored_content_enabled,
             durable_finalized_replays: filesystem,
+            durable_active_sessions: filesystem,
         },
     )
     .expect("compiled owner registries form a valid capability manifest");
@@ -188,7 +197,7 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         }
     }
     let replay_root = root.join("replays");
-    let report = FileReplayArchiveStorage::open(replay_root, storage_scenarios)
+    let report = FileReplayArchiveStorage::open(replay_root, storage_scenarios.clone())
         .map_err(|issue| issue.message)?;
     let mut storage = report.storage;
     for (index, package) in replay_packages.into_iter().enumerate() {
@@ -203,11 +212,15 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         .list()
         .map_err(|error| format!("Could not list durable replay repository: {error:?}"))?
         .len();
+    let recovery_report =
+        FileSessionRecoveryStorage::open(root.join("session-recovery"), storage_scenarios.clone())
+            .map_err(|issue| issue.message)?;
     let (content, content_issues) = ContentPackStorage::open_quarantining(root.join("content"))
         .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
     let (content, workspace_issues) = ContentWorkspace::open(content);
     let content_artifact_count = content.storage().list().len();
     let mut issues = report.issues;
+    issues.extend(recovery_report.issues);
     issues.extend(
         content_issues
             .into_iter()
@@ -226,9 +239,10 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         replay_artifact_count,
         issues,
     };
-    let bridge = RulebenchBridge::new_with_replay_storage_and_viewer_sessions(
+    let bridge = RulebenchBridge::new_with_durable_storage(
         scenarios,
         Box::new(storage),
+        Box::new(recovery_report.storage),
         viewer_session_transcripts(),
     )
     .map_err(|error| error.to_string())?;
@@ -323,6 +337,46 @@ impl ProcessHostRouter {
                 )
             }
             (HttpMethod::Get, ["scenarios"]) => bridge_result(self.bridge.list_scenarios(&context)),
+            (HttpMethod::Get, ["session-recovery"]) => {
+                match self.bridge.list_session_recovery(&context) {
+                    Ok(sessions) => json_ok(SessionRecoveryCatalogDto {
+                        sessions,
+                        issues: self
+                            .repository_status
+                            .issues
+                            .iter()
+                            .filter(|issue| issue.artifact_kind == "sessionRecovery")
+                            .map(|issue| SessionRecoveryIssueDto {
+                                code: issue.code.clone(),
+                                message: issue.message.clone(),
+                                path: issue.path.clone(),
+                            })
+                            .collect(),
+                    }),
+                    Err(error) => bridge_error(error),
+                }
+            }
+            (HttpMethod::Delete, ["session-recovery", session_id]) => {
+                let handle = session_handle(session_id);
+                match self.bridge.discard_recovery_session(&context, &handle) {
+                    Ok(snapshot) => json_ok(LiveSessionSnapshotDto::from(&snapshot)),
+                    Err(error) => bridge_error(error),
+                }
+            }
+            (HttpMethod::Post, ["session-recovery", session_id, "fork"]) => {
+                let request = match decode_body::<SessionRecoveryForkRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                let handle = session_handle(session_id);
+                match self
+                    .bridge
+                    .fork_recovery_session(&context, &handle, &request.new_session_id)
+                {
+                    Ok(created) => json_ok(LiveSessionSnapshotDto::from(&created.snapshot)),
+                    Err(error) => bridge_error(error),
+                }
+            }
             (HttpMethod::Get, ["sessions"]) => match self.bridge.list_sessions(&context) {
                 Ok(snapshots) => json_ok(
                     snapshots
@@ -707,6 +761,8 @@ fn bridge_error(error: BridgeError) -> HttpResponse {
         BridgeErrorKind::ReplayArchive if error.code == "unknownReplayPackage" => 404,
         BridgeErrorKind::ReplayArchive if error.retryable => 503,
         BridgeErrorKind::ReplayArchive => 422,
+        BridgeErrorKind::SessionRecovery if error.retryable => 503,
+        BridgeErrorKind::SessionRecovery => 422,
     };
     error_response(status, "bridge", error.code, error.message, error.retryable)
 }

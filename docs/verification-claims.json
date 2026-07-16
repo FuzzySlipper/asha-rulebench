@@ -78,10 +78,6 @@
       "denHeading": "Trusted-local single-writer process host"
     },
     {
-      "id": "active-session-recovery",
-      "denHeading": "Active sessions remain process-local"
-    },
-    {
       "id": "authored-content-v1-vocabulary",
       "denHeading": "Authored content wire remains intentionally narrow"
     }

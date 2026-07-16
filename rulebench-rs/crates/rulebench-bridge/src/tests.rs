@@ -4,6 +4,7 @@ use rulebench_protocol::{
     ProtocolRequestContextDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
 use rulebench_rules::*;
+use std::collections::BTreeMap;
 
 use crate::{BridgeErrorKind, BridgeScenario, RulebenchBridge};
 
@@ -14,6 +15,64 @@ fn bridge() -> RulebenchBridge {
         "Bridge contract fixture.",
         minimal_scenario(),
     )])
+    .expect("fixture registry is valid")
+}
+
+#[derive(Debug)]
+struct FailOnWriteRecoveryStorage {
+    fail_on_write: usize,
+    write_count: usize,
+    packages: BTreeMap<String, SessionRecoveryPackage>,
+}
+
+impl FailOnWriteRecoveryStorage {
+    fn new(fail_on_write: usize) -> Self {
+        Self {
+            fail_on_write,
+            write_count: 0,
+            packages: BTreeMap::new(),
+        }
+    }
+}
+
+impl SessionRecoveryStorage for FailOnWriteRecoveryStorage {
+    fn write(
+        &mut self,
+        package: SessionRecoveryPackage,
+    ) -> Result<(), SessionRecoveryStorageError> {
+        self.write_count += 1;
+        if self.write_count == self.fail_on_write {
+            return Err(SessionRecoveryStorageError::WriteFailed {
+                session_id: package.session_id().to_string(),
+            });
+        }
+        self.packages
+            .insert(package.session_id().to_string(), package);
+        Ok(())
+    }
+
+    fn list(&self) -> Result<Vec<SessionRecoveryPackage>, SessionRecoveryStorageError> {
+        Ok(self.packages.values().cloned().collect())
+    }
+
+    fn delete(&mut self, session_id: &str) -> Result<(), SessionRecoveryStorageError> {
+        self.packages.remove(session_id);
+        Ok(())
+    }
+}
+
+fn bridge_with_recovery_storage(recovery: Box<dyn SessionRecoveryStorage>) -> RulebenchBridge {
+    RulebenchBridge::new_with_durable_storage(
+        [BridgeScenario::new(
+            "hexing-bolt",
+            "Hexing Bolt",
+            "Bridge contract fixture.",
+            minimal_scenario(),
+        )],
+        Box::new(InMemoryReplayArchiveStorage::new()),
+        recovery,
+        Vec::new(),
+    )
     .expect("fixture registry is valid")
 }
 
@@ -209,6 +268,59 @@ fn create(bridge: &mut RulebenchBridge, session_id: &str) -> CombatSessionHandle
         )
         .expect("fixture session is valid");
     CombatSessionHandleDto::from(&created.session)
+}
+
+#[test]
+fn bridge_rolls_back_creation_when_the_initial_recovery_checkpoint_fails() {
+    let mut bridge = bridge_with_recovery_storage(Box::new(FailOnWriteRecoveryStorage::new(1)));
+
+    let error = bridge
+        .create_session(
+            &context(),
+            &CombatSessionCreateRequestDto {
+                session_id: "uncommitted".to_string(),
+                scenario_id: "hexing-bolt".to_string(),
+                participant_order: Vec::new(),
+                content_pack: None,
+            },
+        )
+        .expect_err("failed initial checkpoint rejects the session");
+
+    assert_eq!(error.kind, BridgeErrorKind::SessionRecovery);
+    assert!(bridge
+        .list_sessions(&context())
+        .expect("session catalog remains readable")
+        .is_empty());
+    assert!(bridge
+        .list_session_recovery(&context())
+        .expect("recovery catalog remains readable")
+        .is_empty());
+}
+
+#[test]
+fn bridge_restores_the_previous_frame_when_a_command_checkpoint_fails() {
+    let mut bridge = bridge_with_recovery_storage(Box::new(FailOnWriteRecoveryStorage::new(2)));
+    let session = create(&mut bridge, "rollback-command");
+
+    let error = bridge
+        .submit_control(
+            &context(),
+            &session,
+            &CombatControlCommandDto {
+                kind: CombatControlCommandKindDto::ExplicitStart,
+            },
+        )
+        .expect_err("failed command checkpoint rejects the command");
+
+    assert_eq!(error.kind, BridgeErrorKind::SessionRecovery);
+    let snapshot = bridge
+        .get_session(&context(), &session)
+        .expect("previous verified frame remains active");
+    assert_eq!(snapshot.lifecycle.phase, CombatLifecyclePhase::Ready);
+    let recovery = bridge
+        .list_session_recovery(&context())
+        .expect("recovery catalog remains readable");
+    assert_eq!(recovery[0].generation, 0);
 }
 
 #[test]

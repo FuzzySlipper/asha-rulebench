@@ -204,13 +204,39 @@ import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol"
                           scenario.contentPackVersion
                     }}
                   </p>
-                  <div class="choice-row" aria-label="Activated authored content choices">
-                    <button type="button" [attr.aria-pressed]="selectedContentPack() === null" (click)="selectContentPack(null)">Built-in</button>
-                    @for (pack of compatibleActivePacks(); track pack.fingerprintLabel) {
-                      <button type="button" [attr.aria-pressed]="selectedContentPack()?.fingerprint.value === pack.reference.fingerprint.value" (click)="selectContentPack(pack.reference)">{{ pack.identityLabel }}</button>
+                  <div
+                    class="choice-row"
+                    aria-label="Activated authored content choices"
+                  >
+                    <button
+                      type="button"
+                      [attr.aria-pressed]="selectedContentPack() === null"
+                      (click)="selectContentPack(null)"
+                    >
+                      Built-in
+                    </button>
+                    @for (
+                      pack of compatibleActivePacks();
+                      track pack.fingerprintLabel
+                    ) {
+                      <button
+                        type="button"
+                        [attr.aria-pressed]="
+                          selectedContentPack()?.fingerprint.value ===
+                          pack.reference.fingerprint.value
+                        "
+                        (click)="selectContentPack(pack.reference)"
+                      >
+                        {{ pack.identityLabel }}
+                      </button>
                     }
                   </div>
-                  @if (contentWorkspace().kind === "error") { <p role="alert">{{ contentWorkspace().error.code }} · {{ contentWorkspace().error.message }}</p> }
+                  @if (contentWorkspace().kind === "error") {
+                    <p role="alert">
+                      {{ contentWorkspace().error.code }} ·
+                      {{ contentWorkspace().error.message }}
+                    </p>
+                  }
                 </section>
                 <section class="setup-section">
                   <h4>Participant order</h4>
@@ -264,6 +290,66 @@ import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol"
                 }
               </div>
             }
+
+            <section class="setup-section" aria-label="Session recovery">
+              <h4>Restart-safe sessions</h4>
+              @switch (recovery().kind) {
+                @case ("loading") {
+                  <p class="state" aria-busy="true">Loading recovery catalog</p>
+                }
+                @case ("error") {
+                  <p role="alert">
+                    {{ recovery().error.code }} · {{ recovery().error.message }}
+                  </p>
+                  <button type="button" (click)="refreshRecovery()">
+                    Retry recovery catalog
+                  </button>
+                }
+                @case ("data") {
+                  @for (
+                    entry of recovery().value.sessions;
+                    track entry.sessionId
+                  ) {
+                    <div class="choice-row">
+                      <span>
+                        {{ entry.sessionId }} ·
+                        {{ recoveryOriginLabel(entry.origin) }} · generation
+                        {{ entry.generation }}
+                        @if (entry.pendingReactionWindowId !== null) {
+                          · suspended reaction
+                          {{ entry.pendingReactionWindowId }}
+                        }
+                      </span>
+                      <button
+                        type="button"
+                        (click)="forkRecovery(entry.sessionId)"
+                      >
+                        Fork
+                      </button>
+                      <button
+                        type="button"
+                        (click)="discardRecovery(entry.sessionId)"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  }
+                  @for (issue of recovery().value.issues; track issue.path) {
+                    <p role="alert">
+                      Unrecoverable · {{ issue.code }} · {{ issue.message }}
+                    </p>
+                  }
+                  @if (
+                    recovery().value.sessions.length === 0 &&
+                    recovery().value.issues.length === 0
+                  ) {
+                    <p class="state">
+                      No active or quarantined recovery checkpoints
+                    </p>
+                  }
+                }
+              }
+            </section>
           </div>
         }
       }
@@ -284,6 +370,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   protected readonly connection = computed(() => this.store.connection());
   protected readonly scenarios = computed(() => this.store.scenarios());
   protected readonly sessions = computed(() => this.store.sessions());
+  protected readonly recovery = computed(() => this.store.recovery());
   protected readonly snapshot = computed(() => this.store.snapshot());
   protected readonly selectedScenarioId = computed(() =>
     this.store.selectedScenarioId(),
@@ -301,8 +388,11 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   );
   protected readonly sessionIdInput = signal("manual-session");
   protected readonly participantOrder = signal<readonly string[]>([]);
-  protected readonly selectedContentPack = signal<RulebenchContentPackReferenceDto | null>(null);
-  protected readonly contentWorkspace = computed(() => this.contentStore.workspace());
+  protected readonly selectedContentPack =
+    signal<RulebenchContentPackReferenceDto | null>(null);
+  protected readonly contentWorkspace = computed(() =>
+    this.contentStore.workspace(),
+  );
   protected readonly compatibleActivePacks = computed(() => {
     const workspace = this.contentWorkspace();
     const scenario = this.selectedScenario();
@@ -310,7 +400,8 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     return workspace.value.packs.filter(
       (pack) =>
         pack.active &&
-        pack.rulesetLabel === `${scenario.rulesetId}@${scenario.rulesetVersion}`,
+        pack.rulesetLabel ===
+          `${scenario.rulesetId}@${scenario.rulesetVersion}`,
     );
   });
   protected readonly canCreateSession = computed(
@@ -333,7 +424,30 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   }
 
   protected refreshSessions(): void {
-    void this.store.loadSessions();
+    void Promise.all([this.store.loadSessions(), this.store.loadRecovery()]);
+  }
+
+  protected refreshRecovery(): void {
+    void this.store.loadRecovery();
+  }
+
+  protected discardRecovery(sessionId: string): void {
+    void this.store.discardRecoveredSession(sessionId);
+  }
+
+  protected forkRecovery(sessionId: string): void {
+    void this.store.forkRecoveredSession(sessionId, `${sessionId}-fork`);
+  }
+
+  protected recoveryOriginLabel(origin: "new" | "restored" | "forked"): string {
+    switch (origin) {
+      case "new":
+        return "new this process";
+      case "restored":
+        return "restored after restart";
+      case "forked":
+        return "explicit fork";
+    }
   }
 
   protected selectScenario(id: string): void {
@@ -345,7 +459,9 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     this.sessionIdInput.set(value);
   }
 
-  protected selectContentPack(reference: RulebenchContentPackReferenceDto | null): void {
+  protected selectContentPack(
+    reference: RulebenchContentPackReferenceDto | null,
+  ): void {
     this.selectedContentPack.set(reference);
   }
 
@@ -389,6 +505,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     await Promise.all([
       this.store.loadScenarios(),
       this.store.loadSessions(),
+      this.store.loadRecovery(),
       this.contentStore.loadWorkspace(),
     ]);
     this.syncParticipantOrder();

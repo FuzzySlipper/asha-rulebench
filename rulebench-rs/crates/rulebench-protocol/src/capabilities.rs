@@ -208,6 +208,7 @@ mod tests {
                 exposes_capabilities_in_ui: true,
                 durable_content: false,
                 durable_finalized_replays: false,
+                durable_active_sessions: false,
             },
         )
         .expect("manifest is valid");

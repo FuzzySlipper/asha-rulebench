@@ -28,8 +28,10 @@ pub mod replay_storage {
         EquipmentCommandSpec, GridPosition, ReactionCommandSpec, ReactionResponseKind,
         ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage, ReplayArchiveStorageError,
         ReplayCommand, ReplayCommandRecord, ReplayCommandRecordingSpec, ReplayNarration,
-        RulesetArtifactProvenance, UseActionIntent, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
-        REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
+        RulesetArtifactProvenance, SessionRecoveryError, SessionRecoveryFrame,
+        SessionRecoveryPackage, SessionRecoveryStorage, SessionRecoveryStorageError,
+        StateFingerprint, UseActionIntent, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
+        REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM, SESSION_RECOVERY_PACKAGE_VERSION,
     };
 }
 

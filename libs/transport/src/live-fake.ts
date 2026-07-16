@@ -79,6 +79,18 @@ export function createFakeRulebenchLiveTransport(
       unavailable("getViewerSessionStep"),
     listSessions: (requestOptions) =>
       handlers.listSessions?.(requestOptions) ?? unavailable("listSessions"),
+    getSessionRecovery: (requestOptions) =>
+      handlers.getSessionRecovery?.(requestOptions) ??
+      unavailable("getSessionRecovery"),
+    discardRecoveredSession: (sessionId, requestOptions) =>
+      handlers.discardRecoveredSession?.(sessionId, requestOptions) ??
+      unavailable("discardRecoveredSession"),
+    forkRecoveredSession: (sessionId, newSessionId, requestOptions) =>
+      handlers.forkRecoveredSession?.(
+        sessionId,
+        newSessionId,
+        requestOptions,
+      ) ?? unavailable("forkRecoveredSession"),
     createSession: (request, requestOptions) =>
       handlers.createSession?.(request, requestOptions) ??
       unavailable("createSession"),
@@ -137,7 +149,8 @@ export function createFakeRulebenchLiveTransport(
       handlers.deleteContent?.(reference, requestOptions) ??
       unavailable("deleteContent"),
     listReplayPackages: () =>
-      handlers.listReplayPackages?.() ?? replayUnavailable("listReplayPackages"),
+      handlers.listReplayPackages?.() ??
+      replayUnavailable("listReplayPackages"),
     loadReplayPackage: (packageId) =>
       handlers.loadReplayPackage?.(packageId) ??
       replayUnavailable("loadReplayPackage"),

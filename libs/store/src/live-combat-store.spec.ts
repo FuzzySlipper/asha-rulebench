@@ -40,13 +40,13 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           manifestId: "asha-rulebench.capabilities",
-          manifestVersion: 3,
-          generatedArtifactSchema: "asha-rulebench.capabilities.ts@3",
+          manifestVersion: 4,
+          generatedArtifactSchema: "asha-rulebench.capabilities.ts@4",
           governedAshaRevision: "0123456789abcdef",
           operationVocabularyVersion: "2",
           effectVocabularyVersion: "1",
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 3,
+          protocolVersion: 4,
           host: {
             adapterId: "rulebench-process-host",
             storageMode: "filesystem",
@@ -106,7 +106,7 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 3,
+          protocolVersion: 4,
           authoritySurface: "test-authority",
         },
       }),
@@ -268,7 +268,10 @@ describe("LiveCombatStore", () => {
     });
     expect(store.snapshot()).toMatchObject({
       kind: "data",
-      value: { reactionWindow: null, participants: [{}, { hitPointLabel: "11/18 HP" }] },
+      value: {
+        reactionWindow: null,
+        participants: [{}, { hitPointLabel: "11/18 HP" }],
+      },
     });
   });
 
@@ -382,10 +385,7 @@ describe("LiveCombatStore", () => {
     const store = new LiveCombatStore(transport, fixedClock);
     await store.selectSession("live-session");
     store.selectAction("storm-pulse");
-    store.selectTargetSet(
-      ["entity-bruiser", "entity-raider"],
-      { x: 8, y: 3 },
-    );
+    store.selectTargetSet(["entity-bruiser", "entity-raider"], { x: 8, y: 3 });
     await store.preflightIntent();
 
     expect(observedIntent).toMatchObject({
@@ -454,6 +454,65 @@ describe("LiveCombatStore", () => {
     });
   });
 
+  it("loads recovery evidence and performs explicit fork and discard lifecycles", async () => {
+    const calls: string[] = [];
+    const catalog = {
+      sessions: [
+        {
+          sessionId: "restored-session",
+          origin: "restored" as const,
+          state: "recoverable" as const,
+          generation: 2,
+          lastVerifiedFrameId: "2:fingerprint",
+          pendingReactionWindowId: "reaction-1",
+          actions: ["discard", "fork"] as const,
+        },
+      ],
+      issues: [
+        {
+          code: "sessionRecoveryFrameMismatch",
+          message: "Stored frame did not verify.",
+          path: "quarantine/recovery.json",
+        },
+      ],
+    };
+    const transport = createFakeRulebenchLiveTransport({
+      getSessionRecovery: async () => ({ ok: true, value: catalog }),
+      listSessions: async () => ({ ok: true, value: [] }),
+      forkRecoveredSession: async (sessionId, newSessionId) => {
+        calls.push(`fork:${sessionId}:${newSessionId}`);
+        return {
+          ok: true,
+          value: makeLiveSessionSnapshot({ sessionId: newSessionId }),
+        };
+      },
+      discardRecoveredSession: async (sessionId) => {
+        calls.push(`discard:${sessionId}`);
+        return {
+          ok: true,
+          value: makeLiveSessionSnapshot({ sessionId }),
+        };
+      },
+    });
+    const store = new LiveCombatStore(transport, fixedClock);
+
+    await store.loadRecovery();
+    expect(store.recovery()).toEqual({ kind: "data", value: catalog });
+
+    await store.forkRecoveredSession("restored-session", "explicit-fork");
+    expect(store.selectedSessionId()).toBe("explicit-fork");
+    expect(store.snapshot()).toMatchObject({
+      kind: "data",
+      value: { sessionId: "explicit-fork" },
+    });
+
+    await store.discardRecoveredSession("restored-session");
+    expect(calls).toEqual([
+      "fork:restored-session:explicit-fork",
+      "discard:restored-session",
+    ]);
+  });
+
   it("does not let a pending connection overwrite disconnected cleanup state", async () => {
     const connection = deferred<
       RulebenchLiveTransportResult<{
@@ -474,7 +533,7 @@ describe("LiveCombatStore", () => {
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 3,
+        protocolVersion: 4,
         authoritySurface: "late",
       },
     });

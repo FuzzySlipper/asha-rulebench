@@ -56,3 +56,9 @@ pub use comparison::{
     compare_replay_archive_entries, compare_replay_packages, ReplayComparisonDifference,
     ReplayComparisonDifferenceCode, ReplayComparisonReadout,
 };
+mod recovery;
+pub use recovery::{
+    InMemorySessionRecoveryStorage, RecoveredSession, SessionRecoveryError, SessionRecoveryFrame,
+    SessionRecoveryPackage, SessionRecoveryStorage, SessionRecoveryStorageError,
+    SESSION_RECOVERY_PACKAGE_VERSION,
+};

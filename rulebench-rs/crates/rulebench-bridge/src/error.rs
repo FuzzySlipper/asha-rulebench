@@ -1,4 +1,6 @@
-use rulebench_rules::{CombatSessionApiError, ReplayArchiveError};
+use rulebench_rules::{
+    CombatSessionApiError, ReplayArchiveError, SessionRecoveryError, SessionRecoveryStorageError,
+};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,6 +13,7 @@ pub enum BridgeErrorKind {
     InvalidScenario,
     InvalidLifecycle,
     ReplayArchive,
+    SessionRecovery,
 }
 
 impl BridgeErrorKind {
@@ -24,6 +27,7 @@ impl BridgeErrorKind {
             BridgeErrorKind::InvalidScenario => "invalidScenario",
             BridgeErrorKind::InvalidLifecycle => "invalidLifecycle",
             BridgeErrorKind::ReplayArchive => "replayArchive",
+            BridgeErrorKind::SessionRecovery => "sessionRecovery",
         }
     }
 }
@@ -85,6 +89,24 @@ impl BridgeError {
             code: error.code().to_string(),
             message: format!("{error:?}"),
             retryable: matches!(error, ReplayArchiveError::Storage(_)),
+        }
+    }
+
+    pub(crate) fn from_recovery_error(error: SessionRecoveryError) -> Self {
+        Self {
+            kind: BridgeErrorKind::SessionRecovery,
+            code: error.code().to_string(),
+            message: format!("{error:?}"),
+            retryable: false,
+        }
+    }
+
+    pub(crate) fn from_recovery_storage_error(error: SessionRecoveryStorageError) -> Self {
+        Self {
+            kind: BridgeErrorKind::SessionRecovery,
+            code: "sessionRecoveryStorageFailed".to_string(),
+            message: format!("{error:?}"),
+            retryable: true,
         }
     }
 }

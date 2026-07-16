@@ -10,8 +10,9 @@ use rulebench_bridge::replay_storage::{
     ContentPackSetReference, EquipmentCommandKind, EquipmentCommandSpec, GridPosition,
     ReactionCommandSpec, ReactionResponseKind, ReplayArchiveEntry, ReplayArchiveMetadata,
     ReplayArchiveStorage, ReplayArchiveStorageError, ReplayCommand, ReplayCommandRecordingSpec,
-    ReplayNarration, UseActionIntent, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
-    REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
+    ReplayNarration, SessionRecoveryFrame, SessionRecoveryPackage, SessionRecoveryStorage,
+    SessionRecoveryStorageError, StateFingerprint, UseActionIntent,
+    REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION, REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM,
 };
 use rulebench_bridge::{prepare_replay_scenario, BridgeScenario};
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ const STORAGE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-artifact-store.v1
 const LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-replay-archive.v0";
 const LEGACY_REPLAY_ARCHIVE_DEBUG_FINGERPRINT_ALGORITHM: &str =
     "fnv1a64.rulebench-replay-archive.v1";
+const RECOVERY_STORAGE_FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactRepositoryIssue {
@@ -43,6 +45,203 @@ pub struct FileReplayArchiveStorage {
     root: PathBuf,
     scenarios: BTreeMap<String, BridgeScenario>,
     entries: BTreeMap<String, ReplayArchiveEntry>,
+}
+
+#[derive(Debug)]
+pub struct SessionRecoveryOpenReport {
+    pub storage: FileSessionRecoveryStorage,
+    pub issues: Vec<ArtifactRepositoryIssue>,
+}
+
+#[derive(Debug)]
+pub struct FileSessionRecoveryStorage {
+    root: PathBuf,
+    scenarios: BTreeMap<String, BridgeScenario>,
+    packages: BTreeMap<String, SessionRecoveryPackage>,
+}
+
+impl FileSessionRecoveryStorage {
+    pub fn open(
+        root: impl Into<PathBuf>,
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+    ) -> Result<SessionRecoveryOpenReport, ArtifactRepositoryIssue> {
+        let root = root.into();
+        fs::create_dir_all(&root).map_err(|_| {
+            issue(
+                "sessionRecovery",
+                "createRecoveryDirectoryFailed",
+                &root,
+                "The session recovery directory could not be created.",
+            )
+        })?;
+        let scenarios = scenarios
+            .into_iter()
+            .map(|scenario| (scenario.scenario.metadata.id.clone(), scenario))
+            .collect();
+        let mut storage = Self {
+            root,
+            scenarios,
+            packages: BTreeMap::new(),
+        };
+        let issues = storage.load_packages()?;
+        Ok(SessionRecoveryOpenReport { storage, issues })
+    }
+
+    fn load_packages(&mut self) -> Result<Vec<ArtifactRepositoryIssue>, ArtifactRepositoryIssue> {
+        let directory = fs::read_dir(&self.root).map_err(|_| {
+            issue(
+                "sessionRecovery",
+                "readRecoveryDirectoryFailed",
+                &self.root,
+                "The session recovery directory could not be read.",
+            )
+        })?;
+        let mut paths = directory
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>();
+        paths.sort();
+        let mut issues = Vec::new();
+        for path in paths {
+            let file_name = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("");
+            if file_name.ends_with(".tmp") {
+                issues.push(issue(
+                    "sessionRecovery",
+                    "partialRecoveryCommitQuarantined",
+                    &path,
+                    "An uncommitted session recovery temporary file was ignored.",
+                ));
+                continue;
+            }
+            if !file_name.ends_with(".recovery.json") {
+                continue;
+            }
+            match self.decode_package(&path) {
+                Ok(package) => {
+                    let session_id = package.session_id().to_string();
+                    if self.packages.insert(session_id.clone(), package).is_some() {
+                        issues.push(issue(
+                            "sessionRecovery",
+                            "duplicateRecoveryIdentityQuarantined",
+                            &path,
+                            format!("A duplicate recovery identity was ignored: {session_id}."),
+                        ));
+                    }
+                }
+                Err(problem) => issues.push(problem),
+            }
+        }
+        Ok(issues)
+    }
+
+    fn decode_package(
+        &self,
+        path: &Path,
+    ) -> Result<SessionRecoveryPackage, ArtifactRepositoryIssue> {
+        let bytes = fs::read(path).map_err(|_| {
+            issue(
+                "sessionRecovery",
+                "readRecoveryFailed",
+                path,
+                "The session recovery artifact could not be read.",
+            )
+        })?;
+        let envelope: StoredRecoveryEnvelope = serde_json::from_slice(&bytes).map_err(|error| {
+            issue(
+                "sessionRecovery",
+                "corruptRecoveryEnvelopeQuarantined",
+                path,
+                format!("The recovery envelope was invalid and was ignored: {error}."),
+            )
+        })?;
+        if envelope.format_version != RECOVERY_STORAGE_FORMAT_VERSION {
+            return Err(issue(
+                "sessionRecovery",
+                "unsupportedRecoveryStorageVersionQuarantined",
+                path,
+                format!(
+                    "Recovery storage version {} is not supported; expected {}.",
+                    envelope.format_version, RECOVERY_STORAGE_FORMAT_VERSION
+                ),
+            ));
+        }
+        if envelope.fingerprint_algorithm != STORAGE_FINGERPRINT_ALGORITHM
+            || envelope.payload_fingerprint != fingerprint_serializable(&envelope.payload)
+        {
+            return Err(issue(
+                "sessionRecovery",
+                "recoveryIntegrityMismatchQuarantined",
+                path,
+                "The recovery storage payload fingerprint did not match.",
+            ));
+        }
+        let frame = envelope.frame.to_authority();
+        let package = envelope
+            .payload
+            .to_recovery(envelope.generation, frame, &self.scenarios)
+            .map_err(|message| {
+                issue(
+                    "sessionRecovery",
+                    "incompatibleRecoveryPayloadQuarantined",
+                    path,
+                    message,
+                )
+            })?;
+        package.restore().map_err(|error| {
+            issue(
+                "sessionRecovery",
+                error.code(),
+                path,
+                format!("The recovery checkpoint could not be verified: {error:?}."),
+            )
+        })?;
+        Ok(package)
+    }
+
+    fn package_path(&self, session_id: &str) -> PathBuf {
+        self.root
+            .join(format!("{}.recovery.json", hex_name(session_id)))
+    }
+}
+
+impl SessionRecoveryStorage for FileSessionRecoveryStorage {
+    fn write(
+        &mut self,
+        package: SessionRecoveryPackage,
+    ) -> Result<(), SessionRecoveryStorageError> {
+        let session_id = package.session_id().to_string();
+        package
+            .restore()
+            .map_err(|_| SessionRecoveryStorageError::WriteFailed {
+                session_id: session_id.clone(),
+            })?;
+        let envelope = StoredRecoveryEnvelope::from_package(&package);
+        atomic_write_json(&self.package_path(&session_id), &envelope).map_err(|_| {
+            SessionRecoveryStorageError::WriteFailed {
+                session_id: session_id.clone(),
+            }
+        })?;
+        self.packages.insert(session_id, package);
+        Ok(())
+    }
+
+    fn list(&self) -> Result<Vec<SessionRecoveryPackage>, SessionRecoveryStorageError> {
+        Ok(self.packages.values().cloned().collect())
+    }
+
+    fn delete(&mut self, session_id: &str) -> Result<(), SessionRecoveryStorageError> {
+        let path = self.package_path(session_id);
+        if path.exists() {
+            fs::remove_file(path).map_err(|_| SessionRecoveryStorageError::DeleteFailed {
+                session_id: session_id.to_string(),
+            })?;
+        }
+        self.packages.remove(session_id);
+        Ok(())
+    }
 }
 
 impl FileReplayArchiveStorage {
@@ -530,6 +729,114 @@ impl StoredReplayPayload {
         }
         package.narration = self.narration.as_ref().map(StoredNarration::to_authority);
         Ok(ReplayArchiveEntry::new(package, &self.completed_at))
+    }
+
+    fn from_recovery(package: &SessionRecoveryPackage) -> Self {
+        let commands = package
+            .commands
+            .iter()
+            .map(|command| ReplayCommandRecordingSpec::new(&command.id, command.command.clone()))
+            .collect();
+        let replay = record_replay_package(
+            format!("recovery:{}", package.session_id()),
+            package.initial_session.clone(),
+            package.ruleset.clone(),
+            commands,
+        );
+        Self::from_entry(&ReplayArchiveEntry::new(replay, "active-session"))
+    }
+
+    fn to_recovery(
+        &self,
+        generation: u64,
+        expected_frame: SessionRecoveryFrame,
+        scenarios: &BTreeMap<String, BridgeScenario>,
+    ) -> Result<SessionRecoveryPackage, String> {
+        let entry = self.to_entry(scenarios)?;
+        let commands = entry
+            .package
+            .commands
+            .into_iter()
+            .map(|command| ReplayCommandRecordingSpec::new(command.id, command.command))
+            .collect();
+        let package = SessionRecoveryPackage::record(
+            generation,
+            entry.package.initial_session,
+            entry.package.ruleset,
+            commands,
+        )
+        .map_err(|error| format!("Recovery package reconstruction failed: {error:?}."))?;
+        if package.frame != expected_frame {
+            return Err(
+                "Recovery frame identity did not match reconstructed authority.".to_string(),
+            );
+        }
+        Ok(package)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredRecoveryEnvelope {
+    format_version: u32,
+    fingerprint_algorithm: String,
+    payload_fingerprint: String,
+    generation: u64,
+    frame: StoredRecoveryFrame,
+    payload: StoredReplayPayload,
+}
+
+impl StoredRecoveryEnvelope {
+    fn from_package(package: &SessionRecoveryPackage) -> Self {
+        let payload = StoredReplayPayload::from_recovery(package);
+        Self {
+            format_version: RECOVERY_STORAGE_FORMAT_VERSION,
+            fingerprint_algorithm: STORAGE_FINGERPRINT_ALGORITHM.to_string(),
+            payload_fingerprint: fingerprint_serializable(&payload),
+            generation: package.frame.generation,
+            frame: StoredRecoveryFrame::from_authority(&package.frame),
+            payload,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredRecoveryFrame {
+    generation: u64,
+    command_sequence: Option<u32>,
+    command_id: Option<String>,
+    state_fingerprint_algorithm: String,
+    state_fingerprint_value: String,
+    gameplay_module_state_hash: String,
+    pending_reaction_window_id: Option<String>,
+}
+
+impl StoredRecoveryFrame {
+    fn from_authority(value: &SessionRecoveryFrame) -> Self {
+        Self {
+            generation: value.generation,
+            command_sequence: value.command_sequence,
+            command_id: value.command_id.clone(),
+            state_fingerprint_algorithm: value.state_fingerprint.algorithm.clone(),
+            state_fingerprint_value: value.state_fingerprint.value.clone(),
+            gameplay_module_state_hash: value.gameplay_module_state_hash.clone(),
+            pending_reaction_window_id: value.pending_reaction_window_id.clone(),
+        }
+    }
+
+    fn to_authority(&self) -> SessionRecoveryFrame {
+        SessionRecoveryFrame {
+            generation: self.generation,
+            command_sequence: self.command_sequence,
+            command_id: self.command_id.clone(),
+            state_fingerprint: StateFingerprint {
+                algorithm: self.state_fingerprint_algorithm.clone(),
+                value: self.state_fingerprint_value.clone(),
+            },
+            gameplay_module_state_hash: self.gameplay_module_state_hash.clone(),
+            pending_reaction_window_id: self.pending_reaction_window_id.clone(),
+        }
     }
 }
 
@@ -1570,6 +1877,69 @@ mod tests {
             .storage
             .list()
             .expect("repository lists")
+            .is_empty());
+        cleanup(&directory);
+    }
+
+    #[test]
+    fn session_recovery_round_trips_and_quarantines_corrupt_or_stale_frames() {
+        let directory = test_directory("session-recovery");
+        let replay = replay_review_packages()
+            .into_iter()
+            .next()
+            .expect("replay fixture exists");
+        let command = replay.commands[0].clone();
+        let package = SessionRecoveryPackage::record(
+            1,
+            replay.initial_session,
+            replay.ruleset,
+            vec![ReplayCommandRecordingSpec::new(command.id, command.command)],
+        )
+        .expect("recovery package records");
+        let session_id = package.session_id().to_string();
+        let mut report =
+            FileSessionRecoveryStorage::open(&directory, scenarios()).expect("storage opens");
+        report
+            .storage
+            .write(package.clone())
+            .expect("checkpoint commits");
+        drop(report.storage);
+
+        let reopened =
+            FileSessionRecoveryStorage::open(&directory, scenarios()).expect("storage reopens");
+        assert!(reopened.issues.is_empty(), "issues={:?}", reopened.issues);
+        assert_eq!(
+            reopened.storage.list().expect("storage lists"),
+            vec![package]
+        );
+        drop(reopened.storage);
+
+        let path = directory.join(format!("{}.recovery.json", hex_name(&session_id)));
+        let mut stale: StoredRecoveryEnvelope =
+            serde_json::from_slice(&fs::read(&path).expect("checkpoint reads"))
+                .expect("checkpoint decodes");
+        stale.frame.state_fingerprint_value.push_str("-stale");
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&stale).expect("stale fixture serializes"),
+        )
+        .expect("stale fixture writes");
+        fs::write(directory.join("partial.recovery.json.tmp"), b"partial")
+            .expect("partial fixture writes");
+
+        let quarantined =
+            FileSessionRecoveryStorage::open(&directory, scenarios()).expect("storage quarantines");
+        let codes = quarantined
+            .issues
+            .iter()
+            .map(|problem| problem.code.as_str())
+            .collect::<BTreeSet<_>>();
+        assert!(codes.contains("incompatibleRecoveryPayloadQuarantined"));
+        assert!(codes.contains("partialRecoveryCommitQuarantined"));
+        assert!(quarantined
+            .storage
+            .list()
+            .expect("quarantined storage lists")
             .is_empty());
         cleanup(&directory);
     }

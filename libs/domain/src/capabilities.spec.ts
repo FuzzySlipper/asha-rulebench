@@ -6,13 +6,13 @@ describe("projectCapabilityManifest", () => {
   it("keeps owner support levels explicit instead of collapsing them into one boolean", () => {
     const view = projectCapabilityManifest({
       manifestId: "asha-rulebench.capabilities",
-      manifestVersion: 3,
-      generatedArtifactSchema: "asha-rulebench.capabilities.ts@3",
+      manifestVersion: 4,
+      generatedArtifactSchema: "asha-rulebench.capabilities.ts@4",
       governedAshaRevision: "0123456789abcdef",
       operationVocabularyVersion: "2",
       effectVocabularyVersion: "1",
       protocolId: "asha-rulebench.protocol",
-      protocolVersion: 3,
+      protocolVersion: 4,
       host: {
         adapterId: "rulebench-process-host",
         storageMode: "filesystem",

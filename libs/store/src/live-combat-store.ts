@@ -29,6 +29,7 @@ import type {
   RulebenchUseActionIntentDto,
   RulebenchProtocolHandshakeDto,
   RulebenchScenarioOptionDto,
+  RulebenchSessionRecoveryCatalogDto,
   RulebenchContentPackReferenceDto,
 } from "@asha-rulebench/protocol";
 import {
@@ -79,6 +80,12 @@ export class LiveCombatStore {
   >({ kind: "idle" });
   readonly sessions: Signal<LiveState<readonly RulebenchLiveSessionView[]>> =
     this._sessions.asReadonly();
+  private readonly _recovery = signal<
+    LiveState<RulebenchSessionRecoveryCatalogDto>
+  >({
+    kind: "idle",
+  });
+  readonly recovery = this._recovery.asReadonly();
   private readonly _snapshot = signal<LiveState<RulebenchLiveSessionView>>({
     kind: "idle",
   });
@@ -203,6 +210,53 @@ export class LiveCombatStore {
     this.clock.now();
   }
 
+  async loadRecovery(): Promise<void> {
+    const generation = this.lifecycleGeneration;
+    this._recovery.set({ kind: "loading" });
+    const result = await this.transport.getSessionRecovery();
+    if (generation !== this.lifecycleGeneration) return;
+    this._recovery.set(
+      result.ok
+        ? { kind: "data", value: result.value }
+        : { kind: "error", error: result.error },
+    );
+    this.clock.now();
+  }
+
+  async discardRecoveredSession(sessionId: string): Promise<void> {
+    this._recovery.set({ kind: "loading" });
+    const result = await this.transport.discardRecoveredSession(sessionId);
+    if (!result.ok) {
+      this._recovery.set({ kind: "error", error: result.error });
+      this.clock.now();
+      return;
+    }
+    if (this._selectedSessionId() === sessionId) this.clearSessionState();
+    await Promise.all([this.loadSessions(), this.loadRecovery()]);
+  }
+
+  async forkRecoveredSession(
+    sessionId: string,
+    newSessionId: string,
+  ): Promise<void> {
+    this._recovery.set({ kind: "loading" });
+    const result = await this.transport.forkRecoveredSession(
+      sessionId,
+      newSessionId,
+    );
+    if (!result.ok) {
+      this._recovery.set({ kind: "error", error: result.error });
+      this.clock.now();
+      return;
+    }
+    this.selectSessionIdentity(newSessionId);
+    this._snapshot.set({
+      kind: "data",
+      value: projectLiveSessionSnapshot(result.value),
+    });
+    await Promise.all([this.loadSessions(), this.loadRecovery()]);
+  }
+
   async createSession(
     sessionId: string,
     scenarioId: string,
@@ -226,6 +280,8 @@ export class LiveCombatStore {
     );
     if (result.ok)
       this.reconcileIntent(projectLiveSessionSnapshot(result.value));
+    if (result.ok)
+      await Promise.all([this.loadSessions(), this.loadRecovery()]);
     this.clock.now();
   }
 
@@ -423,7 +479,10 @@ export class LiveCombatStore {
     const request = this.currentRequest();
     if (request === null) return;
     this._reaction.set({ kind: "loading" });
-    const result = await this.transport.submitReaction(request.sessionId, command);
+    const result = await this.transport.submitReaction(
+      request.sessionId,
+      command,
+    );
     if (!this.isCurrent(request.sessionId, request.generation)) return;
     if (result.ok) {
       const snapshot = projectLiveSessionSnapshot(result.value.snapshot);
@@ -523,6 +582,7 @@ export class LiveCombatStore {
     this.clearSessionState();
     await Promise.all([
       this.loadSessions(),
+      this.loadRecovery(),
       this.replayStore?.loadPackages() ?? Promise.resolve(),
     ]);
   }
@@ -535,6 +595,7 @@ export class LiveCombatStore {
     this._capabilities.set({ kind: "idle" });
     this._scenarios.set({ kind: "idle" });
     this._sessions.set({ kind: "idle" });
+    this._recovery.set({ kind: "idle" });
     this._selectedScenarioId.set(null);
     this.clearSessionState();
     this.clock.now();
@@ -613,10 +674,12 @@ export class LiveCombatStore {
     }
     if (
       action.targetMode === "entity" &&
-      !(current.targetIds !== undefined &&
+      !(
+        current.targetIds !== undefined &&
         action.targetSets.some((targetSet) =>
           sameTargetIds(targetSet.targetIds, current.targetIds ?? []),
-        )) &&
+        )
+      ) &&
       !action.targets.some((target) => target.id === current.targetId)
     ) {
       this._intent.set({
@@ -731,8 +794,14 @@ function protocolIntent(
   };
 }
 
-function sameTargetIds(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
+function sameTargetIds(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 }
 
 export function provideLiveCombatStoreKernel(): Provider[] {

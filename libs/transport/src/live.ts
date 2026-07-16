@@ -29,16 +29,20 @@ import type {
   RulebenchReplayVerificationReadoutDto,
   RulebenchReactionCommandSpecDto,
   RulebenchScenarioOptionDto,
+  RulebenchSessionRecoveryCatalogDto,
   RulebenchUseActionIntentDto,
   RulebenchViewerScenarioReadoutDto,
   RulebenchViewerScenarioSummaryDto,
   RulebenchViewerSessionStepReadoutDto,
   RulebenchViewerSessionSummaryDto,
 } from "@asha-rulebench/protocol";
-import type { ReplayReviewResult, ReplayReviewTransport } from "./replay-review";
+import type {
+  ReplayReviewResult,
+  ReplayReviewTransport,
+} from "./replay-review";
 
 export const RULEBENCH_PROTOCOL_ID = "asha-rulebench.protocol";
-export const RULEBENCH_PROTOCOL_VERSION = 3;
+export const RULEBENCH_PROTOCOL_VERSION = 4;
 
 const DEFAULT_API_BASE_URL = "/api/rulebench/v1";
 
@@ -94,12 +98,28 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
     sessionId: string,
     stepId: string,
     options?: RulebenchLiveRequestOptions,
-  ) => Promise<RulebenchLiveTransportResult<RulebenchViewerSessionStepReadoutDto>>;
+  ) => Promise<
+    RulebenchLiveTransportResult<RulebenchViewerSessionStepReadoutDto>
+  >;
   readonly listSessions: (
     options?: RulebenchLiveRequestOptions,
   ) => Promise<
     RulebenchLiveTransportResult<readonly RulebenchLiveSessionSnapshotDto[]>
   >;
+  readonly getSessionRecovery: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<
+    RulebenchLiveTransportResult<RulebenchSessionRecoveryCatalogDto>
+  >;
+  readonly discardRecoveredSession: (
+    sessionId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchLiveSessionSnapshotDto>>;
+  readonly forkRecoveredSession: (
+    sessionId: string,
+    newSessionId: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchLiveSessionSnapshotDto>>;
   readonly createSession: (
     request: RulebenchCombatSessionCreateRequestDto,
     options?: RulebenchLiveRequestOptions,
@@ -287,6 +307,8 @@ export function createLiveRulebenchTransport(
     `/viewer/scenarios/${encodeURIComponent(scenarioId)}`;
   const viewerSessionStepPath = (sessionId: string, stepId: string): string =>
     `/viewer/sessions/${encodeURIComponent(sessionId)}/steps/${encodeURIComponent(stepId)}`;
+  const recoveryPath = (sessionId: string): string =>
+    `/session-recovery/${encodeURIComponent(sessionId)}`;
   const replayPath = (packageId: string): string =>
     `/replays/${encodeURIComponent(packageId)}`;
   const replayRequest = async <T>(
@@ -356,6 +378,17 @@ export function createLiveRulebenchTransport(
       ),
     listSessions: (requestOptions) =>
       request("GET", "/sessions", undefined, requestOptions),
+    getSessionRecovery: (requestOptions) =>
+      request("GET", "/session-recovery", undefined, requestOptions),
+    discardRecoveredSession: (sessionId, requestOptions) =>
+      request("DELETE", recoveryPath(sessionId), undefined, requestOptions),
+    forkRecoveredSession: (sessionId, newSessionId, requestOptions) =>
+      request(
+        "POST",
+        `${recoveryPath(sessionId)}/fork`,
+        { newSessionId },
+        requestOptions,
+      ),
     createSession: (createRequest, requestOptions) =>
       request("POST", "/sessions", createRequest, requestOptions),
     getSession: (sessionId, requestOptions) =>
@@ -475,7 +508,12 @@ function replayArchiveError(
               error.code === "replayCombatNotFinalized"
             ? "invalidPackage"
             : "storage";
-  return { kind, code: error.code, message: error.message, retryable: error.retryable };
+  return {
+    kind,
+    code: error.code,
+    message: error.message,
+    retryable: error.retryable,
+  };
 }
 
 async function decodeJsonResponse<T>(

@@ -30,7 +30,6 @@ const limitationIds = new Set(
 );
 for (const id of [
   "trusted-local-process-host",
-  "active-session-recovery",
   "authored-content-v1-vocabulary",
 ]) {
   if (!limitationIds.has(id))
@@ -140,11 +139,11 @@ function checkCapabilityManifest(capabilities) {
   if (capabilities.manifestId !== "asha-rulebench.capabilities") {
     failures.push("capability manifest has the wrong manifestId.");
   }
-  if (capabilities.manifestVersion !== 3) {
-    failures.push("capability manifest must use manifestVersion 3.");
+  if (capabilities.manifestVersion !== 4) {
+    failures.push("capability manifest must use manifestVersion 4.");
   }
   if (
-    capabilities.generatedArtifactSchema !== "asha-rulebench.capabilities.ts@3"
+    capabilities.generatedArtifactSchema !== "asha-rulebench.capabilities.ts@4"
   ) {
     failures.push(
       "capability manifest has the wrong generated artifact schema.",
@@ -317,17 +316,21 @@ function checkCapabilityManifest(capabilities) {
     }
   }
 
-  if (capabilities.host.sessionRecoveryMode !== "none") {
+  if (capabilities.host.sessionRecoveryMode !== "replayVerifiedCheckpoints") {
     failures.push(
-      "claims inventory must be reconciled before active-session recovery is reported.",
+      "filesystem host must report replay-verified active-session checkpoints.",
     );
   }
   const activeRecovery = capabilities.capabilities.find(
     (entry) => entry.id === "session.active-recovery",
   );
-  if (activeRecovery?.support.runtimeExecutable !== false) {
+  if (
+    activeRecovery?.support.runtimeExecutable !== true ||
+    activeRecovery?.support.durableAcrossRestart !== true ||
+    activeRecovery?.support.regressionCovered !== true
+  ) {
     failures.push(
-      "session.active-recovery must remain explicitly non-executable while host recovery mode is none.",
+      "session.active-recovery must be executable, regression covered, and restart durable.",
     );
   }
 }

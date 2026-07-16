@@ -6,9 +6,9 @@ use rulebench_protocol::{
     ProtocolHandshakeDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
     ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayPackageReviewDto,
     ReplayVerificationReadoutDto, ScenarioOptionDto, ScenarioParticipantOptionDto,
-    UseActionIntentDto, ViewerScenarioReadoutDto, ViewerScenarioSummaryDto,
-    ViewerSessionStepReadoutDto, ViewerSessionSummaryDto, ViewerSessionTranscriptDto, PROTOCOL_ID,
-    PROTOCOL_VERSION,
+    SessionRecoveryEntryDto, UseActionIntentDto, ViewerScenarioReadoutDto,
+    ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto, ViewerSessionSummaryDto,
+    ViewerSessionTranscriptDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 use rulebench_rules::{
     compare_replay_packages, record_replay_package, verify_replay_package, CombatControlReadout,
@@ -16,8 +16,9 @@ use rulebench_rules::{
     CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
     CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
     ContentPackSetReference, CurrentActorOptionSummary, InMemoryReplayArchiveStorage,
-    ReactionCommandReadout, ReplayArchive, ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand,
-    ReplayCommandRecordingSpec, ReplayPackage, RulebenchScenario, RulesetArtifactProvenance,
+    InMemorySessionRecoveryStorage, ReactionCommandReadout, ReplayArchive, ReplayArchiveQuery,
+    ReplayArchiveStorage, ReplayCommand, ReplayCommandRecordingSpec, ReplayPackage,
+    RulebenchScenario, RulesetArtifactProvenance, SessionRecoveryPackage, SessionRecoveryStorage,
     AUTHORITY_SURFACE,
 };
 
@@ -86,6 +87,7 @@ pub struct RulebenchBridge {
     viewer_sessions: BTreeMap<String, ViewerSessionTranscriptDto>,
     sessions: CombatSessionApi,
     replays: ReplayArchive<Box<dyn ReplayArchiveStorage>>,
+    recovery: Box<dyn SessionRecoveryStorage>,
     recordings: BTreeMap<String, LiveReplayRecording>,
 }
 
@@ -100,10 +102,11 @@ impl std::fmt::Debug for RulebenchBridge {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LiveReplayRecording {
     initial_session: rulebench_rules::CombatSessionCreateRequest,
     commands: Vec<ReplayCommandRecordingSpec>,
+    origin: String,
 }
 
 impl Default for RulebenchBridge {
@@ -113,6 +116,7 @@ impl Default for RulebenchBridge {
             viewer_sessions: BTreeMap::new(),
             sessions: CombatSessionApi::new(),
             replays: ReplayArchive::new(Box::new(InMemoryReplayArchiveStorage::new())),
+            recovery: Box::new(InMemorySessionRecoveryStorage::new()),
             recordings: BTreeMap::new(),
         }
     }
@@ -167,6 +171,7 @@ impl RulebenchBridge {
             viewer_sessions,
             sessions: CombatSessionApi::new(),
             replays,
+            recovery: Box::new(InMemorySessionRecoveryStorage::new()),
             recordings: BTreeMap::new(),
         })
     }
@@ -186,6 +191,27 @@ impl RulebenchBridge {
         let mut bridge =
             Self::new_with_replays_and_viewer_sessions(scenarios, Vec::new(), viewer_sessions)?;
         bridge.replays = ReplayArchive::new(replay_storage);
+        Ok(bridge)
+    }
+
+    pub fn new_with_durable_storage(
+        scenarios: impl IntoIterator<Item = BridgeScenario>,
+        replay_storage: Box<dyn ReplayArchiveStorage>,
+        recovery_storage: Box<dyn SessionRecoveryStorage>,
+        viewer_sessions: impl IntoIterator<Item = ViewerSessionTranscriptDto>,
+    ) -> Result<Self, BridgeError> {
+        let mut bridge = Self::new_with_replay_storage_and_viewer_sessions(
+            scenarios,
+            replay_storage,
+            viewer_sessions,
+        )?;
+        let packages = recovery_storage
+            .list()
+            .map_err(BridgeError::from_recovery_storage_error)?;
+        bridge.recovery = recovery_storage;
+        for package in packages {
+            bridge.restore_recovery_package(package)?;
+        }
         Ok(bridge)
     }
 
@@ -350,8 +376,14 @@ impl RulebenchBridge {
             LiveReplayRecording {
                 initial_session,
                 commands: Vec::new(),
+                origin: "new".to_string(),
             },
         );
+        if let Err(error) = self.persist_recovery_checkpoint(&request.session_id) {
+            let _ = self.sessions.discard_session(&readout.session);
+            self.recordings.remove(&request.session_id);
+            return Err(error);
+        }
         Ok(readout)
     }
 
@@ -361,6 +393,91 @@ impl RulebenchBridge {
     ) -> Result<Vec<CombatSessionSnapshot>, BridgeError> {
         self.check_version(context)?;
         Ok(self.sessions.list_active_sessions())
+    }
+
+    pub fn list_session_recovery(
+        &self,
+        context: &ProtocolRequestContextDto,
+    ) -> Result<Vec<SessionRecoveryEntryDto>, BridgeError> {
+        self.check_version(context)?;
+        self.recordings
+            .iter()
+            .map(|(session_id, recording)| {
+                let package = recovery_package(recording)?;
+                Ok(SessionRecoveryEntryDto {
+                    session_id: session_id.clone(),
+                    origin: recording.origin.clone(),
+                    state: "recoverable".to_string(),
+                    generation: package.frame.generation,
+                    last_verified_frame_id: format!(
+                        "{}:{}",
+                        package.frame.generation, package.frame.state_fingerprint.value
+                    ),
+                    pending_reaction_window_id: package.frame.pending_reaction_window_id,
+                    actions: vec!["discard".to_string(), "fork".to_string()],
+                })
+            })
+            .collect()
+    }
+
+    pub fn discard_recovery_session(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        session: &CombatSessionHandleDto,
+    ) -> Result<CombatSessionSnapshot, BridgeError> {
+        self.check_version(context)?;
+        let snapshot = self
+            .sessions
+            .snapshot(&session.to_combat_session_handle())
+            .map_err(BridgeError::from_session_error)?;
+        self.recovery
+            .delete(&session.id)
+            .map_err(BridgeError::from_recovery_storage_error)?;
+        self.sessions
+            .discard_session(&session.to_combat_session_handle())
+            .map_err(BridgeError::from_session_error)?;
+        self.recordings.remove(&session.id);
+        Ok(snapshot)
+    }
+
+    pub fn fork_recovery_session(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        source: &CombatSessionHandleDto,
+        new_session_id: &str,
+    ) -> Result<CombatSessionCreateReadout, BridgeError> {
+        self.check_version(context)?;
+        if new_session_id.is_empty() {
+            return Err(BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "Forked session id must not be empty.",
+            ));
+        }
+        let source_recording = self.recordings.get(&source.id).cloned().ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::UnknownSession,
+                format!("Session does not exist: {}", source.id),
+            )
+        })?;
+        let mut recording = source_recording;
+        recording.initial_session.session.id = new_session_id.to_string();
+        recording.origin = "forked".to_string();
+        let package = recovery_package(&recording)?;
+        let restored = package
+            .restore()
+            .map_err(BridgeError::from_recovery_error)?;
+        let readout = self
+            .sessions
+            .restore_session(restored.state)
+            .map_err(BridgeError::from_session_error)?;
+        self.recordings
+            .insert(new_session_id.to_string(), recording);
+        if let Err(error) = self.persist_recovery_checkpoint(new_session_id) {
+            let _ = self.sessions.discard_session(&readout.session);
+            self.recordings.remove(new_session_id);
+            return Err(error);
+        }
+        Ok(readout)
     }
 
     pub fn get_session(
@@ -560,6 +677,9 @@ impl RulebenchBridge {
         self.replays
             .save(package, format!("session:{}", session.id))
             .map_err(BridgeError::from_replay_error)?;
+        self.recovery
+            .delete(&session.id)
+            .map_err(BridgeError::from_recovery_storage_error)?;
         let archive = self
             .sessions
             .close_session(&handle)
@@ -670,8 +790,104 @@ impl RulebenchBridge {
         recording
             .commands
             .push(ReplayCommandRecordingSpec::new(id, command));
+        if let Err(error) = self.persist_recovery_checkpoint(session_id) {
+            let recording = self.recordings.get_mut(session_id).ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    "Live session recording does not exist.",
+                )
+            })?;
+            recording.commands.pop();
+            let package = recovery_package(recording)?;
+            let restored = package
+                .restore()
+                .map_err(BridgeError::from_recovery_error)?;
+            self.sessions
+                .replace_active_session(restored.state)
+                .map_err(BridgeError::from_session_error)?;
+            return Err(error);
+        }
         Ok(())
     }
+
+    fn persist_recovery_checkpoint(&mut self, session_id: &str) -> Result<(), BridgeError> {
+        let recording = self.recordings.get(session_id).ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::InvalidRequest,
+                "Live session recording does not exist.",
+            )
+        })?;
+        let ruleset = recording
+            .initial_session
+            .scenario
+            .selected_ruleset()
+            .ok_or_else(|| {
+                BridgeError::new(
+                    BridgeErrorKind::InvalidScenario,
+                    "Live session ruleset does not exist.",
+                )
+            })?
+            .artifact_provenance();
+        let package = SessionRecoveryPackage::record(
+            recording.commands.len() as u64,
+            recording.initial_session.clone(),
+            ruleset,
+            recording.commands.clone(),
+        )
+        .map_err(BridgeError::from_recovery_error)?;
+        self.recovery
+            .write(package)
+            .map_err(BridgeError::from_recovery_storage_error)
+    }
+
+    fn restore_recovery_package(
+        &mut self,
+        package: SessionRecoveryPackage,
+    ) -> Result<(), BridgeError> {
+        let restored = package
+            .restore()
+            .map_err(BridgeError::from_recovery_error)?;
+        let session_id = package.session_id().to_string();
+        self.sessions
+            .restore_session(restored.state)
+            .map_err(BridgeError::from_session_error)?;
+        self.recordings.insert(
+            session_id,
+            LiveReplayRecording {
+                initial_session: package.initial_session,
+                commands: package
+                    .commands
+                    .into_iter()
+                    .map(|record| ReplayCommandRecordingSpec::new(record.id, record.command))
+                    .collect(),
+                origin: "restored".to_string(),
+            },
+        );
+        Ok(())
+    }
+}
+
+fn recovery_package(
+    recording: &LiveReplayRecording,
+) -> Result<SessionRecoveryPackage, BridgeError> {
+    let ruleset = recording
+        .initial_session
+        .scenario
+        .selected_ruleset()
+        .ok_or_else(|| {
+            BridgeError::new(
+                BridgeErrorKind::InvalidScenario,
+                "Live session ruleset does not exist.",
+            )
+        })?
+        .artifact_provenance();
+    SessionRecoveryPackage::record(
+        recording.commands.len() as u64,
+        recording.initial_session.clone(),
+        ruleset,
+        recording.commands.clone(),
+    )
+    .map_err(BridgeError::from_recovery_error)
 }
 
 fn index_viewer_sessions(

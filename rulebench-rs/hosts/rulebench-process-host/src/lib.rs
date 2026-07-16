@@ -14,7 +14,8 @@ mod router;
 mod server;
 
 pub use artifact_repository::{
-    ArtifactRepositoryIssue, FileReplayArchiveStorage, ReplayStorageOpenReport,
+    ArtifactRepositoryIssue, FileReplayArchiveStorage, FileSessionRecoveryStorage,
+    ReplayStorageOpenReport, SessionRecoveryOpenReport,
 };
 pub use capability_artifact::render_capability_manifest_artifact;
 pub use http::{HttpMethod, HttpRequest, HttpResponse};

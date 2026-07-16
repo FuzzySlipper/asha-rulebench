@@ -43,7 +43,13 @@ consume that generated DTO. They do not fall back to the checked durable-host
 artifact when the live route is unavailable, because that would turn build
 evidence into a false runtime claim.
 
-Manifest v3 adds an explicit `authorityViewerMode` host readback and the
+Manifest v4 adds the `session.active-recovery` capability and makes its support
+levels depend on the selected recovery adapter. The checked filesystem-host
+artifact reports replay-verified checkpoints and restart durability; an
+in-memory host reports process-local checkpoints without durability. Protocol,
+host, UI, regression, and durability evidence remain separate.
+
+Manifest v3 added an explicit `authorityViewerMode` host readback and the
 `viewer.authority-readback` capability. `liveAuthorityReadback` means the
 versioned viewer routes are composed from the current Rust registries and are
 visible in the UI; it never means the checked TypeScript catalogs are a runtime

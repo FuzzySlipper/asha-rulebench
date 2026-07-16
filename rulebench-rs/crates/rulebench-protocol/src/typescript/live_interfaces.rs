@@ -18,6 +18,37 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                 ]),
             },
             Interface {
+                name: "RulebenchSessionRecoveryEntryDto",
+                fields: fields(vec![
+                    field("sessionId", "string"),
+                    field("origin", "'new' | 'restored' | 'forked'"),
+                    field("state", "'recoverable'"),
+                    field("generation", "number"),
+                    field("lastVerifiedFrameId", "string"),
+                    field("pendingReactionWindowId", "string | null"),
+                    field("actions", "readonly ('discard' | 'fork')[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchSessionRecoveryIssueDto",
+                fields: fields(vec![
+                    field("code", "string"),
+                    field("message", "string"),
+                    field("path", "string"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchSessionRecoveryCatalogDto",
+                fields: fields(vec![
+                    field("sessions", "readonly RulebenchSessionRecoveryEntryDto[]"),
+                    field("issues", "readonly RulebenchSessionRecoveryIssueDto[]"),
+                ]),
+            },
+            Interface {
+                name: "RulebenchSessionRecoveryForkRequestDto",
+                fields: fields(vec![field("newSessionId", "string")]),
+            },
+            Interface {
                 name: "RulebenchLiveStateFingerprintDto",
                 fields: fields(vec![field("algorithm", "string"), field("value", "string")]),
             },

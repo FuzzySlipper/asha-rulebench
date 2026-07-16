@@ -72,11 +72,19 @@ The canonical `pnpm run e2e` gate starts this combined stack and completes a
 real Rust-owned combat session through the transport, including cleanup and
 classified failure/version-mismatch checks.
 
-For restart-stable authored content and finalized replays, start the Rust host
+For restart-stable authored content, finalized replays, and active sessions,
+start the Rust host
 with `--artifact-root PATH` (or set `RULEBENCH_ARTIFACT_ROOT`). The concrete
 host owns that versioned, single-writer filesystem repository; portable Rust
-crates remain serialization-free and the bridge remains host-neutral. Active
-combat sessions are still process-local and are not recovered after restart.
+crates remain serialization-free and the bridge remains host-neutral. At each
+accepted command boundary the host atomically stores the canonical scenario,
+exact ruleset provenance, typed command history, generation, and verified
+authority frame. Startup reconstructs valid sessions by replaying those typed
+commands through fresh Rust authority; incompatible or corrupt records are
+quarantined instead of becoming live state. The setup tool distinguishes new,
+restored, and explicitly forked sessions and provides explicit fork and discard
+actions. See `docs/session-recovery.md` for the recovery, migration, and
+non-claim boundaries.
 Stored authored packs are re-decoded and re-imported on every host start before
 their exact activation can be used. A new session may select a compatible
 activated pack set; its exact references and set fingerprint are then retained
@@ -263,8 +271,8 @@ three-participant saving-throw package. Both use deterministic cases, live
 commands, bounded automatic control, and replay inspection. With an artifact
 root configured, the content tool imports,
 reviews, compares, activates, deactivates, and safely deletes authored packs;
-authored packs and finalized replays survive host restart. Active sessions
-remain process-local. Live session snapshots expose authoritative board and
+authored packs, finalized replays, and verified active-session checkpoints
+survive host restart. Live session snapshots expose authoritative board and
 participant positions to the workbench.
 
 The executable capability manifest currently reports 2 compiled providers, 2

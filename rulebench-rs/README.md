@@ -220,9 +220,16 @@ network filesystems. Future database adapters belong behind the bridge storage
 composition seam. In-memory adapters remain the default for isolated tests.
 
 The process host is trusted local development infrastructure. It is not an
-authenticated, internet-facing, multi-user, or durable active-session service.
-Configured content and finalized replay artifacts survive restart; active
-combat sessions do not.
+authenticated, internet-facing, multi-user service. With an artifact root,
+configured content, finalized replay artifacts, and verified active-session
+recovery packages survive restart. Recovery is deliberately limited to fully
+accepted command boundaries: startup reconstructs a fresh authority session by
+replaying canonical typed commands and admits it only when command evidence,
+ruleset provenance, generation, state fingerprint, gameplay-module hash, and
+pending reaction-window identity all agree. Corrupt, partial, unknown-version,
+or incompatible recovery records are quarantined. The host does not persist
+opaque ASHA continuations or arbitrary in-flight CPU state. See
+`../docs/session-recovery.md`.
 
 ## Dependency Posture
 

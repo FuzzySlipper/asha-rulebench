@@ -48,7 +48,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 3,
+        protocolVersion: 4,
         authoritySurface: "asha-rulebench.local-authority.v0",
       },
     });
@@ -272,7 +272,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       error: {
         kind: "bridge",
         code: "protocolVersionMismatch",
-        message: "Unsupported protocol version 999; expected 3.",
+        message: "Unsupported protocol version 999; expected 4.",
         retryable: false,
       },
     });
@@ -301,6 +301,16 @@ test("completes a supported scenario through the visible panel workbench", async
     .click();
   await workspace.getByLabel("Session", { exact: true }).fill(sessionId);
   await workspace.getByRole("button", { name: "Create session" }).click();
+
+  const recovery = workspace.getByRole("region", {
+    name: "Session recovery",
+  });
+  await expect(recovery).toContainText("Restart-safe sessions");
+  await expect(recovery).toContainText(
+    `${sessionId} · new this process · generation 0`,
+  );
+  await expect(recovery.getByRole("button", { name: "Fork" })).toBeVisible();
+  await expect(recovery.getByRole("button", { name: "Discard" })).toBeVisible();
 
   await page
     .getByRole("dialog", { name: "Live combat setup" })
@@ -456,6 +466,52 @@ test("completes a supported scenario through the visible panel workbench", async
     replayWorkspace.getByRole("region", { name: "Replay command evidence" }),
   ).toContainText("Move");
   await replayDialog.getByLabel("Close", { exact: true }).click();
+});
+
+test("renders restored and quarantined recovery states without conflating them", async ({
+  page,
+}) => {
+  await page.route("**/api/rulebench/v1/session-recovery", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        sessions: [
+          {
+            sessionId: "restored-reaction-session",
+            origin: "restored",
+            state: "recoverable",
+            generation: 3,
+            lastVerifiedFrameId: "3:verified-fingerprint",
+            pendingReactionWindowId: "reaction-window-1",
+            actions: ["discard", "fork"],
+          },
+        ],
+        issues: [
+          {
+            code: "sessionRecoveryFrameMismatch",
+            message: "Stored authority frame did not verify.",
+            path: "session-recovery/quarantine.json",
+          },
+        ],
+      }),
+    });
+  });
+  await page.goto("/");
+  const workspace = await openLiveCombatWorkspace(page);
+  const recovery = workspace.getByRole("region", {
+    name: "Session recovery",
+  });
+
+  await expect(recovery).toContainText(
+    "restored-reaction-session · restored after restart · generation 3 · suspended reaction reaction-window-1",
+  );
+  await expect(recovery.getByRole("alert")).toContainText(
+    "Unrecoverable · sessionRecoveryFrameMismatch · Stored authority frame did not verify.",
+  );
+  await recovery.scrollIntoViewIfNeeded();
+  await recovery.screenshot({
+    path: "dist/.playwright/session-recovery-states.png",
+  });
 });
 
 test("resolves a bounded area target set and renders every v2 result @live", async ({

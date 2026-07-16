@@ -59,9 +59,11 @@ test("renders the current Rust host capability manifest", async ({ page }) => {
   const activeRecoveryRow = supportMatrix.getByRole("row", {
     name: /session\.active-recovery/,
   });
-  await expect(activeRecoveryRow).toContainText("Not declared");
   await expect(activeRecoveryRow).toContainText(
-    "rulebench-process-host.session-recovery-mode:none",
+    "Durable and regression covered",
+  );
+  await expect(activeRecoveryRow).toContainText(
+    "rulebench-process-host.session-recovery-mode:replayVerifiedCheckpoints",
   );
   const viewerReadbackRow = supportMatrix.getByRole("row", {
     name: /viewer\.authority-readback/,
@@ -128,7 +130,9 @@ test("keeps live authority viewer evidence inspectable at mobile width", async (
 
   const dialog = await openAuthorityViewer(page);
   await expect(
-    dialog.getByRole("button", { name: /Storm Pulse Multiple-target Conformance/ }),
+    dialog.getByRole("button", {
+      name: /Storm Pulse Multiple-target Conformance/,
+    }),
   ).toBeVisible();
   const dimensions = await page.evaluate(() => ({
     body: document.body.scrollWidth,

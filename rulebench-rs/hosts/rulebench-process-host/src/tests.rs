@@ -13,9 +13,10 @@ use rulebench_protocol::{
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
     ReactionResponseKindDto, ReplayArchiveMetadataDto, ReplayComparisonReadoutDto,
     ReplayComparisonRequestDto, ReplayPackageReviewDto, ReplayVerificationReadoutDto,
-    RulebenchCapabilityManifestDto, ScenarioOptionDto, UseActionIntentDto,
-    ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto,
-    ViewerSessionSummaryDto, PROTOCOL_VERSION,
+    RulebenchCapabilityManifestDto, ScenarioOptionDto, SessionRecoveryCatalogDto,
+    SessionRecoveryForkRequestDto, UseActionIntentDto, ViewerScenarioReadoutDto,
+    ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto, ViewerSessionSummaryDto,
+    PROTOCOL_VERSION,
 };
 
 use crate::{
@@ -53,7 +54,10 @@ fn capability_route_reports_registry_and_actual_host_composition() {
         serde_json::from_slice(&response.body).expect("capability manifest is JSON");
 
     assert_eq!(manifest.host.storage_mode, "memory");
-    assert_eq!(manifest.host.session_recovery_mode, "none");
+    assert_eq!(
+        manifest.host.session_recovery_mode,
+        "processLocalCheckpoints"
+    );
     assert_eq!(manifest.host.authority_viewer_mode, "liveAuthorityReadback");
     assert_eq!(manifest.providers.len(), 2);
     assert_eq!(manifest.rulesets.len(), 2);
@@ -419,6 +423,138 @@ fn durable_router_reports_repository_state_and_reloads_a_finalized_live_replay()
         serde_json::from_slice(&verified.body).expect("restarted replay verification is JSON");
     assert!(verified.accepted);
     assert!(verified.finalized);
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
+fn durable_router_reconstructs_an_active_session_and_continues_it_exactly() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-active-recovery-{}-{sequence}",
+        std::process::id()
+    ));
+    let session_id = "restart-safe-active";
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario_id = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "hexing-bolt-hit")
+        .expect("recoverable fixture exists")
+        .id
+        .clone();
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/sessions",
+                &CombatSessionCreateRequestDto {
+                    session_id: session_id.to_string(),
+                    scenario_id,
+                    participant_order: Vec::new(),
+                    content_pack: None,
+                },
+            ))
+            .status,
+        200
+    );
+    let started = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+        &CombatControlCommandDto {
+            kind: CombatControlCommandKindDto::ExplicitStart,
+        },
+    ));
+    assert_eq!(started.status, 200);
+    let before_restart = router.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    let before_restart: LiveSessionSnapshotDto =
+        serde_json::from_slice(&before_restart.body).expect("active snapshot is JSON");
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("active session reconstructs");
+    let after_restart = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    assert_eq!(after_restart.status, 200);
+    let after_restart: LiveSessionSnapshotDto =
+        serde_json::from_slice(&after_restart.body).expect("restored snapshot is JSON");
+    assert_eq!(after_restart, before_restart);
+    let recovery = restarted.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/session-recovery",
+    ));
+    let recovery: SessionRecoveryCatalogDto =
+        serde_json::from_slice(&recovery.body).expect("recovery catalog is JSON");
+    let restored_entry = recovery
+        .sessions
+        .iter()
+        .find(|entry| entry.session_id == session_id)
+        .expect("restored session is classified");
+    assert_eq!(restored_entry.origin, "restored");
+    assert_eq!(restored_entry.state, "recoverable");
+    assert_eq!(restored_entry.generation, 1);
+
+    let fork_id = "restart-safe-active-fork";
+    let forked = restarted.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/session-recovery/{session_id}/fork"),
+        &SessionRecoveryForkRequestDto {
+            new_session_id: fork_id.to_string(),
+        },
+    ));
+    let forked: LiveSessionSnapshotDto =
+        serde_json::from_slice(&forked.body).expect("forked snapshot is JSON");
+    assert_eq!(forked.session_id, fork_id);
+    assert_eq!(forked.state_fingerprint, after_restart.state_fingerprint);
+    assert_eq!(
+        restarted
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/session-recovery/{fork_id}"),
+            ))
+            .status,
+        200
+    );
+
+    let ended = restarted.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+        &CombatControlCommandDto {
+            kind: CombatControlCommandKindDto::ExplicitEnd,
+        },
+    ));
+    assert_eq!(ended.status, 200);
+    assert_eq!(
+        restarted
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/sessions/{session_id}"),
+            ))
+            .status,
+        200
+    );
+    drop(restarted);
+
+    let mut finalized =
+        build_durable_rulebench_router(&directory).expect("finalized repository reopens");
+    let sessions = finalized.handle(&request(HttpMethod::Get, "/api/rulebench/v1/sessions"));
+    let sessions: Vec<LiveSessionSnapshotDto> =
+        serde_json::from_slice(&sessions.body).expect("session list is JSON");
+    assert!(sessions.is_empty());
+    let replay = finalized.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/live-{session_id}/verify"),
+    ));
+    let replay: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&replay.body).expect("recovered replay verification is JSON");
+    assert!(replay.accepted);
+    assert!(replay.finalized);
     fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 
@@ -808,6 +944,134 @@ fn router_completes_rejects_stale_and_archives_the_live_reaction_workflow() {
         serde_json::from_slice(&verified.body).expect("live reaction replay verification is JSON");
     assert!(verified.accepted);
     assert!(verified.finalized);
+}
+
+#[test]
+fn durable_router_reconstructs_a_suspended_reaction_before_resuming_it() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-reaction-recovery-{}-{sequence}",
+        std::process::id()
+    ));
+    let session_id = "recovered-reaction";
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let scenarios = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let scenarios: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&scenarios.body).expect("scenario options are JSON");
+    let scenario_id = scenarios
+        .iter()
+        .find(|scenario| scenario.id == "hexing-bolt-reaction")
+        .expect("reaction scenario exists")
+        .id
+        .clone();
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/sessions",
+                &CombatSessionCreateRequestDto {
+                    session_id: session_id.to_owned(),
+                    scenario_id,
+                    participant_order: Vec::new(),
+                    content_pack: None,
+                },
+            ))
+            .status,
+        200
+    );
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                &CombatControlCommandDto {
+                    kind: CombatControlCommandKindDto::ExplicitStart,
+                },
+            ))
+            .status,
+        200
+    );
+    let submitted = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/intents"),
+        &CombatSessionIntentCommandDto {
+            id: "recovery-reaction-action".to_owned(),
+            title: "Hexing Bolt".to_owned(),
+            summary: "Open the restart-safe reaction window.".to_owned(),
+            intent: UseActionIntentDto {
+                actor_id: "entity-adept".to_owned(),
+                action_id: "hexing_bolt".to_owned(),
+                target_id: "entity-raider".to_owned(),
+                target_ids: Vec::new(),
+                target_cell: None,
+                destination_cell: None,
+                observed_origin: None,
+            },
+            roll_stream: vec![17, 5],
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
+        },
+    ));
+    let before_restart: LiveCommandExecutionDto =
+        serde_json::from_slice(&submitted.body).expect("suspended execution is JSON");
+    let opened = before_restart
+        .snapshot
+        .current_reaction_window
+        .clone()
+        .expect("reaction window opens");
+    assert_eq!(
+        before_restart
+            .snapshot
+            .gameplay_fabric
+            .pending_decision_count,
+        1
+    );
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("reaction checkpoint reconstructs");
+    let restored = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    let restored: LiveSessionSnapshotDto =
+        serde_json::from_slice(&restored.body).expect("restored reaction snapshot is JSON");
+    assert_eq!(restored, before_restart.snapshot);
+
+    for (reactor_id, response_kind, option_id) in [
+        ("entity-adept", ReactionResponseKindDto::Pass, None),
+        (
+            "entity-raider",
+            ReactionResponseKindDto::Accept,
+            Some("raider-ward".to_owned()),
+        ),
+    ] {
+        let response = restarted.handle(&json_request(
+            HttpMethod::Post,
+            &format!("/api/rulebench/v1/sessions/{session_id}/reactions"),
+            &ReactionCommandSpecDto {
+                window_id: opened.id.clone(),
+                reactor_id: reactor_id.to_owned(),
+                response_kind,
+                option_id,
+            },
+        ));
+        assert_eq!(
+            response.status,
+            200,
+            "{}",
+            String::from_utf8_lossy(&response.body)
+        );
+    }
+    let resumed = restarted.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/sessions/{session_id}"),
+    ));
+    let resumed: LiveSessionSnapshotDto =
+        serde_json::from_slice(&resumed.body).expect("resumed snapshot is JSON");
+    assert!(resumed.current_reaction_window.is_none());
+    assert_eq!(resumed.gameplay_fabric.pending_decision_count, 0);
+    fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 
 #[test]

@@ -132,6 +132,47 @@ impl CombatSessionApi {
             .collect()
     }
 
+    /// Install a session that was reconstructed and verified by the replay
+    /// owner. Private runtime state still never crosses this API boundary.
+    pub fn restore_session(
+        &mut self,
+        state: CombatSessionState,
+    ) -> Result<CombatSessionCreateReadout, CombatSessionApiError> {
+        let snapshot = state.snapshot();
+        let session = CombatSessionHandle::new(&snapshot.session_id);
+        if session.id.is_empty() {
+            return Err(CombatSessionApiError::EmptySessionId);
+        }
+        if self.active_sessions.contains_key(&session.id)
+            || self.archived_sessions.contains_key(&session.id)
+        {
+            return Err(CombatSessionApiError::DuplicateSessionId {
+                session_id: session.id,
+            });
+        }
+        self.active_sessions.insert(session.id.clone(), state);
+        Ok(CombatSessionCreateReadout { session, snapshot })
+    }
+
+    /// Replace an existing active session with a replay-verified reconstruction.
+    ///
+    /// This rollback seam cannot create a new identity or replace an archived
+    /// session.
+    pub fn replace_active_session(
+        &mut self,
+        state: CombatSessionState,
+    ) -> Result<CombatSessionSnapshot, CombatSessionApiError> {
+        let snapshot = state.snapshot();
+        if !self.active_sessions.contains_key(&snapshot.session_id) {
+            return Err(CombatSessionApiError::UnknownSessionId {
+                session_id: snapshot.session_id,
+            });
+        }
+        self.active_sessions
+            .insert(snapshot.session_id.clone(), state);
+        Ok(snapshot)
+    }
+
     pub fn snapshot(
         &self,
         session: &CombatSessionHandle,
@@ -257,6 +298,18 @@ impl CombatSessionApi {
         self.archived_sessions
             .insert(session.id.clone(), archive.clone());
         Ok(archive)
+    }
+
+    pub fn discard_session(
+        &mut self,
+        session: &CombatSessionHandle,
+    ) -> Result<CombatSessionSnapshot, CombatSessionApiError> {
+        let state = self.active_sessions.remove(&session.id).ok_or_else(|| {
+            CombatSessionApiError::UnknownSessionId {
+                session_id: session.id.clone(),
+            }
+        })?;
+        Ok(state.snapshot())
     }
 
     pub fn archived_session(&self, session: &CombatSessionHandle) -> Option<&CombatSessionArchive> {

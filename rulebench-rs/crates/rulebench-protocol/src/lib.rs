@@ -12,6 +12,7 @@ mod capabilities;
 mod content;
 mod live;
 mod reaction;
+mod recovery;
 mod replay;
 mod session;
 mod typescript;
@@ -59,6 +60,10 @@ pub use reaction::{
     ReactionAuditEntryDto, ReactionCommandReadoutDto, ReactionCommandSpecDto, ReactionOptionDto,
     ReactionResponseEntryDto, ReactionResponseKindDto, ReactionWindowDto,
     ReactionWindowLifecycleEntryDto,
+};
+pub use recovery::{
+    SessionRecoveryCatalogDto, SessionRecoveryEntryDto, SessionRecoveryForkRequestDto,
+    SessionRecoveryIssueDto,
 };
 pub use replay::{
     ReplayArchiveErrorDto, ReplayArchiveMetadataDto, ReplayCommandReviewDto,

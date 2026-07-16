@@ -7,8 +7,8 @@ use rulebench_combat::{
 use rulebench_ruleset::{EffectOperationId, OperationPipelineV2, TargetingOperationId};
 
 pub const CAPABILITY_MANIFEST_ID: &str = "asha-rulebench.capabilities";
-pub const CAPABILITY_MANIFEST_VERSION: u32 = 3;
-pub const CAPABILITY_ARTIFACT_SCHEMA: &str = "asha-rulebench.capabilities.ts@3";
+pub const CAPABILITY_MANIFEST_VERSION: u32 = 4;
+pub const CAPABILITY_ARTIFACT_SCHEMA: &str = "asha-rulebench.capabilities.ts@4";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CapabilityKind {
@@ -149,6 +149,7 @@ pub struct HostCapabilityProfile {
     pub exposes_capabilities_in_ui: bool,
     pub durable_content: bool,
     pub durable_finalized_replays: bool,
+    pub durable_active_sessions: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -385,16 +386,19 @@ fn host_capabilities(
         CapabilityEntry {
             id: "session.active-recovery".to_string(),
             kind: CapabilityKind::Session,
-            version: "none".to_string(),
+            version: "1".to_string(),
             support: CapabilitySupport {
-                declared: false,
-                validation_supported: false,
-                runtime_executable: false,
-                protocol_exposed: false,
-                live_host_exposed: false,
-                ui_exposed: false,
-                regression_covered: false,
-                durable_across_restart: false,
+                declared: host.session_recovery_mode != "none",
+                validation_supported: host.session_recovery_mode != "none",
+                runtime_executable: host.session_recovery_mode != "none",
+                protocol_exposed: host.session_recovery_mode != "none"
+                    && host.exposes_capabilities_through_protocol,
+                live_host_exposed: host.session_recovery_mode != "none"
+                    && host.exposes_capabilities_through_live_host,
+                ui_exposed: host.session_recovery_mode != "none" && host.exposes_capabilities_in_ui,
+                regression_covered: host.session_recovery_mode != "none"
+                    && regression.contains("session.active-recovery"),
+                durable_across_restart: host.durable_active_sessions,
             },
             evidence: vec![format!(
                 "rulebench-process-host.session-recovery-mode:{}",
@@ -458,6 +462,7 @@ mod tests {
             exposes_capabilities_in_ui: true,
             durable_content: false,
             durable_finalized_replays: false,
+            durable_active_sessions: false,
         }
     }
 

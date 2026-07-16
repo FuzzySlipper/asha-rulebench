@@ -26,7 +26,7 @@ describe("live Rulebench transport", () => {
     }> = [];
     const responseBodies: unknown[] = [
       handshake,
-      ...Array.from({ length: 29 }, () => ({})),
+      ...Array.from({ length: 32 }, () => ({})),
     ];
     const fetchRequest: typeof fetch = async (input, init) => {
       calls.push({
@@ -90,6 +90,12 @@ describe("live Rulebench transport", () => {
     await transport.listViewerSessions();
     await transport.getViewerSessionStep("session/one", "step/one");
     await transport.listSessions();
+    await transport.getSessionRecovery();
+    await transport.discardRecoveredSession(createRequest.sessionId);
+    await transport.forkRecoveredSession(
+      createRequest.sessionId,
+      "fork/session",
+    );
     await transport.createSession(createRequest);
     await transport.getSession(createRequest.sessionId);
     await transport.closeSession(createRequest.sessionId);
@@ -115,9 +121,9 @@ describe("live Rulebench transport", () => {
       fingerprint: { algorithm: "fnv1a64", value: "abc123" },
     };
     await transport.listContentWorkspace();
-    await transport.importContent("{\"formatVersion\":1}", "reject");
+    await transport.importContent('{"formatVersion":1}', "reject");
     await transport.reviewContent(contentReference);
-    await transport.compareContent("{\"formatVersion\":1}");
+    await transport.compareContent('{"formatVersion":1}');
     await transport.activateContent(contentReference);
     await transport.deactivateContent(contentReference);
     await transport.deleteContent(contentReference);
@@ -135,6 +141,9 @@ describe("live Rulebench transport", () => {
       "GET http://rulebench.test/api/rulebench/v1/viewer/sessions",
       "GET http://rulebench.test/api/rulebench/v1/viewer/sessions/session%2Fone/steps/step%2Fone",
       "GET http://rulebench.test/api/rulebench/v1/sessions",
+      "GET http://rulebench.test/api/rulebench/v1/session-recovery",
+      "DELETE http://rulebench.test/api/rulebench/v1/session-recovery/session%2Fone",
+      "POST http://rulebench.test/api/rulebench/v1/session-recovery/session%2Fone/fork",
       "POST http://rulebench.test/api/rulebench/v1/sessions",
       "GET http://rulebench.test/api/rulebench/v1/sessions/session%2Fone",
       "DELETE http://rulebench.test/api/rulebench/v1/sessions/session%2Fone",
@@ -159,14 +168,17 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/replays/compare",
       "GET http://rulebench.test/api/rulebench/v1/capabilities",
     ]);
-    expect(calls.every((call) => call.version === "3")).toBe(true);
-    expect(calls[7]?.body).toBe(JSON.stringify(createRequest));
-    expect(calls[11]?.body).toBe(JSON.stringify(intent));
-    expect(calls[13]?.body).toBe(JSON.stringify(intentCommand));
-    expect(calls[15]?.body).toBe(JSON.stringify(reactionCommand));
-    expect(calls[16]?.body).toBe(JSON.stringify(automaticStep));
-    expect(calls[17]?.body).toBe(JSON.stringify(automaticRun));
-    expect(calls[28]?.body).toBe(
+    expect(calls.every((call) => call.version === "4")).toBe(true);
+    expect(calls[9]?.body).toBe(
+      JSON.stringify({ newSessionId: "fork/session" }),
+    );
+    expect(calls[10]?.body).toBe(JSON.stringify(createRequest));
+    expect(calls[14]?.body).toBe(JSON.stringify(intent));
+    expect(calls[16]?.body).toBe(JSON.stringify(intentCommand));
+    expect(calls[18]?.body).toBe(JSON.stringify(reactionCommand));
+    expect(calls[19]?.body).toBe(JSON.stringify(automaticStep));
+    expect(calls[20]?.body).toBe(JSON.stringify(automaticRun));
+    expect(calls[31]?.body).toBe(
       JSON.stringify({
         expectedPackageId: "expected",
         actualPackageId: "actual",
@@ -187,7 +199,7 @@ describe("live Rulebench transport", () => {
     });
 
     const mismatched = createLiveRulebenchTransport({
-      fetch: async () => Response.json({ ...handshake, protocolVersion: 4 }),
+      fetch: async () => Response.json({ ...handshake, protocolVersion: 5 }),
     });
     const mismatchResult = await mismatched.connect();
 
@@ -197,7 +209,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v3; received asha-rulebench.protocol v4.",
+          "Expected asha-rulebench.protocol v4; received asha-rulebench.protocol v5.",
         retryable: false,
       },
     });
