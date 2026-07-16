@@ -3,7 +3,7 @@ use rulebench_protocol::{
 };
 use rulebench_rules::{
     import_content_pack, CanonicalContentPack, ContentImportContext, ContentImportLimits,
-    ImportedContentPack,
+    ImportedContentPack, RulesetProviderCatalog,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +17,7 @@ pub struct ContentInvocationError {
 pub fn import_authored_content(
     document: &AuthoredContentPackDocumentDto,
     available_packs: &[CanonicalContentPack],
+    provider_catalog: &RulesetProviderCatalog,
 ) -> Result<ImportedContentPack, ContentInvocationError> {
     let identity = ContentPackIdentityDto {
         id: document.pack.id.clone(),
@@ -49,6 +50,7 @@ pub fn import_authored_content(
         ContentImportContext {
             available_packs,
             rulesets: &rulesets,
+            provider_catalog: Some(provider_catalog),
         },
     )
     .map_err(|report| {

@@ -10,8 +10,12 @@ use crate::{
 };
 use crate::{ContentDefinitionKind, ContentPackDiagnostic, CONTENT_PACK_FINGERPRINT_ALGORITHM};
 use rulebench_ruleset::{
-    CheckDeclaration, ModifierTenure, OperationPipelineV2, TargetKind, TargetSelection,
+    CheckDeclaration, EffectOperationId, ModifierTenure, OperationPipelineV2,
+    RulesetProviderCatalog, RulesetProviderDescriptor, TargetKind, TargetSelection,
+    TargetingOperationId,
 };
+
+const CHECK_CAPABILITY_VERSION: &str = "1";
 
 pub(super) fn validate_authored_pack(
     authored: &AuthoredContentPack,
@@ -341,7 +345,7 @@ fn validate_check(
     let supported = selected_ruleset
         .and_then(|ruleset| ruleset.validate_modules().ok())
         .is_some_and(|registry| registry.action_resolution().supports_check(&action.check));
-    if !supported {
+    if selected_ruleset.is_some() && !supported {
         push_action_error(
             diagnostics,
             ContentImportDiagnosticCode::UnsupportedActionCheck,
@@ -563,6 +567,170 @@ pub(super) fn validate_resolved_action_references(
         }
     }
     diagnostics
+}
+
+pub(super) fn validate_resolved_action_compatibility(
+    resolved: &ResolvedContentPackSet,
+    provider_catalog: Option<&RulesetProviderCatalog>,
+) -> Vec<ContentImportDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for pack in &resolved.packs {
+        for (index, action) in pack.catalogs.actions.iter().enumerate() {
+            let base = format!(
+                "resolvedPacks[{}@{}].catalogs.actions[{index}]",
+                pack.identity.id, pack.identity.version
+            );
+            let Some(provider) = provider_catalog.and_then(|catalog| {
+                catalog
+                    .select_ruleset(&pack.ruleset.ruleset_id, &pack.ruleset.ruleset_version)
+                    .ok()
+            }) else {
+                push_action_error(
+                    &mut diagnostics,
+                    ContentImportDiagnosticCode::UnavailableActionRulesetProvider,
+                    format!("{base}.ruleset"),
+                    &action.id,
+                    format!(
+                        "Authored action {} requires unavailable compiled ruleset provider {}@{}.",
+                        action.id, pack.ruleset.ruleset_id, pack.ruleset.ruleset_version
+                    ),
+                );
+                continue;
+            };
+
+            let declared_ruleset = resolved.packs.iter().find_map(|candidate| {
+                candidate.catalogs.rulesets.iter().find(|ruleset| {
+                    ruleset.id == pack.ruleset.ruleset_id
+                        && ruleset.version == pack.ruleset.ruleset_version
+                })
+            });
+            if !declared_ruleset.is_some_and(|ruleset| ruleset.modules == provider.ruleset.modules)
+            {
+                push_action_error(
+                    &mut diagnostics,
+                    ContentImportDiagnosticCode::IncompatibleActionRulesetProvider,
+                    format!("{base}.ruleset"),
+                    &action.id,
+                    format!(
+                        "Authored action {} ruleset modules do not match compiled provider {}@{}.",
+                        action.id, provider.provider_id, provider.provider_version
+                    ),
+                );
+                continue;
+            }
+
+            let (check_id, check_version) = check_capability(&action.check);
+            if !provider_supports(provider, check_id, check_version) {
+                push_missing_provider_capability(
+                    &mut diagnostics,
+                    ContentImportDiagnosticCode::UnsupportedActionCheck,
+                    format!("{base}.check"),
+                    &action.id,
+                    provider,
+                    check_id,
+                    check_version,
+                );
+            }
+
+            let targeting = targeting_capability(action);
+            let targeting_id = format!("targeting.{}", targeting.code());
+            if !provider_supports(
+                provider,
+                &targeting_id,
+                OperationPipelineV2::VOCABULARY_VERSION,
+            ) {
+                push_missing_provider_capability(
+                    &mut diagnostics,
+                    ContentImportDiagnosticCode::UnsupportedActionTargeting,
+                    format!("{base}.targeting"),
+                    &action.id,
+                    provider,
+                    &targeting_id,
+                    OperationPipelineV2::VOCABULARY_VERSION,
+                );
+            }
+
+            for (effect_index, effect) in action.effects.iter().enumerate() {
+                let capability_id = format!("operation.{}", effect.code());
+                if !provider_supports(
+                    provider,
+                    &capability_id,
+                    EffectOperationId::VOCABULARY_VERSION,
+                ) {
+                    push_missing_provider_capability(
+                        &mut diagnostics,
+                        ContentImportDiagnosticCode::UnsupportedActionEffect,
+                        format!("{base}.effects[{effect_index}]"),
+                        &action.id,
+                        provider,
+                        &capability_id,
+                        EffectOperationId::VOCABULARY_VERSION,
+                    );
+                }
+            }
+        }
+    }
+    diagnostics
+}
+
+fn check_capability(check: &CheckDeclaration) -> (&'static str, &'static str) {
+    let id = match check {
+        CheckDeclaration::Attack(_) => "check.attackVsDefense",
+        CheckDeclaration::SavingThrow(_) => "check.savingThrow",
+        CheckDeclaration::Contested(_) => "check.contested",
+    };
+    (id, CHECK_CAPABILITY_VERSION)
+}
+
+fn targeting_capability(action: &crate::AuthoredActionDefinition) -> TargetingOperationId {
+    if action.movement.is_some() {
+        return TargetingOperationId::CellMovement;
+    }
+    match (
+        action.targeting.target_kind,
+        action.targeting.selection,
+        action.targeting.operation_pipeline.as_ref(),
+    ) {
+        (TargetKind::Combatant, TargetSelection::Single, _) => {
+            TargetingOperationId::SingleCombatant
+        }
+        (TargetKind::Combatant, TargetSelection::Multiple, _) => {
+            TargetingOperationId::MultipleCombatants
+        }
+        (TargetKind::Area, _, Some(_)) => TargetingOperationId::ManhattanBurstArea,
+        (TargetKind::Area, _, None) => TargetingOperationId::CellMovement,
+    }
+}
+
+fn provider_supports(
+    provider: &RulesetProviderDescriptor,
+    capability_id: &str,
+    capability_version: &str,
+) -> bool {
+    provider
+        .capability(capability_id)
+        .is_some_and(|capability| capability.version == capability_version)
+}
+
+fn push_missing_provider_capability(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    code: ContentImportDiagnosticCode,
+    path: String,
+    action_id: &str,
+    provider: &RulesetProviderDescriptor,
+    capability_id: &str,
+    capability_version: &str,
+) {
+    push_action_error(
+        diagnostics,
+        code,
+        path,
+        action_id,
+        format!(
+            "Authored action {action_id} requires provider capability {capability_id}@{capability_version}, which {}@{} does not expose.",
+            provider.provider_id, provider.provider_version
+        ),
+    );
 }
 
 fn push_action_error(

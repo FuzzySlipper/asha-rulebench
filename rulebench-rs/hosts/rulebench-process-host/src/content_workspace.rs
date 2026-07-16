@@ -3,6 +3,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use rulebench_bridge::content_storage::RulesetProviderCatalog;
 use rulebench_bridge::content_storage::{
     compare_content_packs, ContentPackReference, ContentPackSetReference, ContentPackStorage,
     ContentStorageError, ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
@@ -54,13 +55,17 @@ impl ContentWorkspaceError {
 #[derive(Debug)]
 pub struct ContentWorkspace {
     storage: ContentPackStorage,
+    provider_catalog: RulesetProviderCatalog,
     imported: BTreeMap<ContentPackReference, ImportedContentPack>,
     audit: Vec<ContentAuditEntryDto>,
     audit_path: PathBuf,
 }
 
 impl ContentWorkspace {
-    pub fn open(mut storage: ContentPackStorage) -> (Self, Vec<ArtifactRepositoryIssue>) {
+    pub fn open(
+        mut storage: ContentPackStorage,
+        provider_catalog: RulesetProviderCatalog,
+    ) -> (Self, Vec<ArtifactRepositoryIssue>) {
         let audit_path = storage.root().join(AUDIT_FILE_NAME);
         let (audit, mut issues) = load_audit(&audit_path);
         let mut imported: BTreeMap<ContentPackReference, ImportedContentPack> = BTreeMap::new();
@@ -97,7 +102,7 @@ impl ContentWorkspace {
                     .values()
                     .map(|value| value.pack.clone())
                     .collect::<Vec<_>>();
-                match import_authored_content(&document, &available) {
+                match import_authored_content(&document, &available, &provider_catalog) {
                     Ok(candidate) if candidate.pack.exact_reference() == reference => {
                         imported.insert(reference, candidate);
                         progress = true;
@@ -137,6 +142,7 @@ impl ContentWorkspace {
         (
             Self {
                 storage,
+                provider_catalog,
                 imported,
                 audit,
                 audit_path,
@@ -192,7 +198,8 @@ impl ContentWorkspace {
             .filter(|(reference, _)| Some(*reference) != previous.as_ref())
             .map(|(_, value)| value.pack.clone())
             .collect::<Vec<_>>();
-        let imported = match import_authored_content(&document, &available) {
+        let imported = match import_authored_content(&document, &available, &self.provider_catalog)
+        {
             Ok(imported) => imported,
             Err(error) => return rejected_invocation(identity, error),
         };
@@ -277,7 +284,8 @@ impl ContentWorkspace {
             .filter(|(reference, _)| Some(*reference) != previous)
             .map(|(_, value)| value.pack.clone())
             .collect::<Vec<_>>();
-        let imported = match import_authored_content(&document, &available) {
+        let imported = match import_authored_content(&document, &available, &self.provider_catalog)
+        {
             Ok(imported) => imported,
             Err(error) => return rejected_invocation(identity, error),
         };
@@ -327,7 +335,8 @@ impl ContentWorkspace {
             .filter(|value| value.pack.exact_reference() != previous.pack.exact_reference())
             .map(|value| value.pack.clone())
             .collect::<Vec<_>>();
-        let candidate = import_authored_content(&document, &available).map_err(invocation_error)?;
+        let candidate = import_authored_content(&document, &available, &self.provider_catalog)
+            .map_err(invocation_error)?;
         Ok(ContentPackDiffDto::from(&compare_content_packs(
             &previous.pack,
             &candidate.pack,

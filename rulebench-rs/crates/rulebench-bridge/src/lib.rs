@@ -43,7 +43,7 @@ pub mod content_storage {
         ContentImportDiagnostic, ContentImportDiagnosticSeverity, ContentImportLimits,
         ContentPackDiffReadout, ContentPackReference, ContentPackSetReference, ContentPackStorage,
         ContentStorageError, ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
-        StorageReplacementPolicy, StoredContentPayload,
+        RulesetProviderCatalog, StorageReplacementPolicy, StoredContentPayload,
     };
 }
 

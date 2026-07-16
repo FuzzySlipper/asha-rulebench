@@ -435,6 +435,7 @@ fn imported_pack_with_dependency(
         ContentImportContext {
             available_packs: std::slice::from_ref(&dependency),
             rulesets: std::slice::from_ref(&ruleset),
+            provider_catalog: None,
         },
     )
     .expect("dependent fixture should import")

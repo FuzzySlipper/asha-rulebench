@@ -559,9 +559,9 @@ fn bridge_fails_closed_for_versions_handles_commands_and_lifecycle() {
     let mut bridge = bridge();
     let version = bridge
         .handshake(&ProtocolRequestContextDto {
-            protocol_version: PROTOCOL_VERSION + 1,
+            protocol_version: PROTOCOL_VERSION - 1,
         })
-        .expect_err("unsupported version must fail");
+        .expect_err("old protocol version must fail");
     assert_eq!(version.kind, BridgeErrorKind::ProtocolVersionMismatch);
 
     let missing = bridge

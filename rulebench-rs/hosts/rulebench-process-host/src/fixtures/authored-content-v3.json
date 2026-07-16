@@ -101,20 +101,6 @@
             {
               "operation": "applyModifier",
               "modifierId": "modifier.binding-glyph.anchored"
-            },
-            {
-              "operation": "openReactionWindow",
-              "hookId": "binding-glyph-response",
-              "window": "afterEffect",
-              "eligibleReactors": ["declaredTargets"],
-              "options": [
-                {
-                  "id": "brace",
-                  "reactor": "declaredTargets",
-                  "opensNestedWindow": false
-                }
-              ],
-              "maximumNestedDepth": 0
             }
           ],
           "resourceCosts": [
@@ -124,7 +110,7 @@
             }
           ],
           "actionText": "Inscribe a binding glyph beneath a visible hostile combatant.",
-          "effectText": "Deal arcane damage, apply Anchored, then open the declared response hook."
+          "effectText": "Deal arcane damage and apply Anchored."
         }
       ]
     }

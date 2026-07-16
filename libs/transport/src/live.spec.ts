@@ -197,7 +197,7 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/experiments/lab%2Fone/cancel",
       "POST http://rulebench.test/api/rulebench/v1/experiments/compare",
     ]);
-    expect(calls.every((call) => call.version === "6")).toBe(true);
+    expect(calls.every((call) => call.version === "7")).toBe(true);
     expect(calls[9]?.body).toBe(
       JSON.stringify({ newSessionId: "fork/session" }),
     );
@@ -230,7 +230,7 @@ describe("live Rulebench transport", () => {
     });
 
     const mismatched = createLiveRulebenchTransport({
-      fetch: async () => Response.json({ ...handshake, protocolVersion: 7 }),
+      fetch: async () => Response.json({ ...handshake, protocolVersion: 6 }),
     });
     const mismatchResult = await mismatched.connect();
 
@@ -240,7 +240,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v6; received asha-rulebench.protocol v7.",
+          "Expected asha-rulebench.protocol v7; received asha-rulebench.protocol v6.",
         retryable: false,
       },
     });
@@ -348,7 +348,7 @@ describe("fake live Rulebench transport", () => {
             version: "3.0.0",
             fingerprint: {
               algorithm: "fnv1a64.rulebench-content-pack.v1",
-              value: "cf89ac91fa911871",
+              value: "85329f7475287f69",
             },
           },
           outcome: null,

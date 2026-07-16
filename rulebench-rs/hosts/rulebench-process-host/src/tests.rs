@@ -412,6 +412,20 @@ fn router_serializes_lifecycle_and_isolates_multiple_sessions() {
 #[test]
 fn router_classifies_version_serialization_handle_and_lifecycle_errors() {
     let mut router = router();
+    let old_content_client = router.handle(
+        &HttpRequest::new(HttpMethod::Post, "/api/rulebench/v1/content/validate")
+            .with_header(
+                "x-rulebench-protocol-version",
+                (PROTOCOL_VERSION - 1).to_string(),
+            )
+            .with_header("content-type", "application/json")
+            .with_body(b"{}".to_vec()),
+    );
+    assert_eq!(old_content_client.status, 409);
+    let old_content_error: rulebench_protocol::LiveTransportErrorDto =
+        serde_json::from_slice(&old_content_client.body).expect("protocol rejection is JSON");
+    assert_eq!(old_content_error.code, "protocolVersionMismatch");
+
     let version = router.handle(
         &HttpRequest::new(HttpMethod::Get, "/api/rulebench/v1/handshake")
             .with_header("x-rulebench-protocol-version", "999"),
@@ -962,7 +976,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
         v3.reference.fingerprint.algorithm,
         "fnv1a64.rulebench-content-pack.v1"
     );
-    assert_eq!(v3.reference.fingerprint.value, "cf89ac91fa911871");
+    assert_eq!(v3.reference.fingerprint.value, "85329f7475287f69");
     assert!(v3.definitions.iter().any(|definition| {
         definition.kind == "modifier" && definition.id == "modifier.binding-glyph.anchored"
     }));
@@ -1029,8 +1043,21 @@ fn authored_content_validation_returns_a_receipt_without_mutating_the_workspace(
     let mut invalid: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
             .expect("v3 fixture is JSON");
-    invalid["pack"]["catalogs"]["actions"][0]["effects"][1]["modifierId"] =
-        serde_json::Value::String("modifier.missing".to_string());
+    invalid["pack"]["catalogs"]["actions"][0]["effects"]
+        .as_array_mut()
+        .expect("v3 effects are an array")
+        .push(serde_json::json!({
+            "operation": "openReactionWindow",
+            "hookId": "unsupported-turn-control-response",
+            "window": "afterEffect",
+            "eligibleReactors": ["declaredTargets"],
+            "options": [{
+                "id": "brace",
+                "reactor": "declaredTargets",
+                "opensNestedWindow": false
+            }],
+            "maximumNestedDepth": 0
+        }));
     let invalid_payload = serde_json::to_string(&invalid).expect("invalid fixture serializes");
     let dry_run_rejection = router.handle(&json_request(
         HttpMethod::Post,
@@ -1050,6 +1077,13 @@ fn authored_content_validation_returns_a_receipt_without_mutating_the_workspace(
     let import_rejection: ContentImportAttemptDto =
         serde_json::from_slice(&import_rejection.body).expect("import rejection is JSON");
     assert!(!dry_run_rejection.accepted);
+    assert!(dry_run_rejection.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "unsupportedAuthoredActionEffect"
+            && diagnostic.path
+                == "resolvedPacks[pack.fixture.authored.v3@3.0.0].catalogs.actions[0].effects[2]"
+            && diagnostic.definition_kind.as_deref() == Some("action")
+            && diagnostic.reference_id.as_deref() == Some("action.binding-glyph")
+    }));
     assert_eq!(dry_run_rejection.pack, import_rejection.pack);
     assert_eq!(dry_run_rejection.diagnostics, import_rejection.diagnostics);
     assert_eq!(dry_run_rejection.error_code, import_rejection.error_code);

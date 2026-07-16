@@ -12,8 +12,8 @@ use rulebench_fixtures::{
     replay_review_packages, resolve_catalog_scenario,
 };
 use rulebench_fixtures::{
-    assemble_capability_manifest, capability_registry_input, scenario_package_registry,
-    HostCapabilityProfile,
+    assemble_capability_manifest, capability_registry_input, compiled_ruleset_provider_catalog,
+    scenario_package_registry, HostCapabilityProfile,
 };
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
@@ -26,6 +26,7 @@ use rulebench_protocol::{
     ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, SessionRecoveryCatalogDto,
     SessionRecoveryForkRequestDto, SessionRecoveryIssueDto, UseActionIntentDto,
     ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionTranscriptDto,
+    PROTOCOL_VERSION,
 };
 
 const API_PREFIX: &str = "/api/rulebench/v1";
@@ -218,7 +219,8 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
             .map_err(|issue| issue.message)?;
     let (content, content_issues) = ContentPackStorage::open_quarantining(root.join("content"))
         .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
-    let (content, workspace_issues) = ContentWorkspace::open(content);
+    let (content, workspace_issues) =
+        ContentWorkspace::open(content, compiled_ruleset_provider_catalog());
     let content_artifact_count = content.storage().list().len();
     let mut issues = report.issues;
     issues.extend(recovery_report.issues);
@@ -742,6 +744,17 @@ fn request_context(request: &HttpRequest) -> Result<ProtocolRequestContextDto, H
             false,
         )
     })?;
+    if protocol_version != PROTOCOL_VERSION {
+        return Err(error_response(
+            409,
+            "protocol",
+            "protocolVersionMismatch",
+            format!(
+                "Unsupported protocol version {protocol_version}; expected {PROTOCOL_VERSION}."
+            ),
+            false,
+        ));
+    }
     Ok(ProtocolRequestContextDto { protocol_version })
 }
 

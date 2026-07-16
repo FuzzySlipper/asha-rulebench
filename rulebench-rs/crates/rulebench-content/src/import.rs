@@ -3,13 +3,13 @@ use crate::{
     ContentDefinitionKind, ContentPackDefinition, ContentPackDiagnosticCode,
     ResolvedContentPackSet,
 };
-use rulebench_ruleset::RulesetMetadata;
+use rulebench_ruleset::{RulesetMetadata, RulesetProviderCatalog};
 
 mod validation;
 
 use validation::{
     import_pack_diagnostic, rejected, sort_diagnostics, validate_authored_pack,
-    validate_resolved_action_references,
+    validate_resolved_action_compatibility, validate_resolved_action_references,
 };
 
 pub type AuthoredContentPack = ContentPackDefinition;
@@ -43,6 +43,7 @@ impl Default for ContentImportLimits {
 pub struct ContentImportContext<'a> {
     pub available_packs: &'a [CanonicalContentPack],
     pub rulesets: &'a [RulesetMetadata],
+    pub provider_catalog: Option<&'a RulesetProviderCatalog>,
 }
 
 impl ContentImportContext<'_> {
@@ -50,6 +51,7 @@ impl ContentImportContext<'_> {
         Self {
             available_packs: &[],
             rulesets: &[],
+            provider_catalog: None,
         }
     }
 }
@@ -79,7 +81,11 @@ pub enum ContentImportDiagnosticCode {
     InvalidModifierDeclaration,
     MissingActionAbility,
     MissingActionModifier,
+    UnavailableActionRulesetProvider,
+    IncompatibleActionRulesetProvider,
     UnsupportedActionCheck,
+    UnsupportedActionTargeting,
+    UnsupportedActionEffect,
     DuplicateActionResourceCost,
     InvalidReactionDeclaration,
     DuplicateTagCanonicalized,
@@ -101,7 +107,19 @@ impl ContentImportDiagnosticCode {
             }
             ContentImportDiagnosticCode::MissingActionAbility => "missingAuthoredActionAbility",
             ContentImportDiagnosticCode::MissingActionModifier => "missingAuthoredActionModifier",
+            ContentImportDiagnosticCode::UnavailableActionRulesetProvider => {
+                "authoredActionRulesetProviderUnavailable"
+            }
+            ContentImportDiagnosticCode::IncompatibleActionRulesetProvider => {
+                "authoredActionRulesetProviderIncompatible"
+            }
             ContentImportDiagnosticCode::UnsupportedActionCheck => "unsupportedAuthoredActionCheck",
+            ContentImportDiagnosticCode::UnsupportedActionTargeting => {
+                "unsupportedAuthoredActionTargeting"
+            }
+            ContentImportDiagnosticCode::UnsupportedActionEffect => {
+                "unsupportedAuthoredActionEffect"
+            }
             ContentImportDiagnosticCode::DuplicateActionResourceCost => {
                 "duplicateAuthoredActionResourceCost"
             }
@@ -163,6 +181,10 @@ pub fn import_content_pack(
     match resolve_content_pack_set(&root, &available_packs, &rulesets) {
         Ok(resolved_set) => {
             diagnostics.extend(validate_resolved_action_references(&resolved_set));
+            diagnostics.extend(validate_resolved_action_compatibility(
+                &resolved_set,
+                context.provider_catalog,
+            ));
             sort_diagnostics(&mut diagnostics);
             if diagnostics
                 .iter()

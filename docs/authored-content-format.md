@@ -62,6 +62,9 @@ diagnostics include `emptyContentImportField`,
 `duplicateContentImportDefinition`, `invalidAuthoredActionDeclaration`,
 `invalidAuthoredModifierDeclaration`, `missingAuthoredActionAbility`,
 `missingAuthoredActionModifier`, `unsupportedAuthoredActionCheck`,
+`unsupportedAuthoredActionTargeting`, `unsupportedAuthoredActionEffect`,
+`authoredActionRulesetProviderUnavailable`,
+`authoredActionRulesetProviderIncompatible`,
 `duplicateAuthoredActionResourceCost`, `invalidAuthoredReactionDeclaration`,
 `contentImportLimitExceeded`, and `unsupportedAuthoredContentVersion`. Closed
 enum decoding and runtime-only action fields such as `actorId` are rejected as
@@ -103,8 +106,11 @@ exact references.
 Replacement is transactional. A failed decode, semantic import, canonical
 store, or activation change leaves the last known-good payload, active set, and
 audit history intact. A pack cannot supply a missing compiled ruleset provider
-or capability: session binding fails closed when the selected scenario and
-exact pack ruleset are incompatible.
+or capability. Import and dry-run validation select the exact compiled provider
+by ruleset id and version, require its module configuration to match, and reject
+unsupported check, targeting, or effect capability identities before
+persistence. Session binding repeats compatibility checks against the selected
+scenario and exact pack ruleset.
 
 ## Evolution and migration
 

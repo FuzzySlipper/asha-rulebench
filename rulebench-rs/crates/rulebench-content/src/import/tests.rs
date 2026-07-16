@@ -8,9 +8,11 @@ use crate::{
 };
 use rulebench_ruleset::{
     AbilityDefinition, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
-    ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DefenseReference, ModifierTenure,
-    ReactionWindow, RuleModuleDeclaration, RulesetMetadata, SavingThrowCheckDeclaration,
-    TargetKind, TargetSelection, TargetTeamConstraint, VisibilityRequirement,
+    ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DefenseReference,
+    EffectOperationId, ModifierTenure, OperationPipelineV2, ReactionWindow, RuleModuleDeclaration,
+    RulesetMetadata, RulesetProviderCapability, RulesetProviderCatalog, RulesetProviderDescriptor,
+    SavingThrowCheckDeclaration, TargetKind, TargetSelection, TargetTeamConstraint,
+    VisibilityRequirement,
 };
 
 #[test]
@@ -207,6 +209,7 @@ fn exact_dependency_must_be_available() {
         ContentImportContext {
             available_packs: &[dependency],
             rulesets: &[ruleset],
+            provider_catalog: None,
         },
     )
     .expect("available dependency should resolve");
@@ -232,18 +235,77 @@ fn portable_actions_resolve_ability_and_modifier_from_the_exact_dependency_set()
     root.canonical_version = ContentPackCanonicalVersion::V1;
     root.dependencies = vec![dependency.pack.exact_reference()];
     root.catalogs.actions = vec![portable_action("ability.portable", "modifier.portable")];
+    let provider_catalog = provider_catalog(
+        &ruleset,
+        &[
+            ("check.attackVsDefense", "1"),
+            (
+                "targeting.singleCombatant",
+                OperationPipelineV2::VOCABULARY_VERSION,
+            ),
+            (
+                "operation.applyModifier",
+                EffectOperationId::VOCABULARY_VERSION,
+            ),
+        ],
+    );
     let imported = import_content_pack(
         root,
         ContentImportLimits::default(),
         ContentImportContext {
             available_packs: std::slice::from_ref(&dependency.pack),
             rulesets: &[],
+            provider_catalog: Some(&provider_catalog),
         },
     )
     .expect("exact dependency definitions satisfy portable action references");
 
     assert_eq!(imported.resolved_set.packs.len(), 2);
     assert!(imported.diagnostics.is_empty());
+}
+
+#[test]
+fn provider_capabilities_reject_unsupported_check_targeting_and_effect() {
+    let ruleset = ruleset();
+    let mut root = authored_pack_with_id(&ruleset, "pack.provider-gap", "entity.root");
+    root.canonical_version = ContentPackCanonicalVersion::V1;
+    root.catalogs.abilities = vec![portable_ability()];
+    root.catalogs.modifiers = vec![portable_modifier()];
+    root.catalogs.actions = vec![portable_action("ability.portable", "modifier.portable")];
+    let provider_catalog = provider_catalog(&ruleset, &[]);
+
+    let report = import_content_pack(
+        root,
+        ContentImportLimits::default(),
+        ContentImportContext {
+            available_packs: &[],
+            rulesets: &[],
+            provider_catalog: Some(&provider_catalog),
+        },
+    )
+    .expect_err("provider capability omissions fail before persistence");
+
+    for (code, path) in [
+        (
+            ContentImportDiagnosticCode::UnsupportedActionCheck,
+            "resolvedPacks[pack.provider-gap@1.0.0].catalogs.actions[0].check",
+        ),
+        (
+            ContentImportDiagnosticCode::UnsupportedActionTargeting,
+            "resolvedPacks[pack.provider-gap@1.0.0].catalogs.actions[0].targeting",
+        ),
+        (
+            ContentImportDiagnosticCode::UnsupportedActionEffect,
+            "resolvedPacks[pack.provider-gap@1.0.0].catalogs.actions[0].effects[0]",
+        ),
+    ] {
+        assert!(report.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == code
+                && diagnostic.path == path
+                && diagnostic.definition_kind == Some(ContentDefinitionKind::Action)
+                && diagnostic.definition_id.as_deref() == Some("action.portable")
+        }));
+    }
 }
 
 #[test]
@@ -453,4 +515,25 @@ fn ruleset() -> RulesetMetadata {
             ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight(),
         )],
     }
+}
+
+fn provider_catalog(
+    ruleset: &RulesetMetadata,
+    capabilities: &[(&str, &str)],
+) -> RulesetProviderCatalog {
+    RulesetProviderCatalog::new(vec![RulesetProviderDescriptor {
+        provider_id: "provider.rules.test".to_string(),
+        provider_version: "1".to_string(),
+        ruleset: ruleset.clone(),
+        operation_vocabulary_version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+        effect_operation_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+        capabilities: capabilities
+            .iter()
+            .map(|(id, version)| RulesetProviderCapability {
+                id: (*id).to_string(),
+                version: (*version).to_string(),
+            })
+            .collect(),
+    }])
+    .expect("test provider catalog is valid")
 }

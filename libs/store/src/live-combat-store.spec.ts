@@ -46,7 +46,7 @@ describe("LiveCombatStore", () => {
           operationVocabularyVersion: "2",
           effectVocabularyVersion: "1",
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 6,
+          protocolVersion: 7,
           host: {
             adapterId: "rulebench-process-host",
             storageMode: "filesystem",
@@ -195,7 +195,7 @@ describe("LiveCombatStore", () => {
         ok: true,
         value: {
           protocolId: "asha-rulebench.protocol",
-          protocolVersion: 6,
+          protocolVersion: 7,
           authoritySurface: "test-authority",
         },
       }),
@@ -622,7 +622,7 @@ describe("LiveCombatStore", () => {
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 6,
+        protocolVersion: 7,
         authoritySurface: "late",
       },
     });
