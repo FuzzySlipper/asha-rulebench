@@ -1,7 +1,7 @@
 # Validation Tiers And Risk Inventory
 
-Status: design contract for Den task #5868  
-Baseline commit: `74623131d9c9e558773c2844a991df357bb30ede`  
+Status: design contract for Den task #5868
+Baseline commit: `74623131d9c9e558773c2844a991df357bb30ede`
 Measured: 2026-07-16
 
 This document records the current Rulebench verification graph, the defects
@@ -205,7 +205,7 @@ verify:static
 regression:gate
   hexing-bolt-reaction
   watchtower-storm-pulse-multiple
-  objective-turn-control-objective-pressure-run
+  binding-glyph-failed-save
 
 e2e:gate
   boots the rulebench shell
@@ -215,9 +215,25 @@ e2e:gate
 ```
 
 The three regression cases retain a reaction/replay path, operation-pipeline-v2
-multi-target and classified-rejection path, and second-ruleset policy path.
-They are representative blocking evidence, not a claim of exhaustive
-capability conformance.
+multi-target and classified-rejection path, and a second-provider ruleset
+saving-throw/effect path. They are representative blocking evidence, not a
+claim of exhaustive capability conformance.
+
+Each entry is an exact scenario-catalog identity that must remain independently
+runnable through the current fail-closed selector:
+
+```bash
+cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-fixtures --bin check_regressions -- --scenario <scenario-id>
+```
+
+`regression:gate` invokes that command once for each identity above. A named
+identity succeeds only when both the scenario regression and its capability
+conformance case are selected and accepted. An unknown, renamed, catalog-only,
+or conformance-only identity exits nonzero; the gate may not treat an empty
+selection in either runner as success. The fixture test
+`documented_project_gate_cases_are_independently_executable` locks this
+composition contract so #5869 can wire the command without rediscovering which
+selector owns each case.
 
 The four browser workflows cover the primary rules-designer loop:
 

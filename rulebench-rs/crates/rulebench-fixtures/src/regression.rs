@@ -221,6 +221,12 @@ fn compare_receipts(
 mod tests {
     use super::*;
 
+    const DOCUMENTED_PROJECT_GATE_CASES: [&str; 3] = [
+        "hexing-bolt-reaction",
+        "watchtower-storm-pulse-multiple",
+        "binding-glyph-failed-save",
+    ];
+
     #[test]
     fn runner_executes_every_registered_package_reproducibly() {
         let report =
@@ -281,6 +287,41 @@ mod tests {
             .cases
             .iter()
             .all(|case| case.ruleset_id == crate::TURN_CONTROL_RULESET_ID));
+    }
+
+    #[test]
+    fn documented_project_gate_cases_are_independently_executable() {
+        let registry = crate::scenario_package_registry();
+
+        for scenario_id in DOCUMENTED_PROJECT_GATE_CASES {
+            let regression = run_scenario_regressions(
+                &registry,
+                &ScenarioRegressionFilter {
+                    scenario_id: Some(scenario_id.to_string()),
+                    ..Default::default()
+                },
+            );
+            assert!(
+                regression.accepted,
+                "documented gate scenario {scenario_id} failed regression selection: {:?}",
+                regression.first_difference
+            );
+            assert_eq!(regression.cases.len(), 1, "{scenario_id}");
+
+            let conformance = crate::run_capability_conformance(
+                &registry,
+                &crate::CapabilityConformanceFilter {
+                    scenario_id: Some(scenario_id.to_string()),
+                    ..Default::default()
+                },
+            );
+            assert!(
+                conformance.accepted,
+                "documented gate scenario {scenario_id} failed conformance selection: {:?}",
+                conformance.failures
+            );
+            assert_eq!(conformance.cases.len(), 1, "{scenario_id}");
+        }
     }
 
     #[test]
