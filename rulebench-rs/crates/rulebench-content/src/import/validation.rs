@@ -4,7 +4,14 @@ use super::{
     AuthoredContentPack, ContentImportDiagnostic, ContentImportDiagnosticCode,
     ContentImportDiagnosticSeverity, ContentImportLimits, ContentImportReport,
 };
+use crate::{
+    AuthoredEffectOperation, ModifierDurationPolicy, ResolvedContentPackSet,
+    CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
+};
 use crate::{ContentDefinitionKind, ContentPackDiagnostic, CONTENT_PACK_FINGERPRINT_ALGORITHM};
+use rulebench_ruleset::{
+    CheckDeclaration, ModifierTenure, OperationPipelineV2, TargetKind, TargetSelection,
+};
 
 pub(super) fn validate_authored_pack(
     authored: &AuthoredContentPack,
@@ -75,6 +82,8 @@ pub(super) fn validate_authored_pack(
         validate_catalog(&mut diagnostics, kind, &ids, limits);
     }
     validate_ability_definitions(&mut diagnostics, authored);
+    validate_modifier_definitions(&mut diagnostics, authored);
+    validate_action_definitions(&mut diagnostics, authored, limits);
 
     for (index, dependency) in authored.dependencies.iter().enumerate() {
         validate_fingerprint(
@@ -108,6 +117,487 @@ fn validate_ability_definitions(
             }
         }
     }
+}
+
+fn validate_modifier_definitions(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    authored: &AuthoredContentPack,
+) {
+    for (index, modifier) in authored.catalogs.modifiers.iter().enumerate() {
+        let base = format!("catalogs.modifiers[{index}]");
+        for (field, value) in [
+            ("label", &modifier.label),
+            ("summary", &modifier.summary),
+            ("stackingGroup", &modifier.stacking_group),
+        ] {
+            if value.is_empty() {
+                push_definition_error(
+                    diagnostics,
+                    ContentImportDiagnosticCode::InvalidModifierDeclaration,
+                    format!("{base}.{field}"),
+                    ContentDefinitionKind::Modifier,
+                    &modifier.id,
+                    format!(
+                        "Authored modifier {} field {field} must not be empty.",
+                        modifier.id
+                    ),
+                );
+            }
+        }
+        let duration_valid = match (&modifier.default_tenure, &modifier.duration_policy) {
+            (ModifierTenure::Permanent, ModifierDurationPolicy::Permanent) => true,
+            (ModifierTenure::Temporary, ModifierDurationPolicy::Turns(value))
+            | (ModifierTenure::Temporary, ModifierDurationPolicy::Rounds(value)) => *value > 0,
+            (ModifierTenure::Temporary, ModifierDurationPolicy::UntilEvent(event)) => {
+                !event.is_empty()
+            }
+            _ => false,
+        };
+        if !duration_valid {
+            push_definition_error(
+                diagnostics,
+                ContentImportDiagnosticCode::InvalidModifierDeclaration,
+                format!("{base}.durationPolicy"),
+                ContentDefinitionKind::Modifier,
+                &modifier.id,
+                format!(
+                    "Authored modifier {} has an incompatible or empty tenure/duration policy.",
+                    modifier.id
+                ),
+            );
+        }
+        let mut stat_ids = BTreeSet::new();
+        for (adjustment_index, adjustment) in modifier.stat_adjustments.iter().enumerate() {
+            if adjustment.stat_id.is_empty()
+                || adjustment.stat_label.is_empty()
+                || adjustment.delta == 0
+                || !stat_ids.insert(adjustment.stat_id.clone())
+            {
+                push_definition_error(
+                    diagnostics,
+                    ContentImportDiagnosticCode::InvalidModifierDeclaration,
+                    format!("{base}.statAdjustments[{adjustment_index}]"),
+                    ContentDefinitionKind::Modifier,
+                    &modifier.id,
+                    format!(
+                        "Authored modifier {} has an empty or duplicate stat adjustment.",
+                        modifier.id
+                    ),
+                );
+            }
+        }
+    }
+}
+
+fn validate_action_definitions(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    authored: &AuthoredContentPack,
+    limits: ContentImportLimits,
+) {
+    let selected_ruleset = authored
+        .catalogs
+        .rulesets
+        .iter()
+        .find(|ruleset| ruleset.id == authored.ruleset.ruleset_id);
+    for (index, action) in authored.catalogs.actions.iter().enumerate() {
+        let base = format!("catalogs.actions[{index}]");
+        for (field, value) in [
+            ("abilityId", &action.ability_id),
+            ("name", &action.name),
+            ("actionText", &action.action_text),
+            ("effectText", &action.effect_text),
+        ] {
+            if value.is_empty() {
+                push_action_error(
+                    diagnostics,
+                    ContentImportDiagnosticCode::InvalidActionDeclaration,
+                    format!("{base}.{field}"),
+                    &action.id,
+                    format!(
+                        "Authored action {} field {field} must not be empty.",
+                        action.id
+                    ),
+                );
+            }
+        }
+
+        if action.effects.len() > limits.maximum_operations_per_action {
+            diagnostics.push(limit_diagnostic(
+                &format!("{base}.effects"),
+                action.effects.len(),
+                limits.maximum_operations_per_action,
+            ));
+        }
+        if action.effects.is_empty() && action.movement.is_none() {
+            push_action_error(
+                diagnostics,
+                ContentImportDiagnosticCode::InvalidActionDeclaration,
+                format!("{base}.effects"),
+                &action.id,
+                format!(
+                    "Authored action {} must declare an effect or movement.",
+                    action.id
+                ),
+            );
+        }
+
+        validate_targeting(diagnostics, action, &base);
+        validate_check(diagnostics, action, &base, selected_ruleset);
+        validate_costs(diagnostics, action, &base);
+        validate_effects(diagnostics, action, &base, limits);
+    }
+}
+
+fn validate_targeting(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    action: &crate::AuthoredActionDefinition,
+    base: &str,
+) {
+    let supported_single = action.movement.is_none()
+        && action.targeting.target_kind == TargetKind::Combatant
+        && action.targeting.selection == TargetSelection::Single
+        && action.targeting.operation_pipeline.is_none();
+    let supported_movement = action.movement.is_some()
+        && action.targeting.target_kind == TargetKind::Area
+        && action.targeting.selection == TargetSelection::Single
+        && action.targeting.operation_pipeline.is_none();
+    let supported_pipeline = action.movement.is_none()
+        && action
+            .targeting
+            .operation_pipeline
+            .as_ref()
+            .is_some_and(|pipeline| {
+                let bounded = (1..=OperationPipelineV2::MAXIMUM_TARGET_LIMIT)
+                    .contains(&pipeline.maximum_targets);
+                let shape = match (
+                    action.targeting.target_kind,
+                    action.targeting.selection,
+                    &pipeline.area,
+                ) {
+                    (TargetKind::Combatant, TargetSelection::Multiple, None) => true,
+                    (TargetKind::Area, TargetSelection::Multiple, Some(area)) => {
+                        (1..=OperationPipelineV2::MAXIMUM_AREA_RADIUS).contains(&area.radius)
+                    }
+                    _ => false,
+                };
+                bounded && shape
+            });
+    if !supported_single && !supported_movement && !supported_pipeline {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::InvalidActionDeclaration,
+            format!("{base}.targeting"),
+            &action.id,
+            format!(
+                "Authored action {} declares unsupported targeting.",
+                action.id
+            ),
+        );
+    }
+    if let Some(movement) = &action.movement {
+        if movement.allowance == 0 {
+            push_action_error(
+                diagnostics,
+                ContentImportDiagnosticCode::InvalidActionDeclaration,
+                format!("{base}.movement.allowance"),
+                &action.id,
+                format!("Authored action {} has zero movement allowance.", action.id),
+            );
+        }
+    }
+}
+
+fn validate_check(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    action: &crate::AuthoredActionDefinition,
+    base: &str,
+    selected_ruleset: Option<&rulebench_ruleset::RulesetMetadata>,
+) {
+    let fields_valid = match &action.check {
+        CheckDeclaration::Attack(attack) => {
+            !attack.modifier_stat_id.is_empty()
+                && !attack.defense.id.is_empty()
+                && !attack.defense.label.is_empty()
+        }
+        CheckDeclaration::SavingThrow(save) => {
+            !save.save_stat_id.is_empty() && save.difficulty_class >= 0
+        }
+        CheckDeclaration::Contested(contested) => {
+            !contested.actor_stat_id.is_empty() && !contested.target_stat_id.is_empty()
+        }
+    };
+    if !fields_valid {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::InvalidActionDeclaration,
+            format!("{base}.check"),
+            &action.id,
+            format!(
+                "Authored action {} has an incomplete check declaration.",
+                action.id
+            ),
+        );
+    }
+    let supported = selected_ruleset
+        .and_then(|ruleset| ruleset.validate_modules().ok())
+        .is_some_and(|registry| registry.action_resolution().supports_check(&action.check));
+    if !supported {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::UnsupportedActionCheck,
+            format!("{base}.check"),
+            &action.id,
+            format!(
+                "Authored action {} check is unavailable in the selected ruleset.",
+                action.id
+            ),
+        );
+    }
+}
+
+fn validate_costs(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    action: &crate::AuthoredActionDefinition,
+    base: &str,
+) {
+    let mut resource_ids = BTreeSet::new();
+    for (index, cost) in action.resource_costs.iter().enumerate() {
+        if cost.resource_id.is_empty() || cost.amount == 0 {
+            push_action_error(
+                diagnostics,
+                ContentImportDiagnosticCode::InvalidActionDeclaration,
+                format!("{base}.resourceCosts[{index}]"),
+                &action.id,
+                format!(
+                    "Authored action {} has an invalid resource cost.",
+                    action.id
+                ),
+            );
+        } else if !resource_ids.insert(cost.resource_id.clone()) {
+            push_action_error(
+                diagnostics,
+                ContentImportDiagnosticCode::DuplicateActionResourceCost,
+                format!("{base}.resourceCosts[{index}].resourceId"),
+                &action.id,
+                format!(
+                    "Authored action {} repeats resource cost {}.",
+                    action.id, cost.resource_id
+                ),
+            );
+        }
+    }
+}
+
+fn validate_effects(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    action: &crate::AuthoredActionDefinition,
+    base: &str,
+    limits: ContentImportLimits,
+) {
+    let mut reaction_count = 0;
+    for (index, effect) in action.effects.iter().enumerate() {
+        let path = format!("{base}.effects[{index}]");
+        let valid = match effect {
+            AuthoredEffectOperation::Damage(value) => !value.damage_type.is_empty(),
+            AuthoredEffectOperation::Heal(value) => !value.healing_type.is_empty(),
+            AuthoredEffectOperation::GrantTemporaryVitality(_) => true,
+            AuthoredEffectOperation::ApplyModifier(value) => !value.modifier_id.is_empty(),
+            AuthoredEffectOperation::Move(value) => {
+                let has_pipeline = action.targeting.operation_pipeline.is_some();
+                let distance_valid = value.maximum_distance > 0
+                    && value.maximum_distance <= OperationPipelineV2::MAXIMUM_AREA_RADIUS
+                    && (!matches!(value.movement_kind, rulebench_ruleset::MovementKind::Shift)
+                        || value.maximum_distance == 1);
+                has_pipeline && distance_valid
+            }
+            AuthoredEffectOperation::ChangeResource(value) => {
+                action.targeting.operation_pipeline.is_some()
+                    && !value.resource_id.is_empty()
+                    && value.delta != 0
+            }
+            AuthoredEffectOperation::OpenReactionWindow(hook) => {
+                reaction_count += 1;
+                validate_reaction(diagnostics, action, hook, &path, limits);
+                true
+            }
+        };
+        if !valid {
+            push_action_error(
+                diagnostics,
+                ContentImportDiagnosticCode::InvalidActionDeclaration,
+                path,
+                &action.id,
+                format!(
+                    "Authored action {} has an invalid effect operation.",
+                    action.id
+                ),
+            );
+        }
+    }
+    if reaction_count > 1 {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::InvalidReactionDeclaration,
+            format!("{base}.effects"),
+            &action.id,
+            format!(
+                "Authored action {} declares more than one reaction hook.",
+                action.id
+            ),
+        );
+    }
+}
+
+fn validate_reaction(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    action: &crate::AuthoredActionDefinition,
+    hook: &crate::AuthoredReactionHookEffectOperation,
+    path: &str,
+    limits: ContentImportLimits,
+) {
+    let mut valid = !hook.hook_id.is_empty()
+        && !hook.eligible_reactors.is_empty()
+        && !hook.options.is_empty()
+        && hook.maximum_nested_depth <= 2;
+    if hook.eligible_reactors.len() > limits.maximum_reaction_selectors {
+        diagnostics.push(limit_diagnostic(
+            &format!("{path}.eligibleReactors"),
+            hook.eligible_reactors.len(),
+            limits.maximum_reaction_selectors,
+        ));
+    }
+    if hook.options.len() > limits.maximum_reaction_options {
+        diagnostics.push(limit_diagnostic(
+            &format!("{path}.options"),
+            hook.options.len(),
+            limits.maximum_reaction_options,
+        ));
+    }
+    let eligible = hook
+        .eligible_reactors
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut option_ids = BTreeSet::new();
+    for option in &hook.options {
+        if option.id.is_empty()
+            || !eligible.contains(&option.reactor)
+            || !option_ids.insert(option.id.clone())
+            || (option.opens_nested_window && hook.maximum_nested_depth == 0)
+        {
+            valid = false;
+        }
+    }
+    if !valid {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::InvalidReactionDeclaration,
+            path.to_string(),
+            &action.id,
+            format!(
+                "Authored action {} has an invalid reaction declaration.",
+                action.id
+            ),
+        );
+    }
+}
+
+pub(super) fn validate_resolved_action_references(
+    resolved: &ResolvedContentPackSet,
+) -> Vec<ContentImportDiagnostic> {
+    let ability_ids = resolved
+        .packs
+        .iter()
+        .flat_map(|pack| {
+            pack.catalogs
+                .abilities
+                .iter()
+                .map(|value| value.id.as_str())
+        })
+        .collect::<BTreeSet<_>>();
+    let modifier_ids = resolved
+        .packs
+        .iter()
+        .flat_map(|pack| {
+            pack.catalogs
+                .modifiers
+                .iter()
+                .map(|value| value.id.as_str())
+        })
+        .collect::<BTreeSet<_>>();
+    let mut diagnostics = Vec::new();
+    for pack in &resolved.packs {
+        for (index, action) in pack.catalogs.actions.iter().enumerate() {
+            let base = format!(
+                "resolvedPacks[{}@{}].catalogs.actions[{index}]",
+                pack.identity.id, pack.identity.version
+            );
+            if !ability_ids.contains(action.ability_id.as_str()) {
+                push_action_error(
+                    &mut diagnostics,
+                    ContentImportDiagnosticCode::MissingActionAbility,
+                    format!("{base}.abilityId"),
+                    &action.id,
+                    format!(
+                        "Authored action {} references unavailable ability {}.",
+                        action.id, action.ability_id
+                    ),
+                );
+            }
+            for (effect_index, effect) in action.effects.iter().enumerate() {
+                if let AuthoredEffectOperation::ApplyModifier(modifier) = effect {
+                    if !modifier_ids.contains(modifier.modifier_id.as_str()) {
+                        push_action_error(
+                            &mut diagnostics,
+                            ContentImportDiagnosticCode::MissingActionModifier,
+                            format!("{base}.effects[{effect_index}].modifierId"),
+                            &action.id,
+                            format!(
+                                "Authored action {} references unavailable modifier {}.",
+                                action.id, modifier.modifier_id
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    diagnostics
+}
+
+fn push_action_error(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    code: ContentImportDiagnosticCode,
+    path: String,
+    action_id: &str,
+    message: String,
+) {
+    push_definition_error(
+        diagnostics,
+        code,
+        path,
+        ContentDefinitionKind::Action,
+        action_id,
+        message,
+    );
+}
+
+fn push_definition_error(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    code: ContentImportDiagnosticCode,
+    path: String,
+    kind: ContentDefinitionKind,
+    definition_id: &str,
+    message: String,
+) {
+    diagnostics.push(ContentImportDiagnostic {
+        severity: ContentImportDiagnosticSeverity::Error,
+        code,
+        path,
+        definition_kind: Some(kind),
+        definition_id: Some(definition_id.to_string()),
+        message,
+    });
 }
 
 fn validate_catalog(
@@ -173,7 +663,11 @@ fn validate_fingerprint(
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
-    if algorithm != CONTENT_PACK_FINGERPRINT_ALGORITHM || !valid_value {
+    if !matches!(
+        algorithm,
+        CONTENT_PACK_FINGERPRINT_ALGORITHM | CONTENT_PACK_FINGERPRINT_ALGORITHM_V1
+    ) || !valid_value
+    {
         diagnostics.push(ContentImportDiagnostic {
             severity: ContentImportDiagnosticSeverity::Error,
             code: ContentImportDiagnosticCode::InvalidFingerprint,
@@ -181,7 +675,7 @@ fn validate_fingerprint(
             definition_kind: None,
             definition_id: None,
             message: format!(
-                "Content fingerprint at {path} must use {CONTENT_PACK_FINGERPRINT_ALGORITHM} with 16 lowercase hexadecimal characters."
+                "Content fingerprint at {path} must use a supported content-pack fingerprint algorithm with 16 lowercase hexadecimal characters."
             ),
         });
     }
@@ -284,7 +778,158 @@ fn pack_strings(authored: &AuthoredContentPack) -> Vec<(String, &str)> {
             ));
         }
     }
+    for (index, modifier) in authored.catalogs.modifiers.iter().enumerate() {
+        strings.extend([
+            (
+                format!("catalogs.modifiers[{index}].id"),
+                modifier.id.as_str(),
+            ),
+            (
+                format!("catalogs.modifiers[{index}].label"),
+                modifier.label.as_str(),
+            ),
+            (
+                format!("catalogs.modifiers[{index}].summary"),
+                modifier.summary.as_str(),
+            ),
+            (
+                format!("catalogs.modifiers[{index}].stackingGroup"),
+                modifier.stacking_group.as_str(),
+            ),
+        ]);
+        if let ModifierDurationPolicy::UntilEvent(event) = &modifier.duration_policy {
+            strings.push((
+                format!("catalogs.modifiers[{index}].durationPolicy.event"),
+                event.as_str(),
+            ));
+        }
+        for (adjustment_index, adjustment) in modifier.stat_adjustments.iter().enumerate() {
+            strings.extend([
+                (
+                    format!(
+                        "catalogs.modifiers[{index}].statAdjustments[{adjustment_index}].statId"
+                    ),
+                    adjustment.stat_id.as_str(),
+                ),
+                (
+                    format!(
+                        "catalogs.modifiers[{index}].statAdjustments[{adjustment_index}].statLabel"
+                    ),
+                    adjustment.stat_label.as_str(),
+                ),
+            ]);
+        }
+    }
+    for (index, action) in authored.catalogs.actions.iter().enumerate() {
+        strings.extend([
+            (format!("catalogs.actions[{index}].id"), action.id.as_str()),
+            (
+                format!("catalogs.actions[{index}].abilityId"),
+                action.ability_id.as_str(),
+            ),
+            (
+                format!("catalogs.actions[{index}].name"),
+                action.name.as_str(),
+            ),
+            (
+                format!("catalogs.actions[{index}].actionText"),
+                action.action_text.as_str(),
+            ),
+            (
+                format!("catalogs.actions[{index}].effectText"),
+                action.effect_text.as_str(),
+            ),
+        ]);
+        for (cost_index, cost) in action.resource_costs.iter().enumerate() {
+            strings.push((
+                format!("catalogs.actions[{index}].resourceCosts[{cost_index}].resourceId"),
+                cost.resource_id.as_str(),
+            ));
+        }
+        match &action.check {
+            CheckDeclaration::Attack(attack) => {
+                strings.extend([
+                    (
+                        format!("catalogs.actions[{index}].check.modifierStatId"),
+                        attack.modifier_stat_id.as_str(),
+                    ),
+                    (
+                        format!("catalogs.actions[{index}].check.defense.id"),
+                        attack.defense.id.as_str(),
+                    ),
+                    (
+                        format!("catalogs.actions[{index}].check.defense.label"),
+                        attack.defense.label.as_str(),
+                    ),
+                ]);
+            }
+            CheckDeclaration::SavingThrow(save) => strings.push((
+                format!("catalogs.actions[{index}].check.saveStatId"),
+                save.save_stat_id.as_str(),
+            )),
+            CheckDeclaration::Contested(contested) => strings.extend([
+                (
+                    format!("catalogs.actions[{index}].check.actorStatId"),
+                    contested.actor_stat_id.as_str(),
+                ),
+                (
+                    format!("catalogs.actions[{index}].check.targetStatId"),
+                    contested.target_stat_id.as_str(),
+                ),
+            ]),
+        }
+        if let Some(movement) = &action.movement {
+            for (tag_index, tag) in movement.blocking_terrain_tags.iter().enumerate() {
+                strings.push((
+                    format!("catalogs.actions[{index}].movement.blockingTerrainTags[{tag_index}]"),
+                    tag.as_str(),
+                ));
+            }
+            for (tag_index, tag) in movement.difficult_terrain_tags.iter().enumerate() {
+                strings.push((
+                    format!("catalogs.actions[{index}].movement.difficultTerrainTags[{tag_index}]"),
+                    tag.as_str(),
+                ));
+            }
+        }
+        collect_action_operation_strings(&mut strings, index, action);
+    }
     strings
+}
+
+fn collect_action_operation_strings<'a>(
+    strings: &mut Vec<(String, &'a str)>,
+    action_index: usize,
+    action: &'a crate::AuthoredActionDefinition,
+) {
+    for (effect_index, effect) in action.effects.iter().enumerate() {
+        let base = format!("catalogs.actions[{action_index}].effects[{effect_index}]");
+        match effect {
+            AuthoredEffectOperation::Damage(value) => {
+                strings.push((format!("{base}.damageType"), value.damage_type.as_str()));
+            }
+            AuthoredEffectOperation::Heal(value) => {
+                strings.push((format!("{base}.healingType"), value.healing_type.as_str()));
+            }
+            AuthoredEffectOperation::ApplyModifier(value) => {
+                strings.push((format!("{base}.modifierId"), value.modifier_id.as_str()));
+            }
+            AuthoredEffectOperation::ChangeResource(value) => {
+                strings.push((format!("{base}.resourceId"), value.resource_id.as_str()));
+            }
+            AuthoredEffectOperation::OpenReactionWindow(hook) => {
+                strings.push((format!("{base}.hookId"), hook.hook_id.as_str()));
+                for (option_index, option) in hook.options.iter().enumerate() {
+                    strings.push((
+                        format!("{base}.options[{option_index}].id"),
+                        option.id.as_str(),
+                    ));
+                }
+            }
+            AuthoredEffectOperation::GrantTemporaryVitality(_)
+            | AuthoredEffectOperation::Move(_) => {}
+        }
+    }
 }
 
 fn catalog_identities(authored: &AuthoredContentPack) -> Vec<(ContentDefinitionKind, Vec<String>)> {

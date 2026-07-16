@@ -907,6 +907,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
     let fixtures = [
         include_str!("fixtures/authored-content-v1.json"),
         include_str!("fixtures/authored-content-v2.json"),
+        include_str!("fixtures/authored-content-v3.json"),
     ];
 
     for payload in fixtures {
@@ -932,7 +933,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
     let workspace = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
     let workspace: ContentWorkspaceDto =
         serde_json::from_slice(&workspace.body).expect("workspace is JSON");
-    assert_eq!(workspace.packs.len(), 2);
+    assert_eq!(workspace.packs.len(), 3);
     let v1 = workspace
         .packs
         .iter()
@@ -942,6 +943,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
         .definitions
         .iter()
         .any(|definition| definition.kind == "entity"));
+    assert_eq!(v1.reference.fingerprint.value, "673a6a29efafa979");
     let v2 = workspace
         .packs
         .iter()
@@ -950,6 +952,124 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
     assert!(v2.definitions.iter().any(|definition| {
         definition.kind == "ability" && definition.id == "ability.binding-glyph"
     }));
+    assert_eq!(v2.reference.fingerprint.value, "938acf1dca484c9c");
+    let v3 = workspace
+        .packs
+        .iter()
+        .find(|pack| pack.reference.id == "pack.fixture.authored.v3")
+        .expect("v3 receipt exists");
+    assert_eq!(
+        v3.reference.fingerprint.algorithm,
+        "fnv1a64.rulebench-content-pack.v1"
+    );
+    assert_eq!(v3.reference.fingerprint.value, "cf89ac91fa911871");
+    assert!(v3.definitions.iter().any(|definition| {
+        definition.kind == "modifier" && definition.id == "modifier.binding-glyph.anchored"
+    }));
+    assert!(v3.definitions.iter().any(|definition| {
+        definition.kind == "action" && definition.id == "action.binding-glyph"
+    }));
+    let references = workspace
+        .packs
+        .iter()
+        .map(|pack| pack.reference.clone())
+        .collect::<Vec<_>>();
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("all shipped versions reload");
+    let workspace = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let workspace: ContentWorkspaceDto =
+        serde_json::from_slice(&workspace.body).expect("restarted workspace is JSON");
+    assert_eq!(
+        workspace
+            .packs
+            .iter()
+            .map(|pack| pack.reference.clone())
+            .collect::<Vec<_>>(),
+        references
+    );
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
+fn authored_content_validation_returns_a_receipt_without_mutating_the_workspace() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-validation-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let before = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let before: ContentWorkspaceDto =
+        serde_json::from_slice(&before.body).expect("initial workspace is JSON");
+
+    let validated = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/validate",
+        &serde_json::json!({
+            "authoredPayload": include_str!("fixtures/authored-content-v3.json")
+        }),
+    ));
+    assert_eq!(validated.status, 200);
+    let validated: ContentImportAttemptDto =
+        serde_json::from_slice(&validated.body).expect("validation attempt is JSON");
+    assert!(validated.accepted, "{validated:?}");
+    assert!(validated.outcome.is_none());
+    assert_eq!(
+        validated
+            .pack
+            .fingerprint
+            .as_ref()
+            .expect("accepted validation has a canonical receipt")
+            .algorithm,
+        "fnv1a64.rulebench-content-pack.v1"
+    );
+
+    let mut invalid: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    invalid["pack"]["catalogs"]["actions"][0]["effects"][1]["modifierId"] =
+        serde_json::Value::String("modifier.missing".to_string());
+    let invalid_payload = serde_json::to_string(&invalid).expect("invalid fixture serializes");
+    let dry_run_rejection = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/validate",
+        &serde_json::json!({ "authoredPayload": invalid_payload }),
+    ));
+    let dry_run_rejection: ContentImportAttemptDto =
+        serde_json::from_slice(&dry_run_rejection.body).expect("dry-run rejection is JSON");
+    let import_rejection = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": invalid_payload,
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let import_rejection: ContentImportAttemptDto =
+        serde_json::from_slice(&import_rejection.body).expect("import rejection is JSON");
+    assert!(!dry_run_rejection.accepted);
+    assert_eq!(dry_run_rejection.pack, import_rejection.pack);
+    assert_eq!(dry_run_rejection.diagnostics, import_rejection.diagnostics);
+    assert_eq!(dry_run_rejection.error_code, import_rejection.error_code);
+    assert_eq!(
+        dry_run_rejection.error_message,
+        import_rejection.error_message
+    );
+
+    let after = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let after: ContentWorkspaceDto =
+        serde_json::from_slice(&after.body).expect("final workspace is JSON");
+    assert_eq!(after, before);
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("workspace restarts after dry-run");
+    let restarted = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let restarted: ContentWorkspaceDto =
+        serde_json::from_slice(&restarted.body).expect("restarted workspace is JSON");
+    assert_eq!(restarted, before);
     fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 

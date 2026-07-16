@@ -1,12 +1,27 @@
 use crate::{
-    ClassDefinition, EntityDefinition, ItemDefinition, ModifierDefinition, StatDefinition,
+    AuthoredActionDefinition, ClassDefinition, EntityDefinition, ItemDefinition,
+    ModifierDefinition, StatDefinition,
 };
-use rulebench_ruleset::{
-    AbilityDefinition, ActionDefinition, RulesetArtifactProvenance, RulesetMetadata,
-};
+use rulebench_ruleset::{AbilityDefinition, RulesetArtifactProvenance, RulesetMetadata};
 
 pub const CONTENT_PACK_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-pack.v0";
+pub const CONTENT_PACK_FINGERPRINT_ALGORITHM_V1: &str = "fnv1a64.rulebench-content-pack.v1";
 pub const CONTENT_PACK_SET_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-pack-set.v0";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentPackCanonicalVersion {
+    V0,
+    V1,
+}
+
+impl ContentPackCanonicalVersion {
+    pub const fn fingerprint_algorithm(self) -> &'static str {
+        match self {
+            Self::V0 => CONTENT_PACK_FINGERPRINT_ALGORITHM,
+            Self::V1 => CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ContentPackIdentity {
@@ -156,11 +171,12 @@ pub struct ContentPackCatalogs {
     pub stat_definitions: Vec<StatDefinition>,
     pub modifiers: Vec<ModifierDefinition>,
     pub items: Vec<ItemDefinition>,
-    pub actions: Vec<ActionDefinition>,
+    pub actions: Vec<AuthoredActionDefinition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentPackDefinition {
+    pub canonical_version: ContentPackCanonicalVersion,
     pub identity: ContentPackIdentity,
     pub title: String,
     pub summary: String,
@@ -174,6 +190,7 @@ pub struct ContentPackDefinition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalContentPack {
+    pub canonical_version: ContentPackCanonicalVersion,
     pub identity: ContentPackIdentity,
     pub title: String,
     pub summary: String,

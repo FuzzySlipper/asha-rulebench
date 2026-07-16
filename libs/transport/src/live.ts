@@ -219,6 +219,10 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
     replacementPolicy: RulebenchContentReplacementPolicyDto,
     options?: RulebenchLiveRequestOptions,
   ) => Promise<RulebenchLiveTransportResult<RulebenchContentImportAttemptDto>>;
+  readonly validateContent: (
+    authoredPayload: string,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentImportAttemptDto>>;
   readonly reviewContent: (
     reference: RulebenchContentPackReferenceDto,
     options?: RulebenchLiveRequestOptions,
@@ -525,6 +529,8 @@ export function createLiveRulebenchTransport(
         { authoredPayload, replacementPolicy },
         requestOptions,
       ),
+    validateContent: (authoredPayload, requestOptions) =>
+      request("POST", "/content/validate", { authoredPayload }, requestOptions),
     reviewContent: (reference, requestOptions) =>
       request("POST", "/content/review", { reference }, requestOptions),
     compareContent: (authoredPayload, requestOptions) =>

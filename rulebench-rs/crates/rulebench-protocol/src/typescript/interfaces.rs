@@ -2689,6 +2689,14 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "abilities",
                     ty: "readonly RulebenchAuthoredAbilityDefinitionDto[]",
                 },
+                Field {
+                    name: "modifiers",
+                    ty: "readonly RulebenchAuthoredModifierDefinitionDto[]",
+                },
+                Field {
+                    name: "actions",
+                    ty: "readonly RulebenchAuthoredActionDefinitionDto[]",
+                },
             ],
         },
         Interface {
@@ -2738,6 +2746,236 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "damageAdjustments",
                     ty: "readonly RulebenchAuthoredDamageAdjustmentDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredActionDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "targeting",
+                    ty: "RulebenchAuthoredTargetingDeclarationDto",
+                },
+                Field {
+                    name: "check",
+                    ty: "RulebenchAuthoredCheckDeclarationDto",
+                },
+                Field {
+                    name: "effects",
+                    ty: "readonly RulebenchAuthoredEffectOperationDto[]",
+                },
+                Field {
+                    name: "resourceCosts",
+                    ty: "readonly RulebenchAuthoredActionResourceCostDto[]",
+                },
+                Field {
+                    name: "movement",
+                    ty: "RulebenchAuthoredMovementActionDeclarationDto | null",
+                },
+                Field {
+                    name: "actionText",
+                    ty: "string",
+                },
+                Field {
+                    name: "effectText",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredTargetingDeclarationDto",
+            fields: &[
+                Field {
+                    name: "targetKind",
+                    ty: "RulebenchAuthoredTargetKindDto",
+                },
+                Field {
+                    name: "selection",
+                    ty: "RulebenchAuthoredTargetSelectionDto",
+                },
+                Field {
+                    name: "teamConstraint",
+                    ty: "RulebenchAuthoredTargetTeamConstraintDto",
+                },
+                Field {
+                    name: "maximumRange",
+                    ty: "number",
+                },
+                Field {
+                    name: "visibilityRequirement",
+                    ty: "RulebenchAuthoredVisibilityRequirementDto",
+                },
+                Field {
+                    name: "operationPipeline",
+                    ty: "RulebenchAuthoredOperationPipelineDto | null",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredOperationPipelineDto",
+            fields: &[
+                Field {
+                    name: "maximumTargets",
+                    ty: "number",
+                },
+                Field {
+                    name: "area",
+                    ty: "RulebenchAuthoredAreaTargetingDeclarationDto | null",
+                },
+                Field {
+                    name: "rollPolicy",
+                    ty: "RulebenchAuthoredActionRollPolicyDto",
+                },
+                Field {
+                    name: "failurePolicy",
+                    ty: "RulebenchAuthoredTargetFailurePolicyDto",
+                },
+                Field {
+                    name: "targetOrder",
+                    ty: "RulebenchAuthoredTargetOrderPolicyDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredAreaTargetingDeclarationDto",
+            fields: &[
+                Field {
+                    name: "shape",
+                    ty: "RulebenchAuthoredAreaShapeDto",
+                },
+                Field {
+                    name: "radius",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredDefenseReferenceDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "label",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredActionResourceCostDto",
+            fields: &[
+                Field {
+                    name: "resourceId",
+                    ty: "string",
+                },
+                Field {
+                    name: "amount",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredMovementActionDeclarationDto",
+            fields: &[
+                Field {
+                    name: "allowance",
+                    ty: "number",
+                },
+                Field {
+                    name: "topology",
+                    ty: "RulebenchAuthoredMovementTopologyDto",
+                },
+                Field {
+                    name: "blockingTerrainTags",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "difficultTerrainTags",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredReactionOptionDeclarationDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "reactor",
+                    ty: "RulebenchAuthoredReactionParticipantSelectorDto",
+                },
+                Field {
+                    name: "opensNestedWindow",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredModifierDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "label",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "defaultTenure",
+                    ty: "RulebenchAuthoredModifierTenureDto",
+                },
+                Field {
+                    name: "stackingGroup",
+                    ty: "string",
+                },
+                Field {
+                    name: "stackingPolicy",
+                    ty: "RulebenchAuthoredModifierStackingPolicyDto",
+                },
+                Field {
+                    name: "durationPolicy",
+                    ty: "RulebenchAuthoredModifierDurationPolicyDto",
+                },
+                Field {
+                    name: "statAdjustments",
+                    ty: "readonly RulebenchAuthoredModifierStatAdjustmentDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredModifierStatAdjustmentDto",
+            fields: &[
+                Field {
+                    name: "statId",
+                    ty: "string",
+                },
+                Field {
+                    name: "statLabel",
+                    ty: "string",
+                },
+                Field {
+                    name: "delta",
+                    ty: "number",
                 },
             ],
         },

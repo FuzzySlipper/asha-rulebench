@@ -1,8 +1,8 @@
 use rulebench_rules::{
     import_content_pack, ContentImportContext, ContentImportLimits, ContentImportReport,
-    ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
-    ContentPackProvenance, ContentPackSourceKind, EntityDefinition, ImportedContentPack,
-    RulesetMetadata,
+    ContentPackCanonicalVersion, ContentPackCatalogs, ContentPackCollisionPolicy,
+    ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackSourceKind,
+    EntityDefinition, ImportedContentPack, RulesetMetadata,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +68,7 @@ fn import_example(id: &str, definition: ContentPackDefinition) -> ContentImportE
 
 fn pack(ruleset: &RulesetMetadata, pack_id: &str, entity_id: &str) -> ContentPackDefinition {
     ContentPackDefinition {
+        canonical_version: ContentPackCanonicalVersion::V0,
         identity: ContentPackIdentity::new(pack_id, "1.0.0"),
         title: "Content Import Example".to_string(),
         summary: "Generated fixture for content import protocol evidence.".to_string(),

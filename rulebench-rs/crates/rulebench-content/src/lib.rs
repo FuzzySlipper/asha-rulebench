@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 mod active_modifier;
+mod authored_action;
 mod canonical;
 mod diagnostics;
 mod diff;
@@ -18,6 +19,11 @@ mod storage;
 mod validation;
 
 pub use active_modifier::ActiveModifier;
+pub use authored_action::{
+    AuthoredActionDefinition, AuthoredEffectOperation, AuthoredModifierEffectOperation,
+    AuthoredReactionHookEffectOperation, AuthoredReactionOptionDeclaration,
+    AuthoredTargetingDeclaration, ReactionParticipantSelector,
+};
 pub use canonical::{canonicalize_content_pack, fingerprint_content_pack_set};
 pub use diagnostics::{
     ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity, ContentValidationReport,
@@ -34,9 +40,10 @@ pub use import::{
 };
 pub use pack::{
     CanonicalContentPack, ContentDefinitionKind, ContentDefinitionReference, ContentFingerprint,
-    ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
-    ContentPackProvenance, ContentPackReference, ContentPackSetReference, ContentPackSourceKind,
-    CONTENT_PACK_FINGERPRINT_ALGORITHM, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
+    ContentPackCanonicalVersion, ContentPackCatalogs, ContentPackCollisionPolicy,
+    ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackReference,
+    ContentPackSetReference, ContentPackSourceKind, CONTENT_PACK_FINGERPRINT_ALGORITHM,
+    CONTENT_PACK_FINGERPRINT_ALGORITHM_V1, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
 pub use pack_validation::{
     resolve_content_pack_set, ContentPackDiagnostic, ContentPackDiagnosticCode,

@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+mod authored_action;
 mod authoring;
 mod bridge;
 mod capabilities;
@@ -19,6 +20,19 @@ mod session;
 mod typescript;
 mod viewer;
 
+pub use authored_action::{
+    AuthoredActionDefinitionDto, AuthoredActionResourceCostDto, AuthoredActionRollPolicyDto,
+    AuthoredAreaShapeDto, AuthoredAreaTargetingDeclarationDto, AuthoredCheckDeclarationDto,
+    AuthoredDefenseReferenceDto, AuthoredEffectOperationDto, AuthoredModifierDefinitionDto,
+    AuthoredModifierDurationPolicyDto, AuthoredModifierStackingPolicyDto,
+    AuthoredModifierStatAdjustmentDto, AuthoredModifierTenureDto,
+    AuthoredMovementActionDeclarationDto, AuthoredMovementKindDto, AuthoredMovementTopologyDto,
+    AuthoredOperationPipelineDto, AuthoredReactionOptionDeclarationDto,
+    AuthoredReactionParticipantSelectorDto, AuthoredReactionWindowDto,
+    AuthoredTargetFailurePolicyDto, AuthoredTargetKindDto, AuthoredTargetOrderPolicyDto,
+    AuthoredTargetSelectionDto, AuthoredTargetTeamConstraintDto, AuthoredTargetingDeclarationDto,
+    AuthoredVisibilityRequirementDto,
+};
 pub use authoring::{
     validate_ruleset_definition, RuleModuleConfigurationDto, RuleModuleDeclarationDto,
     RulesetAuthoringError, RulesetDefinitionDto,
@@ -45,7 +59,7 @@ pub use content::{
     ContentPackReferenceDto, ContentPackReviewDto, ContentPayloadRequestDto,
     ContentReferenceRequestDto, ContentReplacementPolicyDto, ContentWorkspaceDto,
     StoredContentPackSummaryDto, AUTHORED_CONTENT_PACK_FORMAT, AUTHORED_CONTENT_PACK_VERSION,
-    AUTHORED_CONTENT_PACK_VERSION_V1,
+    AUTHORED_CONTENT_PACK_VERSION_V1, AUTHORED_CONTENT_PACK_VERSION_V2,
 };
 pub use experiment::{
     AutomationPolicyCatalogEntryDto, ExperimentComparisonReadoutDto,

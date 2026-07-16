@@ -1,8 +1,8 @@
 use super::*;
 use crate::{
-    canonicalize_content_pack, ContentPackCatalogs, ContentPackCollisionPolicy,
-    ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackSourceKind,
-    EntityDefinition,
+    canonicalize_content_pack, ContentPackCanonicalVersion, ContentPackCatalogs,
+    ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity, ContentPackProvenance,
+    ContentPackSourceKind, EntityDefinition,
 };
 use rulebench_ruleset::RulesetMetadata;
 
@@ -98,6 +98,7 @@ fn definition() -> ContentPackDefinition {
         modules: Vec::new(),
     };
     ContentPackDefinition {
+        canonical_version: ContentPackCanonicalVersion::V0,
         identity: ContentPackIdentity::new("pack.diff", "1.0.0"),
         title: "Diff Pack".to_string(),
         summary: "Content diff fixture".to_string(),

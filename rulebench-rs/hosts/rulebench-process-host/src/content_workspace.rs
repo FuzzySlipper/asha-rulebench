@@ -256,6 +256,47 @@ impl ContentWorkspace {
         }
     }
 
+    /// Runs the exact decode, canonicalization, dependency, and semantic
+    /// validation path used by import without writing storage or audit state.
+    pub fn validate(&self, authored_payload: &str) -> ContentImportAttemptDto {
+        let document = match decode_document(authored_payload.as_bytes()) {
+            Ok(document) => document,
+            Err(error) => return rejected_attempt(None, error),
+        };
+        let mut identity = ContentPackIdentityDto {
+            id: document.pack.id.clone(),
+            version: document.pack.version.clone(),
+            fingerprint: None,
+        };
+        let previous = self.imported.keys().find(|reference| {
+            reference.id == document.pack.id && reference.version == document.pack.version
+        });
+        let available = self
+            .imported
+            .iter()
+            .filter(|(reference, _)| Some(*reference) != previous)
+            .map(|(_, value)| value.pack.clone())
+            .collect::<Vec<_>>();
+        let imported = match import_authored_content(&document, &available) {
+            Ok(imported) => imported,
+            Err(error) => return rejected_invocation(identity, error),
+        };
+        identity.fingerprint =
+            Some(ContentPackReferenceDto::from(&imported.pack.exact_reference()).fingerprint);
+        ContentImportAttemptDto {
+            accepted: true,
+            pack: identity,
+            outcome: None,
+            diagnostics: imported
+                .diagnostics
+                .iter()
+                .map(ContentImportDiagnosticDto::from)
+                .collect(),
+            error_code: None,
+            error_message: None,
+        }
+    }
+
     pub fn review(
         &self,
         reference: &ContentPackReference,

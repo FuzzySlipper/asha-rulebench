@@ -7,7 +7,10 @@ use rulebench_ruleset::RulesetMetadata;
 
 mod validation;
 
-use validation::{import_pack_diagnostic, rejected, sort_diagnostics, validate_authored_pack};
+use validation::{
+    import_pack_diagnostic, rejected, sort_diagnostics, validate_authored_pack,
+    validate_resolved_action_references,
+};
 
 pub type AuthoredContentPack = ContentPackDefinition;
 
@@ -17,6 +20,9 @@ pub struct ContentImportLimits {
     pub maximum_definitions_per_catalog: usize,
     pub maximum_total_definitions: usize,
     pub maximum_string_bytes: usize,
+    pub maximum_operations_per_action: usize,
+    pub maximum_reaction_selectors: usize,
+    pub maximum_reaction_options: usize,
 }
 
 impl Default for ContentImportLimits {
@@ -26,6 +32,9 @@ impl Default for ContentImportLimits {
             maximum_definitions_per_catalog: 10_000,
             maximum_total_definitions: 50_000,
             maximum_string_bytes: 16_384,
+            maximum_operations_per_action: 64,
+            maximum_reaction_selectors: 4,
+            maximum_reaction_options: 16,
         }
     }
 }
@@ -66,6 +75,13 @@ pub enum ContentImportDiagnosticCode {
     InvalidFingerprint,
     LimitExceeded,
     DuplicateDefinition,
+    InvalidActionDeclaration,
+    InvalidModifierDeclaration,
+    MissingActionAbility,
+    MissingActionModifier,
+    UnsupportedActionCheck,
+    DuplicateActionResourceCost,
+    InvalidReactionDeclaration,
     DuplicateTagCanonicalized,
     PackValidation(ContentPackDiagnosticCode),
 }
@@ -77,6 +93,21 @@ impl ContentImportDiagnosticCode {
             ContentImportDiagnosticCode::InvalidFingerprint => "invalidContentFingerprint",
             ContentImportDiagnosticCode::LimitExceeded => "contentImportLimitExceeded",
             ContentImportDiagnosticCode::DuplicateDefinition => "duplicateContentImportDefinition",
+            ContentImportDiagnosticCode::InvalidActionDeclaration => {
+                "invalidAuthoredActionDeclaration"
+            }
+            ContentImportDiagnosticCode::InvalidModifierDeclaration => {
+                "invalidAuthoredModifierDeclaration"
+            }
+            ContentImportDiagnosticCode::MissingActionAbility => "missingAuthoredActionAbility",
+            ContentImportDiagnosticCode::MissingActionModifier => "missingAuthoredActionModifier",
+            ContentImportDiagnosticCode::UnsupportedActionCheck => "unsupportedAuthoredActionCheck",
+            ContentImportDiagnosticCode::DuplicateActionResourceCost => {
+                "duplicateAuthoredActionResourceCost"
+            }
+            ContentImportDiagnosticCode::InvalidReactionDeclaration => {
+                "invalidAuthoredReactionDeclaration"
+            }
             ContentImportDiagnosticCode::DuplicateTagCanonicalized => {
                 "duplicateContentTagCanonicalized"
             }
@@ -130,11 +161,21 @@ pub fn import_content_pack(
     rulesets.extend(pack.catalogs.rulesets.clone());
 
     match resolve_content_pack_set(&root, &available_packs, &rulesets) {
-        Ok(resolved_set) => Ok(ImportedContentPack {
-            pack,
-            resolved_set,
-            diagnostics,
-        }),
+        Ok(resolved_set) => {
+            diagnostics.extend(validate_resolved_action_references(&resolved_set));
+            sort_diagnostics(&mut diagnostics);
+            if diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.severity == ContentImportDiagnosticSeverity::Error)
+            {
+                return Err(rejected(diagnostics));
+            }
+            Ok(ImportedContentPack {
+                pack,
+                resolved_set,
+                diagnostics,
+            })
+        }
         Err(report) => {
             diagnostics.extend(report.diagnostics.into_iter().map(import_pack_diagnostic));
             sort_diagnostics(&mut diagnostics);

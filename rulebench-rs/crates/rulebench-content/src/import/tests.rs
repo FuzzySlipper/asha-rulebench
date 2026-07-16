@@ -1,11 +1,16 @@
 use super::*;
 use crate::{
+    AuthoredActionDefinition, AuthoredEffectOperation, AuthoredModifierEffectOperation,
+    AuthoredReactionHookEffectOperation, AuthoredTargetingDeclaration, ContentPackCanonicalVersion,
     ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackIdentity, ContentPackProvenance,
-    ContentPackSourceKind, EntityDefinition,
+    ContentPackSourceKind, EntityDefinition, ModifierDefinition, ModifierDurationPolicy,
+    ModifierStackingPolicy, ModifierStatAdjustment, ReactionParticipantSelector,
 };
 use rulebench_ruleset::{
     AbilityDefinition, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
-    RuleModuleDeclaration, RulesetMetadata,
+    ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DefenseReference, ModifierTenure,
+    ReactionWindow, RuleModuleDeclaration, RulesetMetadata, SavingThrowCheckDeclaration,
+    TargetKind, TargetSelection, TargetTeamConstraint, VisibilityRequirement,
 };
 
 #[test]
@@ -208,6 +213,130 @@ fn exact_dependency_must_be_available() {
     assert_eq!(imported.resolved_set.packs.len(), 2);
 }
 
+#[test]
+fn portable_actions_resolve_ability_and_modifier_from_the_exact_dependency_set() {
+    let ruleset = ruleset();
+    let mut dependency_definition =
+        authored_pack_with_id(&ruleset, "pack.action-dependency", "entity.dependency");
+    dependency_definition.canonical_version = ContentPackCanonicalVersion::V1;
+    dependency_definition.catalogs.abilities = vec![portable_ability()];
+    dependency_definition.catalogs.modifiers = vec![portable_modifier()];
+    let dependency = import_content_pack(
+        dependency_definition,
+        ContentImportLimits::default(),
+        ContentImportContext::empty(),
+    )
+    .expect("dependency definitions import");
+
+    let mut root = authored_pack_with_id(&ruleset, "pack.action-root", "entity.root");
+    root.canonical_version = ContentPackCanonicalVersion::V1;
+    root.dependencies = vec![dependency.pack.exact_reference()];
+    root.catalogs.actions = vec![portable_action("ability.portable", "modifier.portable")];
+    let imported = import_content_pack(
+        root,
+        ContentImportLimits::default(),
+        ContentImportContext {
+            available_packs: std::slice::from_ref(&dependency.pack),
+            rulesets: &[],
+        },
+    )
+    .expect("exact dependency definitions satisfy portable action references");
+
+    assert_eq!(imported.resolved_set.packs.len(), 2);
+    assert!(imported.diagnostics.is_empty());
+}
+
+#[test]
+fn portable_action_missing_references_report_stable_definition_paths() {
+    let ruleset = ruleset();
+    let mut root = authored_pack_with_id(&ruleset, "pack.action-root", "entity.root");
+    root.canonical_version = ContentPackCanonicalVersion::V1;
+    root.catalogs.actions = vec![portable_action("ability.missing", "modifier.missing")];
+
+    let report = import_content_pack(
+        root,
+        ContentImportLimits::default(),
+        ContentImportContext::empty(),
+    )
+    .expect_err("unresolved portable definitions fail closed");
+
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentImportDiagnosticCode::MissingActionAbility
+            && diagnostic.path
+                == "resolvedPacks[pack.action-root@1.0.0].catalogs.actions[0].abilityId"
+            && diagnostic.definition_kind == Some(ContentDefinitionKind::Action)
+            && diagnostic.definition_id.as_deref() == Some("action.portable")
+    }));
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == ContentImportDiagnosticCode::MissingActionModifier
+            && diagnostic.path
+                == "resolvedPacks[pack.action-root@1.0.0].catalogs.actions[0].effects[0].modifierId"
+            && diagnostic.definition_kind == Some(ContentDefinitionKind::Action)
+            && diagnostic.definition_id.as_deref() == Some("action.portable")
+    }));
+}
+
+#[test]
+fn malformed_portable_action_catalog_reports_stable_semantic_diagnostics() {
+    let ruleset = ruleset();
+    let mut root = authored_pack_with_id(&ruleset, "pack.action-invalid", "entity.root");
+    root.canonical_version = ContentPackCanonicalVersion::V1;
+    root.catalogs.abilities = vec![portable_ability()];
+    let mut modifier = portable_modifier();
+    modifier.duration_policy = ModifierDurationPolicy::Permanent;
+    root.catalogs.modifiers = vec![modifier];
+    let mut action = portable_action("ability.portable", "modifier.portable");
+    action.check = CheckDeclaration::SavingThrow(SavingThrowCheckDeclaration {
+        save_stat_id: "body".to_string(),
+        difficulty_class: 12,
+    });
+    action.resource_costs = vec![
+        ActionResourceCost::standard_action(),
+        ActionResourceCost::standard_action(),
+    ];
+    action.effects = vec![AuthoredEffectOperation::OpenReactionWindow(
+        AuthoredReactionHookEffectOperation {
+            hook_id: "response".to_string(),
+            window: ReactionWindow::AfterEffect,
+            eligible_reactors: vec![ReactionParticipantSelector::DeclaredTargets],
+            options: Vec::new(),
+            maximum_nested_depth: 0,
+        },
+    )];
+    root.catalogs.actions = vec![action];
+
+    let report = import_content_pack(
+        root,
+        ContentImportLimits::default(),
+        ContentImportContext::empty(),
+    )
+    .expect_err("malformed portable declarations fail before canonical import");
+
+    for (code, path) in [
+        (
+            ContentImportDiagnosticCode::InvalidModifierDeclaration,
+            "catalogs.modifiers[0].durationPolicy",
+        ),
+        (
+            ContentImportDiagnosticCode::UnsupportedActionCheck,
+            "catalogs.actions[0].check",
+        ),
+        (
+            ContentImportDiagnosticCode::DuplicateActionResourceCost,
+            "catalogs.actions[0].resourceCosts[1].resourceId",
+        ),
+        (
+            ContentImportDiagnosticCode::InvalidReactionDeclaration,
+            "catalogs.actions[0].effects[0]",
+        ),
+    ] {
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == code && diagnostic.path == path));
+    }
+}
+
 fn authored_pack(ruleset: &RulesetMetadata, reverse: bool) -> AuthoredContentPack {
     let mut pack = authored_pack_with_id(ruleset, "test.pack", "entity.one");
     pack.tags = if reverse {
@@ -227,6 +356,7 @@ fn authored_pack_with_id(
     entity_id: &str,
 ) -> AuthoredContentPack {
     ContentPackDefinition {
+        canonical_version: ContentPackCanonicalVersion::V0,
         identity: ContentPackIdentity::new(pack_id, "1.0.0"),
         title: "Test Pack".to_string(),
         summary: "A pack submitted through the canonical import boundary.".to_string(),
@@ -250,6 +380,66 @@ fn authored_pack_with_id(
             }],
             ..ContentPackCatalogs::default()
         },
+    }
+}
+
+fn portable_ability() -> AbilityDefinition {
+    AbilityDefinition {
+        id: "ability.portable".to_string(),
+        name: "Portable Ability".to_string(),
+        kind: AbilityDefinitionKind::Ability,
+        summary: "Dependency-owned ability.".to_string(),
+        tags: Vec::new(),
+    }
+}
+
+fn portable_modifier() -> ModifierDefinition {
+    ModifierDefinition {
+        id: "modifier.portable".to_string(),
+        label: "Portable Modifier".to_string(),
+        summary: "Dependency-owned modifier.".to_string(),
+        default_tenure: ModifierTenure::Temporary,
+        stacking_group: "portable".to_string(),
+        stacking_policy: ModifierStackingPolicy::Refresh,
+        duration_policy: ModifierDurationPolicy::Turns(1),
+        stat_adjustments: vec![ModifierStatAdjustment {
+            stat_id: "guard".to_string(),
+            stat_label: "Guard".to_string(),
+            delta: -1,
+        }],
+    }
+}
+
+fn portable_action(ability_id: &str, modifier_id: &str) -> AuthoredActionDefinition {
+    AuthoredActionDefinition {
+        id: "action.portable".to_string(),
+        ability_id: ability_id.to_string(),
+        name: "Portable Action".to_string(),
+        targeting: AuthoredTargetingDeclaration {
+            target_kind: TargetKind::Combatant,
+            selection: TargetSelection::Single,
+            team_constraint: TargetTeamConstraint::Hostile,
+            maximum_range: 6,
+            visibility_requirement: VisibilityRequirement::Required,
+            operation_pipeline: None,
+        },
+        check: CheckDeclaration::Attack(AttackCheckDeclaration {
+            modifier: 2,
+            modifier_stat_id: "focus".to_string(),
+            defense: DefenseReference {
+                id: "guard".to_string(),
+                label: "Guard".to_string(),
+            },
+        }),
+        effects: vec![AuthoredEffectOperation::ApplyModifier(
+            AuthoredModifierEffectOperation {
+                modifier_id: modifier_id.to_string(),
+            },
+        )],
+        resource_costs: Vec::new(),
+        movement: None,
+        action_text: "Use the portable action.".to_string(),
+        effect_text: "Apply the portable modifier.".to_string(),
     }
 }
 

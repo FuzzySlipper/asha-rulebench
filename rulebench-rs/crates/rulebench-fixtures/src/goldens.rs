@@ -50,9 +50,9 @@ pub enum FixtureGoldenArtifactKind {
 mod tests {
     use super::*;
     use rulebench_rules::{
-        canonicalize_content_pack, ContentPackCatalogs, ContentPackCollisionPolicy,
-        ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackSourceKind,
-        RulesetMetadata,
+        canonicalize_content_pack, ContentPackCanonicalVersion, ContentPackCatalogs,
+        ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
+        ContentPackProvenance, ContentPackSourceKind, RulesetMetadata,
     };
 
     #[test]
@@ -77,6 +77,7 @@ mod tests {
             modules: Vec::new(),
         };
         ContentPackDefinition {
+            canonical_version: ContentPackCanonicalVersion::V0,
             identity: ContentPackIdentity::new("pack.golden", "1.0.0"),
             title: title.to_string(),
             summary: "Golden review pack".to_string(),

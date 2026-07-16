@@ -1,16 +1,16 @@
 use crate::{
-    CanonicalContentPack, ContentFingerprint, ContentPackCatalogs, ContentPackDefinition,
-    ContentPackReference, DerivedStatFormula, ModifierDurationPolicy,
-    CONTENT_PACK_FINGERPRINT_ALGORITHM, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
+    AuthoredActionDefinition, AuthoredEffectOperation, CanonicalContentPack, ContentFingerprint,
+    ContentPackCatalogs, ContentPackDefinition, ContentPackReference, DerivedStatFormula,
+    ModifierDurationPolicy, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
 use rulebench_ruleset::{
-    ActionDefinition, ActionResourcePool, ActionResourceRefreshPolicy, CheckDeclaration,
-    CombatEndPolicy, HitEffectOperation, MovementKind, RuleModuleConfiguration,
-    RulesetArtifactProvenance,
+    ActionResourcePool, ActionResourceRefreshPolicy, CheckDeclaration, CombatEndPolicy,
+    MovementKind, RuleModuleConfiguration, RulesetArtifactProvenance,
 };
 
 pub fn canonicalize_content_pack(definition: ContentPackDefinition) -> CanonicalContentPack {
     let mut pack = CanonicalContentPack {
+        canonical_version: definition.canonical_version,
         identity: definition.identity,
         title: definition.title,
         summary: definition.summary,
@@ -21,7 +21,10 @@ pub fn canonicalize_content_pack(definition: ContentPackDefinition) -> Canonical
         collision_policy: definition.collision_policy,
         catalogs: definition.catalogs,
         fingerprint: ContentFingerprint {
-            algorithm: CONTENT_PACK_FINGERPRINT_ALGORITHM.to_string(),
+            algorithm: definition
+                .canonical_version
+                .fingerprint_algorithm()
+                .to_string(),
             value: String::new(),
         },
     };
@@ -132,19 +135,29 @@ fn canonicalize_catalogs(catalogs: &mut ContentPackCatalogs) {
             .sort_by(|left, right| left.id.cmp(&right.id));
     }
     for action in &mut catalogs.actions {
-        action.targeting.target_ids.sort();
-        action.targeting.target_ids.dedup();
-        action.targeting.visible_target_ids.sort();
-        action.targeting.visible_target_ids.dedup();
         action
             .resource_costs
             .sort_by(|left, right| left.resource_id.cmp(&right.resource_id));
+        if let Some(movement) = &mut action.movement {
+            movement.blocking_terrain_tags.sort();
+            movement.blocking_terrain_tags.dedup();
+            movement.difficult_terrain_tags.sort();
+            movement.difficult_terrain_tags.dedup();
+        }
+        for operation in &mut action.effects {
+            if let AuthoredEffectOperation::OpenReactionWindow(hook) = operation {
+                hook.eligible_reactors.sort();
+                hook.eligible_reactors.dedup();
+                hook.options.sort_by(|left, right| left.id.cmp(&right.id));
+            }
+        }
     }
 }
 
 fn fingerprint_canonical_pack(pack: &CanonicalContentPack) -> ContentFingerprint {
     let mut encoder = FingerprintEncoder::new();
-    encoder.feed_str(CONTENT_PACK_FINGERPRINT_ALGORITHM);
+    let algorithm = pack.canonical_version.fingerprint_algorithm();
+    encoder.feed_str(algorithm);
     encoder.feed_str("canonicalContentPack");
     encoder.feed_str(&pack.identity.id);
     encoder.feed_str(&pack.identity.version);
@@ -160,7 +173,7 @@ fn fingerprint_canonical_pack(pack: &CanonicalContentPack) -> ContentFingerprint
     feed_catalogs(&mut encoder, &pack.catalogs);
 
     ContentFingerprint {
-        algorithm: CONTENT_PACK_FINGERPRINT_ALGORITHM.to_string(),
+        algorithm: algorithm.to_string(),
         value: encoder.finish_hex(),
     }
 }
@@ -397,12 +410,10 @@ fn feed_modifier_duration(encoder: &mut FingerprintEncoder, duration: &ModifierD
     }
 }
 
-fn feed_action(encoder: &mut FingerprintEncoder, action: &ActionDefinition) {
+fn feed_action(encoder: &mut FingerprintEncoder, action: &AuthoredActionDefinition) {
     encoder.feed_str(&action.id);
-    encoder.feed_str(&action.ruleset_id);
     encoder.feed_str(&action.ability_id);
     encoder.feed_str(&action.name);
-    encoder.feed_str(&action.actor_id);
     encoder.feed_str(match action.targeting.target_kind {
         rulebench_ruleset::TargetKind::Combatant => "combatant",
         rulebench_ruleset::TargetKind::Area => "area",
@@ -421,42 +432,38 @@ fn feed_action(encoder: &mut FingerprintEncoder, action: &ActionDefinition) {
         rulebench_ruleset::VisibilityRequirement::Required => "required",
         rulebench_ruleset::VisibilityRequirement::Ignored => "ignored",
     });
-    encoder.feed_strings(&action.targeting.target_ids);
-    encoder.feed_strings(&action.targeting.visible_target_ids);
-    if let Some(pipeline) = &action.targeting.operation_pipeline {
-        encoder.feed_str("operationPipelineV2");
-        encoder.feed_str(rulebench_ruleset::OperationPipelineV2::VOCABULARY_VERSION);
-        encoder.feed_u32(pipeline.maximum_targets);
-        match &pipeline.area {
-            Some(area) => {
-                encoder.feed_str(match area.shape {
-                    rulebench_ruleset::AreaShape::ManhattanBurst => "manhattanBurst",
-                });
-                encoder.feed_u32(area.radius);
+    match &action.targeting.operation_pipeline {
+        Some(pipeline) => {
+            encoder.feed_str("operationPipelineV2");
+            encoder.feed_str(rulebench_ruleset::OperationPipelineV2::VOCABULARY_VERSION);
+            encoder.feed_u32(pipeline.maximum_targets);
+            match &pipeline.area {
+                Some(area) => {
+                    encoder.feed_str(match area.shape {
+                        rulebench_ruleset::AreaShape::ManhattanBurst => "manhattanBurst",
+                    });
+                    encoder.feed_u32(area.radius);
+                }
+                None => encoder.feed_str("noArea"),
             }
-            None => encoder.feed_str("noArea"),
+            encoder.feed_str(match pipeline.roll_policy {
+                rulebench_ruleset::ActionRollPolicy::Shared => "shared",
+                rulebench_ruleset::ActionRollPolicy::PerTarget => "perTarget",
+                rulebench_ruleset::ActionRollPolicy::NoRoll => "noRoll",
+            });
+            encoder.feed_str(match pipeline.failure_policy {
+                rulebench_ruleset::TargetFailurePolicy::Atomic => "atomic",
+            });
+            encoder.feed_str(match pipeline.target_order {
+                rulebench_ruleset::TargetOrderPolicy::CanonicalId => "canonicalId",
+            });
         }
-        encoder.feed_str(match pipeline.roll_policy {
-            rulebench_ruleset::ActionRollPolicy::Shared => "shared",
-            rulebench_ruleset::ActionRollPolicy::PerTarget => "perTarget",
-            rulebench_ruleset::ActionRollPolicy::NoRoll => "noRoll",
-        });
-        encoder.feed_str(match pipeline.failure_policy {
-            rulebench_ruleset::TargetFailurePolicy::Atomic => "atomic",
-        });
-        encoder.feed_str(match pipeline.target_order {
-            rulebench_ruleset::TargetOrderPolicy::CanonicalId => "canonicalId",
-        });
+        None => encoder.feed_str("noOperationPipeline"),
     }
     feed_check(encoder, &action.check);
-    encoder.feed_i32(action.hit.damage_bonus);
-    encoder.feed_str(&action.hit.damage_type);
-    encoder.feed_str(&action.hit.modifier_id);
-    encoder.feed_str(&action.hit.modifier_label);
-    encoder.feed_str(&action.hit.modifier_duration);
-    encoder.feed_u32(action.hit.operations.len() as u32);
-    for operation in &action.hit.operations {
-        feed_hit_effect_operation(encoder, operation);
+    encoder.feed_u32(action.effects.len() as u32);
+    for operation in &action.effects {
+        feed_authored_effect_operation(encoder, operation);
     }
     encoder.feed_u32(action.resource_costs.len() as u32);
     for cost in &action.resource_costs {
@@ -501,26 +508,27 @@ fn feed_check(encoder: &mut FingerprintEncoder, check: &CheckDeclaration) {
     }
 }
 
-fn feed_hit_effect_operation(encoder: &mut FingerprintEncoder, operation: &HitEffectOperation) {
-    encoder.feed_str(operation.id().code());
+fn feed_authored_effect_operation(
+    encoder: &mut FingerprintEncoder,
+    operation: &AuthoredEffectOperation,
+) {
+    encoder.feed_str(operation.code());
     match operation {
-        HitEffectOperation::Damage(damage) => {
+        AuthoredEffectOperation::Damage(damage) => {
             encoder.feed_i32(damage.damage_bonus);
             encoder.feed_str(&damage.damage_type);
         }
-        HitEffectOperation::Heal(healing) => {
+        AuthoredEffectOperation::Heal(healing) => {
             encoder.feed_i32(healing.healing_bonus);
             encoder.feed_str(&healing.healing_type);
         }
-        HitEffectOperation::GrantTemporaryVitality(vitality) => {
+        AuthoredEffectOperation::GrantTemporaryVitality(vitality) => {
             encoder.feed_i32(vitality.vitality_bonus);
         }
-        HitEffectOperation::ApplyModifier(modifier) => {
+        AuthoredEffectOperation::ApplyModifier(modifier) => {
             encoder.feed_str(&modifier.modifier_id);
-            encoder.feed_str(&modifier.modifier_label);
-            encoder.feed_str(&modifier.modifier_duration);
         }
-        HitEffectOperation::Move(movement) => {
+        AuthoredEffectOperation::Move(movement) => {
             encoder.feed_u32(movement.maximum_distance);
             encoder.feed_str(match movement.movement_kind {
                 MovementKind::Push => "push",
@@ -528,18 +536,21 @@ fn feed_hit_effect_operation(encoder: &mut FingerprintEncoder, operation: &HitEf
                 MovementKind::Shift => "shift",
             });
         }
-        HitEffectOperation::ChangeResource(change) => {
+        AuthoredEffectOperation::ChangeResource(change) => {
             encoder.feed_str(&change.resource_id);
             encoder.feed_i32(change.delta);
         }
-        HitEffectOperation::OpenReactionWindow(hook) => {
+        AuthoredEffectOperation::OpenReactionWindow(hook) => {
             encoder.feed_str(&hook.hook_id);
             encoder.feed_str(hook.window.code());
-            encoder.feed_strings(&hook.eligible_reactor_ids);
+            encoder.feed_u32(hook.eligible_reactors.len() as u32);
+            for selector in &hook.eligible_reactors {
+                encoder.feed_str(selector.code());
+            }
             encoder.feed_u32(hook.options.len() as u32);
             for option in &hook.options {
                 encoder.feed_str(&option.id);
-                encoder.feed_str(&option.reactor_id);
+                encoder.feed_str(option.reactor.code());
                 encoder.feed_bool(option.opens_nested_window);
             }
             encoder.feed_u32(hook.maximum_nested_depth);
@@ -620,10 +631,18 @@ impl FingerprintEncoder {
 mod tests {
     use super::*;
     use crate::{
-        ContentPackCollisionPolicy, ContentPackIdentity, ContentPackProvenance,
-        ContentPackSourceKind,
+        AuthoredModifierEffectOperation, AuthoredReactionHookEffectOperation,
+        AuthoredReactionOptionDeclaration, AuthoredTargetingDeclaration,
+        ContentPackCanonicalVersion, ContentPackCollisionPolicy, ContentPackIdentity,
+        ContentPackProvenance, ContentPackSourceKind, ModifierDefinition, ModifierStackingPolicy,
+        ModifierStatAdjustment, ReactionParticipantSelector,
     };
-    use rulebench_ruleset::{AbilityDefinition, AbilityDefinitionKind, RulesetModuleProvenance};
+    use rulebench_ruleset::{
+        AbilityDefinition, AbilityDefinitionKind, ActionResourceCost, AttackCheckDeclaration,
+        DamageEffectOperation, DefenseReference, ModifierTenure, MovementActionDeclaration,
+        MovementTopology, ReactionWindow, RulesetModuleProvenance, TargetKind, TargetSelection,
+        TargetTeamConstraint, VisibilityRequirement,
+    };
 
     #[test]
     fn equivalent_set_and_catalog_order_fingerprints_identically() {
@@ -645,6 +664,168 @@ mod tests {
         let changed = canonicalize_content_pack(changed_definition);
 
         assert_ne!(original.fingerprint, changed.fingerprint);
+    }
+
+    #[test]
+    fn portable_action_material_fields_and_effect_order_change_v1_fingerprint() {
+        let original = canonicalize_content_pack(portable_action_definition());
+        assert_eq!(
+            original.fingerprint.algorithm,
+            ContentPackCanonicalVersion::V1.fingerprint_algorithm()
+        );
+
+        let mut changes = Vec::new();
+        let mut changed = portable_action_definition();
+        changed.catalogs.actions[0].name = "Changed action".to_string();
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        changed.catalogs.actions[0].targeting.maximum_range += 1;
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        changed.catalogs.actions[0].check = CheckDeclaration::Attack(AttackCheckDeclaration {
+            modifier: 3,
+            modifier_stat_id: "focus".to_string(),
+            defense: DefenseReference {
+                id: "guard".to_string(),
+                label: "Guard".to_string(),
+            },
+        });
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        changed.catalogs.actions[0].resource_costs[0].amount += 1;
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        changed.catalogs.actions[0].effects.swap(0, 1);
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        let hook = match &mut changed.catalogs.actions[0].effects[2] {
+            AuthoredEffectOperation::OpenReactionWindow(hook) => hook,
+            _ => panic!("third operation is the reaction fixture"),
+        };
+        hook.eligible_reactors[0] = ReactionParticipantSelector::ActorAllies;
+        hook.options[0].reactor = ReactionParticipantSelector::ActorAllies;
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        changed.catalogs.actions[0].movement = Some(MovementActionDeclaration {
+            allowance: 4,
+            topology: MovementTopology::OrthogonalManhattan,
+            blocking_terrain_tags: vec!["wall".to_string()],
+            difficult_terrain_tags: vec!["mud".to_string()],
+        });
+        changes.push(changed);
+        let mut changed = portable_action_definition();
+        changed.catalogs.modifiers[0].summary = "Changed modifier".to_string();
+        changes.push(changed);
+
+        for changed in changes {
+            assert_ne!(
+                original.fingerprint,
+                canonicalize_content_pack(changed).fingerprint
+            );
+        }
+    }
+
+    #[test]
+    fn portable_action_unordered_sets_canonicalize_without_reordering_effects() {
+        let first = canonicalize_content_pack(portable_action_definition());
+        let mut reordered = portable_action_definition();
+        reordered.catalogs.actions[0].resource_costs.reverse();
+        let hook = match &mut reordered.catalogs.actions[0].effects[2] {
+            AuthoredEffectOperation::OpenReactionWindow(hook) => hook,
+            _ => panic!("third operation is the reaction fixture"),
+        };
+        hook.eligible_reactors.reverse();
+        hook.options.reverse();
+        let second = canonicalize_content_pack(reordered);
+
+        assert_eq!(first.fingerprint, second.fingerprint);
+        assert_eq!(first.catalogs.actions[0].effects[0].code(), "damage");
+        assert_eq!(first.catalogs.actions[0].effects[1].code(), "applyModifier");
+        assert_eq!(
+            first.catalogs.actions[0].effects[2].code(),
+            "openReactionWindow"
+        );
+    }
+
+    fn portable_action_definition() -> ContentPackDefinition {
+        let mut definition = test_definition(false);
+        definition.canonical_version = ContentPackCanonicalVersion::V1;
+        definition.catalogs.modifiers = vec![ModifierDefinition {
+            id: "modifier.anchor".to_string(),
+            label: "Anchor".to_string(),
+            summary: "Portable modifier".to_string(),
+            default_tenure: ModifierTenure::Temporary,
+            stacking_group: "anchor".to_string(),
+            stacking_policy: ModifierStackingPolicy::Refresh,
+            duration_policy: ModifierDurationPolicy::Turns(1),
+            stat_adjustments: vec![ModifierStatAdjustment {
+                stat_id: "mobility".to_string(),
+                stat_label: "Mobility".to_string(),
+                delta: -1,
+            }],
+        }];
+        definition.catalogs.actions = vec![AuthoredActionDefinition {
+            id: "action.arc".to_string(),
+            ability_id: "arc".to_string(),
+            name: "Arc".to_string(),
+            targeting: AuthoredTargetingDeclaration {
+                target_kind: TargetKind::Combatant,
+                selection: TargetSelection::Single,
+                team_constraint: TargetTeamConstraint::Hostile,
+                maximum_range: 6,
+                visibility_requirement: VisibilityRequirement::Required,
+                operation_pipeline: None,
+            },
+            check: CheckDeclaration::Attack(AttackCheckDeclaration {
+                modifier: 2,
+                modifier_stat_id: "focus".to_string(),
+                defense: DefenseReference {
+                    id: "guard".to_string(),
+                    label: "Guard".to_string(),
+                },
+            }),
+            effects: vec![
+                AuthoredEffectOperation::Damage(DamageEffectOperation {
+                    damage_bonus: 4,
+                    damage_type: "arcane".to_string(),
+                }),
+                AuthoredEffectOperation::ApplyModifier(AuthoredModifierEffectOperation {
+                    modifier_id: "modifier.anchor".to_string(),
+                }),
+                AuthoredEffectOperation::OpenReactionWindow(AuthoredReactionHookEffectOperation {
+                    hook_id: "arc-response".to_string(),
+                    window: ReactionWindow::AfterEffect,
+                    eligible_reactors: vec![
+                        ReactionParticipantSelector::TargetAllies,
+                        ReactionParticipantSelector::DeclaredTargets,
+                    ],
+                    options: vec![
+                        AuthoredReactionOptionDeclaration {
+                            id: "ward".to_string(),
+                            reactor: ReactionParticipantSelector::TargetAllies,
+                            opens_nested_window: false,
+                        },
+                        AuthoredReactionOptionDeclaration {
+                            id: "brace".to_string(),
+                            reactor: ReactionParticipantSelector::DeclaredTargets,
+                            opens_nested_window: false,
+                        },
+                    ],
+                    maximum_nested_depth: 0,
+                }),
+            ],
+            resource_costs: vec![
+                ActionResourceCost {
+                    resource_id: "spell-slot".to_string(),
+                    amount: 1,
+                },
+                ActionResourceCost::standard_action(),
+            ],
+            movement: None,
+            action_text: "Cast Arc.".to_string(),
+            effect_text: "Damage and anchor.".to_string(),
+        }];
+        definition
     }
 
     fn test_definition(reverse_order: bool) -> ContentPackDefinition {
@@ -677,6 +858,7 @@ mod tests {
         }
 
         ContentPackDefinition {
+            canonical_version: ContentPackCanonicalVersion::V0,
             identity: ContentPackIdentity::new("test-pack", "1"),
             title: "Test pack".to_string(),
             summary: "Fingerprint fixture.".to_string(),
@@ -709,7 +891,9 @@ mod tests {
             id: id.to_string(),
             version: version.to_string(),
             fingerprint: ContentFingerprint {
-                algorithm: CONTENT_PACK_FINGERPRINT_ALGORITHM.to_string(),
+                algorithm: ContentPackCanonicalVersion::V0
+                    .fingerprint_algorithm()
+                    .to_string(),
                 value: value.to_string(),
             },
         }

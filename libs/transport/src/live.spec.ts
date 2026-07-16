@@ -122,6 +122,7 @@ describe("live Rulebench transport", () => {
     };
     await transport.listContentWorkspace();
     await transport.importContent('{"formatVersion":1}', "reject");
+    await transport.validateContent('{"formatVersion":3}');
     await transport.reviewContent(contentReference);
     await transport.compareContent('{"formatVersion":1}');
     await transport.activateContent(contentReference);
@@ -177,6 +178,7 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/sessions/session%2Fone/automatic-run",
       "GET http://rulebench.test/api/rulebench/v1/content",
       "POST http://rulebench.test/api/rulebench/v1/content/import",
+      "POST http://rulebench.test/api/rulebench/v1/content/validate",
       "POST http://rulebench.test/api/rulebench/v1/content/review",
       "POST http://rulebench.test/api/rulebench/v1/content/compare",
       "POST http://rulebench.test/api/rulebench/v1/content/activate",
@@ -205,14 +207,14 @@ describe("live Rulebench transport", () => {
     expect(calls[18]?.body).toBe(JSON.stringify(reactionCommand));
     expect(calls[19]?.body).toBe(JSON.stringify(automaticStep));
     expect(calls[20]?.body).toBe(JSON.stringify(automaticRun));
-    expect(calls[31]?.body).toBe(
+    expect(calls[32]?.body).toBe(
       JSON.stringify({
         expectedPackageId: "expected",
         actualPackageId: "actual",
       }),
     );
-    expect(calls[35]?.body).toBe(JSON.stringify(experimentMatrix));
-    expect(calls[39]?.body).toBe(JSON.stringify(experimentComparison));
+    expect(calls[36]?.body).toBe(JSON.stringify(experimentMatrix));
+    expect(calls[40]?.body).toBe(JSON.stringify(experimentComparison));
   });
 
   it("tracks a verified handshake and rejects a mismatched protocol without repairing it", async () => {
@@ -337,6 +339,24 @@ describe("fake live Rulebench transport", () => {
     const transport = createFakeRulebenchLiveTransport({
       connect: async () => ({ ok: true, value: handshake }),
       listScenarios: async () => ({ ok: true, value: scenarios }),
+      validateContent: async (authoredPayload) => ({
+        ok: true,
+        value: {
+          accepted: authoredPayload === '{"formatVersion":3}',
+          pack: {
+            id: "pack.authored.v3",
+            version: "3.0.0",
+            fingerprint: {
+              algorithm: "fnv1a64.rulebench-content-pack.v1",
+              value: "cf89ac91fa911871",
+            },
+          },
+          outcome: null,
+          diagnostics: [],
+          errorCode: null,
+          errorMessage: null,
+        },
+      }),
     });
 
     await transport.connect();
@@ -347,6 +367,9 @@ describe("fake live Rulebench transport", () => {
       kind: "connected",
       handshake,
     });
+    await expect(
+      transport.validateContent('{"formatVersion":3}'),
+    ).resolves.toMatchObject({ ok: true, value: { accepted: true } });
     await expect(transport.listSessions()).resolves.toEqual({
       ok: false,
       error: {

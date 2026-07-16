@@ -636,6 +636,16 @@ impl ProcessHostRouter {
                     None => content_repository_required(),
                 }
             }
+            (HttpMethod::Post, ["content", "validate"]) => {
+                let request = match decode_body::<ContentPayloadRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                match self.content_workspace.as_ref() {
+                    Some(workspace) => json_ok(workspace.validate(&request.authored_payload)),
+                    None => content_repository_required(),
+                }
+            }
             (HttpMethod::Post, ["content", "review"]) => {
                 let request = match decode_body::<ContentReferenceRequestDto>(request) {
                     Ok(request) => request,

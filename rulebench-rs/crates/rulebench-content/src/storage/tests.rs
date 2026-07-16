@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::*;
 use crate::{
-    import_content_pack, ContentImportContext, ContentImportLimits, ContentPackCatalogs,
-    ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity, ContentPackSourceKind,
-    EntityDefinition,
+    import_content_pack, ContentImportContext, ContentImportLimits, ContentPackCanonicalVersion,
+    ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
+    ContentPackSourceKind, EntityDefinition,
 };
 use rulebench_ruleset::{
     ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata,
@@ -367,6 +367,7 @@ fn imported_pack(pack_id: &str, entity_id: &str) -> ImportedContentPack {
     let ruleset = ruleset();
     import_content_pack(
         ContentPackDefinition {
+            canonical_version: ContentPackCanonicalVersion::V0,
             identity: ContentPackIdentity::new(pack_id, "1.0.0"),
             title: "Stored Pack".to_string(),
             summary: "Storage integration fixture".to_string(),
@@ -405,6 +406,7 @@ fn imported_pack_with_dependency(
     let ruleset = ruleset();
     import_content_pack(
         ContentPackDefinition {
+            canonical_version: ContentPackCanonicalVersion::V0,
             identity: ContentPackIdentity::new(pack_id, "1.0.0"),
             title: "Dependent Stored Pack".to_string(),
             summary: "Storage dependency fixture".to_string(),

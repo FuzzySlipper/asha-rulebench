@@ -30,6 +30,40 @@ export type RulebenchAuthoredDamageAdjustmentPolicyDto = 'resistance' | 'vulnera
 
 export type RulebenchAuthoredAbilityDefinitionKindDto = 'ability' | 'spell';
 
+export type RulebenchAuthoredTargetKindDto = 'combatant' | 'area';
+
+export type RulebenchAuthoredTargetSelectionDto = 'single' | 'multiple';
+
+export type RulebenchAuthoredTargetTeamConstraintDto = 'hostile' | 'ally' | 'any';
+
+export type RulebenchAuthoredVisibilityRequirementDto = 'required' | 'ignored';
+
+export type RulebenchAuthoredAreaShapeDto = 'manhattanBurst';
+
+export type RulebenchAuthoredActionRollPolicyDto = 'shared' | 'perTarget' | 'noRoll';
+
+export type RulebenchAuthoredTargetFailurePolicyDto = 'atomic';
+
+export type RulebenchAuthoredTargetOrderPolicyDto = 'canonicalId';
+
+export type RulebenchAuthoredCheckDeclarationDto = { readonly kind: 'attack'; readonly modifier: number; readonly modifierStatId: string; readonly defense: RulebenchAuthoredDefenseReferenceDto } | { readonly kind: 'savingThrow'; readonly saveStatId: string; readonly difficultyClass: number } | { readonly kind: 'contested'; readonly actorStatId: string; readonly targetStatId: string };
+
+export type RulebenchAuthoredMovementTopologyDto = 'orthogonalManhattan';
+
+export type RulebenchAuthoredMovementKindDto = 'push' | 'pull' | 'shift';
+
+export type RulebenchAuthoredReactionWindowDto = 'beforeEffect' | 'afterEffect';
+
+export type RulebenchAuthoredReactionParticipantSelectorDto = 'declaredTargets' | 'actorAllies' | 'targetAllies' | 'allOtherParticipants';
+
+export type RulebenchAuthoredEffectOperationDto = { readonly operation: 'damage'; readonly damageBonus: number; readonly damageType: string } | { readonly operation: 'heal'; readonly healingBonus: number; readonly healingType: string } | { readonly operation: 'grantTemporaryVitality'; readonly vitalityBonus: number } | { readonly operation: 'applyModifier'; readonly modifierId: string } | { readonly operation: 'move'; readonly maximumDistance: number; readonly movementKind: RulebenchAuthoredMovementKindDto } | { readonly operation: 'changeResource'; readonly resourceId: string; readonly delta: number } | { readonly operation: 'openReactionWindow'; readonly hookId: string; readonly window: RulebenchAuthoredReactionWindowDto; readonly eligibleReactors: readonly RulebenchAuthoredReactionParticipantSelectorDto[]; readonly options: readonly RulebenchAuthoredReactionOptionDeclarationDto[]; readonly maximumNestedDepth: number };
+
+export type RulebenchAuthoredModifierTenureDto = 'temporary' | 'permanent';
+
+export type RulebenchAuthoredModifierStackingPolicyDto = 'stack' | 'replace' | 'refresh';
+
+export type RulebenchAuthoredModifierDurationPolicyDto = { readonly kind: 'permanent' } | { readonly kind: 'turns'; readonly turns: number } | { readonly kind: 'rounds'; readonly rounds: number } | { readonly kind: 'untilEvent'; readonly event: string };
+
 export type RulebenchContentReplacementPolicyDto = 'reject' | 'replaceSameIdentity';
 
 export type RulebenchCommandOutcomeClassDto = 'acceptedHit' | 'acceptedMiss' | 'rejectedTargetLegality' | 'rejectedInvalidCommand';
@@ -1459,6 +1493,8 @@ export interface RulebenchAuthoredContentCatalogsDto {
   readonly rulesets: readonly RulebenchRulesetDefinitionDto[];
   readonly entities: readonly RulebenchAuthoredEntityDefinitionDto[];
   readonly abilities: readonly RulebenchAuthoredAbilityDefinitionDto[];
+  readonly modifiers: readonly RulebenchAuthoredModifierDefinitionDto[];
+  readonly actions: readonly RulebenchAuthoredActionDefinitionDto[];
 }
 
 export interface RulebenchAuthoredAbilityDefinitionDto {
@@ -1475,6 +1511,81 @@ export interface RulebenchAuthoredEntityDefinitionDto {
   readonly summary: string;
   readonly tags: readonly string[];
   readonly damageAdjustments: readonly RulebenchAuthoredDamageAdjustmentDto[];
+}
+
+export interface RulebenchAuthoredActionDefinitionDto {
+  readonly id: string;
+  readonly abilityId: string;
+  readonly name: string;
+  readonly targeting: RulebenchAuthoredTargetingDeclarationDto;
+  readonly check: RulebenchAuthoredCheckDeclarationDto;
+  readonly effects: readonly RulebenchAuthoredEffectOperationDto[];
+  readonly resourceCosts: readonly RulebenchAuthoredActionResourceCostDto[];
+  readonly movement: RulebenchAuthoredMovementActionDeclarationDto | null;
+  readonly actionText: string;
+  readonly effectText: string;
+}
+
+export interface RulebenchAuthoredTargetingDeclarationDto {
+  readonly targetKind: RulebenchAuthoredTargetKindDto;
+  readonly selection: RulebenchAuthoredTargetSelectionDto;
+  readonly teamConstraint: RulebenchAuthoredTargetTeamConstraintDto;
+  readonly maximumRange: number;
+  readonly visibilityRequirement: RulebenchAuthoredVisibilityRequirementDto;
+  readonly operationPipeline: RulebenchAuthoredOperationPipelineDto | null;
+}
+
+export interface RulebenchAuthoredOperationPipelineDto {
+  readonly maximumTargets: number;
+  readonly area: RulebenchAuthoredAreaTargetingDeclarationDto | null;
+  readonly rollPolicy: RulebenchAuthoredActionRollPolicyDto;
+  readonly failurePolicy: RulebenchAuthoredTargetFailurePolicyDto;
+  readonly targetOrder: RulebenchAuthoredTargetOrderPolicyDto;
+}
+
+export interface RulebenchAuthoredAreaTargetingDeclarationDto {
+  readonly shape: RulebenchAuthoredAreaShapeDto;
+  readonly radius: number;
+}
+
+export interface RulebenchAuthoredDefenseReferenceDto {
+  readonly id: string;
+  readonly label: string;
+}
+
+export interface RulebenchAuthoredActionResourceCostDto {
+  readonly resourceId: string;
+  readonly amount: number;
+}
+
+export interface RulebenchAuthoredMovementActionDeclarationDto {
+  readonly allowance: number;
+  readonly topology: RulebenchAuthoredMovementTopologyDto;
+  readonly blockingTerrainTags: readonly string[];
+  readonly difficultTerrainTags: readonly string[];
+}
+
+export interface RulebenchAuthoredReactionOptionDeclarationDto {
+  readonly id: string;
+  readonly reactor: RulebenchAuthoredReactionParticipantSelectorDto;
+  readonly opensNestedWindow: boolean;
+}
+
+export interface RulebenchAuthoredModifierDefinitionDto {
+  readonly id: string;
+  readonly label: string;
+  readonly summary: string;
+  readonly defaultTenure: RulebenchAuthoredModifierTenureDto;
+  readonly stackingGroup: string;
+  readonly stackingPolicy: RulebenchAuthoredModifierStackingPolicyDto;
+  readonly durationPolicy: RulebenchAuthoredModifierDurationPolicyDto;
+  readonly statAdjustments: readonly RulebenchAuthoredModifierStatAdjustmentDto[];
+}
+
+export interface RulebenchAuthoredModifierStatAdjustmentDto {
+  readonly statId: string;
+  readonly statLabel: string;
+  readonly delta: number;
 }
 
 export interface RulebenchAuthoredDamageAdjustmentDto {

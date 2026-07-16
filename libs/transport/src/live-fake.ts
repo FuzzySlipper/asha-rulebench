@@ -154,6 +154,9 @@ export function createFakeRulebenchLiveTransport(
         replacementPolicy,
         requestOptions,
       ) ?? unavailable("importContent"),
+    validateContent: (authoredPayload, requestOptions) =>
+      handlers.validateContent?.(authoredPayload, requestOptions) ??
+      unavailable("validateContent"),
     reviewContent: (reference, requestOptions) =>
       handlers.reviewContent?.(reference, requestOptions) ??
       unavailable("reviewContent"),

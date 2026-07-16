@@ -328,11 +328,33 @@ impl<'a> ContentPackResolver<'a> {
     }
 
     fn validate_collisions(&mut self) {
-        let mut owners = BTreeMap::<(ContentDefinitionKind, String), ContentPackIdentity>::new();
+        let mut owners = BTreeMap::<
+            (ContentDefinitionKind, String),
+            (ContentPackIdentity, Option<RulesetMetadata>),
+        >::new();
         for pack in self.resolved.clone() {
             for (kind, id) in definition_identities(&pack) {
                 let key = (kind, id.clone());
-                if let Some(owner) = owners.get(&key) {
+                let ruleset = (kind == ContentDefinitionKind::Ruleset)
+                    .then(|| {
+                        pack.catalogs
+                            .rulesets
+                            .iter()
+                            .find(|ruleset| ruleset.id == id)
+                            .cloned()
+                    })
+                    .flatten();
+                if let Some((owner, owner_ruleset)) = owners.get(&key) {
+                    // An exact repeated ruleset declaration is compatibility
+                    // metadata, not load-order override authority. This lets
+                    // exact dependency packs share the selected ruleset while
+                    // every differing or non-ruleset definition still fails
+                    // closed as a collision.
+                    if kind == ContentDefinitionKind::Ruleset
+                        && owner_ruleset.as_ref() == ruleset.as_ref()
+                    {
+                        continue;
+                    }
                     self.push_diagnostic(
                         ContentPackDiagnosticCode::DefinitionCollision,
                         &pack.identity.id,
@@ -349,7 +371,7 @@ impl<'a> ContentPackResolver<'a> {
                         ),
                     );
                 } else {
-                    owners.insert(key, pack.identity.clone());
+                    owners.insert(key, (pack.identity.clone(), ruleset));
                 }
             }
         }
@@ -442,8 +464,9 @@ fn incompatible_ruleset_message(
 mod tests {
     use super::*;
     use crate::{
-        canonicalize_content_pack, ContentPackCatalogs, ContentPackCollisionPolicy,
-        ContentPackDefinition, ContentPackProvenance, ContentPackSourceKind, EntityDefinition,
+        canonicalize_content_pack, ContentPackCanonicalVersion, ContentPackCatalogs,
+        ContentPackCollisionPolicy, ContentPackDefinition, ContentPackProvenance,
+        ContentPackSourceKind, EntityDefinition,
     };
     use rulebench_ruleset::{
         ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata,
@@ -624,6 +647,7 @@ mod tests {
         ruleset: &RulesetMetadata,
     ) -> CanonicalContentPack {
         canonicalize_content_pack(ContentPackDefinition {
+            canonical_version: ContentPackCanonicalVersion::V0,
             identity: ContentPackIdentity::new(id, "1.0.0"),
             title: format!("{id} pack"),
             summary: format!("Canonical content for {id}."),
