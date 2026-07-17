@@ -193,18 +193,24 @@ independent of Rust `Debug`, private layout, and host JSON. See
 `docs/replay-archive-identity.md` for the version boundaries and migration
 policy.
 
-The authored content route accepts only `asha-rulebench.content-pack` version
-1 documents up to 512 KiB. The protocol DTO owns decoding; portable content
-and ruleset crates remain free of JSON/serde concerns. Rust converts the closed
-wire vocabulary, validates structural limits and exact dependencies, resolves
-ruleset compatibility, canonicalizes the pack, and stores the original payload
-beside its canonical receipt. On restart every payload is decoded and imported
-again; corrupt, unsupported, dependency-incomplete, or canonically drifted
-payloads are classified and excluded from activation. Activation is an atomic
-exact-reference index, replacement clears the old activation, and deletion is
-denied for active packs or packs with stored dependents. The host audit log
-distinguishes payload acceptance, canonical receipt storage, activation,
-replacement, deletion, and session binding.
+The authored content route accepts strict `asha-rulebench.content-pack`
+versions 1, 2, and 3 up to 512 KiB. V1 owns ruleset/entity catalogs, v2 adds
+ability metadata, and v3 adds the portable modifier and authored-action
+declarations documented in `../docs/authored-content-format.md`. The protocol
+DTO owns decoding; portable content and ruleset crates remain free of
+JSON/serde concerns. Rust converts the closed wire vocabulary, validates
+structural limits, exact dependencies, and provider capabilities, canonicalizes
+the pack, and stores the original payload beside its canonical receipt. The v3
+binder resolves one exact active action/ability/modifier set, derives scenario
+targets and reaction participants, checks actor resources, creates a
+session-local ability grant, and routes execution through the normal Rust
+events, trace, replay, and recovery owners. On restart every payload is decoded
+and imported again; corrupt, unsupported, dependency-incomplete, or canonically
+drifted payloads are classified and excluded from activation. Activation is an
+atomic exact-reference index, replacement clears the old activation, and
+deletion is denied for active packs or packs with stored dependents. The host
+audit log distinguishes payload acceptance, canonical receipt storage,
+activation, replacement, deletion, and session binding.
 
 This filesystem repository is deliberately single-writer. Run only one host
 against an artifact root; it does not provide locking, multi-process conflict

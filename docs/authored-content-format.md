@@ -138,6 +138,27 @@ the combatant is within the authored Manhattan-burst radius of that center,
 matching runtime area execution. An empty legal or required-visible set rejects
 before session creation.
 
+## Certified executable boundary
+
+The shipped product binds one exact active v3 root, action id, scenario, and
+actor through Rust. Rust re-imports the exact pack set, resolves the action,
+ability, and modifiers, derives legal and visible targets, expands reaction
+selectors, creates a session-local ability grant, and validates the composed
+scenario before creating a session. The binding receipt records the exact
+pack, set, action-definition, ability, actor, scenario, grant, and vocabulary
+identities in live explanation, finalized replay, and replay-verified active
+session recovery.
+
+`content.authored-action@1` in the executable capability manifest means only
+this closed v3 product boundary. It covers the target/check/effect declarations
+accepted by the selected compiled provider, the ordered executable effect
+profile documented above, exact actor resource-pool checks at binding, and the
+template/clone/JSON validation/import/activation workflow. The capability does
+not widen provider support: each check, targeting operation, and effect must
+still appear in the exact selected provider catalog. Top-level authored
+movement remains rejected until one Rust resolver executes its complete
+targeting, check, and effect program.
+
 ## Evolution and migration
 
 - Readers for versions 1, 2, and 3 are permanent compatibility surfaces. Version 1
@@ -156,12 +177,15 @@ before session creation.
 
 ## Non-claims
 
-Version 3 defines portable executable action content, but it does not bind an
-action to a scenario, combatant, concrete targets, visibility snapshot,
-participant resource pools, or reaction participants. It does not add mutable
-TypeScript authority, provider implementations, stats, classes, items,
-equipment, entity ability grants, or a generic scripting language. Runtime
-binding and the first authoring workflow are separate delivery slices. The
-filesystem adapter remains trusted-local and single-writer. It does not claim
-multi-process locking, authenticated upload, network-filesystem atomicity,
-power-loss durability, or durable in-progress policy experiments.
+Version 3 defines a closed executable authored-action surface, not a general
+rules or character authoring system. Pack content never supplies scenario-bound
+actor ids, concrete target or visibility snapshots, concrete reaction
+participants, or participant resource pools; Rust derives and validates those
+at binding. It does not add arbitrary scripts, plugins, callbacks, mutable
+TypeScript authority, provider implementations, general stats, classes, items,
+equipment, resources, characters, or persistent entity ability grants. Support
+is guaranteed only for the closed v3 vocabulary and exact compiled-provider
+capabilities described above. The filesystem adapter remains trusted-local and
+single-writer. It does not claim multi-process locking, authenticated upload,
+network-filesystem atomicity, power-loss durability, or durable in-progress
+policy experiments.

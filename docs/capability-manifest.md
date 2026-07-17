@@ -49,6 +49,16 @@ artifact reports replay-verified checkpoints and restart durability; an
 in-memory host reports process-local checkpoints without durability. Protocol,
 host, UI, regression, and durability evidence remain separate.
 
+Manifest v4 also reports `content.authored-action@1`. This row claims only the
+strict v3 template/clone/text workflow and the Rust-owned exact-pack action
+binding described in `authored-content-format.md`: provider-gated targeting,
+checks, ordered effects, modifiers/durations, reaction selector expansion,
+actor resource-pool checks, session-local ability grants, and exact replay and
+recovery provenance. It does not claim top-level authored movement, arbitrary
+scripts/plugins/callbacks, general character/class/item/resource authoring, or
+TypeScript authority. Its regression flag remains separate from independent
+milestone certification evidence.
+
 Manifest v3 added an explicit `authorityViewerMode` host readback and the
 `viewer.authority-readback` capability. `liveAuthorityReadback` means the
 versioned viewer routes are composed from the current Rust registries and are

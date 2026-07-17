@@ -363,7 +363,22 @@ fn host_capabilities(
         "rulebench-bridge.viewer-readback-index".to_string(),
         "rulebench-process-host.viewer-readback-routes".to_string(),
     ];
+    let mut authored_action = host_capability(
+        "content.authored-action",
+        "1",
+        CapabilityKind::Content,
+        host.authored_content_enabled,
+        host.durable_content,
+        host,
+        regression,
+    );
+    authored_action.evidence = vec![
+        "rulebench-content.authored-action-v3".to_string(),
+        "rulebench-content.authored-action-binding-v1".to_string(),
+        "rulebench-process-host.authored-action-workflow".to_string(),
+    ];
     vec![
+        authored_action,
         host_capability(
             "content.authored-pack",
             "1",

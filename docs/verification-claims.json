@@ -78,7 +78,7 @@
       "denHeading": "Trusted-local single-writer process host"
     },
     {
-      "id": "authored-content-v2-vocabulary",
+      "id": "authored-content-v3-vocabulary",
       "denHeading": "Authored content wire remains intentionally bounded"
     }
   ]

@@ -143,6 +143,16 @@ fn capability_route_reports_registry_and_actual_host_composition() {
             && !capability.support.live_host_exposed
     }));
     assert!(manifest.capabilities.iter().any(|capability| {
+        capability.id == "content.authored-action"
+            && capability.version == "1"
+            && !capability.support.runtime_executable
+            && !capability.support.live_host_exposed
+            && !capability.support.regression_covered
+            && capability
+                .evidence
+                .contains(&"rulebench-content.authored-action-v3".to_string())
+    }));
+    assert!(manifest.capabilities.iter().any(|capability| {
         capability.id == "viewer.authority-readback"
             && capability.support.protocol_exposed
             && capability.support.live_host_exposed

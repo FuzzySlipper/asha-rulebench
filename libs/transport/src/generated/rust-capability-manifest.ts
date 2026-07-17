@@ -477,6 +477,26 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
       ]
     },
     {
+      "id": "content.authored-action",
+      "kind": "content",
+      "version": "1",
+      "support": {
+        "declared": true,
+        "validationSupported": true,
+        "runtimeExecutable": true,
+        "protocolExposed": true,
+        "liveHostExposed": true,
+        "uiExposed": true,
+        "regressionCovered": false,
+        "durableAcrossRestart": true
+      },
+      "evidence": [
+        "rulebench-content.authored-action-v3",
+        "rulebench-content.authored-action-binding-v1",
+        "rulebench-process-host.authored-action-workflow"
+      ]
+    },
+    {
       "id": "content.authored-pack",
       "kind": "content",
       "version": "1",

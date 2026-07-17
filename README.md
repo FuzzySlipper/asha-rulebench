@@ -92,10 +92,14 @@ repository, and exposes cancellation and first-divergence comparison. See
 Stored authored packs are re-decoded and re-imported on every host start before
 their exact activation can be used. A new session may select a compatible
 activated pack set; its exact references and set fingerprint are then retained
-in the finalized replay. Authored-content v2 adds the Rust-owned ability/spell
-catalog needed by the second provider while preserving the strict v1 reader.
-See `docs/authored-content-format.md` for both wire contracts, migration
-posture, and the still-bounded vocabulary.
+in the finalized replay. Authored-content v3 adds strict portable modifier and
+action declarations while preserving the permanent strict v1 and v2 readers.
+Through the `content.authored-action@1` product boundary, Rust binds one exact
+active action and actor, derives targets and reaction participants, grants its
+ability for that session, executes the selected provider's closed vocabulary,
+and retains exact pack/action/ability/fingerprint/grant provenance through
+replay-verified restart recovery. See `docs/authored-content-format.md` for the
+wire contracts, executable profile, migration posture, and non-claims.
 Finalized replay files use the portable, versioned canonical identity described
 in `docs/replay-archive-identity.md`; the process host atomically migrates only
 recognized legacy identities and quarantines unknown or mismatched records.
@@ -286,6 +290,11 @@ reviews, compares, activates, deactivates, and safely deletes authored packs;
 authored packs, finalized replays, and verified active-session checkpoints
 survive host restart. Live session snapshots expose authoritative board and
 participant positions to the workbench.
+
+The authored-action claim is deliberately narrow: no arbitrary scripts,
+plugins, callbacks, general character/class/item/resource authoring, or
+TypeScript rule authority, and no guarantee beyond the exact closed v3
+vocabulary and capabilities of the selected compiled provider.
 
 The executable capability manifest currently reports 2 compiled providers, 2
 ruleset identities, 4 registered packages, 11 scenario cases, 3 automation
