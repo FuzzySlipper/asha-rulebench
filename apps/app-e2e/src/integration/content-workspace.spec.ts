@@ -77,25 +77,26 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
   ).toBeDisabled();
 
   const unsupportedEffect = templatePayload.replace(
-    /\{\s*"operation": "damage",\s*"damageBonus": 4,\s*"damageType": "arcane"\s*\}/,
-    JSON.stringify(
-      {
-        operation: "openReactionWindow",
-        hookId: "e2e-unsupported-reaction",
-        window: "afterEffect",
-        eligibleReactors: ["declaredTargets"],
-        options: [
-          {
-            id: "brace",
-            reactor: "declaredTargets",
-            opensNestedWindow: false,
-          },
-        ],
-        maximumNestedDepth: 0,
-      },
-      null,
-      2,
-    ),
+    /\{\s*"operation": "applyModifier",\s*"modifierId": "modifier\.binding-glyph\.anchored"\s*\}/,
+    (modifierEffect) =>
+      `${modifierEffect},${JSON.stringify(
+        {
+          operation: "openReactionWindow",
+          hookId: "e2e-unsupported-reaction",
+          window: "afterEffect",
+          eligibleReactors: ["declaredTargets"],
+          options: [
+            {
+              id: "brace",
+              reactor: "declaredTargets",
+              opensNestedWindow: false,
+            },
+          ],
+          maximumNestedDepth: 0,
+        },
+        null,
+        2,
+      )}`,
   );
   expect(unsupportedEffect).not.toBe(templatePayload);
   await editor.fill(unsupportedEffect);
@@ -109,7 +110,7 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
   await expect(semanticValidation).toContainText(
     "unsupportedAuthoredActionEffect",
   );
-  await expect(semanticValidation).toContainText("catalogs.actions[0].effects[0]");
+  await expect(semanticValidation).toContainText("catalogs.actions[0].effects[2]");
 
   await editor.fill(templatePayload);
   await contentDialog

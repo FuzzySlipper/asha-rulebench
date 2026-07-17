@@ -43,6 +43,16 @@ and applied modifiers across the complete exact dependency set. Missing
 references, incompatible checks, malformed reaction hooks, duplicate resource
 costs, and definition collisions fail before persistence.
 
+The current executable effect profile is deliberately fail-closed. A
+non-movement effect program must contain exactly one leading damage operation,
+followed by at most one healing, temporary-vitality, modifier, and forced-
+movement operation in that order, then zero or more resource changes, and at
+most one final reaction hook. Resource changes retain their authored order.
+Damage-free programs, repeated fixed-slot operations, and operations reordered
+outside that executable sequence reject as `unsupportedAuthoredActionEffect`
+before persistence. This prevents a material fingerprint change from being
+silently ignored or executed in a different order by the current resolver.
+
 The committed fixtures
 `rulebench-process-host/src/fixtures/authored-content-v1.json` and
 `authored-content-v2.json` are permanent reader compatibility evidence. The
@@ -110,7 +120,13 @@ or capability. Import and dry-run validation select the exact compiled provider
 by ruleset id and version, require its module configuration to match, and reject
 unsupported check, targeting, or effect capability identities before
 persistence. Session binding repeats compatibility checks against the selected
-scenario and exact pack ruleset.
+scenario and exact pack ruleset. The selected action, ability, and every applied
+modifier must each be owned by a pack whose exact provider provenance matches
+the scenario provider; a dependency definition is never relabeled to the root
+pack's provider. Binding derives living, non-self, team-legal, in-range targets
+and intersects required visibility with the selected actor's existing Rust
+scenario visibility snapshot. An empty legal or required-visible set rejects
+before session creation.
 
 ## Evolution and migration
 

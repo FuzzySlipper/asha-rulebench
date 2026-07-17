@@ -450,6 +450,60 @@ fn validate_effects(
             ),
         );
     }
+    validate_effect_execution_profile(diagnostics, action, base);
+}
+
+fn validate_effect_execution_profile(
+    diagnostics: &mut Vec<ContentImportDiagnostic>,
+    action: &crate::AuthoredActionDefinition,
+    base: &str,
+) {
+    if action.effects.is_empty() {
+        return;
+    }
+
+    let mut counts = [0_usize; 7];
+    let mut previous_rank = 0_usize;
+    for (index, effect) in action.effects.iter().enumerate() {
+        let rank = match effect {
+            AuthoredEffectOperation::Damage(_) => 0,
+            AuthoredEffectOperation::Heal(_) => 1,
+            AuthoredEffectOperation::GrantTemporaryVitality(_) => 2,
+            AuthoredEffectOperation::ApplyModifier(_) => 3,
+            AuthoredEffectOperation::Move(_) => 4,
+            AuthoredEffectOperation::ChangeResource(_) => 5,
+            AuthoredEffectOperation::OpenReactionWindow(_) => 6,
+        };
+        counts[rank] += 1;
+        let repeated_non_sequential_operation = counts[rank] > 1 && rank != 5;
+        let out_of_execution_order = index > 0 && rank < previous_rank;
+        if repeated_non_sequential_operation || out_of_execution_order {
+            push_action_error(
+                diagnostics,
+                ContentImportDiagnosticCode::UnsupportedActionEffect,
+                format!("{base}.effects[{index}]"),
+                &action.id,
+                format!(
+                    "Authored action {} declares an effect sequence the current Rust resolver cannot execute exactly in authored order.",
+                    action.id
+                ),
+            );
+        }
+        previous_rank = rank;
+    }
+
+    if counts[0] != 1 {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::UnsupportedActionEffect,
+            format!("{base}.effects"),
+            &action.id,
+            format!(
+                "Authored action {} must declare exactly one leading damage effect until the Rust resolver supports damage-free or repeated-damage programs.",
+                action.id
+            ),
+        );
+    }
 }
 
 fn validate_reaction(

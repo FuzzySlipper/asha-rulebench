@@ -8,9 +8,10 @@ use crate::{
 };
 use rulebench_ruleset::{
     AbilityDefinition, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
-    ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DefenseReference,
-    EffectOperationId, ModifierTenure, OperationPipelineV2, ReactionWindow, RuleModuleDeclaration,
-    RulesetMetadata, RulesetProviderCapability, RulesetProviderCatalog, RulesetProviderDescriptor,
+    ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DamageEffectOperation,
+    DefenseReference, EffectOperationId, HealingEffectOperation, ModifierTenure,
+    OperationPipelineV2, ReactionWindow, RuleModuleDeclaration, RulesetMetadata,
+    RulesetProviderCapability, RulesetProviderCatalog, RulesetProviderDescriptor,
     SavingThrowCheckDeclaration, TargetKind, TargetSelection, TargetTeamConstraint,
     VisibilityRequirement,
 };
@@ -247,6 +248,7 @@ fn portable_actions_resolve_ability_and_modifier_from_the_exact_dependency_set()
                 "operation.applyModifier",
                 EffectOperationId::VOCABULARY_VERSION,
             ),
+            ("operation.damage", EffectOperationId::VOCABULARY_VERSION),
         ],
     );
     let imported = import_content_pack(
@@ -332,7 +334,7 @@ fn portable_action_missing_references_report_stable_definition_paths() {
     assert!(report.diagnostics.iter().any(|diagnostic| {
         diagnostic.code == ContentImportDiagnosticCode::MissingActionModifier
             && diagnostic.path
-                == "resolvedPacks[pack.action-root@1.0.0].catalogs.actions[0].effects[0].modifierId"
+                == "resolvedPacks[pack.action-root@1.0.0].catalogs.actions[0].effects[1].modifierId"
             && diagnostic.definition_kind == Some(ContentDefinitionKind::Action)
             && diagnostic.definition_id.as_deref() == Some("action.portable")
     }));
@@ -396,6 +398,65 @@ fn malformed_portable_action_catalog_reports_stable_semantic_diagnostics() {
             .diagnostics
             .iter()
             .any(|diagnostic| diagnostic.code == code && diagnostic.path == path));
+    }
+}
+
+#[test]
+fn non_executable_effect_sequences_fail_before_canonical_import() {
+    let ruleset = ruleset();
+    let damage = || {
+        AuthoredEffectOperation::Damage(DamageEffectOperation {
+            damage_bonus: 1,
+            damage_type: "force".to_string(),
+        })
+    };
+    let heal = || {
+        AuthoredEffectOperation::Heal(HealingEffectOperation {
+            healing_bonus: 2,
+            healing_type: "restoration".to_string(),
+        })
+    };
+
+    for (case, effects, expected_path) in [
+        ("heal-only", vec![heal()], "catalogs.actions[0].effects"),
+        (
+            "repeated-damage",
+            vec![damage(), damage()],
+            "catalogs.actions[0].effects[1]",
+        ),
+        (
+            "reordered-heal-before-damage",
+            vec![heal(), damage()],
+            "catalogs.actions[0].effects[1]",
+        ),
+    ] {
+        let mut pack = authored_pack_with_id(
+            &ruleset,
+            &format!("pack.effect-program.{case}"),
+            &format!("entity.{case}"),
+        );
+        pack.canonical_version = ContentPackCanonicalVersion::V1;
+        pack.catalogs.abilities = vec![portable_ability()];
+        pack.catalogs.modifiers = vec![portable_modifier()];
+        let mut action = portable_action("ability.portable", "modifier.portable");
+        action.effects = effects;
+        pack.catalogs.actions = vec![action];
+
+        let report = import_content_pack(
+            pack,
+            ContentImportLimits::default(),
+            ContentImportContext::empty(),
+        )
+        .expect_err("non-executable authored effect programs must fail before persistence");
+
+        assert!(
+            report.diagnostics.iter().any(|diagnostic| {
+                diagnostic.code == ContentImportDiagnosticCode::UnsupportedActionEffect
+                    && diagnostic.path == expected_path
+                    && diagnostic.definition_id.as_deref() == Some("action.portable")
+            }),
+            "missing exact rejection for {case}: {report:?}"
+        );
     }
 }
 
@@ -493,11 +554,15 @@ fn portable_action(ability_id: &str, modifier_id: &str) -> AuthoredActionDefinit
                 label: "Guard".to_string(),
             },
         }),
-        effects: vec![AuthoredEffectOperation::ApplyModifier(
-            AuthoredModifierEffectOperation {
+        effects: vec![
+            AuthoredEffectOperation::Damage(DamageEffectOperation {
+                damage_bonus: 1,
+                damage_type: "force".to_string(),
+            }),
+            AuthoredEffectOperation::ApplyModifier(AuthoredModifierEffectOperation {
                 modifier_id: modifier_id.to_string(),
-            },
-        )],
+            }),
+        ],
         resource_costs: Vec::new(),
         movement: None,
         action_text: "Use the portable action.".to_string(),

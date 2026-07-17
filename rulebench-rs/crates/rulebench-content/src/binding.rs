@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use rulebench_ruleset::{
     EffectOperationId, HitEffect, HitEffectOperation, ModifierEffectOperation, OperationPipelineV2,
     ReactionHookEffectOperation, ReactionOptionDeclaration, TargetKind, TargetTeamConstraint,
-    TargetingDeclaration,
+    TargetingDeclaration, VisibilityRequirement,
 };
 
 use crate::{
@@ -79,7 +79,8 @@ pub fn bind_authored_action(
             "The selected scenario ruleset does not exist.",
         )
     })?;
-    if selected_ruleset.artifact_provenance() != imported.pack.ruleset {
+    let selected_ruleset_provenance = selected_ruleset.artifact_provenance();
+    if selected_ruleset_provenance != imported.pack.ruleset {
         return Err(rejected(
             "incompatibleAuthoredActionRuleset",
             Some(imported.pack.ruleset.ruleset_id.clone()),
@@ -87,8 +88,21 @@ pub fn bind_authored_action(
         ));
     }
 
-    let action = unique_action(&imported.resolved_set.packs, &request.action_id)?;
-    let ability = unique_ability(&imported.resolved_set.packs, &action.ability_id)?;
+    let (action_owner, action) = unique_action(&imported.resolved_set.packs, &request.action_id)?;
+    validate_definition_ruleset(
+        &selected_ruleset_provenance,
+        action_owner,
+        "action",
+        &action.id,
+    )?;
+    let (ability_owner, ability) =
+        unique_ability(&imported.resolved_set.packs, &action.ability_id)?;
+    validate_definition_ruleset(
+        &selected_ruleset_provenance,
+        ability_owner,
+        "ability",
+        &ability.id,
+    )?;
     let actor_index = scenario
         .combatants
         .iter()
@@ -104,24 +118,33 @@ pub fn bind_authored_action(
     validate_resource_pools(&scenario, actor_index, action)?;
     merge_ability(&mut scenario, ability);
     for modifier_id in referenced_modifier_ids(action) {
-        let modifier = unique_modifier(&imported.resolved_set.packs, &modifier_id)?;
+        let (modifier_owner, modifier) =
+            unique_modifier(&imported.resolved_set.packs, &modifier_id)?;
+        validate_definition_ruleset(
+            &selected_ruleset_provenance,
+            modifier_owner,
+            "modifier",
+            &modifier.id,
+        )?;
         merge_modifier(&mut scenario, modifier)?;
     }
 
-    let target_ids = derive_target_ids(&scenario, actor_index, action);
-    if target_ids.is_empty() && !is_cell_movement(action) {
+    let target_set = derive_target_set(&scenario, actor_index, action);
+    let selectable_target_ids =
+        target_set.selectable_target_ids(action.targeting.visibility_requirement);
+    if selectable_target_ids.is_empty() && !is_cell_movement(action) {
         return Err(rejected(
             "authoredActionTargetExhausted",
             Some(action.id.clone()),
-            "The authored action has no legal target candidates in the selected scenario.",
+            "The authored action has no living, non-self, legal and visible target candidates in the selected scenario.",
         ));
     }
-    let operations = materialize_operations(&scenario, actor_index, action, &target_ids)?;
+    let operations = materialize_operations(&scenario, actor_index, action, selectable_target_ids)?;
     let runtime_action = materialize_action(
         &scenario.selected_ruleset_id,
         &request.actor_id,
         action,
-        target_ids,
+        target_set,
         operations,
     );
     if scenario
@@ -185,14 +208,19 @@ pub fn bind_authored_action(
 fn unique_action<'a>(
     packs: &'a [CanonicalContentPack],
     action_id: &str,
-) -> Result<&'a AuthoredActionDefinition, AuthoredActionBindingError> {
+) -> Result<(&'a CanonicalContentPack, &'a AuthoredActionDefinition), AuthoredActionBindingError> {
     let matches = packs
         .iter()
-        .flat_map(|pack| &pack.catalogs.actions)
-        .filter(|action| action.id == action_id)
+        .flat_map(|pack| {
+            pack.catalogs
+                .actions
+                .iter()
+                .map(move |action| (pack, action))
+        })
+        .filter(|(_, action)| action.id == action_id)
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [action] => Ok(*action),
+        [entry] => Ok(*entry),
         [] => Err(rejected(
             "unknownAuthoredAction",
             Some(action_id.to_string()),
@@ -209,14 +237,25 @@ fn unique_action<'a>(
 fn unique_ability<'a>(
     packs: &'a [CanonicalContentPack],
     ability_id: &str,
-) -> Result<&'a rulebench_ruleset::AbilityDefinition, AuthoredActionBindingError> {
+) -> Result<
+    (
+        &'a CanonicalContentPack,
+        &'a rulebench_ruleset::AbilityDefinition,
+    ),
+    AuthoredActionBindingError,
+> {
     let matches = packs
         .iter()
-        .flat_map(|pack| &pack.catalogs.abilities)
-        .filter(|ability| ability.id == ability_id)
+        .flat_map(|pack| {
+            pack.catalogs
+                .abilities
+                .iter()
+                .map(move |ability| (pack, ability))
+        })
+        .filter(|(_, ability)| ability.id == ability_id)
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [ability] => Ok(*ability),
+        [entry] => Ok(*entry),
         [] => Err(rejected(
             "unknownAuthoredActionAbility",
             Some(ability_id.to_string()),
@@ -233,14 +272,19 @@ fn unique_ability<'a>(
 fn unique_modifier<'a>(
     packs: &'a [CanonicalContentPack],
     modifier_id: &str,
-) -> Result<&'a ModifierDefinition, AuthoredActionBindingError> {
+) -> Result<(&'a CanonicalContentPack, &'a ModifierDefinition), AuthoredActionBindingError> {
     let matches = packs
         .iter()
-        .flat_map(|pack| &pack.catalogs.modifiers)
-        .filter(|modifier| modifier.id == modifier_id)
+        .flat_map(|pack| {
+            pack.catalogs
+                .modifiers
+                .iter()
+                .map(move |modifier| (pack, modifier))
+        })
+        .filter(|(_, modifier)| modifier.id == modifier_id)
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [modifier] => Ok(*modifier),
+        [entry] => Ok(*entry),
         [] => Err(rejected(
             "unknownAuthoredActionModifier",
             Some(modifier_id.to_string()),
@@ -252,6 +296,28 @@ fn unique_modifier<'a>(
             "The exact resolved pack set contains more than one modifier with this id.",
         )),
     }
+}
+
+fn validate_definition_ruleset(
+    selected_ruleset: &rulebench_ruleset::RulesetArtifactProvenance,
+    owner: &CanonicalContentPack,
+    definition_kind: &str,
+    definition_id: &str,
+) -> Result<(), AuthoredActionBindingError> {
+    if &owner.ruleset == selected_ruleset {
+        return Ok(());
+    }
+    Err(rejected(
+        "incompatibleAuthoredActionRuleset",
+        Some(definition_id.to_string()),
+        format!(
+            "The selected authored {definition_kind} {definition_id} is owned by {}@{}, which does not match scenario provider {}@{}.",
+            owner.ruleset.ruleset_id,
+            owner.ruleset.ruleset_version,
+            selected_ruleset.ruleset_id,
+            selected_ruleset.ruleset_version,
+        ),
+    ))
 }
 
 fn merge_ability(scenario: &mut RulebenchScenario, ability: &rulebench_ruleset::AbilityDefinition) {
@@ -343,15 +409,38 @@ fn referenced_modifier_ids(action: &AuthoredActionDefinition) -> BTreeSet<String
         .collect()
 }
 
-fn derive_target_ids(
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MaterializedTargetSet {
+    target_ids: Vec<String>,
+    visible_target_ids: Vec<String>,
+}
+
+impl MaterializedTargetSet {
+    fn selectable_target_ids(&self, visibility: VisibilityRequirement) -> &[String] {
+        match visibility {
+            VisibilityRequirement::Required => &self.visible_target_ids,
+            VisibilityRequirement::Ignored => &self.target_ids,
+        }
+    }
+}
+
+fn derive_target_set(
     scenario: &RulebenchScenario,
     actor_index: usize,
     action: &AuthoredActionDefinition,
-) -> Vec<String> {
+) -> MaterializedTargetSet {
     let actor = &scenario.combatants[actor_index];
-    let mut targets = scenario
+    let visible_snapshot = scenario
+        .actions
+        .iter()
+        .filter(|existing| existing.actor_id == actor.id)
+        .flat_map(|existing| existing.targeting.visible_target_ids.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    let mut target_ids = scenario
         .combatants
         .iter()
+        .filter(|target| target.id != actor.id)
+        .filter(|target| target.hit_points.current > 0)
         .filter(|target| match action.targeting.team_constraint {
             TargetTeamConstraint::Hostile => target.team != actor.team,
             TargetTeamConstraint::Ally => target.team == actor.team,
@@ -364,8 +453,19 @@ fn derive_target_ids(
         })
         .map(|target| target.id.clone())
         .collect::<Vec<_>>();
-    targets.sort();
-    targets
+    target_ids.sort();
+    let visible_target_ids = match action.targeting.visibility_requirement {
+        VisibilityRequirement::Required => target_ids
+            .iter()
+            .filter(|target_id| visible_snapshot.contains(*target_id))
+            .cloned()
+            .collect(),
+        VisibilityRequirement::Ignored => target_ids.clone(),
+    };
+    MaterializedTargetSet {
+        target_ids,
+        visible_target_ids,
+    }
 }
 
 fn is_cell_movement(action: &AuthoredActionDefinition) -> bool {
@@ -376,7 +476,7 @@ fn materialize_action(
     ruleset_id: &str,
     actor_id: &str,
     action: &AuthoredActionDefinition,
-    target_ids: Vec<String>,
+    target_set: MaterializedTargetSet,
     operations: Vec<HitEffectOperation>,
 ) -> rulebench_ruleset::ActionDefinition {
     let damage = operations.iter().find_map(|operation| match operation {
@@ -399,8 +499,8 @@ fn materialize_action(
             team_constraint: action.targeting.team_constraint,
             maximum_range: action.targeting.maximum_range,
             visibility_requirement: action.targeting.visibility_requirement,
-            visible_target_ids: target_ids.clone(),
-            target_ids,
+            visible_target_ids: target_set.visible_target_ids,
+            target_ids: target_set.target_ids,
             operation_pipeline: action.targeting.operation_pipeline.clone(),
         },
         check: action.check.clone(),

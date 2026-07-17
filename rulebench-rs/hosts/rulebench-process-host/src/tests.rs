@@ -6,12 +6,17 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use rulebench_bridge::content_storage::{CanonicalContentPack, ImportedContentPack};
+use rulebench_bridge::import_authored_content;
+use rulebench_bridge::replay_storage::{bind_authored_action, AuthoredActionBindingRequest};
+use rulebench_fixtures::{aggregated_scenario_catalog_cases, compiled_ruleset_provider_catalog};
 use rulebench_protocol::{
-    AuthoredActionBindingRequestDto, AutomaticRunRequestDto, AutomationPolicyCatalogEntryDto,
-    CombatAutomationNoCandidateBehaviorDto, CombatAutomationPolicyDto, CombatControlCommandDto,
-    CombatControlCommandKindDto, CombatSessionCreateRequestDto, CombatSessionIntentCommandDto,
-    CommandRollModeDto, ContentActionBindingCatalogDto, ContentAuthoringDraftDto,
-    ContentImportAttemptDto, ContentPackReferenceDto, ContentPackReviewDto, ContentWorkspaceDto,
+    AuthoredActionBindingRequestDto, AuthoredContentPackDocumentDto, AutomaticRunRequestDto,
+    AutomationPolicyCatalogEntryDto, CombatAutomationNoCandidateBehaviorDto,
+    CombatAutomationPolicyDto, CombatControlCommandDto, CombatControlCommandKindDto,
+    CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, CommandRollModeDto,
+    ContentActionBindingCatalogDto, ContentAuthoringDraftDto, ContentImportAttemptDto,
+    ContentPackReferenceDto, ContentPackReviewDto, ContentWorkspaceDto,
     ExperimentComparisonReadoutDto, ExperimentComparisonRequestDto, ExperimentMatrixRequestDto,
     ExperimentReadoutDto, LiveAutomaticRunDto, LiveCommandExecutionDto, LiveControlExecutionDto,
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
@@ -46,6 +51,20 @@ where
     request(method, path)
         .with_header("content-type", "application/json")
         .with_body(serde_json::to_vec(body).expect("test DTO serializes"))
+}
+
+fn import_v3_test_payload(
+    payload: &serde_json::Value,
+    available_packs: &[CanonicalContentPack],
+) -> ImportedContentPack {
+    let document: AuthoredContentPackDocumentDto =
+        serde_json::from_value(payload.clone()).expect("v3 test payload decodes");
+    import_authored_content(
+        &document,
+        available_packs,
+        &compiled_ruleset_provider_catalog(),
+    )
+    .expect("v3 test payload imports")
 }
 
 #[test]
@@ -1277,6 +1296,177 @@ fn authored_action_template_clone_review_and_binding_catalog_use_rust_authority(
         .any(|actor| actor.id == "entity-missing"));
 
     fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
+fn authored_action_binding_rejects_defeated_self_and_non_visible_target_exhaustion() {
+    let payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    let imported = import_v3_test_payload(&payload, &[]);
+    let request = AuthoredActionBindingRequest {
+        content_pack: imported.pack.exact_reference(),
+        action_id: "action.binding-glyph".to_string(),
+        actor_id: "entity-warden".to_string(),
+    };
+    let scenario = || {
+        aggregated_scenario_catalog_cases()
+            .into_iter()
+            .find(|case| case.summary.id == "binding-glyph-failed-save")
+            .expect("turn-control authored-action scenario is registered")
+            .scenario
+    };
+
+    let mut partially_visible = scenario();
+    let hostile_team = partially_visible
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == "entity-saboteur")
+        .expect("hostile target exists")
+        .team;
+    partially_visible
+        .combatants
+        .iter_mut()
+        .find(|combatant| combatant.id == "entity-scout")
+        .expect("second in-range participant exists")
+        .team = hostile_team;
+    let partially_visible = bind_authored_action(partially_visible, &imported, &request)
+        .expect("one visible target keeps the authored binding executable");
+    let materialized = partially_visible
+        .action_by_id("action.binding-glyph")
+        .expect("authored action was materialized");
+    assert_eq!(
+        materialized.targeting.target_ids,
+        vec!["entity-saboteur", "entity-scout"]
+    );
+    assert_eq!(
+        materialized.targeting.visible_target_ids,
+        vec!["entity-saboteur"]
+    );
+
+    let mut defeated = scenario();
+    defeated
+        .combatants
+        .iter_mut()
+        .find(|combatant| combatant.id == "entity-saboteur")
+        .expect("hostile target exists")
+        .hit_points
+        .current = 0;
+    let defeated_error = bind_authored_action(defeated, &imported, &request)
+        .expect_err("a defeated-only target set must fail before session creation");
+    assert_eq!(defeated_error.code, "authoredActionTargetExhausted");
+
+    let mut non_visible = scenario();
+    for action in non_visible
+        .actions
+        .iter_mut()
+        .filter(|action| action.actor_id == "entity-warden")
+    {
+        action.targeting.visible_target_ids.clear();
+    }
+    let non_visible_error = bind_authored_action(non_visible, &imported, &request)
+        .expect_err("required visibility without a visible target must fail closed");
+    assert_eq!(non_visible_error.code, "authoredActionTargetExhausted");
+
+    let mut self_only_payload = payload;
+    self_only_payload["pack"]["id"] = serde_json::json!("pack.fixture.authored.self-only-v3");
+    self_only_payload["pack"]["version"] = serde_json::json!("3.3.0");
+    let targeting = &mut self_only_payload["pack"]["catalogs"]["actions"][0]["targeting"];
+    targeting["teamConstraint"] = serde_json::json!("any");
+    targeting["maximumRange"] = serde_json::json!(0);
+    targeting["visibilityRequirement"] = serde_json::json!("ignored");
+    let self_only_imported = import_v3_test_payload(&self_only_payload, &[]);
+    let self_only_error = bind_authored_action(
+        scenario(),
+        &self_only_imported,
+        &AuthoredActionBindingRequest {
+            content_pack: self_only_imported.pack.exact_reference(),
+            action_id: "action.binding-glyph".to_string(),
+            actor_id: "entity-warden".to_string(),
+        },
+    )
+    .expect_err("the actor must not become its own only target candidate");
+    assert_eq!(self_only_error.code, "authoredActionTargetExhausted");
+}
+
+#[test]
+fn authored_action_binding_rejects_an_action_owned_by_a_dependency_provider() {
+    let mut dependency_payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    dependency_payload["pack"]["id"] =
+        serde_json::json!("pack.fixture.authored.cross-provider-dependency-v3");
+    dependency_payload["pack"]["version"] = serde_json::json!("3.4.0");
+    dependency_payload["pack"]["rulesetId"] = serde_json::json!("asha-rulebench.hexing-bolt.v0");
+    let ruleset = &mut dependency_payload["pack"]["catalogs"]["rulesets"][0];
+    ruleset["id"] = serde_json::json!("asha-rulebench.hexing-bolt.v0");
+    ruleset["name"] = serde_json::json!("Hexing Bolt Fixture Rules");
+    ruleset["version"] = serde_json::json!("0.0.0");
+    ruleset["summary"] = serde_json::json!("Exact dependency provider ownership probe.");
+    ruleset["modules"] = serde_json::json!([{
+        "module": "actionResolution",
+        "version": "1",
+        "configuration": {
+            "module": "actionResolution",
+            "targetingPolicy": "declaredTargetsAndLineOfSight",
+            "supportedCheckHandlers": ["attackVsDefense"]
+        }
+    }]);
+    dependency_payload["pack"]["catalogs"]["abilities"][0]["id"] =
+        serde_json::json!("ability.cross-provider");
+    dependency_payload["pack"]["catalogs"]["modifiers"] = serde_json::json!([]);
+    let dependency_action = &mut dependency_payload["pack"]["catalogs"]["actions"][0];
+    dependency_action["id"] = serde_json::json!("action.cross-provider");
+    dependency_action["abilityId"] = serde_json::json!("ability.cross-provider");
+    dependency_action["check"] = serde_json::json!({
+        "kind": "attack",
+        "modifier": 4,
+        "modifierStatId": "mind",
+        "defense": { "id": "nerve", "label": "Nerve" }
+    });
+    dependency_action["effects"] = serde_json::json!([{
+        "operation": "damage",
+        "damageBonus": 4,
+        "damageType": "arcane"
+    }]);
+    let dependency = import_v3_test_payload(&dependency_payload, &[]);
+
+    let mut root_payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    root_payload["pack"]["id"] = serde_json::json!("pack.fixture.authored.cross-provider-root-v3");
+    root_payload["pack"]["version"] = serde_json::json!("3.5.0");
+    root_payload["pack"]["dependencies"] = serde_json::json!([ContentPackReferenceDto::from(
+        &dependency.pack.exact_reference()
+    )]);
+    root_payload["pack"]["catalogs"]["abilities"] = serde_json::json!([]);
+    root_payload["pack"]["catalogs"]["modifiers"] = serde_json::json!([]);
+    root_payload["pack"]["catalogs"]["actions"] = serde_json::json!([]);
+    let root = import_v3_test_payload(&root_payload, std::slice::from_ref(&dependency.pack));
+    let scenario = aggregated_scenario_catalog_cases()
+        .into_iter()
+        .find(|case| case.summary.id == "binding-glyph-failed-save")
+        .expect("turn-control authored-action scenario is registered")
+        .scenario;
+
+    let error = bind_authored_action(
+        scenario,
+        &root,
+        &AuthoredActionBindingRequest {
+            content_pack: root.pack.exact_reference(),
+            action_id: "action.cross-provider".to_string(),
+            actor_id: "entity-warden".to_string(),
+        },
+    )
+    .expect_err("a dependency action may not be relabeled to the root scenario provider");
+    assert_eq!(error.code, "incompatibleAuthoredActionRuleset");
+    assert_eq!(error.reference_id.as_deref(), Some("action.cross-provider"));
+    assert!(error
+        .message
+        .contains("asha-rulebench.hexing-bolt.v0@0.0.0"));
+    assert!(error
+        .message
+        .contains("asha-rulebench.turn-control.v0@0.1.0"));
 }
 
 #[test]
