@@ -93,13 +93,19 @@ Stored authored packs are re-decoded and re-imported on every host start before
 their exact activation can be used. A new session may select a compatible
 activated pack set; its exact references and set fingerprint are then retained
 in the finalized replay. Authored-content v3 adds strict portable modifier and
-action declarations while preserving the permanent strict v1 and v2 readers.
+action declarations. V4 adds dependency-closed archetypes/build inputs,
+participant state, loadouts, multiple action grants, configured scenarios, and
+manual or exact automatic control while preserving the permanent strict v1-v3
+readers.
 Through the `content.authored-action@1` product boundary, Rust binds one exact
 active action and actor, derives targets and reaction participants, grants its
 ability for that session, executes the selected provider's closed vocabulary,
 and retains exact pack/action/ability/fingerprint/grant provenance through
 replay-verified restart recovery. See `docs/authored-content-format.md` for the
 wire contracts, executable profile, migration posture, and non-claims.
+Through `content.authored-scenario@1`, Rust materializes an active v4 scenario,
+retains its exact pack/scenario/archetype/loadout/action/control receipt, and
+reconstructs that composition for recovery and finalized replay verification.
 Finalized replay files use the portable, versioned canonical identity described
 in `docs/replay-archive-identity.md`; the process host atomically migrates only
 recognized legacy identities and quarantines unknown or mismatched records.
@@ -331,9 +337,9 @@ authored packs, finalized replays, and verified active-session checkpoints
 survive host restart. Live session snapshots expose authoritative board and
 participant positions to the workbench.
 
-The authored-action claim is deliberately narrow: no arbitrary scripts,
-plugins, callbacks, general character/class/item/resource authoring, or
-TypeScript rule authority, and no guarantee beyond the exact closed v3
+The authored-content claim is deliberately narrow: no arbitrary scripts,
+plugins, callbacks, general character progression, inventory simulation, or
+TypeScript rule authority, and no guarantee beyond the exact closed v3/v4
 vocabulary and capabilities of the selected compiled provider.
 
 The executable capability manifest reports the current compiled providers,

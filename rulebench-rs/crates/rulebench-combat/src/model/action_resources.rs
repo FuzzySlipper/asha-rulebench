@@ -47,13 +47,14 @@ impl ActionResourceState {
 
     pub fn from_pool_with_source(pool: &ActionResourcePool, source_id: impl Into<String>) -> Self {
         let max = i32::try_from(pool.maximum).unwrap_or_default();
+        let current = i32::try_from(pool.initial).unwrap_or_default();
         Self {
             resource_id: pool.id.clone(),
             source_id: source_id.into(),
             kind: pool.kind,
-            current: max,
+            current,
             max,
-            available: max > 0,
+            available: current > 0,
             refresh_policy: pool.refresh_policy.clone(),
             remaining_refresh_turns: None,
         }

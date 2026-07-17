@@ -6,7 +6,7 @@ use rulebench_rules::{
 use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";
-pub const PROTOCOL_VERSION: u32 = 9;
+pub const PROTOCOL_VERSION: u32 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -40,7 +40,18 @@ pub struct ScenarioOptionDto {
     pub ruleset_version: String,
     pub content_pack_id: Option<String>,
     pub content_pack_version: Option<String>,
+    pub requires_exact_content_pack: bool,
+    pub control_mode: ScenarioControlModeDto,
+    pub automation_policy_id: Option<String>,
+    pub automation_policy_version: Option<u32>,
     pub participants: Vec<ScenarioParticipantOptionDto>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ScenarioControlModeDto {
+    Manual,
+    Automatic,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

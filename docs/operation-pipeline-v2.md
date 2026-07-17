@@ -64,7 +64,7 @@ final evidence. Changing a recorded area cell or target set produces a replay
 mismatch.
 
 Replay archive payload identity is now the explicit portable encoding
-`asha-rulebench.replay-archive-payload.v2` hashed with `fnv1a64`. It covers the
+`asha-rulebench.replay-archive-payload.v3` hashed with `fnv1a64`. It covers the
 complete multi-target/action-resource scenario, command, randomness, and
 evidence contract without depending on Rust `Debug` or host JSON. The process
 host authority-verifies recognized legacy v0/v1 envelopes and atomically

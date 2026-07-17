@@ -178,6 +178,13 @@ pub fn compare_content_packs(
         &after.catalogs.actions,
         |value| &value.id,
     );
+    compare_definitions(
+        &mut definition_changes,
+        ContentDefinitionKind::Scenario,
+        &before.catalogs.scenarios,
+        &after.catalogs.scenarios,
+        |value| &value.id,
+    );
     definition_changes.sort();
 
     ContentPackDiffReadout {

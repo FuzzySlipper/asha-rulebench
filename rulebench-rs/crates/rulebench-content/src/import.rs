@@ -8,8 +8,9 @@ use rulebench_ruleset::{RulesetMetadata, RulesetProviderCatalog};
 mod validation;
 
 use validation::{
-    import_pack_diagnostic, rejected, sort_diagnostics, validate_authored_pack,
-    validate_resolved_action_compatibility, validate_resolved_action_references,
+    import_pack_diagnostic, rejected, scenario_materialization_diagnostic, sort_diagnostics,
+    validate_authored_pack, validate_resolved_action_compatibility,
+    validate_resolved_action_references,
 };
 
 pub type AuthoredContentPack = ContentPackDefinition;
@@ -88,6 +89,8 @@ pub enum ContentImportDiagnosticCode {
     UnsupportedActionEffect,
     DuplicateActionResourceCost,
     InvalidReactionDeclaration,
+    InvalidScenarioDeclaration,
+    InvalidScenarioInitialState,
     DuplicateTagCanonicalized,
     PackValidation(ContentPackDiagnosticCode),
 }
@@ -125,6 +128,12 @@ impl ContentImportDiagnosticCode {
             }
             ContentImportDiagnosticCode::InvalidReactionDeclaration => {
                 "invalidAuthoredReactionDeclaration"
+            }
+            ContentImportDiagnosticCode::InvalidScenarioDeclaration => {
+                "invalidAuthoredScenarioDeclaration"
+            }
+            ContentImportDiagnosticCode::InvalidScenarioInitialState => {
+                "invalidAuthoredScenarioInitialState"
             }
             ContentImportDiagnosticCode::DuplicateTagCanonicalized => {
                 "duplicateContentTagCanonicalized"
@@ -185,6 +194,16 @@ pub fn import_content_pack(
                 &resolved_set,
                 context.provider_catalog,
             ));
+            let candidate = ImportedContentPack {
+                pack: pack.clone(),
+                resolved_set: resolved_set.clone(),
+                diagnostics: diagnostics.clone(),
+            };
+            for scenario in &pack.catalogs.scenarios {
+                if let Err(error) = crate::materialize_authored_scenario(&candidate, &scenario.id) {
+                    diagnostics.push(scenario_materialization_diagnostic(&scenario.id, error));
+                }
+            }
             sort_diagnostics(&mut diagnostics);
             if diagnostics
                 .iter()

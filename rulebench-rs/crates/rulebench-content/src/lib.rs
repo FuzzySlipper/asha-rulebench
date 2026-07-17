@@ -7,6 +7,7 @@
 
 mod active_modifier;
 mod authored_action;
+mod authored_scenario;
 mod binding;
 mod canonical;
 mod diagnostics;
@@ -15,6 +16,7 @@ mod import;
 mod pack;
 mod pack_validation;
 mod scenario;
+mod scenario_binding;
 mod stats;
 mod storage;
 mod validation;
@@ -24,6 +26,11 @@ pub use authored_action::{
     AuthoredActionDefinition, AuthoredEffectOperation, AuthoredModifierEffectOperation,
     AuthoredReactionHookEffectOperation, AuthoredReactionOptionDeclaration,
     AuthoredTargetingDeclaration, ReactionParticipantSelector,
+};
+pub use authored_scenario::{
+    AuthoredScenarioActionGrant, AuthoredScenarioBindingReceipt, AuthoredScenarioControl,
+    AuthoredScenarioControlMode, AuthoredScenarioDefinition, AuthoredScenarioParticipant,
+    AuthoredScenarioParticipantReceipt, AUTHORED_SCENARIO_BINDING_VERSION,
 };
 pub use binding::{
     bind_authored_action, AuthoredActionAbilityGrantReceipt, AuthoredActionBindingError,
@@ -52,7 +59,8 @@ pub use pack::{
     ContentPackCanonicalVersion, ContentPackCatalogs, ContentPackCollisionPolicy,
     ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackReference,
     ContentPackSetReference, ContentPackSourceKind, CONTENT_PACK_FINGERPRINT_ALGORITHM,
-    CONTENT_PACK_FINGERPRINT_ALGORITHM_V1, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
+    CONTENT_PACK_FINGERPRINT_ALGORITHM_V1, CONTENT_PACK_FINGERPRINT_ALGORITHM_V2,
+    CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
 pub use pack_validation::{
     resolve_content_pack_set, ContentPackDiagnostic, ContentPackDiagnosticCode,
@@ -64,6 +72,9 @@ pub use scenario::{
     EffectiveStatReadout, EntityDefinition, Grid, GridCell, ItemDefinition, ModifierDefinition,
     ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
     ModifierStatAdjustmentContribution, RulebenchScenario, StatRequirement, UseActionIntent,
+};
+pub use scenario_binding::{
+    authored_scenario_definition, materialize_authored_scenario, AuthoredScenarioBindingError,
 };
 pub use stats::{DerivedStatFormula, StatBlock, StatDefinition, StatDefinitionKind};
 pub use storage::{
@@ -137,6 +148,7 @@ mod tests {
             },
             content_pack_set: None,
             authored_action_binding: None,
+            authored_scenario_binding: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "missing-ruleset".to_string(),
             grid: Grid {

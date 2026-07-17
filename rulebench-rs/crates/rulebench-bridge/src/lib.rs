@@ -21,17 +21,17 @@ pub use invocation::{prepare_replay_scenario, BridgeScenario, RulebenchBridge};
 /// should not depend on the portable authority facade directly.
 pub mod replay_storage {
     pub use rulebench_rules::{
-        bind_authored_action, record_replay_package, AuthoredActionAbilityGrantReceipt,
-        AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
-        CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
-        CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
-        CombatSessionCandidateSelectionSpec, CombatSessionCreateRequest,
-        CombatSessionIntentCommandSpec, Combatant, CommandRollMode, ContentFingerprint,
-        ContentPackReference, ContentPackSetReference, ContentPackStorage, EquipmentCommandKind,
-        EquipmentCommandSpec, GridPosition, ReactionCommandSpec, ReactionResponseKind,
-        ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage, ReplayArchiveStorageError,
-        ReplayCommand, ReplayCommandRecord, ReplayCommandRecordingSpec, ReplayNarration,
-        RulesetArtifactProvenance, SessionRecoveryError, SessionRecoveryFrame,
+        bind_authored_action, materialize_authored_scenario, record_replay_package,
+        AuthoredActionAbilityGrantReceipt, AuthoredActionBindingReceipt,
+        AuthoredActionBindingRequest, CombatAutomationNoCandidateBehavior,
+        CombatAutomationPolicySpec, CombatControlCommandSpec, CombatSessionAutomaticRunSpec,
+        CombatSessionAutomaticStepSpec, CombatSessionCandidateSelectionSpec,
+        CombatSessionCreateRequest, CombatSessionIntentCommandSpec, Combatant, CommandRollMode,
+        ContentFingerprint, ContentPackReference, ContentPackSetReference, ContentPackStorage,
+        EquipmentCommandKind, EquipmentCommandSpec, GridPosition, ReactionCommandSpec,
+        ReactionResponseKind, ReplayArchiveEntry, ReplayArchiveMetadata, ReplayArchiveStorage,
+        ReplayArchiveStorageError, ReplayCommand, ReplayCommandRecord, ReplayCommandRecordingSpec,
+        ReplayNarration, RulesetArtifactProvenance, SessionRecoveryError, SessionRecoveryFrame,
         SessionRecoveryPackage, SessionRecoveryStorage, SessionRecoveryStorageError,
         StateFingerprint, UseActionIntent, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
         REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM, SESSION_RECOVERY_PACKAGE_VERSION,
@@ -41,10 +41,11 @@ pub mod replay_storage {
 /// Host-neutral types and operations needed by a concrete content repository.
 pub mod content_storage {
     pub use rulebench_rules::{
-        compare_content_packs, CanonicalContentPack, ContentDefinitionKind,
-        ContentImportDiagnostic, ContentImportDiagnosticSeverity, ContentImportLimits,
-        ContentPackDiffReadout, ContentPackReference, ContentPackSetReference, ContentPackStorage,
-        ContentStorageError, ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
+        compare_content_packs, materialize_authored_scenario, AuthoredScenarioControlMode,
+        CanonicalContentPack, ContentDefinitionKind, ContentImportDiagnostic,
+        ContentImportDiagnosticSeverity, ContentImportLimits, ContentPackDiffReadout,
+        ContentPackReference, ContentPackSetReference, ContentPackStorage, ContentStorageError,
+        ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
         RulesetProviderCatalog, StorageReplacementPolicy, StoredContentPayload,
     };
 }

@@ -59,6 +59,13 @@ scripts/plugins/callbacks, general character/class/item/resource authoring, or
 TypeScript authority. Its regression flag remains separate from independent
 milestone certification evidence.
 
+`content.authored-scenario@1` reports the strict v4 scenario-composition path:
+Rust-owned archetype/build inputs, initial participant and grid state, multiple
+action grants, exact manual/automatic control provenance, live materialization,
+and recovery/replay reconstruction from an exact active pack set. It does not
+claim general character progression, inventory simulation, arbitrary scripts,
+or TypeScript legality and automation.
+
 Manifest v3 added an explicit `authorityViewerMode` host readback and the
 `viewer.authority-readback` capability. `liveAuthorityReadback` means the
 versioned viewer routes are composed from the current Rust registries and are

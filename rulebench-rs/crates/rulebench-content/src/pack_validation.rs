@@ -445,6 +445,12 @@ fn definition_identities(pack: &CanonicalContentPack) -> Vec<(ContentDefinitionK
             .iter()
             .map(|definition| (ContentDefinitionKind::Action, definition.id.clone())),
     );
+    definitions.extend(
+        pack.catalogs
+            .scenarios
+            .iter()
+            .map(|definition| (ContentDefinitionKind::Scenario, definition.id.clone())),
+    );
     definitions
 }
 

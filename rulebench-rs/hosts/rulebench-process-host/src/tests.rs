@@ -947,6 +947,245 @@ fn authored_content_survives_restart_binds_a_session_and_replay_to_the_exact_pac
 }
 
 #[test]
+fn shatterline_v4_scenarios_materialize_run_and_recover_from_exact_authored_content() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-shatterline-v4-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": include_str!("fixtures/shatterline-foundation-v4.json"),
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("v4 import attempt is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .expect("accepted v4 import has an outcome")
+        .review
+        .pack
+        .reference;
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/content/activate",
+                &serde_json::json!({ "reference": reference })
+            ))
+            .status,
+        200
+    );
+
+    let base: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/shatterline-foundation-v4.json"))
+            .expect("v4 fixture is JSON");
+    let mut overlapping = base.clone();
+    overlapping["pack"]["catalogs"]["scenarios"][0]["participants"][1]["position"] =
+        overlapping["pack"]["catalogs"]["scenarios"][0]["participants"][0]["position"].clone();
+    let mut missing_action = base.clone();
+    missing_action["pack"]["catalogs"]["scenarios"][0]["participants"][0]["actionGrants"][0]
+        ["actionId"] = serde_json::json!("action.missing");
+    let mut invalid_resource = base.clone();
+    invalid_resource["pack"]["catalogs"]["classes"][0]["levelGrants"][0]["grantedResourcePools"]
+        [0]["initial"] = serde_json::json!(2);
+    let mut unknown_policy = base;
+    unknown_policy["pack"]["catalogs"]["scenarios"][1]["control"]["automationPolicyId"] =
+        serde_json::json!("policy.not-registered");
+    for (mutation, expected_code) in [
+        (overlapping, "invalidAuthoredScenarioInitialState"),
+        (missing_action, "invalidAuthoredScenarioDeclaration"),
+        (invalid_resource, "invalidAuthoredScenarioInitialState"),
+        (
+            unknown_policy,
+            "unsupportedAuthoredScenarioAutomationPolicy",
+        ),
+    ] {
+        let validated = router.handle(&json_request(
+            HttpMethod::Post,
+            "/api/rulebench/v1/content/validate",
+            &serde_json::json!({ "authoredPayload": mutation.to_string() }),
+        ));
+        let validated: ContentImportAttemptDto =
+            serde_json::from_slice(&validated.body).expect("mutation validation is JSON");
+        assert!(
+            !validated.accepted,
+            "mutation unexpectedly accepted: {validated:?}"
+        );
+        assert_eq!(validated.error_code.as_deref(), Some(expected_code));
+    }
+    let retained = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let retained: ContentWorkspaceDto =
+        serde_json::from_slice(&retained.body).expect("retained workspace is JSON");
+    assert_eq!(retained.packs.len(), 1);
+    assert!(retained.packs[0].active);
+    assert_eq!(retained.packs[0].reference, reference);
+
+    let listed = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/scenarios"));
+    let listed: Vec<ScenarioOptionDto> =
+        serde_json::from_slice(&listed.body).expect("scenario catalog is JSON");
+    let manual = listed
+        .iter()
+        .find(|scenario| scenario.id == "shatterline-foundation-manual")
+        .expect("manual authored scenario is listed");
+    let automatic = listed
+        .iter()
+        .find(|scenario| scenario.id == "shatterline-foundation-automatic")
+        .expect("automatic authored scenario is listed");
+    assert_eq!(
+        manual.control_mode,
+        rulebench_protocol::ScenarioControlModeDto::Manual
+    );
+    assert_eq!(
+        automatic.control_mode,
+        rulebench_protocol::ScenarioControlModeDto::Automatic
+    );
+    assert_eq!(
+        automatic.automation_policy_id.as_deref(),
+        Some("firstAcceptedCandidate")
+    );
+    assert_eq!(automatic.automation_policy_version, Some(1));
+
+    let session_id = "shatterline-v4-session";
+    let created = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/sessions",
+        &CombatSessionCreateRequestDto {
+            session_id: session_id.to_string(),
+            scenario_id: manual.id.clone(),
+            participant_order: Vec::new(),
+            content_pack: Some(reference.clone()),
+            authored_action_binding: None,
+        },
+    ));
+    let created: LiveSessionSnapshotDto =
+        serde_json::from_slice(&created.body).expect("authored scenario snapshot is JSON");
+    let receipt = created
+        .authored_scenario_binding
+        .as_ref()
+        .expect("snapshot retains authored scenario receipt");
+    assert_eq!(receipt.scenario_id, manual.id);
+    assert_eq!(
+        receipt.participants[0].archetypes[0].class_id,
+        "archetype.anchor"
+    );
+    assert_eq!(receipt.participants[0].action_grants.len(), 2);
+
+    let started = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+        &CombatControlCommandDto {
+            kind: CombatControlCommandKindDto::ExplicitStart,
+        },
+    ));
+    let started: LiveControlExecutionDto =
+        serde_json::from_slice(&started.body).expect("start readout is JSON");
+    let action_ids = started
+        .snapshot
+        .options
+        .actions
+        .iter()
+        .map(|action| action.action_id.as_str())
+        .collect::<Vec<_>>();
+    assert!(action_ids.contains(&"foundation-anchor-lash"));
+    assert!(action_ids.contains(&"foundation-binding-spark"));
+
+    let executed = router.handle(&json_request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/sessions/{session_id}/intents"),
+        &CombatSessionIntentCommandDto {
+            id: "foundation-anchor-lash-command".to_string(),
+            title: "Anchor Lash".to_string(),
+            summary: "Execute one of two independently selectable authored actions.".to_string(),
+            intent: UseActionIntentDto {
+                actor_id: "foundation-anchor".to_string(),
+                action_id: "foundation-anchor-lash".to_string(),
+                target_id: "foundation-opposition".to_string(),
+                target_ids: Vec::new(),
+                target_cell: None,
+                destination_cell: None,
+                observed_origin: None,
+            },
+            roll_stream: vec![15, 4],
+            roll_mode: CommandRollModeDto::Supplied,
+            generated_seed: None,
+        },
+    ));
+    let executed: LiveCommandExecutionDto =
+        serde_json::from_slice(&executed.body).expect("authored action execution is JSON");
+    assert!(executed.step.accepted);
+    drop(router);
+
+    let mut restarted =
+        build_durable_rulebench_router(&directory).expect("configured host recovers v4 session");
+    let sessions = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/sessions"));
+    let sessions: Vec<LiveSessionSnapshotDto> =
+        serde_json::from_slice(&sessions.body).expect("recovered sessions are JSON");
+    let recovered = sessions
+        .iter()
+        .find(|session| session.session_id == session_id)
+        .expect("authored scenario session recovered");
+    assert_eq!(
+        recovered
+            .authored_scenario_binding
+            .as_ref()
+            .map(|receipt| receipt.content_pack_root.clone()),
+        Some(reference.clone())
+    );
+    assert_eq!(
+        restarted
+            .handle(&json_request(
+                HttpMethod::Post,
+                &format!("/api/rulebench/v1/sessions/{session_id}/controls"),
+                &CombatControlCommandDto {
+                    kind: CombatControlCommandKindDto::ExplicitEnd,
+                },
+            ))
+            .status,
+        200
+    );
+    assert_eq!(
+        restarted
+            .handle(&request(
+                HttpMethod::Delete,
+                &format!("/api/rulebench/v1/sessions/{session_id}"),
+            ))
+            .status,
+        200
+    );
+    drop(restarted);
+
+    let mut finalized =
+        build_durable_rulebench_router(&directory).expect("configured host reloads v4 replay");
+    let replay = finalized.handle(&request(
+        HttpMethod::Get,
+        &format!("/api/rulebench/v1/replays/live-{session_id}"),
+    ));
+    let replay: ReplayPackageReviewDto =
+        serde_json::from_slice(&replay.body).expect("v4 replay review is JSON");
+    assert_eq!(
+        replay
+            .authored_scenario_binding
+            .as_ref()
+            .map(|receipt| receipt.scenario_id.as_str()),
+        Some("shatterline-foundation-manual")
+    );
+    let verification = finalized.handle(&request(
+        HttpMethod::Post,
+        &format!("/api/rulebench/v1/replays/live-{session_id}/verify"),
+    ));
+    let verification: ReplayVerificationReadoutDto =
+        serde_json::from_slice(&verification.body).expect("v4 replay verification is JSON");
+    assert!(verification.accepted);
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
 fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
     let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let directory = std::env::temp_dir().join(format!(
@@ -958,6 +1197,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
         include_str!("fixtures/authored-content-v1.json"),
         include_str!("fixtures/authored-content-v2.json"),
         include_str!("fixtures/authored-content-v3.json"),
+        include_str!("fixtures/shatterline-foundation-v4.json"),
     ];
 
     for payload in fixtures {
@@ -983,7 +1223,7 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
     let workspace = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
     let workspace: ContentWorkspaceDto =
         serde_json::from_slice(&workspace.body).expect("workspace is JSON");
-    assert_eq!(workspace.packs.len(), 3);
+    assert_eq!(workspace.packs.len(), 4);
     let v1 = workspace
         .packs
         .iter()
@@ -1019,6 +1259,29 @@ fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
     assert!(v3.definitions.iter().any(|definition| {
         definition.kind == "action" && definition.id == "action.binding-glyph"
     }));
+    let v4 = workspace
+        .packs
+        .iter()
+        .find(|pack| pack.reference.id == "pack.shatterline.foundation")
+        .expect("v4 Shatterline receipt exists");
+    assert_eq!(
+        v4.reference.fingerprint.algorithm,
+        "fnv1a64.rulebench-content-pack.v2"
+    );
+    assert_eq!(
+        v4.definitions
+            .iter()
+            .filter(|definition| definition.kind == "class")
+            .count(),
+        5
+    );
+    assert_eq!(
+        v4.definitions
+            .iter()
+            .filter(|definition| definition.kind == "scenario")
+            .count(),
+        2
+    );
     let references = workspace
         .packs
         .iter()
@@ -1211,7 +1474,7 @@ fn authored_action_template_clone_review_and_binding_catalog_use_rust_authority(
     assert_eq!(template.source_kind, "rustTemplate");
     let template_document: serde_json::Value =
         serde_json::from_str(&template.authored_payload).expect("template payload is JSON");
-    assert_eq!(template_document["formatVersion"], 3);
+    assert_eq!(template_document["formatVersion"], 4);
     assert_eq!(
         template_document["pack"]["id"],
         "pack.test.authored-template"

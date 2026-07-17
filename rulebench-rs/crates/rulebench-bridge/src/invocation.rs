@@ -5,10 +5,10 @@ use rulebench_protocol::{
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
     ProtocolHandshakeDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
     ReplayArchiveMetadataDto, ReplayComparisonReadoutDto, ReplayPackageReviewDto,
-    ReplayVerificationReadoutDto, ScenarioOptionDto, ScenarioParticipantOptionDto,
-    SessionRecoveryEntryDto, UseActionIntentDto, ViewerScenarioReadoutDto,
-    ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto, ViewerSessionSummaryDto,
-    ViewerSessionTranscriptDto, PROTOCOL_ID, PROTOCOL_VERSION,
+    ReplayVerificationReadoutDto, ScenarioControlModeDto, ScenarioOptionDto,
+    ScenarioParticipantOptionDto, SessionRecoveryEntryDto, UseActionIntentDto,
+    ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto,
+    ViewerSessionSummaryDto, ViewerSessionTranscriptDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 use rulebench_rules::{
     bind_authored_action, compare_replay_packages, record_replay_package, verify_replay_package,
@@ -69,6 +69,10 @@ impl BridgeScenario {
                 ruleset_version,
                 content_pack_id,
                 content_pack_version,
+                requires_exact_content_pack: scenario.authored_scenario_binding.is_some(),
+                control_mode: ScenarioControlModeDto::Manual,
+                automation_policy_id: None,
+                automation_policy_version: None,
                 participants,
             },
             scenario,
@@ -78,6 +82,21 @@ impl BridgeScenario {
 
     pub fn with_viewer_readout(mut self, readout: ViewerScenarioReadoutDto) -> Self {
         self.viewer_readout = Some(readout);
+        self
+    }
+
+    pub fn with_authored_control(
+        mut self,
+        control: &rulebench_rules::AuthoredScenarioControl,
+    ) -> Self {
+        self.option.control_mode = match control.mode {
+            rulebench_rules::AuthoredScenarioControlMode::Manual => ScenarioControlModeDto::Manual,
+            rulebench_rules::AuthoredScenarioControlMode::Automatic => {
+                ScenarioControlModeDto::Automatic
+            }
+        };
+        self.option.automation_policy_id = control.automation_policy_id.clone();
+        self.option.automation_policy_version = control.automation_policy_version;
         self
     }
 }
@@ -329,7 +348,32 @@ impl RulebenchBridge {
         content_pack_set: Option<ContentPackSetReference>,
         content_ruleset: Option<RulesetArtifactProvenance>,
     ) -> Result<CombatSessionCreateReadout, BridgeError> {
-        self.create_configured_session(context, request, content_pack_set, content_ruleset, None)
+        self.create_configured_session(
+            context,
+            request,
+            content_pack_set,
+            content_ruleset,
+            None,
+            None,
+        )
+    }
+
+    pub fn create_authored_scenario_session(
+        &mut self,
+        context: &ProtocolRequestContextDto,
+        request: &CombatSessionCreateRequestDto,
+        scenario: RulebenchScenario,
+        content_ruleset: RulesetArtifactProvenance,
+    ) -> Result<CombatSessionCreateReadout, BridgeError> {
+        let content_pack_set = scenario.content_pack_set.clone();
+        self.create_configured_session(
+            context,
+            request,
+            content_pack_set,
+            Some(content_ruleset),
+            None,
+            Some(scenario),
+        )
     }
 
     pub fn create_session_with_authored_action(
@@ -350,6 +394,7 @@ impl RulebenchBridge {
             Some(imported.resolved_set.reference.clone()),
             Some(imported.pack.ruleset.clone()),
             Some((imported, binding.to_authority())),
+            None,
         )
     }
 
@@ -363,6 +408,7 @@ impl RulebenchBridge {
             &ImportedContentPack,
             rulebench_rules::AuthoredActionBindingRequest,
         )>,
+        scenario_override: Option<RulebenchScenario>,
     ) -> Result<CombatSessionCreateReadout, BridgeError> {
         self.check_version(context)?;
         if request.session_id.is_empty() || request.scenario_id.is_empty() {
@@ -371,14 +417,27 @@ impl RulebenchBridge {
                 "Session id and scenario id must not be empty.",
             ));
         }
-        let scenario = self.scenarios.get(&request.scenario_id).ok_or_else(|| {
-            BridgeError::new(
-                BridgeErrorKind::UnknownScenario,
-                format!("Scenario does not exist: {}", request.scenario_id),
-            )
-        })?;
+        let scenario = match scenario_override {
+            Some(scenario) if scenario.metadata.id == request.scenario_id => scenario,
+            Some(_) => {
+                return Err(BridgeError::new(
+                    BridgeErrorKind::InvalidRequest,
+                    "Authored scenario identity does not match the session request.",
+                ))
+            }
+            None => self
+                .scenarios
+                .get(&request.scenario_id)
+                .map(|scenario| scenario.scenario.clone())
+                .ok_or_else(|| {
+                    BridgeError::new(
+                        BridgeErrorKind::UnknownScenario,
+                        format!("Scenario does not exist: {}", request.scenario_id),
+                    )
+                })?,
+        };
         let mut configured_scenario =
-            configure_participant_order(scenario.scenario.clone(), &request.participant_order)?;
+            configure_participant_order(scenario, &request.participant_order)?;
         if let Some(content_ruleset) = &content_ruleset {
             let ruleset = configured_scenario.selected_ruleset().ok_or_else(|| {
                 BridgeError::new(

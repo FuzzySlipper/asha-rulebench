@@ -2,8 +2,9 @@ use rulebench_protocol::{
     AuthoredContentPackDocumentDto, ContentImportDiagnosticDto, ContentPackIdentityDto,
 };
 use rulebench_rules::{
-    import_content_pack, CanonicalContentPack, ContentImportContext, ContentImportLimits,
-    ImportedContentPack, RulesetProviderCatalog,
+    import_content_pack, AuthoredScenarioControlMode, CanonicalContentPack, ContentImportContext,
+    ContentImportLimits, ImportedContentPack, RulesetProviderCatalog,
+    COMBAT_AUTOMATION_POLICY_REGISTRY,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,7 +45,7 @@ pub fn import_authored_content(
         .iter()
         .flat_map(|pack| pack.catalogs.rulesets.iter().cloned())
         .collect::<Vec<_>>();
-    import_content_pack(
+    let imported = import_content_pack(
         authored,
         ContentImportLimits::default(),
         ContentImportContext {
@@ -67,8 +68,46 @@ pub fn import_authored_content(
         ContentInvocationError {
             code,
             message: "Rust authority rejected the authored content pack.".to_string(),
-            pack: Some(identity),
+            pack: Some(identity.clone()),
             diagnostics,
         }
-    })
+    })?;
+    for scenario in &imported.pack.catalogs.scenarios {
+        if scenario.control.mode != AuthoredScenarioControlMode::Automatic {
+            continue;
+        }
+        let policy_id = scenario
+            .control
+            .automation_policy_id
+            .as_deref()
+            .unwrap_or_default();
+        let policy_version = scenario
+            .control
+            .automation_policy_version
+            .unwrap_or_default();
+        if !COMBAT_AUTOMATION_POLICY_REGISTRY
+            .iter()
+            .any(|registration| {
+                registration.id == policy_id && registration.version == policy_version
+            })
+        {
+            return Err(ContentInvocationError {
+                code: "unsupportedAuthoredScenarioAutomationPolicy".to_string(),
+                message: "Rust authority rejected an unknown authored scenario automation policy."
+                    .to_string(),
+                pack: Some(identity),
+                diagnostics: vec![ContentImportDiagnosticDto {
+                    severity: "error".to_string(),
+                    code: "unsupportedAuthoredScenarioAutomationPolicy".to_string(),
+                    path: format!("catalogs.scenarios[{}].control", scenario.id),
+                    reference_id: Some(scenario.id.clone()),
+                    definition_kind: Some("scenario".to_string()),
+                    message: format!(
+                        "Automation policy {policy_id} v{policy_version} is not registered by the Rust authority."
+                    ),
+                }],
+            });
+        }
+    }
+    Ok(imported)
 }

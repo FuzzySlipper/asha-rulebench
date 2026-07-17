@@ -167,6 +167,7 @@ fn scenario() -> RulebenchScenario {
         metadata: ScenarioMetadata { id: "consumer-scenario".to_string(), title: "Portable Consumer".to_string(), summary: "Standalone authority smoke.".to_string(), seed_label: "17,5".to_string() },
         content_pack_set: None,
         authored_action_binding: None,
+        authored_scenario_binding: None,
         rulesets: vec![RulesetMetadata { id: "consumer-rules".to_string(), name: "Consumer Rules".to_string(), version: "0.1.0".to_string(), summary: "Standalone rules.".to_string(), modules: vec![RuleModuleDeclaration::action_resolution(ActionResolutionModuleConfiguration::declared_targets_and_line_of_sight())] }],
         selected_ruleset_id: "consumer-rules".to_string(),
         grid: Grid { width: 6, height: 1, cells: vec![

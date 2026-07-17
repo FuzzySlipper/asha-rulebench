@@ -5,8 +5,9 @@ use super::{
     ContentImportDiagnosticSeverity, ContentImportLimits, ContentImportReport,
 };
 use crate::{
-    AuthoredEffectOperation, ModifierDurationPolicy, ResolvedContentPackSet,
-    CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
+    AuthoredEffectOperation, AuthoredScenarioBindingError, ModifierDurationPolicy,
+    ResolvedContentPackSet, CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
+    CONTENT_PACK_FINGERPRINT_ALGORITHM_V2,
 };
 use crate::{ContentDefinitionKind, ContentPackDiagnostic, CONTENT_PACK_FINGERPRINT_ALGORITHM};
 use rulebench_ruleset::{
@@ -98,6 +99,44 @@ pub(super) fn validate_authored_pack(
         );
     }
     diagnostics
+}
+
+pub(super) fn scenario_materialization_diagnostic(
+    scenario_id: &str,
+    error: AuthoredScenarioBindingError,
+) -> ContentImportDiagnostic {
+    let initial_state = error.diagnostic_codes.iter().any(|code| {
+        matches!(
+            code.as_str(),
+            "invalidScenarioGridDimensions"
+                | "duplicateScenarioGridCell"
+                | "scenarioGridCellOutOfBounds"
+                | "combatantPlacementOutOfBounds"
+                | "combatantPlacementOccupied"
+                | "combatantPlacementBlocked"
+                | "invalidCombatantVitality"
+                | "invalidActionResourcePoolMaximum"
+                | "invalidActionResourcePoolInitial"
+                | "invalidActionResourceRefreshPolicy"
+        )
+    });
+    ContentImportDiagnostic {
+        severity: ContentImportDiagnosticSeverity::Error,
+        code: if initial_state {
+            ContentImportDiagnosticCode::InvalidScenarioInitialState
+        } else {
+            ContentImportDiagnosticCode::InvalidScenarioDeclaration
+        },
+        path: format!("catalogs.scenarios[{scenario_id}]"),
+        definition_kind: Some(ContentDefinitionKind::Scenario),
+        definition_id: Some(scenario_id.to_string()),
+        message: format!(
+            "Authored scenario materialization failed with {}: {} Diagnostics: {}.",
+            error.code,
+            error.message,
+            error.diagnostic_codes.join(", ")
+        ),
+    }
 }
 
 fn validate_ability_definitions(
@@ -900,7 +939,9 @@ fn validate_fingerprint(
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if !matches!(
         algorithm,
-        CONTENT_PACK_FINGERPRINT_ALGORITHM | CONTENT_PACK_FINGERPRINT_ALGORITHM_V1
+        CONTENT_PACK_FINGERPRINT_ALGORITHM
+            | CONTENT_PACK_FINGERPRINT_ALGORITHM_V1
+            | CONTENT_PACK_FINGERPRINT_ALGORITHM_V2
     ) || !valid_value
     {
         diagnostics.push(ContentImportDiagnostic {
@@ -1011,6 +1052,73 @@ fn pack_strings(authored: &AuthoredContentPack) -> Vec<(String, &str)> {
                 format!("catalogs.abilities[{index}].tags[{tag_index}]"),
                 tag.as_str(),
             ));
+        }
+    }
+    for (index, class) in authored.catalogs.classes.iter().enumerate() {
+        strings.extend([
+            (format!("catalogs.classes[{index}].id"), class.id.as_str()),
+            (
+                format!("catalogs.classes[{index}].name"),
+                class.name.as_str(),
+            ),
+            (
+                format!("catalogs.classes[{index}].version"),
+                class.version.as_str(),
+            ),
+            (
+                format!("catalogs.classes[{index}].summary"),
+                class.summary.as_str(),
+            ),
+        ]);
+        for (tag_index, tag) in class.tags.iter().enumerate() {
+            strings.push((format!("catalogs.classes[{index}].tags[{tag_index}]"), tag));
+        }
+        for (grant_index, grant) in class.level_grants.iter().enumerate() {
+            for (ability_index, ability_id) in grant.granted_ability_ids.iter().enumerate() {
+                strings.push((
+                    format!("catalogs.classes[{index}].levelGrants[{grant_index}].grantedAbilityIds[{ability_index}]"),
+                    ability_id,
+                ));
+            }
+            for (modifier_index, modifier_id) in grant.granted_modifier_ids.iter().enumerate() {
+                strings.push((
+                    format!("catalogs.classes[{index}].levelGrants[{grant_index}].grantedModifierIds[{modifier_index}]"),
+                    modifier_id,
+                ));
+            }
+        }
+    }
+    for (index, definition) in authored.catalogs.stat_definitions.iter().enumerate() {
+        strings.extend([
+            (
+                format!("catalogs.statDefinitions[{index}].id"),
+                definition.id.as_str(),
+            ),
+            (
+                format!("catalogs.statDefinitions[{index}].label"),
+                definition.label.as_str(),
+            ),
+            (
+                format!("catalogs.statDefinitions[{index}].summary"),
+                definition.summary.as_str(),
+            ),
+        ]);
+    }
+    for (index, item) in authored.catalogs.items.iter().enumerate() {
+        strings.extend([
+            (format!("catalogs.items[{index}].id"), item.id.as_str()),
+            (format!("catalogs.items[{index}].name"), item.name.as_str()),
+            (
+                format!("catalogs.items[{index}].summary"),
+                item.summary.as_str(),
+            ),
+            (
+                format!("catalogs.items[{index}].equipmentSlot"),
+                item.equipment_slot.as_str(),
+            ),
+        ]);
+        for (tag_index, tag) in item.tags.iter().enumerate() {
+            strings.push((format!("catalogs.items[{index}].tags[{tag_index}]"), tag));
         }
     }
     for (index, modifier) in authored.catalogs.modifiers.iter().enumerate() {
@@ -1129,6 +1237,68 @@ fn pack_strings(authored: &AuthoredContentPack) -> Vec<(String, &str)> {
         }
         collect_action_operation_strings(&mut strings, index, action);
     }
+    for (index, scenario) in authored.catalogs.scenarios.iter().enumerate() {
+        strings.extend([
+            (
+                format!("catalogs.scenarios[{index}].id"),
+                scenario.id.as_str(),
+            ),
+            (
+                format!("catalogs.scenarios[{index}].title"),
+                scenario.title.as_str(),
+            ),
+            (
+                format!("catalogs.scenarios[{index}].summary"),
+                scenario.summary.as_str(),
+            ),
+            (
+                format!("catalogs.scenarios[{index}].seedLabel"),
+                scenario.seed_label.as_str(),
+            ),
+            (
+                format!("catalogs.scenarios[{index}].rulesetId"),
+                scenario.ruleset_id.as_str(),
+            ),
+            (
+                format!("catalogs.scenarios[{index}].selectedActionId"),
+                scenario.selected_action_id.as_str(),
+            ),
+        ]);
+        if let Some(policy_id) = scenario.control.automation_policy_id.as_deref() {
+            strings.push((
+                format!("catalogs.scenarios[{index}].control.automationPolicyId"),
+                policy_id,
+            ));
+        }
+        for (participant_index, participant) in scenario.participants.iter().enumerate() {
+            strings.extend([
+                (
+                    format!("catalogs.scenarios[{index}].participants[{participant_index}].id"),
+                    participant.id.as_str(),
+                ),
+                (
+                    format!(
+                        "catalogs.scenarios[{index}].participants[{participant_index}].entityId"
+                    ),
+                    participant.entity_id.as_str(),
+                ),
+                (
+                    format!("catalogs.scenarios[{index}].participants[{participant_index}].name"),
+                    participant.name.as_str(),
+                ),
+                (
+                    format!("catalogs.scenarios[{index}].participants[{participant_index}].sideId"),
+                    participant.side_id.as_str(),
+                ),
+            ]);
+            for (grant_index, grant) in participant.action_grants.iter().enumerate() {
+                strings.extend([
+                    (format!("catalogs.scenarios[{index}].participants[{participant_index}].actionGrants[{grant_index}].actionId"), grant.action_id.as_str()),
+                    (format!("catalogs.scenarios[{index}].participants[{participant_index}].actionGrants[{grant_index}].runtimeActionId"), grant.runtime_action_id.as_str()),
+                ]);
+            }
+        }
+    }
     strings
 }
 
@@ -1200,6 +1370,10 @@ fn catalog_identities(authored: &AuthoredContentPack) -> Vec<(ContentDefinitionK
         (
             ContentDefinitionKind::Action,
             ids(&authored.catalogs.actions, |value| &value.id),
+        ),
+        (
+            ContentDefinitionKind::Scenario,
+            ids(&authored.catalogs.scenarios, |value| &value.id),
         ),
     ]
 }

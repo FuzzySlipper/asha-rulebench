@@ -1,10 +1,11 @@
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const root = process.cwd();
+const protocolVersion = readProtocolVersion(root);
 const hostAddress = '127.0.0.1';
 const hostPort = await freePort(hostAddress);
 const hostUrl = `http://${hostAddress}:${hostPort}`;
@@ -100,7 +101,9 @@ async function waitForHost(child, baseUrl) {
     }
     try {
       const response = await fetch(`${baseUrl}/api/rulebench/v1/handshake`, {
-        headers: { 'x-rulebench-protocol-version': '9' },
+        headers: {
+          'x-rulebench-protocol-version': String(protocolVersion),
+        },
         signal: AbortSignal.timeout(500),
       });
       if (response.ok) return;
@@ -110,6 +113,20 @@ async function waitForHost(child, baseUrl) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`Rust host did not become ready at ${baseUrl}.`);
+}
+
+function readProtocolVersion(workspaceRoot) {
+  const liveTransportSource = readFileSync(
+    join(workspaceRoot, 'libs/transport/src/live.ts'),
+    'utf8',
+  );
+  const match = liveTransportSource.match(
+    /export const RULEBENCH_PROTOCOL_VERSION\s*=\s*(\d+);/,
+  );
+  if (match?.[1] === undefined) {
+    throw new Error('Could not resolve the live transport protocol version.');
+  }
+  return Number(match[1]);
 }
 
 function freePort(host) {

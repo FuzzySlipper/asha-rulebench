@@ -377,8 +377,23 @@ fn host_capabilities(
         "rulebench-content.authored-action-binding-v1".to_string(),
         "rulebench-process-host.authored-action-workflow".to_string(),
     ];
+    let mut authored_scenario = host_capability(
+        "content.authored-scenario",
+        "1",
+        CapabilityKind::Content,
+        host.authored_content_enabled,
+        host.durable_content,
+        host,
+        regression,
+    );
+    authored_scenario.evidence = vec![
+        "rulebench-content.authored-scenario-v4".to_string(),
+        "rulebench-content.authored-scenario-binding-v1".to_string(),
+        "rulebench-process-host.authored-scenario-workflow".to_string(),
+    ];
     vec![
         authored_action,
+        authored_scenario,
         host_capability(
             "content.authored-pack",
             "1",

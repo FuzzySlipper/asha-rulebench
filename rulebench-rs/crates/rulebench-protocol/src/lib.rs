@@ -8,6 +8,7 @@
 
 mod authored_action;
 mod authored_action_binding;
+mod authored_scenario;
 mod authoring;
 mod bridge;
 mod capabilities;
@@ -38,6 +39,17 @@ pub use authored_action_binding::{
     AuthoredActionAbilityGrantReceiptDto, AuthoredActionBindingReceiptDto,
     AuthoredActionBindingRequestDto,
 };
+pub use authored_scenario::{
+    AuthoredActionResourceKindDto, AuthoredActionResourcePoolDto,
+    AuthoredActionResourceRefreshPolicyDto, AuthoredBoundedValueDto, AuthoredClassDefinitionDto,
+    AuthoredClassLevelGrantDto, AuthoredClassLevelInputDto, AuthoredDerivedStatFormulaDto,
+    AuthoredGridCellDto, AuthoredGridDto, AuthoredGridPositionDto, AuthoredItemDefinitionDto,
+    AuthoredNamedNumberDto, AuthoredScenarioActionGrantDto, AuthoredScenarioBindingReceiptDto,
+    AuthoredScenarioControlDto, AuthoredScenarioControlModeDto, AuthoredScenarioDefinitionDto,
+    AuthoredScenarioParticipantDto, AuthoredScenarioParticipantReceiptDto, AuthoredStatBlockDto,
+    AuthoredStatDefinitionDto, AuthoredStatDefinitionKindDto, AuthoredStatRequirementDto,
+    AuthoredTeamDto,
+};
 pub use authoring::{
     validate_ruleset_definition, RuleModuleConfigurationDto, RuleModuleDeclarationDto,
     RulesetAuthoringError, RulesetDefinitionDto,
@@ -46,7 +58,7 @@ pub use bridge::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatAutomationNoCandidateBehaviorDto,
     CombatAutomationPolicyDto, CombatControlCommandDto, CombatControlCommandKindDto,
     CombatSessionCreateRequestDto, CombatSessionIntentCommandDto, CommandRollModeDto,
-    ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioOptionDto,
+    ProtocolHandshakeDto, ProtocolRequestContextDto, ScenarioControlModeDto, ScenarioOptionDto,
     ScenarioParticipantOptionDto, UseActionIntentDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
 pub use capabilities::{
@@ -69,7 +81,7 @@ pub use content::{
     ContentPayloadRequestDto, ContentReferenceRequestDto, ContentReplacementPolicyDto,
     ContentTemplateDraftRequestDto, ContentWorkspaceDto, StoredContentPackSummaryDto,
     AUTHORED_CONTENT_PACK_FORMAT, AUTHORED_CONTENT_PACK_VERSION, AUTHORED_CONTENT_PACK_VERSION_V1,
-    AUTHORED_CONTENT_PACK_VERSION_V2,
+    AUTHORED_CONTENT_PACK_VERSION_V2, AUTHORED_CONTENT_PACK_VERSION_V3,
 };
 pub use experiment::{
     AutomationPolicyCatalogEntryDto, ExperimentComparisonReadoutDto,

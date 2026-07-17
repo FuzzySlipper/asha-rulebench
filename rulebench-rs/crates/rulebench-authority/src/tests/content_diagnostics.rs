@@ -176,6 +176,7 @@ fn content_diagnostics_reject_malformed_resource_pools_and_missing_cost_targets(
         .push(ActionResourcePool {
             id: String::new(),
             kind: ActionResourceKind::Charge,
+            initial: 1,
             maximum: 1,
             refresh_policy: ActionResourceRefreshPolicy::Never,
         });
@@ -184,6 +185,7 @@ fn content_diagnostics_reject_malformed_resource_pools_and_missing_cost_targets(
         .push(ActionResourcePool {
             id: "standard-action".to_string(),
             kind: ActionResourceKind::Cooldown,
+            initial: 0,
             maximum: 0,
             refresh_policy: ActionResourceRefreshPolicy::Turns(0),
         });

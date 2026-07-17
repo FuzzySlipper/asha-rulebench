@@ -255,6 +255,22 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "string | null",
                 },
                 Field {
+                    name: "requiresExactContentPack",
+                    ty: "boolean",
+                },
+                Field {
+                    name: "controlMode",
+                    ty: "RulebenchScenarioControlModeDto",
+                },
+                Field {
+                    name: "automationPolicyId",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "automationPolicyVersion",
+                    ty: "number | null",
+                },
+                Field {
                     name: "participants",
                     ty: "readonly RulebenchScenarioParticipantOptionDto[]",
                 },
@@ -394,6 +410,107 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "effectOperationVocabularyVersion",
                     ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredScenarioBindingReceiptDto",
+            fields: &[
+                Field {
+                    name: "bindingVersion",
+                    ty: "number",
+                },
+                Field {
+                    name: "contentPackRoot",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "contentPackReferences",
+                    ty: "readonly RulebenchContentPackReferenceDto[]",
+                },
+                Field {
+                    name: "contentPackSetFingerprint",
+                    ty: "RulebenchContentFingerprintDto",
+                },
+                Field {
+                    name: "scenarioId",
+                    ty: "string",
+                },
+                Field {
+                    name: "participants",
+                    ty: "readonly RulebenchAuthoredScenarioParticipantReceiptDto[]",
+                },
+                Field {
+                    name: "control",
+                    ty: "RulebenchAuthoredScenarioControlDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredScenarioParticipantReceiptDto",
+            fields: &[
+                Field {
+                    name: "participantId",
+                    ty: "string",
+                },
+                Field {
+                    name: "archetypes",
+                    ty: "readonly RulebenchAuthoredClassLevelInputDto[]",
+                },
+                Field {
+                    name: "loadoutItemIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "actionGrants",
+                    ty: "readonly RulebenchAuthoredScenarioActionGrantDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredClassLevelInputDto",
+            fields: &[
+                Field {
+                    name: "classId",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "level",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredScenarioActionGrantDto",
+            fields: &[
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "runtimeActionId",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredScenarioControlDto",
+            fields: &[
+                Field {
+                    name: "mode",
+                    ty: "RulebenchAuthoredScenarioControlModeDto",
+                },
+                Field {
+                    name: "automationPolicyId?",
+                    ty: "string | null",
+                },
+                Field {
+                    name: "automationPolicyVersion?",
+                    ty: "number | null",
                 },
             ],
         },
@@ -2785,14 +2902,390 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     ty: "readonly RulebenchAuthoredAbilityDefinitionDto[]",
                 },
                 Field {
+                    name: "classes",
+                    ty: "readonly RulebenchAuthoredClassDefinitionDto[]",
+                },
+                Field {
+                    name: "statDefinitions",
+                    ty: "readonly RulebenchAuthoredStatDefinitionDto[]",
+                },
+                Field {
                     name: "modifiers",
                     ty: "readonly RulebenchAuthoredModifierDefinitionDto[]",
+                },
+                Field {
+                    name: "items",
+                    ty: "readonly RulebenchAuthoredItemDefinitionDto[]",
                 },
                 Field {
                     name: "actions",
                     ty: "readonly RulebenchAuthoredActionDefinitionDto[]",
                 },
+                Field {
+                    name: "scenarios",
+                    ty: "readonly RulebenchAuthoredScenarioDefinitionDto[]",
+                },
             ],
+        },
+        Interface {
+            name: "RulebenchAuthoredClassDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tags",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "prerequisites",
+                    ty: "readonly RulebenchAuthoredStatRequirementDto[]",
+                },
+                Field {
+                    name: "levelGrants",
+                    ty: "readonly RulebenchAuthoredClassLevelGrantDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredClassLevelGrantDto",
+            fields: &[
+                Field {
+                    name: "level",
+                    ty: "number",
+                },
+                Field {
+                    name: "grantedModifierIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "grantedAbilityIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "grantedResourcePools",
+                    ty: "readonly RulebenchAuthoredActionResourcePoolDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredStatRequirementDto",
+            fields: &[
+                Field {
+                    name: "statId",
+                    ty: "string",
+                },
+                Field {
+                    name: "minimum",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredStatDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "label",
+                    ty: "string",
+                },
+                Field {
+                    name: "kind",
+                    ty: "RulebenchAuthoredStatDefinitionKindDto",
+                },
+                Field {
+                    name: "formula?",
+                    ty: "RulebenchAuthoredDerivedStatFormulaDto | null",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredItemDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tags",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "equipmentSlot",
+                    ty: "string",
+                },
+                Field {
+                    name: "requirements",
+                    ty: "readonly RulebenchAuthoredStatRequirementDto[]",
+                },
+                Field {
+                    name: "grantedModifierIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "grantedAbilityIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "grantedResourcePools",
+                    ty: "readonly RulebenchAuthoredActionResourcePoolDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredActionResourcePoolDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "kind",
+                    ty: "RulebenchAuthoredActionResourceKindDto",
+                },
+                Field {
+                    name: "initial",
+                    ty: "number",
+                },
+                Field {
+                    name: "maximum",
+                    ty: "number",
+                },
+                Field {
+                    name: "refreshPolicy",
+                    ty: "RulebenchAuthoredActionResourceRefreshPolicyDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredScenarioDefinitionDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "seedLabel",
+                    ty: "string",
+                },
+                Field {
+                    name: "rulesetId",
+                    ty: "string",
+                },
+                Field {
+                    name: "grid",
+                    ty: "RulebenchAuthoredGridDto",
+                },
+                Field {
+                    name: "participants",
+                    ty: "readonly RulebenchAuthoredScenarioParticipantDto[]",
+                },
+                Field {
+                    name: "selectedActionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "control",
+                    ty: "RulebenchAuthoredScenarioControlDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredGridDto",
+            fields: &[
+                Field {
+                    name: "width",
+                    ty: "number",
+                },
+                Field {
+                    name: "height",
+                    ty: "number",
+                },
+                Field {
+                    name: "cells",
+                    ty: "readonly RulebenchAuthoredGridCellDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredGridCellDto",
+            fields: &[
+                Field {
+                    name: "position",
+                    ty: "RulebenchAuthoredGridPositionDto",
+                },
+                Field {
+                    name: "terrainTags",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredGridPositionDto",
+            fields: &[
+                Field {
+                    name: "x",
+                    ty: "number",
+                },
+                Field {
+                    name: "y",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredScenarioParticipantDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "entityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "team",
+                    ty: "RulebenchAuthoredTeamDto",
+                },
+                Field {
+                    name: "sideId",
+                    ty: "string",
+                },
+                Field {
+                    name: "initiative",
+                    ty: "number",
+                },
+                Field {
+                    name: "position",
+                    ty: "RulebenchAuthoredGridPositionDto",
+                },
+                Field {
+                    name: "hitPoints",
+                    ty: "RulebenchAuthoredBoundedValueDto",
+                },
+                Field {
+                    name: "temporaryVitality",
+                    ty: "number",
+                },
+                Field {
+                    name: "classInputs",
+                    ty: "readonly RulebenchAuthoredClassLevelInputDto[]",
+                },
+                Field {
+                    name: "stats",
+                    ty: "RulebenchAuthoredStatBlockDto",
+                },
+                Field {
+                    name: "defenses",
+                    ty: "readonly RulebenchAuthoredNamedNumberDto[]",
+                },
+                Field {
+                    name: "resourcePools",
+                    ty: "readonly RulebenchAuthoredActionResourcePoolDto[]",
+                },
+                Field {
+                    name: "inventoryItemIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "equippedItemIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "baseAbilityIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "actionGrants",
+                    ty: "readonly RulebenchAuthoredScenarioActionGrantDto[]",
+                },
+                Field {
+                    name: "visibleTargetIds",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "isActor",
+                    ty: "boolean",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredBoundedValueDto",
+            fields: &[
+                Field {
+                    name: "current",
+                    ty: "number",
+                },
+                Field {
+                    name: "max",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredNamedNumberDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "label",
+                    ty: "string",
+                },
+                Field {
+                    name: "value",
+                    ty: "number",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchAuthoredStatBlockDto",
+            fields: &[Field {
+                name: "baseStats",
+                ty: "readonly RulebenchAuthoredNamedNumberDto[]",
+            }],
         },
         Interface {
             name: "RulebenchAuthoredAbilityDefinitionDto",
@@ -4301,6 +4794,10 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                 Field {
                     name: "authoredActionBinding",
                     ty: "RulebenchAuthoredActionBindingReceiptDto | null",
+                },
+                Field {
+                    name: "authoredScenarioBinding",
+                    ty: "RulebenchAuthoredScenarioBindingReceiptDto | null",
                 },
                 Field {
                     name: "commandCount",

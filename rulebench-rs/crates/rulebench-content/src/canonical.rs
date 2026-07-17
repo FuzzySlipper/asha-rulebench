@@ -1,7 +1,8 @@
 use crate::{
-    AuthoredActionDefinition, AuthoredEffectOperation, CanonicalContentPack, ContentFingerprint,
-    ContentPackCatalogs, ContentPackDefinition, ContentPackReference, DerivedStatFormula,
-    ModifierDurationPolicy, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
+    AuthoredActionDefinition, AuthoredEffectOperation, AuthoredScenarioControlMode,
+    AuthoredScenarioDefinition, CanonicalContentPack, ContentFingerprint, ContentPackCatalogs,
+    ContentPackDefinition, ContentPackReference, DerivedStatFormula, ModifierDurationPolicy,
+    CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
 use rulebench_ruleset::{
     ActionResourcePool, ActionResourceRefreshPolicy, CheckDeclaration, CombatEndPolicy,
@@ -90,6 +91,9 @@ fn canonicalize_catalogs(catalogs: &mut ContentPackCatalogs) {
     catalogs
         .actions
         .sort_by(|left, right| left.id.cmp(&right.id));
+    catalogs
+        .scenarios
+        .sort_by(|left, right| left.id.cmp(&right.id));
 
     for ruleset in &mut catalogs.rulesets {
         ruleset.modules.sort_by_key(|module| module.module.code());
@@ -166,6 +170,45 @@ fn canonicalize_catalogs(catalogs: &mut ContentPackCatalogs) {
             }
         }
     }
+    for scenario in &mut catalogs.scenarios {
+        scenario
+            .grid
+            .cells
+            .sort_by_key(|cell| (cell.position.y, cell.position.x));
+        for cell in &mut scenario.grid.cells {
+            cell.terrain_tags.sort();
+            cell.terrain_tags.dedup();
+        }
+        scenario
+            .participants
+            .sort_by(|left, right| left.id.cmp(&right.id));
+        for participant in &mut scenario.participants {
+            participant
+                .class_inputs
+                .sort_by(|left, right| left.class_id.cmp(&right.class_id));
+            participant
+                .stats
+                .base_stats
+                .sort_by(|left, right| left.id.cmp(&right.id));
+            participant
+                .defenses
+                .sort_by(|left, right| left.id.cmp(&right.id));
+            participant
+                .resource_pools
+                .sort_by(|left, right| left.id.cmp(&right.id));
+            participant.inventory_item_ids.sort();
+            participant.inventory_item_ids.dedup();
+            participant.equipped_item_ids.sort();
+            participant.equipped_item_ids.dedup();
+            participant.base_ability_ids.sort();
+            participant.base_ability_ids.dedup();
+            participant
+                .action_grants
+                .sort_by(|left, right| left.runtime_action_id.cmp(&right.runtime_action_id));
+            participant.visible_target_ids.sort();
+            participant.visible_target_ids.dedup();
+        }
+    }
 }
 
 fn fingerprint_canonical_pack(pack: &CanonicalContentPack) -> ContentFingerprint {
@@ -184,7 +227,11 @@ fn fingerprint_canonical_pack(pack: &CanonicalContentPack) -> ContentFingerprint
     feed_ruleset_provenance(&mut encoder, &pack.ruleset);
     encoder.feed_sequence(&pack.dependencies, feed_content_pack_reference);
     encoder.feed_str(pack.collision_policy.code());
-    feed_catalogs(&mut encoder, &pack.catalogs);
+    feed_catalogs(
+        &mut encoder,
+        &pack.catalogs,
+        pack.canonical_version == crate::ContentPackCanonicalVersion::V2,
+    );
 
     ContentFingerprint {
         algorithm: algorithm.to_string(),
@@ -231,7 +278,11 @@ fn feed_ruleset_provenance(
     encoder.feed_str(&provenance.effect_operation_vocabulary_version);
 }
 
-fn feed_catalogs(encoder: &mut FingerprintEncoder, catalogs: &ContentPackCatalogs) {
+fn feed_catalogs(
+    encoder: &mut FingerprintEncoder,
+    catalogs: &ContentPackCatalogs,
+    include_scenarios: bool,
+) {
     encoder.feed_str("rulesets");
     encoder.feed_u32(catalogs.rulesets.len() as u32);
     for ruleset in &catalogs.rulesets {
@@ -373,11 +424,89 @@ fn feed_catalogs(encoder: &mut FingerprintEncoder, catalogs: &ContentPackCatalog
     for action in &catalogs.actions {
         feed_action(encoder, action);
     }
+
+    if include_scenarios {
+        encoder.feed_str("scenarios");
+        encoder.feed_u32(catalogs.scenarios.len() as u32);
+        for scenario in &catalogs.scenarios {
+            feed_scenario(encoder, scenario);
+        }
+    }
+}
+
+fn feed_scenario(encoder: &mut FingerprintEncoder, scenario: &AuthoredScenarioDefinition) {
+    encoder.feed_str(&scenario.id);
+    encoder.feed_str(&scenario.title);
+    encoder.feed_str(&scenario.summary);
+    encoder.feed_str(&scenario.seed_label);
+    encoder.feed_str(&scenario.ruleset_id);
+    encoder.feed_u32(scenario.grid.width);
+    encoder.feed_u32(scenario.grid.height);
+    encoder.feed_u32(scenario.grid.cells.len() as u32);
+    for cell in &scenario.grid.cells {
+        encoder.feed_u32(cell.position.x);
+        encoder.feed_u32(cell.position.y);
+        encoder.feed_strings(&cell.terrain_tags);
+    }
+    encoder.feed_u32(scenario.participants.len() as u32);
+    for participant in &scenario.participants {
+        encoder.feed_str(&participant.id);
+        encoder.feed_str(&participant.entity_id);
+        encoder.feed_str(&participant.name);
+        encoder.feed_str(match participant.team {
+            rulebench_core::Team::Ally => "ally",
+            rulebench_core::Team::Enemy => "enemy",
+        });
+        encoder.feed_str(&participant.side_id);
+        encoder.feed_i32(participant.initiative);
+        encoder.feed_u32(participant.position.x);
+        encoder.feed_u32(participant.position.y);
+        encoder.feed_i32(participant.hit_points.current);
+        encoder.feed_i32(participant.hit_points.max);
+        encoder.feed_i32(participant.temporary_vitality);
+        encoder.feed_u32(participant.class_inputs.len() as u32);
+        for input in &participant.class_inputs {
+            encoder.feed_str(&input.class_id);
+            encoder.feed_str(&input.version);
+            encoder.feed_u32(input.level);
+        }
+        encoder.feed_u32(participant.stats.base_stats.len() as u32);
+        for stat in &participant.stats.base_stats {
+            encoder.feed_str(&stat.id);
+            encoder.feed_str(&stat.label);
+            encoder.feed_i32(stat.value);
+        }
+        encoder.feed_u32(participant.defenses.len() as u32);
+        for defense in &participant.defenses {
+            encoder.feed_str(&defense.id);
+            encoder.feed_str(&defense.label);
+            encoder.feed_i32(defense.value);
+        }
+        encoder.feed_sequence(&participant.resource_pools, feed_action_resource_pool);
+        encoder.feed_strings(&participant.inventory_item_ids);
+        encoder.feed_strings(&participant.equipped_item_ids);
+        encoder.feed_strings(&participant.base_ability_ids);
+        encoder.feed_u32(participant.action_grants.len() as u32);
+        for grant in &participant.action_grants {
+            encoder.feed_str(&grant.action_id);
+            encoder.feed_str(&grant.runtime_action_id);
+        }
+        encoder.feed_strings(&participant.visible_target_ids);
+        encoder.feed_bool(participant.is_actor);
+    }
+    encoder.feed_str(&scenario.selected_action_id);
+    encoder.feed_str(match scenario.control.mode {
+        AuthoredScenarioControlMode::Manual => "manual",
+        AuthoredScenarioControlMode::Automatic => "automatic",
+    });
+    encoder.feed_optional_str(scenario.control.automation_policy_id.as_deref());
+    encoder.feed_optional_u32(scenario.control.automation_policy_version);
 }
 
 fn feed_action_resource_pool(encoder: &mut FingerprintEncoder, pool: &ActionResourcePool) {
     encoder.feed_str(&pool.id);
     encoder.feed_str(pool.kind.code());
+    encoder.feed_u32(pool.initial);
     encoder.feed_u32(pool.maximum);
     encoder.feed_str(pool.refresh_policy.code());
     if let ActionResourceRefreshPolicy::Turns(turns) = pool.refresh_policy {
@@ -603,6 +732,16 @@ impl FingerprintEncoder {
             Some(value) => {
                 self.feed_bool(true);
                 self.feed_str(value);
+            }
+            None => self.feed_bool(false),
+        }
+    }
+
+    fn feed_optional_u32(&mut self, value: Option<u32>) {
+        match value {
+            Some(value) => {
+                self.feed_bool(true);
+                self.feed_u32(value);
             }
             None => self.feed_bool(false),
         }

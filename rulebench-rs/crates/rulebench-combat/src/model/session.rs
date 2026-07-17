@@ -459,6 +459,7 @@ pub struct CombatSessionSnapshot {
     pub session_id: String,
     pub content_pack_set: Option<ContentPackSetReference>,
     pub authored_action_binding: Option<AuthoredActionBindingReceipt>,
+    pub authored_scenario_binding: Option<rulebench_content::AuthoredScenarioBindingReceipt>,
     pub next_step_index: u32,
     pub lifecycle: CombatLifecycle,
     pub lifecycle_transition_log: Vec<LifecycleTransitionEntry>,

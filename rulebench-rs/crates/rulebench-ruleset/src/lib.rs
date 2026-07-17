@@ -852,6 +852,7 @@ impl ActionResourceRefreshPolicy {
 pub struct ActionResourcePool {
     pub id: String,
     pub kind: ActionResourceKind,
+    pub initial: u32,
     pub maximum: u32,
     pub refresh_policy: ActionResourceRefreshPolicy,
 }
@@ -861,6 +862,7 @@ impl ActionResourcePool {
         Self {
             id: "standard-action".to_string(),
             kind: ActionResourceKind::StandardAction,
+            initial: 1,
             maximum: 1,
             refresh_policy: ActionResourceRefreshPolicy::TurnStart,
         }

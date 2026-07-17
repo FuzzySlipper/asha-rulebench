@@ -43,6 +43,27 @@ and applied modifiers across the complete exact dependency set. Missing
 references, incompatible checks, malformed reaction hooks, duplicate resource
 costs, and definition collisions fail before persistence.
 
+Version 4 preserves the exact v1-v3 readers and adds dependency-closed scenario
+composition. Its required catalogs add reusable classes/archetypes, stat
+definitions, items/loadouts, and scenarios. A scenario declares its grid,
+participant instances, archetype inputs, initial vitality, stats, defenses,
+resource pools (including an explicit initial amount), inventory/equipped
+loadout, ability and action grants, visibility inputs, selected runtime action,
+and manual or exact registered automatic control policy. One authored action
+definition may be granted to multiple participants under distinct scenario-
+local runtime ids; Rust resolves all references and derives executable targets,
+grants, resources, and state.
+
+V4 import materializes every root-owned scenario before persistence. Missing or
+collided references, duplicate runtime action ids, invalid selected actions,
+out-of-bounds/overlapping/blocked placement, invalid vitality or resource
+amounts, unsupported provider capabilities, and unknown automation policies
+fail closed. An accepted scenario retains an exact composition receipt with the
+pack set, scenario, archetype inputs, loadout items, action definition/runtime
+mapping, and control policy. That receipt is projected in live snapshots and
+finalized replay review and is reconstructed from the original exact pack set
+on recovery.
+
 The current executable effect profile is deliberately fail-closed. An effect
 program must contain exactly one leading damage operation,
 followed by at most one healing, temporary-vitality, modifier, and forced-
@@ -63,8 +84,11 @@ The committed fixtures
 `rulebench-process-host/src/fixtures/authored-content-v1.json` and
 `authored-content-v2.json` are permanent reader compatibility evidence. The
 committed `authored-content-v3.json` fixture exercises the executable authored
-schema. All three pass through the same Rust import workspace and durable
-restart path; none is converted or validated by TypeScript.
+schema. `shatterline-foundation-v4.json` adds five reusable archetypes, two
+baseline actions, and manual and automatic scenarios that are materialized from
+configuration rather than a compiled scenario fixture. All four versions pass
+through the same Rust import workspace and durable restart path; none is
+converted or validated by TypeScript.
 
 ## Rust conversion and diagnostics
 
@@ -82,6 +106,8 @@ diagnostics include `emptyContentImportField`,
 `authoredActionRulesetProviderUnavailable`,
 `authoredActionRulesetProviderIncompatible`,
 `duplicateAuthoredActionResourceCost`, `invalidAuthoredReactionDeclaration`,
+`invalidAuthoredScenarioDeclaration`, `invalidAuthoredScenarioInitialState`,
+`unsupportedAuthoredScenarioAutomationPolicy`,
 `contentImportLimitExceeded`, and `unsupportedAuthoredContentVersion`. Closed
 enum decoding and runtime-only action fields such as `actorId` are rejected as
 `invalidAuthoredContentPayload`.
@@ -100,6 +126,11 @@ receipts retain `fnv1a64.rulebench-content-pack.v0`, so adding v3 cannot
 reinterpret their canonical bytes. Generic definition indexes and structured
 pack diffs report all definition kinds without a kind-specific TypeScript
 branch.
+
+V4 canonicalizes classes, stats, items, scenarios, participant sets, grants,
+placements, resource initial amounts, and control provenance and uses
+`fnv1a64.rulebench-content-pack.v2`. V1-v3 canonical bytes and fingerprint
+algorithms are unchanged.
 
 `POST /api/rulebench/v1/content/validate` accepts
 `{ "authoredPayload": "..." }` and runs the same Rust decode, canonicalization,
@@ -138,7 +169,7 @@ the combatant is within the authored Manhattan-burst radius of that center,
 matching runtime area execution. An empty legal or required-visible set rejects
 before session creation.
 
-## Certified executable boundary
+## Certified executable boundaries
 
 The shipped product binds one exact active v3 root, action id, scenario, and
 actor through Rust. Rust re-imports the exact pack set, resolves the action,
@@ -148,6 +179,14 @@ scenario before creating a session. The binding receipt records the exact
 pack, set, action-definition, ability, actor, scenario, grant, and vocabulary
 identities in live explanation, finalized replay, and replay-verified active
 session recovery.
+
+The v4 path selects an active authored scenario instead of injecting one action
+into a compiled scenario. Rust materializes all scenario action grants together,
+creates the session through the same combat API used by built-in scenarios, and
+retains the composition receipt through checkpoints, forks, finalized replay,
+and verification. The Angular setup surface only selects an exact active pack,
+scenario, participant order, and projected control configuration; it does not
+compute grants, targets, legality, derived state, or automation decisions.
 
 `content.authored-action@1` in the executable capability manifest means only
 this closed v3 product boundary. It covers the target/check/effect declarations
@@ -161,13 +200,13 @@ targeting, check, and effect program.
 
 ## Evolution and migration
 
-- Readers for versions 1, 2, and 3 are permanent compatibility surfaces. Version 1
+- Readers for versions 1, 2, 3, and 4 are permanent compatibility surfaces. Version 1
   is lifted into the current in-memory DTO with an empty ability catalog only
   after its exact v1 shape has decoded; version 2 similarly receives empty
   modifier and action catalogs only after exact v2 decoding.
 - A semantic or wire-vocabulary change requires a new `formatVersion` and a
   dedicated Rust reader and, when canonical bytes change, a new fingerprint
-  algorithm id. Never reinterpret v1, v2, or v3 with guessed defaults.
+  algorithm id. Never reinterpret v1, v2, v3, or v4 with guessed defaults.
 - Storage receipt or activation-index changes likewise require an explicit
   reader or migration. Unsupported records are quarantined, not guessed.
 - A future migration must decode the old payload, convert it through the owned
@@ -177,15 +216,15 @@ targeting, check, and effect program.
 
 ## Non-claims
 
-Version 3 defines a closed executable authored-action surface, not a general
-rules or character authoring system. Pack content never supplies scenario-bound
-actor ids, concrete target or visibility snapshots, concrete reaction
-participants, or participant resource pools; Rust derives and validates those
-at binding. It does not add arbitrary scripts, plugins, callbacks, mutable
-TypeScript authority, provider implementations, general stats, classes, items,
-equipment, resources, characters, or persistent entity ability grants. Support
-is guaranteed only for the closed v3 vocabulary and exact compiled-provider
-capabilities described above. The filesystem adapter remains trusted-local and
+Version 4 is a closed Shatterline scenario-composition slice, not a general
+character builder, progression system, inventory simulation, scripting system,
+or provider implementation surface. Its scenario-bound ids, initial state, and
+visibility are authored inputs, but target legality, derived stats, grants,
+runtime resources, automation choice, and mutation remain Rust authority.
+Neither version adds arbitrary scripts, plugins, callbacks, or mutable
+TypeScript authority. Support is guaranteed only for the closed v3/v4
+vocabulary and exact compiled-provider capabilities described above. The
+filesystem adapter remains trusted-local and
 single-writer. It does not claim multi-process locking, authenticated upload,
 network-filesystem atomicity, power-loss durability, or durable in-progress
 policy experiments.

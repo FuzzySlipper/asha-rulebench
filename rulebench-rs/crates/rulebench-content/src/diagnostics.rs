@@ -26,6 +26,14 @@ impl ContentDiagnosticSeverity {
 pub enum ContentDiagnosticCode {
     InvalidContentPackSetReference,
     InvalidAuthoredActionBindingReceipt,
+    InvalidAuthoredScenarioBindingReceipt,
+    InvalidGridDimensions,
+    DuplicateGridCell,
+    GridCellOutOfBounds,
+    CombatantPlacementOutOfBounds,
+    CombatantPlacementOccupied,
+    CombatantPlacementBlocked,
+    InvalidCombatantVitality,
     EmptyRulesetId,
     DuplicateRulesetId,
     SelectedRulesetMissingFromCatalog,
@@ -47,6 +55,7 @@ pub enum ContentDiagnosticCode {
     EmptyActionResourcePoolId,
     DuplicateActionResourcePoolId,
     InvalidActionResourcePoolMaximum,
+    InvalidActionResourcePoolInitial,
     InvalidActionResourceRefreshPolicy,
     MissingActionResourcePool,
     EmptyClassId,
@@ -143,6 +152,16 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::InvalidAuthoredActionBindingReceipt => {
                 "invalidAuthoredActionBindingReceipt"
             }
+            ContentDiagnosticCode::InvalidAuthoredScenarioBindingReceipt => {
+                "invalidAuthoredScenarioBindingReceipt"
+            }
+            ContentDiagnosticCode::InvalidGridDimensions => "invalidScenarioGridDimensions",
+            ContentDiagnosticCode::DuplicateGridCell => "duplicateScenarioGridCell",
+            ContentDiagnosticCode::GridCellOutOfBounds => "scenarioGridCellOutOfBounds",
+            ContentDiagnosticCode::CombatantPlacementOutOfBounds => "combatantPlacementOutOfBounds",
+            ContentDiagnosticCode::CombatantPlacementOccupied => "combatantPlacementOccupied",
+            ContentDiagnosticCode::CombatantPlacementBlocked => "combatantPlacementBlocked",
+            ContentDiagnosticCode::InvalidCombatantVitality => "invalidCombatantVitality",
             ContentDiagnosticCode::EmptyRulesetId => "emptyRulesetId",
             ContentDiagnosticCode::DuplicateRulesetId => "duplicateRulesetId",
             ContentDiagnosticCode::SelectedRulesetMissingFromCatalog => {
@@ -171,6 +190,9 @@ impl ContentDiagnosticCode {
             ContentDiagnosticCode::DuplicateActionResourcePoolId => "duplicateActionResourcePoolId",
             ContentDiagnosticCode::InvalidActionResourcePoolMaximum => {
                 "invalidActionResourcePoolMaximum"
+            }
+            ContentDiagnosticCode::InvalidActionResourcePoolInitial => {
+                "invalidActionResourcePoolInitial"
             }
             ContentDiagnosticCode::InvalidActionResourceRefreshPolicy => {
                 "invalidActionResourceRefreshPolicy"

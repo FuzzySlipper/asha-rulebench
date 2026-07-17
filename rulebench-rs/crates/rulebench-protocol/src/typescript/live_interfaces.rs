@@ -280,6 +280,10 @@ pub fn live_interfaces() -> &'static [ProtocolInterface] {
                         "authoredActionBinding",
                         "RulebenchAuthoredActionBindingReceiptDto | null",
                     ),
+                    field(
+                        "authoredScenarioBinding",
+                        "RulebenchAuthoredScenarioBindingReceiptDto | null",
+                    ),
                     field("nextStepIndex", "number"),
                     field("lifecyclePhase", "RulebenchCombatLifecyclePhaseDto"),
                     field("startedAtStep", "number | null"),

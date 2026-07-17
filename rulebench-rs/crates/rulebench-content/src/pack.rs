@@ -1,17 +1,19 @@
 use crate::{
-    AuthoredActionDefinition, ClassDefinition, EntityDefinition, ItemDefinition,
-    ModifierDefinition, StatDefinition,
+    AuthoredActionDefinition, AuthoredScenarioDefinition, ClassDefinition, EntityDefinition,
+    ItemDefinition, ModifierDefinition, StatDefinition,
 };
 use rulebench_ruleset::{AbilityDefinition, RulesetArtifactProvenance, RulesetMetadata};
 
 pub const CONTENT_PACK_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-pack.v0";
 pub const CONTENT_PACK_FINGERPRINT_ALGORITHM_V1: &str = "fnv1a64.rulebench-content-pack.v1";
+pub const CONTENT_PACK_FINGERPRINT_ALGORITHM_V2: &str = "fnv1a64.rulebench-content-pack.v2";
 pub const CONTENT_PACK_SET_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-pack-set.v0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContentPackCanonicalVersion {
     V0,
     V1,
+    V2,
 }
 
 impl ContentPackCanonicalVersion {
@@ -19,6 +21,7 @@ impl ContentPackCanonicalVersion {
         match self {
             Self::V0 => CONTENT_PACK_FINGERPRINT_ALGORITHM,
             Self::V1 => CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
+            Self::V2 => CONTENT_PACK_FINGERPRINT_ALGORITHM_V2,
         }
     }
 }
@@ -125,6 +128,7 @@ pub enum ContentDefinitionKind {
     Modifier,
     Item,
     Action,
+    Scenario,
 }
 
 impl ContentDefinitionKind {
@@ -138,6 +142,7 @@ impl ContentDefinitionKind {
             ContentDefinitionKind::Modifier => "modifier",
             ContentDefinitionKind::Item => "item",
             ContentDefinitionKind::Action => "action",
+            ContentDefinitionKind::Scenario => "scenario",
         }
     }
 
@@ -151,6 +156,7 @@ impl ContentDefinitionKind {
             "modifier" => Some(ContentDefinitionKind::Modifier),
             "item" => Some(ContentDefinitionKind::Item),
             "action" => Some(ContentDefinitionKind::Action),
+            "scenario" => Some(ContentDefinitionKind::Scenario),
             _ => None,
         }
     }
@@ -172,6 +178,7 @@ pub struct ContentPackCatalogs {
     pub modifiers: Vec<ModifierDefinition>,
     pub items: Vec<ItemDefinition>,
     pub actions: Vec<AuthoredActionDefinition>,
+    pub scenarios: Vec<AuthoredScenarioDefinition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,6 +223,15 @@ impl CanonicalContentPack {
                 .iter()
                 .map(|value| ContentDefinitionReference {
                     kind: ContentDefinitionKind::Ruleset,
+                    id: value.id.clone(),
+                }),
+        );
+        references.extend(
+            self.catalogs
+                .scenarios
+                .iter()
+                .map(|value| ContentDefinitionReference {
+                    kind: ContentDefinitionKind::Scenario,
                     id: value.id.clone(),
                 }),
         );

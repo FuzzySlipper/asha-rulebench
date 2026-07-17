@@ -9,7 +9,7 @@ identities:
 - `archiveFingerprintAlgorithm` names only the hash applied to canonical bytes.
 
 Current writes use envelope format `2`, canonical payload encoding
-`asha-rulebench.replay-archive-payload.v2`, replay package version `1.0.0`, and
+`asha-rulebench.replay-archive-payload.v3`, replay package version `1.0.0`, and
 hash algorithm `fnv1a64`. The hash is deterministic corruption evidence, not a
 cryptographic authenticity proof.
 
@@ -20,7 +20,9 @@ an explicit order and covers archive metadata, the complete initial scenario,
 ruleset and content provenance, every typed command field, supplied or
 generated randomness, ordered events, audits, rolls, trace, gameplay receipts,
 final state identity, and optional narration. Multi-target intent fields and
-action-resource declarations/events are encoded directly.
+action-resource declarations/events are encoded directly. V3 also encodes the
+exact authored-scenario composition receipt: pack set, scenario, archetype
+inputs, loadout items, action definition/runtime mappings, and control policy.
 
 The encoding does not use Rust `Debug`, private layout, declaration order,
 serde or host JSON, generated TypeScript, fixtures, bridge code, or protocol
@@ -51,6 +53,11 @@ committed, the legacy record is quarantined for that startup and remains
 unchanged. Unknown envelope or archive identity versions are quarantined rather
 than silently accepted.
 
+Envelope v2 records carrying the storage-integrity-valid canonical v2 payload
+identity are also recognized as a bounded migration input. Startup reconstructs
+them through current authority and atomically rewrites the current v3 canonical
+identity; it does not reinterpret their stored hash as a v3 hash.
+
 Stable startup diagnostics distinguish unsupported envelope versions,
 unsupported legacy identity versions, malformed envelopes, host-payload
 corruption, canonical identity mismatch, partial commits, and migration commit
@@ -60,7 +67,7 @@ restarts.
 
 ## Compatibility limits
 
-Canonical v2 guarantees that internal Rust formatting, `Debug` output, and
+Canonical v3 guarantees that internal Rust formatting, `Debug` output, and
 host JSON field order do not affect archive identity. It does not promise that
 an archive remains executable after its registered scenario, ruleset, content
 pack, replay package version, or canonical encoding version becomes

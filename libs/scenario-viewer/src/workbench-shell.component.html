@@ -762,6 +762,25 @@
                     }
                   </section>
                 }
+                @if (snapshot().value.authoredScenarioBinding; as binding) {
+                  <section aria-label="Live authored scenario composition">
+                    <h4>Exact Authored Scenario Composition</h4>
+                    <span>{{ binding.bindingVersionLabel }} · {{ binding.scenarioId }} · {{ binding.controlLabel }}</span>
+                    <span>{{ binding.contentPackRootLabel }}</span>
+                    <span>{{ binding.contentPackSetFingerprintLabel }}</span>
+                    @for (reference of binding.contentPackReferenceLabels; track reference) {
+                      <span>{{ reference }}</span>
+                    }
+                    @for (participant of binding.participants; track participant.participantId) {
+                      <span>
+                        {{ participant.participantId }} ·
+                        {{ participant.archetypeLabels.join(", ") || "No archetype" }} ·
+                        {{ participant.loadoutItemIds.join(", ") || "No loadout" }} ·
+                        {{ participant.actionGrantLabels.join(", ") || "No authored actions" }}
+                      </span>
+                    }
+                  </section>
+                }
                 @for (
                   participant of snapshot().value.participants;
                   track participant.id

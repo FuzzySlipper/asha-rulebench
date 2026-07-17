@@ -4,7 +4,7 @@ use crate::{
     Combatant, ContentDiagnostic, ContentDiagnosticCode, ContentDiagnosticSeverity,
     ContentValidationReport, ModifierDurationPolicy, RulebenchScenario, StatDefinitionKind,
     AUTHORED_ACTION_BINDING_VERSION, AUTHORED_ACTION_CHECK_VOCABULARY_VERSION,
-    AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM,
+    AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM, AUTHORED_SCENARIO_BINDING_VERSION,
 };
 use rulebench_ruleset::{
     ActionDefinition, ActionResourceRefreshPolicy, AttackCheckDeclaration, CheckDeclaration,
@@ -35,6 +35,8 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     validate_authored_action_binding(scenario, &mut diagnostics);
+    validate_authored_scenario_binding(scenario, &mut diagnostics);
+    validate_grid_and_initial_state(scenario, &mut diagnostics);
 
     validate_rulesets(scenario, &mut diagnostics);
     validate_entities(scenario, &mut diagnostics);
@@ -83,6 +85,150 @@ pub fn validate_scenario_content(scenario: &RulebenchScenario) -> Vec<ContentDia
     }
 
     diagnostics
+}
+
+fn validate_grid_and_initial_state(
+    scenario: &RulebenchScenario,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    if scenario.grid.width == 0 || scenario.grid.height == 0 {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::InvalidGridDimensions,
+            Some(scenario.metadata.id.clone()),
+            "Scenario grid dimensions must both be greater than zero.",
+        ));
+    }
+    let mut cells = HashSet::new();
+    for cell in &scenario.grid.cells {
+        if cell.position.x >= scenario.grid.width || cell.position.y >= scenario.grid.height {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::GridCellOutOfBounds,
+                Some(format!("{},{}", cell.position.x, cell.position.y)),
+                "Scenario grid cell lies outside the declared dimensions.",
+            ));
+        }
+        if !cells.insert((cell.position.x, cell.position.y)) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::DuplicateGridCell,
+                Some(format!("{},{}", cell.position.x, cell.position.y)),
+                "Scenario grid contains the same cell more than once.",
+            ));
+        }
+    }
+    let mut placements = HashMap::new();
+    for combatant in &scenario.combatants {
+        let position = combatant.position;
+        if position.x >= scenario.grid.width || position.y >= scenario.grid.height {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::CombatantPlacementOutOfBounds,
+                Some(combatant.id.clone()),
+                format!(
+                    "Combatant {} is placed outside the scenario grid.",
+                    combatant.id
+                ),
+            ));
+        }
+        if placements
+            .insert((position.x, position.y), combatant.id.as_str())
+            .is_some_and(|existing_id| existing_id != combatant.id.as_str())
+        {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::CombatantPlacementOccupied,
+                Some(combatant.id.clone()),
+                format!(
+                    "Combatant {} overlaps another initial placement.",
+                    combatant.id
+                ),
+            ));
+        }
+        if scenario.grid.cells.iter().any(|cell| {
+            cell.position == position
+                && cell
+                    .terrain_tags
+                    .iter()
+                    .any(|tag| tag == "blocked" || tag == "wall")
+        }) {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::CombatantPlacementBlocked,
+                Some(combatant.id.clone()),
+                format!(
+                    "Combatant {} starts on movement-blocking terrain.",
+                    combatant.id
+                ),
+            ));
+        }
+        if combatant.hit_points.max <= 0
+            || combatant.hit_points.current < 0
+            || combatant.hit_points.current > combatant.hit_points.max
+            || combatant.temporary_vitality < 0
+        {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidCombatantVitality,
+                Some(combatant.id.clone()),
+                format!(
+                    "Combatant {} declares invalid initial vitality.",
+                    combatant.id
+                ),
+            ));
+        }
+    }
+}
+
+fn validate_authored_scenario_binding(
+    scenario: &RulebenchScenario,
+    diagnostics: &mut Vec<ContentDiagnostic>,
+) {
+    let Some(binding) = &scenario.authored_scenario_binding else {
+        return;
+    };
+    let participants_match = binding.participants.iter().all(|receipt| {
+        scenario
+            .combatants
+            .iter()
+            .find(|combatant| combatant.id == receipt.participant_id)
+            .is_some_and(|combatant| {
+                combatant.class_inputs == receipt.archetypes
+                    && combatant.equipped_item_ids == receipt.loadout_item_ids
+                    && receipt.action_grants.iter().all(|grant| {
+                        scenario.actions.iter().any(|action| {
+                            action.id == grant.runtime_action_id
+                                && action.actor_id == receipt.participant_id
+                        })
+                    })
+            })
+    });
+    let control_valid = match binding.control.mode {
+        crate::AuthoredScenarioControlMode::Manual => {
+            binding.control.automation_policy_id.is_none()
+                && binding.control.automation_policy_version.is_none()
+        }
+        crate::AuthoredScenarioControlMode::Automatic => {
+            binding
+                .control
+                .automation_policy_id
+                .as_ref()
+                .is_some_and(|id| !id.is_empty())
+                && binding
+                    .control
+                    .automation_policy_version
+                    .is_some_and(|version| version > 0)
+        }
+    };
+    let coherent = binding.binding_version == AUTHORED_SCENARIO_BINDING_VERSION
+        && scenario.authored_action_binding.is_none()
+        && scenario.content_pack_set.as_ref() == Some(&binding.content_pack_set)
+        && binding.content_pack_set.is_self_consistent()
+        && binding.scenario_id == scenario.metadata.id
+        && binding.participants.len() == scenario.combatants.len()
+        && participants_match
+        && control_valid;
+    if !coherent {
+        diagnostics.push(ContentDiagnostic::error(
+            ContentDiagnosticCode::InvalidAuthoredScenarioBindingReceipt,
+            Some(binding.scenario_id.clone()),
+            "The authored-scenario composition receipt does not match the materialized scenario.",
+        ));
+    }
 }
 
 fn validate_authored_action_binding(
@@ -411,6 +557,16 @@ fn validate_classes(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentD
                         format!(
                             "Class {} resource pool {} has unsupported maximum {}.",
                             class.id, pool.id, pool.maximum
+                        ),
+                    ));
+                }
+                if pool.initial > pool.maximum {
+                    diagnostics.push(ContentDiagnostic::error(
+                        ContentDiagnosticCode::InvalidActionResourcePoolInitial,
+                        Some(pool.id.clone()),
+                        format!(
+                            "Class {} resource pool {} starts at {} above maximum {}.",
+                            class.id, pool.id, pool.initial, pool.maximum
                         ),
                     ));
                 }
@@ -937,6 +1093,16 @@ fn validate_items(scenario: &RulebenchScenario, diagnostics: &mut Vec<ContentDia
                     ),
                 ));
             }
+            if pool.initial > pool.maximum {
+                diagnostics.push(ContentDiagnostic::error(
+                    ContentDiagnosticCode::InvalidActionResourcePoolInitial,
+                    Some(pool.id.clone()),
+                    format!(
+                        "Item {} resource pool {} starts at {} above maximum {}.",
+                        item.id, pool.id, pool.initial, pool.maximum
+                    ),
+                ));
+            }
             if pool.refresh_policy == ActionResourceRefreshPolicy::Turns(0) {
                 diagnostics.push(ContentDiagnostic::error(
                     ContentDiagnosticCode::InvalidActionResourceRefreshPolicy,
@@ -1423,6 +1589,16 @@ fn validate_combatant_resource_pools(
                 format!(
                     "Combatant {} resource pool {} has unsupported maximum {}.",
                     combatant.id, pool.id, pool.maximum
+                ),
+            ));
+        }
+        if pool.initial > pool.maximum {
+            diagnostics.push(ContentDiagnostic::error(
+                ContentDiagnosticCode::InvalidActionResourcePoolInitial,
+                Some(pool.id.clone()),
+                format!(
+                    "Combatant {} resource pool {} starts at {} above maximum {}.",
+                    combatant.id, pool.id, pool.initial, pool.maximum
                 ),
             ));
         }

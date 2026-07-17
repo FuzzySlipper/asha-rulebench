@@ -185,6 +185,7 @@ fn minimal_scenario() -> RulebenchScenario {
         },
         content_pack_set: None,
         authored_action_binding: None,
+        authored_scenario_binding: None,
         rulesets: vec![RulesetMetadata {
             id: "bridge.v0".to_string(),
             name: "Bridge Rules".to_string(),

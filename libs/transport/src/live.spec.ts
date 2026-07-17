@@ -218,7 +218,7 @@ describe("live Rulebench transport", () => {
       "POST http://rulebench.test/api/rulebench/v1/experiments/lab%2Fone/cancel",
       "POST http://rulebench.test/api/rulebench/v1/experiments/compare",
     ]);
-    expect(calls.every((call) => call.version === "9")).toBe(true);
+    expect(calls.every((call) => call.version === "10")).toBe(true);
     expect(calls[9]?.body).toBe(
       JSON.stringify({ newSessionId: "fork/session" }),
     );
@@ -270,7 +270,7 @@ describe("live Rulebench transport", () => {
         kind: "protocol",
         code: "handshakeMismatch",
         message:
-          "Expected asha-rulebench.protocol v9; received asha-rulebench.protocol v6.",
+          "Expected asha-rulebench.protocol v10; received asha-rulebench.protocol v6.",
         retryable: false,
       },
     });

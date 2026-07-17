@@ -9,6 +9,7 @@ import type {
   RulebenchLiveReactionExecutionDto,
   RulebenchLiveSessionSnapshotDto,
   RulebenchAuthoredActionBindingReceiptDto,
+  RulebenchAuthoredScenarioBindingReceiptDto,
 } from "@asha-rulebench/protocol";
 
 export interface RulebenchLiveAutomaticStepView {
@@ -39,6 +40,7 @@ export interface RulebenchLiveAutomaticRunView {
 export interface RulebenchLiveSessionView {
   readonly sessionId: string;
   readonly authoredActionBinding: RulebenchAuthoredActionBindingView | null;
+  readonly authoredScenarioBinding: RulebenchAuthoredScenarioBindingView | null;
   readonly lifecycleLabel: string;
   readonly roundLabel: string;
   readonly turnLabel: string;
@@ -57,6 +59,23 @@ export interface RulebenchLiveSessionView {
   readonly reactionWindow: RulebenchLiveReactionWindowView | null;
   readonly reactionLifecycleLabels: readonly string[];
   readonly reactionAuditLabels: readonly string[];
+}
+
+export interface RulebenchAuthoredScenarioBindingView {
+  readonly bindingVersionLabel: string;
+  readonly scenarioId: string;
+  readonly controlLabel: string;
+  readonly contentPackRootLabel: string;
+  readonly contentPackSetFingerprintLabel: string;
+  readonly contentPackReferenceLabels: readonly string[];
+  readonly participants: readonly RulebenchAuthoredScenarioParticipantView[];
+}
+
+export interface RulebenchAuthoredScenarioParticipantView {
+  readonly participantId: string;
+  readonly archetypeLabels: readonly string[];
+  readonly loadoutItemIds: readonly string[];
+  readonly actionGrantLabels: readonly string[];
 }
 
 export interface RulebenchAuthoredActionBindingView {
@@ -265,6 +284,10 @@ export function projectLiveSessionSnapshot(
       snapshot.authoredActionBinding === null
         ? null
         : projectAuthoredActionBinding(snapshot.authoredActionBinding),
+    authoredScenarioBinding:
+      snapshot.authoredScenarioBinding === null
+        ? null
+        : projectAuthoredScenarioBinding(snapshot.authoredScenarioBinding),
     lifecycleLabel: labelCode(snapshot.lifecyclePhase),
     roundLabel: String(snapshot.roundNumber),
     turnLabel: String(snapshot.turnIndex + 1),
@@ -353,6 +376,38 @@ export function projectLiveSessionSnapshot(
     reactionAuditLabels: snapshot.reactionAuditLog.map(
       (entry) => `${entry.reactorId}: ${labelCode(entry.decisionKind)} · ${entry.reason}`,
     ),
+  };
+}
+
+export function projectAuthoredScenarioBinding(
+  binding: RulebenchAuthoredScenarioBindingReceiptDto,
+): RulebenchAuthoredScenarioBindingView {
+  const policyLabel =
+    binding.control.automationPolicyId === null ||
+    binding.control.automationPolicyId === undefined
+      ? ""
+      : ` · ${binding.control.automationPolicyId} v${binding.control.automationPolicyVersion}`;
+  return {
+    bindingVersionLabel: `Binding v${binding.bindingVersion}`,
+    scenarioId: binding.scenarioId,
+    controlLabel: `${binding.control.mode}${policyLabel}`,
+    contentPackRootLabel: `${binding.contentPackRoot.id}@${binding.contentPackRoot.version}`,
+    contentPackSetFingerprintLabel: `${binding.contentPackSetFingerprint.algorithm}:${binding.contentPackSetFingerprint.value}`,
+    contentPackReferenceLabels: binding.contentPackReferences.map(
+      (reference) =>
+        `${reference.id}@${reference.version} · ${reference.fingerprint.algorithm}:${reference.fingerprint.value}`,
+    ),
+    participants: binding.participants.map((participant) => ({
+      participantId: participant.participantId,
+      archetypeLabels: participant.archetypes.map(
+        (archetype) =>
+          `${archetype.classId}@${archetype.version} · level ${archetype.level}`,
+      ),
+      loadoutItemIds: participant.loadoutItemIds,
+      actionGrantLabels: participant.actionGrants.map(
+        (grant) => `${grant.actionId} → ${grant.runtimeActionId}`,
+      ),
+    })),
   };
 }
 

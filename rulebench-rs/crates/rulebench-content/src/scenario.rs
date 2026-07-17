@@ -54,6 +54,7 @@ pub struct RulebenchScenario {
     pub metadata: ScenarioMetadata,
     pub content_pack_set: Option<ContentPackSetReference>,
     pub authored_action_binding: Option<AuthoredActionBindingReceipt>,
+    pub authored_scenario_binding: Option<crate::AuthoredScenarioBindingReceipt>,
     pub rulesets: Vec<RulesetMetadata>,
     pub selected_ruleset_id: String,
     pub grid: Grid,

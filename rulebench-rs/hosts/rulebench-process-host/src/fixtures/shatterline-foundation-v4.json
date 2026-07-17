@@ -1,0 +1,412 @@
+{
+  "format": "asha-rulebench.content-pack",
+  "formatVersion": 4,
+  "pack": {
+    "id": "pack.shatterline.foundation",
+    "version": "4.0.0",
+    "title": "Shatterline Foundation",
+    "summary": "Reusable archetypes, baseline actions, and two configured scenarios for the Shatterline pressure corpus.",
+    "tags": ["shatterline", "scenario-composition", "v4"],
+    "provenance": {
+      "sourceKind": "authoredFile",
+      "sourceId": "fixture:shatterline-foundation-v4",
+      "authoredBy": "Rulebench"
+    },
+    "rulesetId": "asha-rulebench.turn-control.v0",
+    "dependencies": [],
+    "catalogs": {
+      "rulesets": [
+        {
+          "id": "asha-rulebench.turn-control.v0",
+          "name": "Objective Turn Control Rules",
+          "version": "0.1.0",
+          "summary": "Attack and saving-throw actions under explicit turns and objective-side victory.",
+          "modules": [
+            {
+              "module": "actionResolution",
+              "version": "1",
+              "configuration": {
+                "module": "actionResolution",
+                "targetingPolicy": "declaredTargetsAndLineOfSight",
+                "supportedCheckHandlers": ["attackVsDefense", "savingThrow"]
+              }
+            },
+            {
+              "module": "turnControl",
+              "version": "1",
+              "configuration": {
+                "module": "turnControl",
+                "turnOrderPolicy": "explicit",
+                "combatEndPolicy": "objectiveSideVictory",
+                "objectiveSide": "wardens"
+              }
+            }
+          ]
+        }
+      ],
+      "entities": [
+        {
+          "id": "entity.shatterline.anchor",
+          "name": "Anchor",
+          "summary": "A durable Shatterline front-line combatant.",
+          "tags": ["shatterline", "anchor"],
+          "damageAdjustments": []
+        },
+        {
+          "id": "entity.shatterline.opposition",
+          "name": "Shatterline Opposition",
+          "summary": "A configurable opposing participant.",
+          "tags": ["shatterline", "opposition"],
+          "damageAdjustments": []
+        }
+      ],
+      "abilities": [
+        {
+          "id": "ability.anchor-lash",
+          "name": "Anchor Lash",
+          "kind": "ability",
+          "summary": "Strike a visible hostile with a stabilizing lash.",
+          "tags": ["attack", "baseline"]
+        },
+        {
+          "id": "ability.binding-spark",
+          "name": "Binding Spark",
+          "kind": "spell",
+          "summary": "Force a Body save and leave the target anchored.",
+          "tags": ["save", "baseline"]
+        }
+      ],
+      "classes": [
+        {
+          "id": "archetype.anchor",
+          "name": "Anchor",
+          "version": "1",
+          "summary": "Durable front-line controller.",
+          "tags": ["shatterline", "archetype"],
+          "prerequisites": [],
+          "levelGrants": [
+            {
+              "level": 1,
+              "grantedModifierIds": [],
+              "grantedAbilityIds": ["ability.anchor-lash", "ability.binding-spark"],
+              "grantedResourcePools": [
+                {
+                  "id": "standard-action",
+                  "kind": "standardAction",
+                  "initial": 1,
+                  "maximum": 1,
+                  "refreshPolicy": { "kind": "turnStart" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "archetype.conductor",
+          "name": "Conductor",
+          "version": "1",
+          "summary": "Charge-routing multi-target specialist.",
+          "tags": ["shatterline", "archetype"],
+          "prerequisites": [],
+          "levelGrants": []
+        },
+        {
+          "id": "archetype.bloom-medic",
+          "name": "Bloom Medic",
+          "version": "1",
+          "summary": "Vitality and defensive-state support specialist.",
+          "tags": ["shatterline", "archetype"],
+          "prerequisites": [],
+          "levelGrants": []
+        },
+        {
+          "id": "archetype.rift-pusher",
+          "name": "Rift Pusher",
+          "version": "1",
+          "summary": "Spatial displacement specialist.",
+          "tags": ["shatterline", "archetype"],
+          "prerequisites": [],
+          "levelGrants": []
+        },
+        {
+          "id": "archetype.salvage-tinker",
+          "name": "Salvage Tinker",
+          "version": "1",
+          "summary": "Loadout-driven action and stat specialist.",
+          "tags": ["shatterline", "archetype"],
+          "prerequisites": [],
+          "levelGrants": []
+        }
+      ],
+      "statDefinitions": [
+        {
+          "id": "body",
+          "label": "Body",
+          "kind": "base",
+          "summary": "Physical resilience and contested force."
+        },
+        {
+          "id": "focus",
+          "label": "Focus",
+          "kind": "base",
+          "summary": "Accuracy and controlled execution."
+        }
+      ],
+      "modifiers": [
+        {
+          "id": "modifier.binding-spark.anchored",
+          "label": "Anchored",
+          "summary": "Reduces bodily force for one turn.",
+          "defaultTenure": "temporary",
+          "stackingGroup": "binding-spark-anchor",
+          "stackingPolicy": "refresh",
+          "durationPolicy": { "kind": "turns", "turns": 1 },
+          "statAdjustments": [
+            { "statId": "body", "statLabel": "Body", "delta": -1 }
+          ]
+        }
+      ],
+      "items": [],
+      "actions": [
+        {
+          "id": "action.anchor-lash",
+          "abilityId": "ability.anchor-lash",
+          "name": "Anchor Lash",
+          "targeting": {
+            "targetKind": "combatant",
+            "selection": "single",
+            "teamConstraint": "hostile",
+            "maximumRange": 3,
+            "visibilityRequirement": "required"
+          },
+          "check": {
+            "kind": "attack",
+            "modifier": 1,
+            "modifierStatId": "focus",
+            "defense": { "id": "guard", "label": "Guard" }
+          },
+          "effects": [
+            { "operation": "damage", "damageBonus": 2, "damageType": "kinetic" }
+          ],
+          "resourceCosts": [
+            { "resourceId": "standard-action", "amount": 1 }
+          ],
+          "actionText": "Lash one visible hostile within three cells.",
+          "effectText": "Deal kinetic damage on a successful attack."
+        },
+        {
+          "id": "action.binding-spark",
+          "abilityId": "ability.binding-spark",
+          "name": "Binding Spark",
+          "targeting": {
+            "targetKind": "combatant",
+            "selection": "single",
+            "teamConstraint": "hostile",
+            "maximumRange": 5,
+            "visibilityRequirement": "required"
+          },
+          "check": {
+            "kind": "savingThrow",
+            "saveStatId": "body",
+            "difficultyClass": 11
+          },
+          "effects": [
+            { "operation": "damage", "damageBonus": 1, "damageType": "arcane" },
+            { "operation": "applyModifier", "modifierId": "modifier.binding-spark.anchored" }
+          ],
+          "resourceCosts": [
+            { "resourceId": "standard-action", "amount": 1 }
+          ],
+          "actionText": "Bind one visible hostile within five cells.",
+          "effectText": "Deal arcane damage and apply Anchored on a failed save."
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "shatterline-foundation-manual",
+          "title": "Shatterline Foundation Manual",
+          "summary": "An Anchor with two authored actions faces configurable opposition under manual control.",
+          "seedLabel": "shatterline:foundation:manual",
+          "rulesetId": "asha-rulebench.turn-control.v0",
+          "grid": {
+            "width": 4,
+            "height": 3,
+            "cells": [
+              { "position": { "x": 0, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 1, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 2, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 3, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 0, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 1, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 2, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 3, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 0, "y": 2 }, "terrainTags": [] },
+              { "position": { "x": 1, "y": 2 }, "terrainTags": [] },
+              { "position": { "x": 2, "y": 2 }, "terrainTags": [] },
+              { "position": { "x": 3, "y": 2 }, "terrainTags": [] }
+            ]
+          },
+          "participants": [
+            {
+              "id": "foundation-anchor",
+              "entityId": "entity.shatterline.anchor",
+              "name": "Foundation Anchor",
+              "team": "ally",
+              "sideId": "wardens",
+              "initiative": 20,
+              "position": { "x": 0, "y": 1 },
+              "hitPoints": { "current": 18, "max": 18 },
+              "temporaryVitality": 0,
+              "classInputs": [
+                { "classId": "archetype.anchor", "version": "1", "level": 1 }
+              ],
+              "stats": {
+                "baseStats": [
+                  { "id": "body", "label": "Body", "value": 3 },
+                  { "id": "focus", "label": "Focus", "value": 4 }
+                ]
+              },
+              "defenses": [
+                { "id": "guard", "label": "Guard", "value": 12 }
+              ],
+              "resourcePools": [],
+              "inventoryItemIds": [],
+              "equippedItemIds": [],
+              "baseAbilityIds": [],
+              "actionGrants": [
+                { "actionId": "action.anchor-lash", "runtimeActionId": "foundation-anchor-lash" },
+                { "actionId": "action.binding-spark", "runtimeActionId": "foundation-binding-spark" }
+              ],
+              "visibleTargetIds": ["foundation-opposition"],
+              "isActor": true
+            },
+            {
+              "id": "foundation-opposition",
+              "entityId": "entity.shatterline.opposition",
+              "name": "Foundation Opposition",
+              "team": "enemy",
+              "sideId": "raiders",
+              "initiative": 10,
+              "position": { "x": 2, "y": 1 },
+              "hitPoints": { "current": 16, "max": 16 },
+              "temporaryVitality": 0,
+              "classInputs": [],
+              "stats": {
+                "baseStats": [
+                  { "id": "body", "label": "Body", "value": 2 },
+                  { "id": "focus", "label": "Focus", "value": 2 }
+                ]
+              },
+              "defenses": [
+                { "id": "guard", "label": "Guard", "value": 10 }
+              ],
+              "resourcePools": [],
+              "inventoryItemIds": [],
+              "equippedItemIds": [],
+              "baseAbilityIds": [],
+              "actionGrants": [],
+              "visibleTargetIds": ["foundation-anchor"],
+              "isActor": false
+            }
+          ],
+          "selectedActionId": "foundation-anchor-lash",
+          "control": { "mode": "manual" }
+        },
+        {
+          "id": "shatterline-foundation-automatic",
+          "title": "Shatterline Foundation Automatic",
+          "summary": "The same Anchor archetype has different vitality, stats, placement, and initial action selection under automatic control.",
+          "seedLabel": "shatterline:foundation:automatic",
+          "rulesetId": "asha-rulebench.turn-control.v0",
+          "grid": {
+            "width": 4,
+            "height": 3,
+            "cells": [
+              { "position": { "x": 0, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 1, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 2, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 3, "y": 0 }, "terrainTags": [] },
+              { "position": { "x": 0, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 1, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 2, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 3, "y": 1 }, "terrainTags": [] },
+              { "position": { "x": 0, "y": 2 }, "terrainTags": [] },
+              { "position": { "x": 1, "y": 2 }, "terrainTags": [] },
+              { "position": { "x": 2, "y": 2 }, "terrainTags": [] },
+              { "position": { "x": 3, "y": 2 }, "terrainTags": [] }
+            ]
+          },
+          "participants": [
+            {
+              "id": "automatic-anchor",
+              "entityId": "entity.shatterline.anchor",
+              "name": "Automatic Anchor",
+              "team": "ally",
+              "sideId": "wardens",
+              "initiative": 18,
+              "position": { "x": 1, "y": 0 },
+              "hitPoints": { "current": 14, "max": 18 },
+              "temporaryVitality": 0,
+              "classInputs": [
+                { "classId": "archetype.anchor", "version": "1", "level": 1 }
+              ],
+              "stats": {
+                "baseStats": [
+                  { "id": "body", "label": "Body", "value": 4 },
+                  { "id": "focus", "label": "Focus", "value": 3 }
+                ]
+              },
+              "defenses": [
+                { "id": "guard", "label": "Guard", "value": 12 }
+              ],
+              "resourcePools": [],
+              "inventoryItemIds": [],
+              "equippedItemIds": [],
+              "baseAbilityIds": [],
+              "actionGrants": [
+                { "actionId": "action.anchor-lash", "runtimeActionId": "automatic-anchor-lash" },
+                { "actionId": "action.binding-spark", "runtimeActionId": "automatic-binding-spark" }
+              ],
+              "visibleTargetIds": ["automatic-opposition"],
+              "isActor": true
+            },
+            {
+              "id": "automatic-opposition",
+              "entityId": "entity.shatterline.opposition",
+              "name": "Automatic Opposition",
+              "team": "enemy",
+              "sideId": "raiders",
+              "initiative": 8,
+              "position": { "x": 3, "y": 0 },
+              "hitPoints": { "current": 13, "max": 16 },
+              "temporaryVitality": 0,
+              "classInputs": [],
+              "stats": {
+                "baseStats": [
+                  { "id": "body", "label": "Body", "value": 2 },
+                  { "id": "focus", "label": "Focus", "value": 2 }
+                ]
+              },
+              "defenses": [
+                { "id": "guard", "label": "Guard", "value": 9 }
+              ],
+              "resourcePools": [],
+              "inventoryItemIds": [],
+              "equippedItemIds": [],
+              "baseAbilityIds": [],
+              "actionGrants": [],
+              "visibleTargetIds": ["automatic-anchor"],
+              "isActor": false
+            }
+          ],
+          "selectedActionId": "automatic-binding-spark",
+          "control": {
+            "mode": "automatic",
+            "automationPolicyId": "firstAcceptedCandidate",
+            "automationPolicyVersion": 1
+          }
+        }
+      ]
+    }
+  }
+}

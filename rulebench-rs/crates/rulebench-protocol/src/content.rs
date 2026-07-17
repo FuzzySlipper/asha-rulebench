@@ -16,12 +16,17 @@ use crate::authored_action::{
     AuthoredTargetKindDto, AuthoredTargetSelectionDto, AuthoredTargetTeamConstraintDto,
     AuthoredVisibilityRequirementDto,
 };
+use crate::authored_scenario::{
+    AuthoredClassDefinitionDto, AuthoredItemDefinitionDto, AuthoredScenarioDefinitionDto,
+    AuthoredStatDefinitionDto,
+};
 use crate::{validate_ruleset_definition, RulesetDefinitionDto};
 
 pub const AUTHORED_CONTENT_PACK_FORMAT: &str = "asha-rulebench.content-pack";
 pub const AUTHORED_CONTENT_PACK_VERSION_V1: u32 = 1;
 pub const AUTHORED_CONTENT_PACK_VERSION_V2: u32 = 2;
-pub const AUTHORED_CONTENT_PACK_VERSION: u32 = 3;
+pub const AUTHORED_CONTENT_PACK_VERSION_V3: u32 = 3;
+pub const AUTHORED_CONTENT_PACK_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -192,6 +197,10 @@ pub struct AuthoredContentCatalogsDto {
     pub abilities: Vec<AuthoredAbilityDefinitionDto>,
     pub modifiers: Vec<AuthoredModifierDefinitionDto>,
     pub actions: Vec<AuthoredActionDefinitionDto>,
+    pub classes: Vec<AuthoredClassDefinitionDto>,
+    pub stat_definitions: Vec<AuthoredStatDefinitionDto>,
+    pub items: Vec<AuthoredItemDefinitionDto>,
+    pub scenarios: Vec<AuthoredScenarioDefinitionDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +227,7 @@ enum AuthoredContentPackDocumentWireDto {
     V1(AuthoredContentPackDocumentV1Dto),
     V2(AuthoredContentPackDocumentV2Dto),
     V3(AuthoredContentPackDocumentV3Dto),
+    V4(AuthoredContentPackDocumentV4Dto),
     Unsupported(UnsupportedAuthoredContentPackDocumentDto),
 }
 
@@ -240,6 +250,14 @@ struct AuthoredContentPackDocumentV2Dto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AuthoredContentPackDocumentV3Dto {
+    format: String,
+    format_version: u32,
+    pack: AuthoredContentPackV3Dto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentPackDocumentV4Dto {
     format: String,
     format_version: u32,
     pack: AuthoredContentPackDto,
@@ -281,6 +299,7 @@ impl<'de> Deserialize<'de> for UnsupportedAuthoredContentPackDocumentDto {
             document.format_version,
             AUTHORED_CONTENT_PACK_VERSION_V1
                 | AUTHORED_CONTENT_PACK_VERSION_V2
+                | AUTHORED_CONTENT_PACK_VERSION_V3
                 | AUTHORED_CONTENT_PACK_VERSION
         ) {
             return Err(D::Error::custom(
@@ -327,6 +346,22 @@ struct AuthoredContentPackV2Dto {
     catalogs: AuthoredContentCatalogsV2Dto,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentPackV3Dto {
+    id: String,
+    version: String,
+    title: String,
+    summary: String,
+    #[serde(default)]
+    tags: Vec<String>,
+    provenance: AuthoredContentProvenanceDto,
+    ruleset_id: String,
+    #[serde(default)]
+    dependencies: Vec<ContentPackReferenceDto>,
+    catalogs: AuthoredContentCatalogsV3Dto,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct AuthoredContentCatalogsV1Dto {
@@ -346,6 +381,16 @@ struct AuthoredContentCatalogsV2Dto {
     abilities: Vec<AuthoredAbilityDefinitionDto>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthoredContentCatalogsV3Dto {
+    rulesets: Vec<RulesetDefinitionDto>,
+    entities: Vec<AuthoredEntityDefinitionDto>,
+    abilities: Vec<AuthoredAbilityDefinitionDto>,
+    modifiers: Vec<AuthoredModifierDefinitionDto>,
+    actions: Vec<AuthoredActionDefinitionDto>,
+}
+
 impl<'de> Deserialize<'de> for AuthoredContentPackDocumentDto {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -357,7 +402,9 @@ impl<'de> Deserialize<'de> for AuthoredContentPackDocumentDto {
             AuthoredContentPackDocumentWireDto::V1(document) => {
                 if matches!(
                     document.format_version,
-                    AUTHORED_CONTENT_PACK_VERSION_V2 | AUTHORED_CONTENT_PACK_VERSION
+                    AUTHORED_CONTENT_PACK_VERSION_V2
+                        | AUTHORED_CONTENT_PACK_VERSION_V3
+                        | AUTHORED_CONTENT_PACK_VERSION
                 ) {
                     return Err(D::Error::custom(format!(
                         "authored content formatVersion {} requires its exact catalog shape",
@@ -373,7 +420,9 @@ impl<'de> Deserialize<'de> for AuthoredContentPackDocumentDto {
             AuthoredContentPackDocumentWireDto::V2(document) => {
                 if matches!(
                     document.format_version,
-                    AUTHORED_CONTENT_PACK_VERSION_V1 | AUTHORED_CONTENT_PACK_VERSION
+                    AUTHORED_CONTENT_PACK_VERSION_V1
+                        | AUTHORED_CONTENT_PACK_VERSION_V3
+                        | AUTHORED_CONTENT_PACK_VERSION
                 ) {
                     return Err(D::Error::custom(format!(
                         "authored content formatVersion {} requires its exact catalog shape",
@@ -389,7 +438,27 @@ impl<'de> Deserialize<'de> for AuthoredContentPackDocumentDto {
             AuthoredContentPackDocumentWireDto::V3(document) => {
                 if matches!(
                     document.format_version,
-                    AUTHORED_CONTENT_PACK_VERSION_V1 | AUTHORED_CONTENT_PACK_VERSION_V2
+                    AUTHORED_CONTENT_PACK_VERSION_V1
+                        | AUTHORED_CONTENT_PACK_VERSION_V2
+                        | AUTHORED_CONTENT_PACK_VERSION
+                ) {
+                    return Err(D::Error::custom(format!(
+                        "authored content formatVersion {} requires its exact catalog shape",
+                        document.format_version
+                    )));
+                }
+                Ok(Self {
+                    format: document.format,
+                    format_version: document.format_version,
+                    pack: document.pack.into_current(),
+                })
+            }
+            AuthoredContentPackDocumentWireDto::V4(document) => {
+                if matches!(
+                    document.format_version,
+                    AUTHORED_CONTENT_PACK_VERSION_V1
+                        | AUTHORED_CONTENT_PACK_VERSION_V2
+                        | AUTHORED_CONTENT_PACK_VERSION_V3
                 ) {
                     return Err(D::Error::custom(format!(
                         "authored content formatVersion {} requires its exact catalog shape",
@@ -422,6 +491,10 @@ impl Serialize for AuthoredContentPackDocumentDto {
             if !self.pack.catalogs.abilities.is_empty()
                 || !self.pack.catalogs.modifiers.is_empty()
                 || !self.pack.catalogs.actions.is_empty()
+                || !self.pack.catalogs.classes.is_empty()
+                || !self.pack.catalogs.stat_definitions.is_empty()
+                || !self.pack.catalogs.items.is_empty()
+                || !self.pack.catalogs.scenarios.is_empty()
             {
                 return Err(S::Error::custom(
                     "authored v2/v3 definitions require a newer formatVersion",
@@ -436,7 +509,13 @@ impl Serialize for AuthoredContentPackDocumentDto {
         }
 
         if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V2 {
-            if !self.pack.catalogs.modifiers.is_empty() || !self.pack.catalogs.actions.is_empty() {
+            if !self.pack.catalogs.modifiers.is_empty()
+                || !self.pack.catalogs.actions.is_empty()
+                || !self.pack.catalogs.classes.is_empty()
+                || !self.pack.catalogs.stat_definitions.is_empty()
+                || !self.pack.catalogs.items.is_empty()
+                || !self.pack.catalogs.scenarios.is_empty()
+            {
                 return Err(S::Error::custom(
                     "authored modifier and action definitions require formatVersion 3",
                 ));
@@ -449,11 +528,29 @@ impl Serialize for AuthoredContentPackDocumentDto {
             .serialize(serializer);
         }
 
+        if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V3 {
+            if !self.pack.catalogs.classes.is_empty()
+                || !self.pack.catalogs.stat_definitions.is_empty()
+                || !self.pack.catalogs.items.is_empty()
+                || !self.pack.catalogs.scenarios.is_empty()
+            {
+                return Err(S::Error::custom(
+                    "authored class, stat, item, and scenario definitions require formatVersion 4",
+                ));
+            }
+            return AuthoredContentPackDocumentV3Dto {
+                format: self.format.clone(),
+                format_version: self.format_version,
+                pack: self.pack.to_v3(),
+            }
+            .serialize(serializer);
+        }
+
         if self.format_version != AUTHORED_CONTENT_PACK_VERSION {
             return Err(S::Error::custom("unsupported authored content version"));
         }
 
-        AuthoredContentPackDocumentV3Dto {
+        AuthoredContentPackDocumentV4Dto {
             format: self.format.clone(),
             format_version: self.format_version,
             pack: self.pack.clone(),
@@ -497,6 +594,10 @@ impl AuthoredContentPackV1Dto {
                 abilities: Vec::new(),
                 modifiers: Vec::new(),
                 actions: Vec::new(),
+                classes: Vec::new(),
+                stat_definitions: Vec::new(),
+                items: Vec::new(),
+                scenarios: Vec::new(),
             },
         }
     }
@@ -519,6 +620,36 @@ impl AuthoredContentPackV2Dto {
                 abilities: self.catalogs.abilities,
                 modifiers: Vec::new(),
                 actions: Vec::new(),
+                classes: Vec::new(),
+                stat_definitions: Vec::new(),
+                items: Vec::new(),
+                scenarios: Vec::new(),
+            },
+        }
+    }
+}
+
+impl AuthoredContentPackV3Dto {
+    fn into_current(self) -> AuthoredContentPackDto {
+        AuthoredContentPackDto {
+            id: self.id,
+            version: self.version,
+            title: self.title,
+            summary: self.summary,
+            tags: self.tags,
+            provenance: self.provenance,
+            ruleset_id: self.ruleset_id,
+            dependencies: self.dependencies,
+            catalogs: AuthoredContentCatalogsDto {
+                rulesets: self.catalogs.rulesets,
+                entities: self.catalogs.entities,
+                abilities: self.catalogs.abilities,
+                modifiers: self.catalogs.modifiers,
+                actions: self.catalogs.actions,
+                classes: Vec::new(),
+                stat_definitions: Vec::new(),
+                items: Vec::new(),
+                scenarios: Vec::new(),
             },
         }
     }
@@ -556,6 +687,26 @@ impl AuthoredContentPackDto {
                 rulesets: self.catalogs.rulesets.clone(),
                 entities: self.catalogs.entities.clone(),
                 abilities: self.catalogs.abilities.clone(),
+            },
+        }
+    }
+
+    fn to_v3(&self) -> AuthoredContentPackV3Dto {
+        AuthoredContentPackV3Dto {
+            id: self.id.clone(),
+            version: self.version.clone(),
+            title: self.title.clone(),
+            summary: self.summary.clone(),
+            tags: self.tags.clone(),
+            provenance: self.provenance.clone(),
+            ruleset_id: self.ruleset_id.clone(),
+            dependencies: self.dependencies.clone(),
+            catalogs: AuthoredContentCatalogsV3Dto {
+                rulesets: self.catalogs.rulesets.clone(),
+                entities: self.catalogs.entities.clone(),
+                abilities: self.catalogs.abilities.clone(),
+                modifiers: self.catalogs.modifiers.clone(),
+                actions: self.catalogs.actions.clone(),
             },
         }
     }
@@ -608,16 +759,18 @@ impl AuthoredContentPackDocumentDto {
             self.format_version,
             AUTHORED_CONTENT_PACK_VERSION_V1
                 | AUTHORED_CONTENT_PACK_VERSION_V2
+                | AUTHORED_CONTENT_PACK_VERSION_V3
                 | AUTHORED_CONTENT_PACK_VERSION
         ) {
             return Err(AuthoredContentDecodeError {
                 code: "unsupportedAuthoredContentVersion",
                 path: "formatVersion".to_string(),
                 message: format!(
-                    "Authored content format version {} is unsupported; supported versions are {}, {}, and {}.",
+                    "Authored content format version {} is unsupported; supported versions are {}, {}, {}, and {}.",
                     self.format_version,
                     AUTHORED_CONTENT_PACK_VERSION_V1,
                     AUTHORED_CONTENT_PACK_VERSION_V2,
+                    AUTHORED_CONTENT_PACK_VERSION_V3,
                     AUTHORED_CONTENT_PACK_VERSION
                 ),
             });
@@ -625,7 +778,11 @@ impl AuthoredContentPackDocumentDto {
         if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V1
             && (!self.pack.catalogs.abilities.is_empty()
                 || !self.pack.catalogs.modifiers.is_empty()
-                || !self.pack.catalogs.actions.is_empty())
+                || !self.pack.catalogs.actions.is_empty()
+                || !self.pack.catalogs.classes.is_empty()
+                || !self.pack.catalogs.stat_definitions.is_empty()
+                || !self.pack.catalogs.items.is_empty()
+                || !self.pack.catalogs.scenarios.is_empty())
         {
             return Err(AuthoredContentDecodeError {
                 code: "authoredDefinitionRequiresV2",
@@ -634,13 +791,32 @@ impl AuthoredContentPackDocumentDto {
             });
         }
         if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V2
-            && (!self.pack.catalogs.modifiers.is_empty() || !self.pack.catalogs.actions.is_empty())
+            && (!self.pack.catalogs.modifiers.is_empty()
+                || !self.pack.catalogs.actions.is_empty()
+                || !self.pack.catalogs.classes.is_empty()
+                || !self.pack.catalogs.stat_definitions.is_empty()
+                || !self.pack.catalogs.items.is_empty()
+                || !self.pack.catalogs.scenarios.is_empty())
         {
             return Err(AuthoredContentDecodeError {
                 code: "authoredDefinitionRequiresV3",
                 path: "pack.catalogs".to_string(),
                 message: "Authored modifier and action definitions require formatVersion 3."
                     .to_string(),
+            });
+        }
+        if self.format_version == AUTHORED_CONTENT_PACK_VERSION_V3
+            && (!self.pack.catalogs.classes.is_empty()
+                || !self.pack.catalogs.stat_definitions.is_empty()
+                || !self.pack.catalogs.items.is_empty()
+                || !self.pack.catalogs.scenarios.is_empty())
+        {
+            return Err(AuthoredContentDecodeError {
+                code: "authoredDefinitionRequiresV4",
+                path: "pack.catalogs".to_string(),
+                message:
+                    "Authored class, stat, item, and scenario definitions require formatVersion 4."
+                        .to_string(),
             });
         }
         let catalogs = self.pack.catalogs.to_authority()?;
@@ -657,10 +833,10 @@ impl AuthoredContentPackDocumentDto {
                 ),
             })?;
         Ok(ContentPackDefinition {
-            canonical_version: if self.format_version == AUTHORED_CONTENT_PACK_VERSION {
-                ContentPackCanonicalVersion::V1
-            } else {
-                ContentPackCanonicalVersion::V0
+            canonical_version: match self.format_version {
+                AUTHORED_CONTENT_PACK_VERSION => ContentPackCanonicalVersion::V2,
+                AUTHORED_CONTENT_PACK_VERSION_V3 => ContentPackCanonicalVersion::V1,
+                _ => ContentPackCanonicalVersion::V0,
             },
             identity: ContentPackIdentity::new(&self.pack.id, &self.pack.version),
             title: self.pack.title.clone(),
@@ -727,6 +903,26 @@ impl AuthoredContentCatalogsDto {
             .iter()
             .map(AuthoredActionDefinitionDto::to_authority)
             .collect();
+        let classes = self
+            .classes
+            .iter()
+            .map(AuthoredClassDefinitionDto::to_authority)
+            .collect();
+        let stat_definitions = self
+            .stat_definitions
+            .iter()
+            .map(AuthoredStatDefinitionDto::to_authority)
+            .collect();
+        let items = self
+            .items
+            .iter()
+            .map(AuthoredItemDefinitionDto::to_authority)
+            .collect();
+        let scenarios = self
+            .scenarios
+            .iter()
+            .map(AuthoredScenarioDefinitionDto::to_authority)
+            .collect();
 
         Ok(ContentPackCatalogs {
             rulesets,
@@ -734,7 +930,10 @@ impl AuthoredContentCatalogsDto {
             abilities,
             modifiers,
             actions,
-            ..ContentPackCatalogs::default()
+            classes,
+            stat_definitions,
+            items,
+            scenarios,
         })
     }
 }
@@ -1428,7 +1627,7 @@ mod tests {
 
     fn authored_v3_document() -> serde_json::Value {
         let mut document = authored_document(
-            AUTHORED_CONTENT_PACK_VERSION,
+            AUTHORED_CONTENT_PACK_VERSION_V3,
             Some(json!([authored_ability()])),
         );
         let catalogs = document["pack"]["catalogs"]

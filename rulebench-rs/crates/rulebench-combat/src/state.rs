@@ -545,6 +545,7 @@ mod tests {
             },
             content_pack_set: None,
             authored_action_binding: None,
+            authored_scenario_binding: None,
             rulesets: Vec::new(),
             selected_ruleset_id: "test-rules".to_string(),
             grid: Grid {

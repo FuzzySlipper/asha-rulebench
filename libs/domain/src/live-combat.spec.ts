@@ -19,6 +19,17 @@ describe("live combat domain projections", () => {
       contentPackRootLabel: "pack.authored.v3@3.0.0",
       actionFingerprintLabel: "action:exact-action",
     });
+    expect(view.authoredScenarioBinding).toMatchObject({
+      scenarioId: "scenario",
+      controlLabel: "manual",
+      participants: [
+        {
+          participantId: "entity-adept",
+          archetypeLabels: ["archetype.anchor@1 · level 1"],
+          actionGrantLabels: ["action.binding-glyph → binding-glyph"],
+        },
+      ],
+    });
     expect(view.fingerprintLabel).toBe("test:state-1");
     expect(view.participants[1]).toEqual({
       id: "entity-raider",
@@ -100,6 +111,33 @@ function snapshot(
       targetingOperationVocabularyVersion: "2",
       checkVocabularyVersion: "1",
       effectOperationVocabularyVersion: "1",
+    },
+    authoredScenarioBinding: {
+      bindingVersion: 1,
+      contentPackRoot: {
+        id: "pack.authored.v4",
+        version: "4.0.0",
+        fingerprint: { algorithm: "pack", value: "exact-pack-v4" },
+      },
+      contentPackReferences: [],
+      contentPackSetFingerprint: { algorithm: "set", value: "exact-set-v4" },
+      scenarioId: "scenario",
+      participants: [
+        {
+          participantId: "entity-adept",
+          archetypes: [
+            { classId: "archetype.anchor", version: "1", level: 1 },
+          ],
+          loadoutItemIds: [],
+          actionGrants: [
+            {
+              actionId: "action.binding-glyph",
+              runtimeActionId: "binding-glyph",
+            },
+          ],
+        },
+      ],
+      control: { mode: "manual" },
     },
     nextStepIndex: 0,
     lifecyclePhase: "inProgress",

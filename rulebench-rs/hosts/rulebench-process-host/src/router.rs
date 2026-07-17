@@ -91,6 +91,9 @@ fn process_host_capability_manifest(
         .push("content.authored-pack".to_string());
     registry
         .regression_capability_ids
+        .push("content.authored-scenario".to_string());
+    registry
+        .regression_capability_ids
         .push("replay.finalized-archive".to_string());
     registry
         .regression_capability_ids
@@ -179,7 +182,7 @@ pub fn build_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, 
 }
 
 fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, String> {
-    let scenarios = bridge_scenarios();
+    let mut scenarios = bridge_scenarios();
     let replay_packages = replay_review_packages();
     let mut storage_scenarios = scenarios.clone();
     for (index, package) in replay_packages.iter().enumerate() {
@@ -202,6 +205,14 @@ fn open_durable_rulebench_router(root: &Path) -> Result<ProcessHostRouter, Strin
         .map_err(|error| format!("Could not open durable content repository: {error:?}"))?;
     let (content, workspace_issues) =
         ContentWorkspace::open(content, compiled_ruleset_provider_catalog());
+    let authored_scenarios = content.active_authored_scenarios().map_err(|error| {
+        format!(
+            "Could not materialize active authored scenarios: {}",
+            error.message
+        )
+    })?;
+    storage_scenarios.extend(authored_scenarios.clone());
+    scenarios.extend(authored_scenarios);
     let content_artifact_count = content.storage().list().len();
     let binding_sources = content.binding_sources();
     let replay_root = root.join("replays");
@@ -376,7 +387,38 @@ impl ProcessHostRouter {
                         .get_viewer_session_step(&context, session_id, step_id),
                 )
             }
-            (HttpMethod::Get, ["scenarios"]) => bridge_result(self.bridge.list_scenarios(&context)),
+            (HttpMethod::Get, ["scenarios"]) => {
+                let mut scenarios = match self.bridge.list_scenarios(&context) {
+                    Ok(scenarios) => scenarios,
+                    Err(error) => return bridge_error(error),
+                };
+                if let Some(workspace) = self.content_workspace.as_ref() {
+                    let authored = match workspace.active_authored_scenarios() {
+                        Ok(authored) => authored,
+                        Err(error) => return content_error(error),
+                    };
+                    for scenario in authored {
+                        if scenarios
+                            .iter()
+                            .any(|existing| existing.id == scenario.option.id)
+                        {
+                            return error_response(
+                                409,
+                                "content",
+                                "authoredScenarioIdentityCollision",
+                                format!(
+                                    "Authored scenario id collides with a registered scenario: {}.",
+                                    scenario.option.id
+                                ),
+                                false,
+                            );
+                        }
+                        scenarios.push(scenario.option);
+                    }
+                }
+                scenarios.sort_by(|left, right| left.id.cmp(&right.id));
+                json_ok(scenarios)
+            }
             (HttpMethod::Get, ["session-recovery"]) => {
                 match self.bridge.list_session_recovery(&context) {
                     Ok(sessions) => json_ok(SessionRecoveryCatalogDto {
@@ -457,12 +499,27 @@ impl ProcessHostRouter {
                                 false,
                             );
                         };
-                        let scenario = match self.bridge.list_scenarios(&context) {
+                        let registered_scenario = match self.bridge.list_scenarios(&context) {
                             Ok(scenarios) => scenarios
                                 .into_iter()
                                 .find(|scenario| scenario.id == request.scenario_id),
                             Err(error) => return bridge_error(error),
                         };
+                        let authored_scenario = if registered_scenario.is_some() {
+                            None
+                        } else {
+                            match workspace
+                                .active_authored_scenario(&reference, &request.scenario_id)
+                            {
+                                Ok(scenario) => Some(scenario),
+                                Err(error) if error.code == "authoredScenarioNotFound" => None,
+                                Err(error) => return content_error(error),
+                            }
+                        };
+                        let scenario = authored_scenario
+                            .as_ref()
+                            .map(|scenario| &scenario.option)
+                            .or(registered_scenario.as_ref());
                         let Some(scenario) = scenario else {
                             return error_response(
                                 404,
@@ -504,17 +561,27 @@ impl ProcessHostRouter {
                             None
                         };
                         match workspace.active_pack_set(&reference) {
-                            Ok(set) => Some((reference, set, provenance, imported)),
+                            Ok(set) => {
+                                Some((reference, set, provenance, imported, authored_scenario))
+                            }
                             Err(error) => return content_error(error),
                         }
                     }
                     None => None,
                 };
                 let created = match &selected_content {
-                    Some((_, _, _, Some(imported))) => self
+                    Some((_, _, _, Some(imported), _)) => self
                         .bridge
                         .create_session_with_authored_action(&context, &request, imported),
-                    Some((_, set, provenance, None)) => {
+                    Some((_, _, provenance, None, Some(authored))) => {
+                        self.bridge.create_authored_scenario_session(
+                            &context,
+                            &request,
+                            authored.scenario.clone(),
+                            provenance.clone(),
+                        )
+                    }
+                    Some((_, set, provenance, None, None)) => {
                         self.bridge.create_session_with_content_pack_set(
                             &context,
                             &request,
@@ -526,7 +593,7 @@ impl ProcessHostRouter {
                 };
                 match created {
                     Ok(created) => {
-                        if let (Some((reference, _, _, _)), Some(workspace)) =
+                        if let (Some((reference, _, _, _, _)), Some(workspace)) =
                             (selected_content, self.content_workspace.as_mut())
                         {
                             if let Err(error) =

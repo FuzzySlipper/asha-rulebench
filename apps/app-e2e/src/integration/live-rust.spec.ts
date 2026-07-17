@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { createLiveRulebenchTransport } from "@asha-rulebench/transport";
+import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol";
+import {
+  createLiveRulebenchTransport,
+  RULEBENCH_PROTOCOL_VERSION,
+} from "@asha-rulebench/transport";
 
 test.describe.configure({ mode: "serial" });
 
@@ -49,7 +53,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 9,
+        protocolVersion: RULEBENCH_PROTOCOL_VERSION,
         authoritySurface: "asha-rulebench.local-authority.v0",
       },
     });
@@ -273,7 +277,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       error: {
         kind: "protocol",
         code: "protocolVersionMismatch",
-        message: "Unsupported protocol version 999; expected 9.",
+        message: `Unsupported protocol version 999; expected ${RULEBENCH_PROTOCOL_VERSION}.`,
         retryable: false,
       },
     });
@@ -282,6 +286,142 @@ test("invokes live Rust authority through the Angular origin", async ({
     if (sessionExists) {
       await transport.submitControl(sessionId, { kind: "explicitEnd" });
       await transport.closeSession(sessionId);
+    }
+    transport.disconnect();
+  }
+});
+
+test("materializes Shatterline v4 scenario provenance and composition in the live UI @gate", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const apiBaseUrl = new URL("/api/rulebench/v1", page.url()).toString();
+  const transport = createLiveRulebenchTransport({ apiBaseUrl });
+  const nonce = Date.now().toString();
+  const packId = `pack.e2e.shatterline.foundation-${nonce}`;
+  const sessionId = `e2e-shatterline-foundation-${nonce}`;
+  const fixture = await readFile(
+    new URL(
+      "../../../../rulebench-rs/hosts/rulebench-process-host/src/fixtures/shatterline-foundation-v4.json",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const payload = fixture
+    .replace("pack.shatterline.foundation", packId)
+    .replace(
+      "fixture:shatterline-foundation-v4",
+      `fixture:e2e-shatterline-foundation-v4-${nonce}`,
+    );
+  let reference: RulebenchContentPackReferenceDto | undefined;
+  let sessionExists = false;
+
+  try {
+    const connected = await transport.connect();
+    expect(connected.ok).toBe(true);
+    const imported = await transport.importContent(payload, "reject");
+    expect(imported.ok).toBe(true);
+    if (!imported.ok || imported.value.outcome === null) return;
+    reference = imported.value.outcome.review.pack.reference;
+    const activated = await transport.activateContent(reference);
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(
+      activated.value.packs.find(
+        (pack) =>
+          pack.reference.fingerprint.value === reference?.fingerprint.value,
+      )?.active,
+    ).toBe(true);
+    const scenarios = await transport.listScenarios();
+    expect(scenarios.ok).toBe(true);
+    if (!scenarios.ok) return;
+    expect(scenarios.value.map((scenario) => scenario.id)).toEqual(
+      expect.arrayContaining([
+        "shatterline-foundation-manual",
+        "shatterline-foundation-automatic",
+      ]),
+    );
+
+    const setup = await openLiveCombatWorkspace(page);
+    await setup.getByRole("button", { name: "Connect", exact: true }).click();
+    await setup
+      .getByRole("button", {
+        name: "Shatterline Foundation Automatic",
+        exact: true,
+      })
+      .click();
+    await expect(
+      setup.getByText("automatic · firstAcceptedCandidate v1", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await setup
+      .getByRole("button", {
+        name: "Shatterline Foundation Manual",
+        exact: true,
+      })
+      .click();
+    await expect(setup.getByText("manual", { exact: true })).toBeVisible();
+    await expect(setup.getByText(`${packId} · 4.0.0`)).toBeVisible();
+    await expect(
+      setup.getByRole("button", { name: `${packId}@4.0.0` }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const createSession = setup.getByRole("button", {
+      name: "Create session",
+    });
+    await expect(createSession).toBeEnabled();
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setup.screenshot({
+      path: "dist/.playwright/shatterline-foundation-setup-desktop.png",
+    });
+    await page.setViewportSize({ width: 640, height: 900 });
+    await setup.screenshot({
+      path: "dist/.playwright/shatterline-foundation-setup-narrow.png",
+    });
+
+    await setup
+      .getByRole("textbox", { name: "Session", exact: true })
+      .fill(sessionId);
+    await createSession.click();
+    await expect(setup.getByRole("alert")).toHaveCount(0);
+    sessionExists = true;
+    await page
+      .getByRole("dialog", { name: "Live combat setup" })
+      .getByRole("button", { name: "Close" })
+      .click();
+    const evidence = page.getByRole("region", { name: "5. Evidence log" });
+    await evidence.getByRole("tab", { name: "State" }).click();
+    const composition = evidence.getByRole("region", {
+      name: "Live authored scenario composition",
+    });
+    await expect(composition).toContainText(
+      "shatterline-foundation-manual · manual",
+    );
+    await expect(composition).toContainText("archetype.anchor@1 · level 1");
+    await expect(composition).toContainText(
+      "action.anchor-lash → foundation-anchor-lash",
+    );
+    await expect(composition).toContainText(
+      "action.binding-spark → foundation-binding-spark",
+    );
+    await page.screenshot({
+      path: "dist/.playwright/shatterline-foundation-receipt-narrow.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({
+      path: "dist/.playwright/shatterline-foundation-receipt-desktop.png",
+      fullPage: true,
+    });
+  } finally {
+    if (sessionExists) {
+      await transport.submitControl(sessionId, { kind: "explicitEnd" });
+      await transport.closeSession(sessionId);
+    }
+    if (reference !== undefined) {
+      await transport.deactivateContent(reference);
+      await transport.deleteContent(reference);
     }
     transport.disconnect();
   }

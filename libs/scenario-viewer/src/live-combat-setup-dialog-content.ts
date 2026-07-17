@@ -195,6 +195,13 @@ import type {
                   <p>
                     {{ scenario.rulesetId }} · {{ scenario.rulesetVersion }}
                   </p>
+                  <h4>Control</h4>
+                  <p>
+                    {{ scenario.controlMode }}
+                    @if (scenario.automationPolicyId !== null) {
+                      · {{ scenario.automationPolicyId }} v{{ scenario.automationPolicyVersion }}
+                    }
+                  </p>
                 </section>
                 <section class="setup-section">
                   <h4>Content</h4>
@@ -506,11 +513,22 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     };
   });
   protected readonly canCreateSession = computed(
-    () =>
+    () => {
+      const scenario = this.selectedScenario();
+      const selectedPack = this.selectedContentPack();
+      const hasRequiredContent =
+        scenario === null ||
+        !scenario.requiresExactContentPack ||
+        (selectedPack?.id === scenario.contentPackId &&
+          selectedPack.version === scenario.contentPackVersion);
+      return (
       this.connection().kind === "data" &&
       this.selectedScenarioId() !== null &&
       this.sessionIdInput().trim().length > 0 &&
-      !this.hasUnresolvedAuthoredActionSelection(),
+      !this.hasUnresolvedAuthoredActionSelection() &&
+      hasRequiredContent
+      );
+    },
   );
 
   ngOnInit(): void {
@@ -556,6 +574,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     this.store.selectScenario(id);
     this.syncParticipantOrder();
     this.syncAuthoredBinding();
+    this.syncContentPack();
   }
 
   protected setSessionId(value: string): void {
@@ -652,6 +671,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
       this.contentStore.loadBindingCatalog(),
     ]);
     this.syncParticipantOrder();
+    this.syncContentPack();
   }
 
   private syncParticipantOrder(): void {
@@ -670,5 +690,26 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
       return;
     }
     this.selectedAuthoredActorId.set(this.bindingActors()[0]?.id ?? null);
+  }
+
+  private syncContentPack(): void {
+    const scenario = this.selectedScenario();
+    const workspace = this.contentWorkspace();
+    if (
+      scenario === null ||
+      scenario.contentPackId === null ||
+      scenario.contentPackVersion === null ||
+      workspace.kind !== "data"
+    ) {
+      this.selectedContentPack.set(null);
+      return;
+    }
+    const pack = workspace.value.packs.find(
+      (candidate) =>
+        candidate.active &&
+        candidate.reference.id === scenario.contentPackId &&
+        candidate.reference.version === scenario.contentPackVersion,
+    );
+    this.selectedContentPack.set(pack?.reference ?? null);
   }
 }

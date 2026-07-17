@@ -10,7 +10,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
   "operationVocabularyVersion": "2",
   "effectVocabularyVersion": "1",
   "protocolId": "asha-rulebench.protocol",
-  "protocolVersion": 9,
+  "protocolVersion": 10,
   "host": {
     "adapterId": "rulebench-process-host",
     "storageMode": "filesystem",
@@ -512,6 +512,26 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
       },
       "evidence": [
         "rulebench-process-host.storage-mode:filesystem"
+      ]
+    },
+    {
+      "id": "content.authored-scenario",
+      "kind": "content",
+      "version": "1",
+      "support": {
+        "declared": true,
+        "validationSupported": true,
+        "runtimeExecutable": true,
+        "protocolExposed": true,
+        "liveHostExposed": true,
+        "uiExposed": true,
+        "regressionCovered": true,
+        "durableAcrossRestart": true
+      },
+      "evidence": [
+        "rulebench-content.authored-scenario-v4",
+        "rulebench-content.authored-scenario-binding-v1",
+        "rulebench-process-host.authored-scenario-workflow"
       ]
     },
     {

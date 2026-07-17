@@ -928,6 +928,7 @@ function makeLiveSessionSnapshot(
   return {
     sessionId,
     authoredActionBinding: null,
+    authoredScenarioBinding: null,
     nextStepIndex: 0,
     lifecyclePhase,
     startedAtStep: lifecyclePhase === "ready" ? null : 0,

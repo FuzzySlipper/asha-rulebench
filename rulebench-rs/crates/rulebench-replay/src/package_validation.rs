@@ -358,6 +358,7 @@ pub(crate) mod tests {
             },
             content_pack_set: Some(content_pack_set()),
             authored_action_binding: None,
+            authored_scenario_binding: None,
             selected_ruleset_id: ruleset.id.clone(),
             rulesets: vec![ruleset],
             grid: Grid {

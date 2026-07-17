@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::{canonical_replay_archive_payload_fingerprint, ReplayPackage};
 
 pub const REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION: &str =
-    "asha-rulebench.replay-archive-payload.v2";
+    "asha-rulebench.replay-archive-payload.v3";
 pub const REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM: &str = "fnv1a64";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

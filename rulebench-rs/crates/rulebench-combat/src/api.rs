@@ -612,18 +612,21 @@ mod tests {
             ActionResourcePool {
                 id: "spell-slot-1".to_string(),
                 kind: ActionResourceKind::SpellSlot,
+                initial: 2,
                 maximum: 2,
                 refresh_policy: ActionResourceRefreshPolicy::CombatStart,
             },
             ActionResourcePool {
                 id: "arcane-charge".to_string(),
                 kind: ActionResourceKind::Charge,
+                initial: 2,
                 maximum: 2,
                 refresh_policy: ActionResourceRefreshPolicy::Never,
             },
             ActionResourcePool {
                 id: "api-bolt-cooldown".to_string(),
                 kind: ActionResourceKind::Cooldown,
+                initial: 1,
                 maximum: 1,
                 refresh_policy: ActionResourceRefreshPolicy::Turns(2),
             },
@@ -759,6 +762,7 @@ mod tests {
             granted_resource_pools: vec![ActionResourcePool {
                 id: "focus-charge".to_string(),
                 kind: ActionResourceKind::Charge,
+                initial: 2,
                 maximum: 2,
                 refresh_policy: ActionResourceRefreshPolicy::Never,
             }],
@@ -892,6 +896,7 @@ mod tests {
                     granted_resource_pools: vec![ActionResourcePool {
                         id: "class-charge".to_string(),
                         kind: ActionResourceKind::Charge,
+                        initial: 2,
                         maximum: 2,
                         refresh_policy: ActionResourceRefreshPolicy::Never,
                     }],
@@ -1221,6 +1226,7 @@ mod tests {
             },
             content_pack_set: None,
             authored_action_binding: None,
+            authored_scenario_binding: None,
             rulesets: vec![RulesetMetadata {
                 id: "combat-api.v0".to_string(),
                 name: "Combat API Rules".to_string(),

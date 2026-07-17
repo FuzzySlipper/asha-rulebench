@@ -54,9 +54,42 @@ pub struct AuthoredActionBindingError {
 }
 
 pub fn bind_authored_action(
+    scenario: RulebenchScenario,
+    imported: &ImportedContentPack,
+    request: &AuthoredActionBindingRequest,
+) -> Result<RulebenchScenario, AuthoredActionBindingError> {
+    bind_authored_action_internal(scenario, imported, request, None, None, true, true, true)
+}
+
+pub(crate) fn materialize_authored_action_for_scenario(
+    scenario: RulebenchScenario,
+    imported: &ImportedContentPack,
+    request: &AuthoredActionBindingRequest,
+    runtime_action_id: &str,
+    visible_target_ids: &[String],
+) -> Result<RulebenchScenario, AuthoredActionBindingError> {
+    bind_authored_action_internal(
+        scenario,
+        imported,
+        request,
+        Some(runtime_action_id),
+        Some(visible_target_ids),
+        false,
+        false,
+        false,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bind_authored_action_internal(
     mut scenario: RulebenchScenario,
     imported: &ImportedContentPack,
     request: &AuthoredActionBindingRequest,
+    runtime_action_id: Option<&str>,
+    visible_target_ids: Option<&[String]>,
+    grant_ability: bool,
+    retain_legacy_receipt: bool,
+    validate_complete_scenario: bool,
 ) -> Result<RulebenchScenario, AuthoredActionBindingError> {
     if request.content_pack != imported.resolved_set.reference.root {
         return Err(rejected(
@@ -65,7 +98,7 @@ pub fn bind_authored_action(
             "The authored-action binding root does not match the exact resolved pack set.",
         ));
     }
-    if scenario.authored_action_binding.is_some() {
+    if retain_legacy_receipt && scenario.authored_action_binding.is_some() {
         return Err(rejected(
             "duplicateAuthoredActionBinding",
             Some(scenario.metadata.id.clone()),
@@ -136,7 +169,7 @@ pub fn bind_authored_action(
         merge_modifier(&mut scenario, modifier)?;
     }
 
-    let target_set = derive_target_set(&scenario, actor_index, action);
+    let target_set = derive_target_set(&scenario, actor_index, action, visible_target_ids);
     let selectable_target_ids =
         target_set.selectable_target_ids(action.targeting.visibility_requirement);
     if selectable_target_ids.is_empty() {
@@ -148,6 +181,7 @@ pub fn bind_authored_action(
     }
     let operations = materialize_operations(&scenario, actor_index, action, selectable_target_ids)?;
     let runtime_action = materialize_action(
+        runtime_action_id.unwrap_or(&action.id),
         &scenario.selected_ruleset_id,
         &request.actor_id,
         action,
@@ -167,7 +201,7 @@ pub fn bind_authored_action(
     }
 
     let actor = &mut scenario.combatants[actor_index];
-    if !actor.base_ability_ids.contains(&ability.id) {
+    if grant_ability && !actor.base_ability_ids.contains(&ability.id) {
         actor.base_ability_ids.push(ability.id.clone());
         actor.base_ability_ids.sort();
     }
@@ -178,25 +212,28 @@ pub fn bind_authored_action(
         .actions
         .sort_by(|left, right| left.id.cmp(&right.id));
     scenario.content_pack_set = Some(imported.resolved_set.reference.clone());
-    scenario.authored_action_binding = Some(AuthoredActionBindingReceipt {
-        binding_version: AUTHORED_ACTION_BINDING_VERSION.to_string(),
-        content_pack_set: imported.resolved_set.reference.clone(),
-        action_id: action.id.clone(),
-        action_definition_fingerprint: fingerprint_authored_action(action),
-        ability_id: ability.id.clone(),
-        scenario_id: scenario.metadata.id.clone(),
-        actor_id: request.actor_id.clone(),
-        grant: AuthoredActionAbilityGrantReceipt {
-            actor_id: request.actor_id.clone(),
+    if retain_legacy_receipt {
+        scenario.authored_action_binding = Some(AuthoredActionBindingReceipt {
+            binding_version: AUTHORED_ACTION_BINDING_VERSION.to_string(),
+            content_pack_set: imported.resolved_set.reference.clone(),
+            action_id: action.id.clone(),
+            action_definition_fingerprint: fingerprint_authored_action(action),
             ability_id: ability.id.clone(),
-        },
-        targeting_operation_vocabulary_version: OperationPipelineV2::VOCABULARY_VERSION.to_string(),
-        check_vocabulary_version: AUTHORED_ACTION_CHECK_VOCABULARY_VERSION.to_string(),
-        effect_operation_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
-    });
+            scenario_id: scenario.metadata.id.clone(),
+            actor_id: request.actor_id.clone(),
+            grant: AuthoredActionAbilityGrantReceipt {
+                actor_id: request.actor_id.clone(),
+                ability_id: ability.id.clone(),
+            },
+            targeting_operation_vocabulary_version: OperationPipelineV2::VOCABULARY_VERSION
+                .to_string(),
+            check_vocabulary_version: AUTHORED_ACTION_CHECK_VOCABULARY_VERSION.to_string(),
+            effect_operation_vocabulary_version: EffectOperationId::VOCABULARY_VERSION.to_string(),
+        });
+    }
 
     let report = validate_scenario_content_report(&scenario);
-    if !report.accepted {
+    if validate_complete_scenario && !report.accepted {
         return Err(AuthoredActionBindingError {
             code: "invalidAuthoredActionScenarioComposition",
             reference_id: Some(action.id.clone()),
@@ -435,14 +472,20 @@ fn derive_target_set(
     scenario: &RulebenchScenario,
     actor_index: usize,
     action: &AuthoredActionDefinition,
+    visible_target_ids: Option<&[String]>,
 ) -> MaterializedTargetSet {
     let actor = &scenario.combatants[actor_index];
-    let visible_snapshot = scenario
-        .actions
-        .iter()
-        .filter(|existing| existing.actor_id == actor.id)
-        .flat_map(|existing| existing.targeting.visible_target_ids.iter().cloned())
-        .collect::<BTreeSet<_>>();
+    let visible_snapshot = visible_target_ids.map_or_else(
+        || {
+            scenario
+                .actions
+                .iter()
+                .filter(|existing| existing.actor_id == actor.id)
+                .flat_map(|existing| existing.targeting.visible_target_ids.iter().cloned())
+                .collect::<BTreeSet<_>>()
+        },
+        |values| values.iter().cloned().collect(),
+    );
     let mut target_ids = scenario
         .combatants
         .iter()
@@ -493,6 +536,7 @@ fn derive_target_set(
 }
 
 fn materialize_action(
+    runtime_action_id: &str,
     ruleset_id: &str,
     actor_id: &str,
     action: &AuthoredActionDefinition,
@@ -508,7 +552,7 @@ fn materialize_action(
         _ => None,
     });
     rulebench_ruleset::ActionDefinition {
-        id: action.id.clone(),
+        id: runtime_action_id.to_string(),
         ruleset_id: ruleset_id.to_string(),
         ability_id: action.ability_id.clone(),
         name: action.name.clone(),

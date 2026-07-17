@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use rulebench_bridge::content_storage::ImportedContentPack;
 use rulebench_bridge::replay_storage::{
-    bind_authored_action, record_replay_package, AuthoredActionAbilityGrantReceipt,
-    AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
+    bind_authored_action, materialize_authored_scenario, record_replay_package,
+    AuthoredActionAbilityGrantReceipt, AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
     CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
     CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec,
     CombatSessionCandidateSelectionSpec, CombatSessionCreateRequest,
@@ -27,6 +27,8 @@ const STORAGE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-artifact-store.v1
 const LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-replay-archive.v0";
 const LEGACY_REPLAY_ARCHIVE_DEBUG_FINGERPRINT_ALGORITHM: &str =
     "fnv1a64.rulebench-replay-archive.v1";
+const LEGACY_REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION_V2: &str =
+    "asha-rulebench.replay-archive-payload.v2";
 const RECOVERY_STORAGE_FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -434,13 +436,19 @@ impl FileReplayArchiveStorage {
                     message,
                 )
             })?;
-        let requires_migration = envelope.format_version == LEGACY_REPLAY_STORAGE_FORMAT_VERSION;
+        let legacy_archive_payload = envelope.archive_payload_encoding_version.as_deref()
+            == Some(LEGACY_REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION_V2)
+            && envelope.archive_fingerprint_algorithm
+                == REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM;
+        let requires_migration = envelope.format_version == LEGACY_REPLAY_STORAGE_FORMAT_VERSION
+            || legacy_archive_payload;
         if requires_migration {
-            let recognized_legacy = matches!(
-                envelope.archive_fingerprint_algorithm.as_str(),
-                LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM
-                    | LEGACY_REPLAY_ARCHIVE_DEBUG_FINGERPRINT_ALGORITHM
-            );
+            let recognized_legacy = legacy_archive_payload
+                || matches!(
+                    envelope.archive_fingerprint_algorithm.as_str(),
+                    LEGACY_REPLAY_ARCHIVE_FINGERPRINT_ALGORITHM
+                        | LEGACY_REPLAY_ARCHIVE_DEBUG_FINGERPRINT_ALGORITHM
+                );
             if !recognized_legacy {
                 return Err(issue(
                     "replay",
@@ -731,13 +739,30 @@ impl StoredReplayPayload {
         scenarios: &BTreeMap<String, BridgeScenario>,
         binding_sources: &BTreeMap<ContentPackReference, ImportedContentPack>,
     ) -> Result<ReplayArchiveEntry, String> {
-        let bridge_scenario = scenarios.get(&self.scenario_id).ok_or_else(|| {
-            format!(
-                "The recorded scenario is not registered: {}.",
-                self.scenario_id
-            )
-        })?;
-        let mut scenario = bridge_scenario.scenario.clone();
+        let mut scenario = match scenarios.get(&self.scenario_id) {
+            Some(bridge_scenario) => bridge_scenario.scenario.clone(),
+            None => {
+                let content_pack_set = self.content_pack_set.as_ref().ok_or_else(|| {
+                    format!(
+                        "The recorded scenario is not registered and has no authored content provenance: {}.",
+                        self.scenario_id
+                    )
+                })?;
+                let root = content_pack_set.root.to_authority();
+                let imported = binding_sources.get(&root).ok_or_else(|| {
+                    format!(
+                        "Authored scenario content is unavailable for exact root {}@{}.",
+                        root.id, root.version
+                    )
+                })?;
+                materialize_authored_scenario(imported, &self.scenario_id).map_err(|error| {
+                    format!(
+                        "Authored scenario rematerialization failed with {}: {}",
+                        error.code, error.message
+                    )
+                })?
+            }
+        };
         apply_participant_configuration(&mut scenario.combatants, &self.participants)?;
         let mut scenario = prepare_replay_scenario(scenario);
         if let Some(stored_binding) = &self.authored_action_binding {

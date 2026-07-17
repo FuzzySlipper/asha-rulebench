@@ -167,6 +167,30 @@ fn feed_scenario(encoder: &mut CanonicalEncoder, scenario: &RulebenchScenario) {
         encoder.string(&binding.check_vocabulary_version);
         encoder.string(&binding.effect_operation_vocabulary_version);
     }
+    if let Some(binding) = &scenario.authored_scenario_binding {
+        encoder.string("authoredScenarioBinding.v1");
+        encoder.u32(binding.binding_version);
+        feed_content_reference(encoder, &binding.content_pack_set.root);
+        encoder.sequence(&binding.content_pack_set.packs, feed_content_reference);
+        feed_content_fingerprint(encoder, &binding.content_pack_set.fingerprint);
+        encoder.string(&binding.scenario_id);
+        encoder.sequence(&binding.participants, |encoder, participant| {
+            encoder.string(&participant.participant_id);
+            encoder.sequence(&participant.archetypes, |encoder, archetype| {
+                encoder.string(&archetype.class_id);
+                encoder.string(&archetype.version);
+                encoder.u32(archetype.level);
+            });
+            encoder.strings(&participant.loadout_item_ids);
+            encoder.sequence(&participant.action_grants, |encoder, grant| {
+                encoder.string(&grant.action_id);
+                encoder.string(&grant.runtime_action_id);
+            });
+        });
+        encoder.string(binding.control.mode.code());
+        encoder.optional_string(binding.control.automation_policy_id.as_deref());
+        encoder.optional_u32(binding.control.automation_policy_version);
+    }
 }
 
 pub fn canonical_replay_archive_payload_fingerprint(entry: &ReplayArchiveEntry) -> String {
@@ -938,7 +962,7 @@ mod tests {
 
         assert_eq!(
             canonical_replay_archive_payload_fingerprint(&entry),
-            "c61f4e498a686aec"
+            "e0d934157764b1d9"
         );
         assert_eq!(
             entry.payload_fingerprint,

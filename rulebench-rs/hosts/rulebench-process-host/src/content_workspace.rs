@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 
 use rulebench_bridge::content_storage::RulesetProviderCatalog;
 use rulebench_bridge::content_storage::{
-    compare_content_packs, ContentPackReference, ContentPackSetReference, ContentPackStorage,
-    ContentStorageError, ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
-    StorageReplacementPolicy,
+    compare_content_packs, materialize_authored_scenario, ContentPackReference,
+    ContentPackSetReference, ContentPackStorage, ContentStorageError, ContentStorageRecord,
+    ImportedContentPack, RulesetArtifactProvenance, StorageReplacementPolicy,
 };
 use rulebench_bridge::replay_storage::{bind_authored_action, AuthoredActionBindingRequest};
 use rulebench_bridge::{import_authored_content, BridgeScenario, ContentInvocationError};
@@ -186,17 +186,17 @@ impl ContentWorkspace {
         document.format_version = AUTHORED_CONTENT_PACK_VERSION;
         document.pack.id = identity.id.clone();
         document.pack.version = identity.version.clone();
-        document.pack.title = "Authored Action Starter".to_string();
+        document.pack.title = "Authored Content Starter".to_string();
         document.pack.summary =
-            "Editable v3 action starter supplied by the Rust content authority.".to_string();
-        document.pack.tags = vec!["authored-action".to_string(), "draft".to_string()];
+            "Editable v4 content starter supplied by the Rust content authority.".to_string();
+        document.pack.tags = vec!["authored-content".to_string(), "draft".to_string()];
         document.pack.provenance.source_kind = AuthoredContentSourceKindDto::BridgeSubmission;
-        document.pack.provenance.source_id = "product:authored-action-template-v3".to_string();
+        document.pack.provenance.source_id = "product:authored-content-template-v4".to_string();
         document.pack.provenance.authored_by = None;
         authoring_draft(
             document,
             "rustTemplate",
-            "Rust v3 authored-action starter",
+            "Rust v4 authored-content starter",
             identity,
         )
     }
@@ -585,6 +585,46 @@ impl ContentWorkspace {
         self.imported.clone()
     }
 
+    pub fn active_authored_scenarios(&self) -> Result<Vec<BridgeScenario>, ContentWorkspaceError> {
+        let mut scenarios = Vec::new();
+        for (reference, imported) in &self.imported {
+            if !self.storage.is_active(reference) {
+                continue;
+            }
+            self.active_pack_set(reference)?;
+            for definition in &imported.pack.catalogs.scenarios {
+                scenarios.push(authored_bridge_scenario(imported, &definition.id)?);
+            }
+        }
+        scenarios.sort_by(|left, right| left.option.id.cmp(&right.option.id));
+        Ok(scenarios)
+    }
+
+    pub fn active_authored_scenario(
+        &self,
+        reference: &ContentPackReference,
+        scenario_id: &str,
+    ) -> Result<BridgeScenario, ContentWorkspaceError> {
+        let imported = self.active_imported_pack(reference)?;
+        if !imported
+            .pack
+            .catalogs
+            .scenarios
+            .iter()
+            .any(|scenario| scenario.id == scenario_id)
+        {
+            return Err(ContentWorkspaceError {
+                code: "authoredScenarioNotFound".to_string(),
+                message: format!(
+                    "Exact active pack {}@{} does not own authored scenario {scenario_id}.",
+                    reference.id, reference.version
+                ),
+                retryable: false,
+            });
+        }
+        authored_bridge_scenario(&imported, scenario_id)
+    }
+
     pub fn ruleset_for(
         &self,
         reference: &ContentPackReference,
@@ -748,6 +788,35 @@ impl ContentWorkspace {
         self.audit.push(entry);
         Ok(())
     }
+}
+
+fn authored_bridge_scenario(
+    imported: &ImportedContentPack,
+    scenario_id: &str,
+) -> Result<BridgeScenario, ContentWorkspaceError> {
+    let scenario = materialize_authored_scenario(imported, scenario_id).map_err(|error| {
+        ContentWorkspaceError {
+            code: error.code.to_string(),
+            message: error.message,
+            retryable: false,
+        }
+    })?;
+    let control = scenario
+        .authored_scenario_binding
+        .as_ref()
+        .map(|binding| binding.control.clone())
+        .ok_or_else(|| ContentWorkspaceError {
+            code: "missingAuthoredScenarioBindingReceipt".to_string(),
+            message: "Materialized authored scenario omitted its composition receipt.".to_string(),
+            retryable: false,
+        })?;
+    Ok(BridgeScenario::new(
+        scenario.metadata.id.clone(),
+        scenario.metadata.title.clone(),
+        scenario.metadata.summary.clone(),
+        scenario,
+    )
+    .with_authored_control(&control))
 }
 
 fn decode_document(bytes: &[u8]) -> Result<AuthoredContentPackDocumentDto, ContentWorkspaceError> {
