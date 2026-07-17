@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
 use rulebench_ruleset::{
-    EffectOperationId, HitEffect, HitEffectOperation, ModifierEffectOperation, OperationPipelineV2,
-    ReactionHookEffectOperation, ReactionOptionDeclaration, TargetKind, TargetTeamConstraint,
-    TargetingDeclaration, VisibilityRequirement,
+    AreaShape, EffectOperationId, HitEffect, HitEffectOperation, ModifierEffectOperation,
+    OperationPipelineV2, ReactionHookEffectOperation, ReactionOptionDeclaration, TargetKind,
+    TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,
 };
 
 use crate::{
@@ -95,6 +95,13 @@ pub fn bind_authored_action(
         "action",
         &action.id,
     )?;
+    if action.movement.is_some() {
+        return Err(rejected(
+            "unsupportedAuthoredActionExecutionProfile",
+            Some(action.id.clone()),
+            "Top-level authored movement is not executable because the current Rust movement resolver does not evaluate the authored targeting, check, or effect program.",
+        ));
+    }
     let (ability_owner, ability) =
         unique_ability(&imported.resolved_set.packs, &action.ability_id)?;
     validate_definition_ruleset(
@@ -132,7 +139,7 @@ pub fn bind_authored_action(
     let target_set = derive_target_set(&scenario, actor_index, action);
     let selectable_target_ids =
         target_set.selectable_target_ids(action.targeting.visibility_requirement);
-    if selectable_target_ids.is_empty() && !is_cell_movement(action) {
+    if selectable_target_ids.is_empty() {
         return Err(rejected(
             "authoredActionTargetExhausted",
             Some(action.id.clone()),
@@ -446,10 +453,27 @@ fn derive_target_set(
             TargetTeamConstraint::Ally => target.team == actor.team,
             TargetTeamConstraint::Any => true,
         })
-        .filter(|target| {
-            actor.position.x.abs_diff(target.position.x)
-                + actor.position.y.abs_diff(target.position.y)
-                <= action.targeting.maximum_range
+        .filter(|target| match action.targeting.target_kind {
+            TargetKind::Combatant => {
+                actor.position.x.abs_diff(target.position.x)
+                    + actor.position.y.abs_diff(target.position.y)
+                    <= action.targeting.maximum_range
+            }
+            TargetKind::Area => action
+                .targeting
+                .operation_pipeline
+                .as_ref()
+                .and_then(|pipeline| pipeline.area.as_ref())
+                .is_some_and(|area| match area.shape {
+                    AreaShape::ManhattanBurst => scenario.grid.cells.iter().any(|cell| {
+                        let actor_to_center = actor.position.x.abs_diff(cell.position.x)
+                            + actor.position.y.abs_diff(cell.position.y);
+                        let center_to_target = cell.position.x.abs_diff(target.position.x)
+                            + cell.position.y.abs_diff(target.position.y);
+                        actor_to_center <= action.targeting.maximum_range
+                            && center_to_target <= area.radius
+                    }),
+                }),
         })
         .map(|target| target.id.clone())
         .collect::<Vec<_>>();
@@ -466,10 +490,6 @@ fn derive_target_set(
         target_ids,
         visible_target_ids,
     }
-}
-
-fn is_cell_movement(action: &AuthoredActionDefinition) -> bool {
-    action.movement.is_some() && action.targeting.target_kind == TargetKind::Area
 }
 
 fn materialize_action(

@@ -1118,6 +1118,42 @@ fn authored_content_validation_returns_a_receipt_without_mutating_the_workspace(
         import_rejection.error_message
     );
 
+    let mut movement: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    let movement_action = &mut movement["pack"]["catalogs"]["actions"][0];
+    movement_action["targeting"] = serde_json::json!({
+        "targetKind": "area",
+        "selection": "single",
+        "teamConstraint": "any",
+        "maximumRange": 4,
+        "visibilityRequirement": "ignored",
+        "operationPipeline": null
+    });
+    movement_action["movement"] = serde_json::json!({
+        "allowance": 4,
+        "topology": "orthogonalManhattan",
+        "blockingTerrainTags": ["blocked"],
+        "difficultTerrainTags": ["difficult"]
+    });
+    let movement_rejection = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/validate",
+        &serde_json::json!({
+            "authoredPayload": serde_json::to_string(&movement)
+                .expect("movement fixture serializes")
+        }),
+    ));
+    let movement_rejection: ContentImportAttemptDto =
+        serde_json::from_slice(&movement_rejection.body).expect("movement rejection is JSON");
+    assert!(!movement_rejection.accepted);
+    assert!(movement_rejection.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "unsupportedAuthoredActionEffect"
+            && diagnostic.path == "catalogs.actions[0].movement"
+            && diagnostic.definition_kind.as_deref() == Some("action")
+            && diagnostic.reference_id.as_deref() == Some("action.binding-glyph")
+    }));
+
     let after = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
     let after: ContentWorkspaceDto =
         serde_json::from_slice(&after.body).expect("final workspace is JSON");
@@ -1387,6 +1423,111 @@ fn authored_action_binding_rejects_defeated_self_and_non_visible_target_exhausti
     )
     .expect_err("the actor must not become its own only target candidate");
     assert_eq!(self_only_error.code, "authoredActionTargetExhausted");
+}
+
+#[test]
+fn authored_area_binding_uses_center_range_and_burst_radius() {
+    let mut payload: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/authored-content-v3.json"))
+            .expect("v3 fixture is JSON");
+    payload["pack"]["id"] = serde_json::json!("pack.fixture.authored.area-binding-v3");
+    payload["pack"]["version"] = serde_json::json!("3.4.0");
+    payload["pack"]["rulesetId"] = serde_json::json!("asha-rulebench.hexing-bolt.v0");
+    payload["pack"]["catalogs"]["rulesets"][0]["id"] =
+        serde_json::json!("asha-rulebench.hexing-bolt.v0");
+    payload["pack"]["catalogs"]["rulesets"][0]["version"] = serde_json::json!("0.0.0");
+    payload["pack"]["catalogs"]["rulesets"][0]["modules"] = serde_json::json!([{
+        "module": "actionResolution",
+        "version": "1",
+        "configuration": {
+            "module": "actionResolution",
+            "targetingPolicy": "declaredTargetsAndLineOfSight",
+            "supportedCheckHandlers": ["attackVsDefense"]
+        }
+    }]);
+    payload["pack"]["catalogs"]["abilities"][0]["id"] =
+        serde_json::json!("ability.authored-area-binding");
+    let action = &mut payload["pack"]["catalogs"]["actions"][0];
+    action["id"] = serde_json::json!("action.authored-area-binding");
+    action["abilityId"] = serde_json::json!("ability.authored-area-binding");
+    action["targeting"] = serde_json::json!({
+        "targetKind": "area",
+        "selection": "multiple",
+        "teamConstraint": "hostile",
+        "maximumRange": 5,
+        "visibilityRequirement": "required",
+        "operationPipeline": {
+            "maximumTargets": 2,
+            "area": { "shape": "manhattanBurst", "radius": 4 },
+            "rollPolicy": "shared",
+            "failurePolicy": "atomic",
+            "targetOrder": "canonicalId"
+        }
+    });
+    action["check"] = serde_json::json!({
+        "kind": "attack",
+        "modifier": 4,
+        "modifierStatId": "mind",
+        "defense": { "id": "nerve", "label": "Nerve" }
+    });
+    let imported = import_v3_test_payload(&payload, &[]);
+    let scenario = aggregated_scenario_catalog_cases()
+        .into_iter()
+        .find(|case| case.summary.id == "watchtower-storm-pulse-area")
+        .expect("area operation-pipeline scenario is registered")
+        .scenario;
+    let actor = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == "entity-adept")
+        .expect("area actor exists");
+    let target = scenario
+        .combatants
+        .iter()
+        .find(|combatant| combatant.id == "entity-raider")
+        .expect("area target exists");
+    assert!(
+        actor.position.x.abs_diff(target.position.x) + actor.position.y.abs_diff(target.position.y)
+            > 5,
+        "regression target must be outside actor-to-target maximum range"
+    );
+    let center = scenario
+        .grid
+        .cells
+        .iter()
+        .find(|cell| cell.position.x == 5 && cell.position.y == 3)
+        .expect("registered center cell exists");
+    assert!(
+        actor.position.x.abs_diff(center.position.x) + actor.position.y.abs_diff(center.position.y)
+            <= 5
+    );
+    assert!(
+        center.position.x.abs_diff(target.position.x)
+            + center.position.y.abs_diff(target.position.y)
+            <= 4
+    );
+
+    let bound = bind_authored_action(
+        scenario,
+        &imported,
+        &AuthoredActionBindingRequest {
+            content_pack: imported.pack.exact_reference(),
+            action_id: "action.authored-area-binding".to_string(),
+            actor_id: "entity-adept".to_string(),
+        },
+    )
+    .expect("a target reachable through a legal area center must bind");
+    let materialized = bound
+        .action_by_id("action.authored-area-binding")
+        .expect("area action was materialized");
+    assert!(materialized
+        .targeting
+        .target_ids
+        .contains(&"entity-raider".to_string()));
+    assert!(materialized
+        .targeting
+        .visible_target_ids
+        .contains(&"entity-raider".to_string()));
 }
 
 #[test]

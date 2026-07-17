@@ -458,6 +458,19 @@ fn validate_effect_execution_profile(
     action: &crate::AuthoredActionDefinition,
     base: &str,
 ) {
+    if action.movement.is_some() {
+        push_action_error(
+            diagnostics,
+            ContentImportDiagnosticCode::UnsupportedActionEffect,
+            format!("{base}.movement"),
+            &action.id,
+            format!(
+                "Authored action {} declares top-level movement, whose current Rust resolver does not execute the authored targeting, check, or effect program.",
+                action.id
+            ),
+        );
+        return;
+    }
     if action.effects.is_empty() {
         return;
     }

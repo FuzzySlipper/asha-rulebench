@@ -10,10 +10,10 @@ use rulebench_ruleset::{
     AbilityDefinition, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
     ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DamageEffectOperation,
     DefenseReference, EffectOperationId, HealingEffectOperation, ModifierTenure,
-    OperationPipelineV2, ReactionWindow, RuleModuleDeclaration, RulesetMetadata,
-    RulesetProviderCapability, RulesetProviderCatalog, RulesetProviderDescriptor,
-    SavingThrowCheckDeclaration, TargetKind, TargetSelection, TargetTeamConstraint,
-    VisibilityRequirement,
+    MovementActionDeclaration, MovementTopology, OperationPipelineV2, ReactionWindow,
+    RuleModuleDeclaration, RulesetMetadata, RulesetProviderCapability, RulesetProviderCatalog,
+    RulesetProviderDescriptor, SavingThrowCheckDeclaration, TargetKind, TargetSelection,
+    TargetTeamConstraint, VisibilityRequirement,
 };
 
 #[test]
@@ -456,6 +456,64 @@ fn non_executable_effect_sequences_fail_before_canonical_import() {
                     && diagnostic.definition_id.as_deref() == Some("action.portable")
             }),
             "missing exact rejection for {case}: {report:?}"
+        );
+    }
+}
+
+#[test]
+fn top_level_movement_and_inert_check_mutations_fail_before_canonical_import() {
+    let ruleset = ruleset();
+    for (case, modifier, retain_effects) in [
+        ("movement-check-two", 2, false),
+        ("movement-check-ninety-nine", 99, false),
+        ("movement-with-effects", 2, true),
+    ] {
+        let mut pack = authored_pack_with_id(
+            &ruleset,
+            &format!("pack.movement-profile.{case}"),
+            &format!("entity.{case}"),
+        );
+        pack.canonical_version = ContentPackCanonicalVersion::V1;
+        pack.catalogs.abilities = vec![portable_ability()];
+        pack.catalogs.modifiers = vec![portable_modifier()];
+        let mut action = portable_action("ability.portable", "modifier.portable");
+        action.targeting = AuthoredTargetingDeclaration {
+            target_kind: TargetKind::Area,
+            selection: TargetSelection::Single,
+            team_constraint: TargetTeamConstraint::Any,
+            maximum_range: 4,
+            visibility_requirement: VisibilityRequirement::Ignored,
+            operation_pipeline: None,
+        };
+        let CheckDeclaration::Attack(check) = &mut action.check else {
+            panic!("portable action uses an attack check");
+        };
+        check.modifier = modifier;
+        if !retain_effects {
+            action.effects.clear();
+        }
+        action.movement = Some(MovementActionDeclaration {
+            allowance: 4,
+            topology: MovementTopology::OrthogonalManhattan,
+            blocking_terrain_tags: vec!["blocked".to_string()],
+            difficult_terrain_tags: vec!["difficult".to_string()],
+        });
+        pack.catalogs.actions = vec![action];
+
+        let report = import_content_pack(
+            pack,
+            ContentImportLimits::default(),
+            ContentImportContext::empty(),
+        )
+        .expect_err("top-level authored movement must fail before canonical persistence");
+
+        assert!(
+            report.diagnostics.iter().any(|diagnostic| {
+                diagnostic.code == ContentImportDiagnosticCode::UnsupportedActionEffect
+                    && diagnostic.path == "catalogs.actions[0].movement"
+                    && diagnostic.definition_id.as_deref() == Some("action.portable")
+            }),
+            "missing exact movement-profile rejection for {case}: {report:?}"
         );
     }
 }
