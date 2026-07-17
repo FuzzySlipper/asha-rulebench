@@ -747,25 +747,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e27ee8bb91ca0adcf0ecb116293afa12d393f9c2b9b9cd54d33e8078fe19839"
 
 [[package]]
+name = "rpg-compiler"
+version = "0.1.0"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=a3d4acd9ac0ff0517a71605bb291a4a844040d9a#a3d4acd9ac0ff0517a71605bb291a4a844040d9a"
+dependencies = [
+ "rpg-core",
+ "rpg-ir",
+ "serde_json",
+]
+
+[[package]]
 name = "rpg-core"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=7d6430bb3fb9809a6d35636275ef2e3e36ae9407#7d6430bb3fb9809a6d35636275ef2e3e36ae9407"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=a3d4acd9ac0ff0517a71605bb291a4a844040d9a#a3d4acd9ac0ff0517a71605bb291a4a844040d9a"
 
 [[package]]
 name = "rpg-ir"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=7d6430bb3fb9809a6d35636275ef2e3e36ae9407#7d6430bb3fb9809a6d35636275ef2e3e36ae9407"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=a3d4acd9ac0ff0517a71605bb291a4a844040d9a#a3d4acd9ac0ff0517a71605bb291a4a844040d9a"
 dependencies = [
  "rpg-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "rpg-runtime"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=7d6430bb3fb9809a6d35636275ef2e3e36ae9407#7d6430bb3fb9809a6d35636275ef2e3e36ae9407"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=a3d4acd9ac0ff0517a71605bb291a4a844040d9a#a3d4acd9ac0ff0517a71605bb291a4a844040d9a"
 dependencies = [
  "asha-gameplay-module-sdk",
  "asha-runtime-session-composition",
+ "rpg-compiler",
+ "rpg-core",
  "serde",
  "serde_json",
 ]

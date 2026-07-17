@@ -12,14 +12,15 @@ source-authority extraction.
 | Public package | Authority and consumer posture |
 |---|---|
 | `rpg-core` | Dependency-free RPG values and deterministic fingerprint vocabulary. |
-| `rpg-ir` | Normalized rule declarations, operation vocabulary, compatibility, and typed ruleset views. |
-| `rpg-runtime` | Public-ASHA-backed RuntimeSession decision/reaction fabric, owner revision checks, accepted commit routing, snapshots, and typed readouts. |
+| `rpg-ir` | Strict `asha.rpg.ir@1` decode types plus extracted declaration vocabulary. |
+| `rpg-compiler` | Closed operation bindings, requirement/reference/semantic validation, opaque compiled programs, deterministic evaluation, owner staging, DomainEvents, trace, and typed diagnostics. |
+| `rpg-runtime` | Private semantic authority sessions plus the public-ASHA-backed decision/reaction fabric. |
 | `asha-rpg` | Supported public Rust facade over the active portable owners. |
 | `@asha-rpg/ir` | Immutable TypeScript IR package location; semantic execution is forbidden. |
 | `@asha-rpg/authoring` | Pure TypeScript authoring package location; complete syntax arrives in #5937. |
 
 The packages are fetched from `https://github.com/FuzzySlipper/asha-rpg.git`
-at exact revision `7d6430bb3fb9809a6d35636275ef2e3e36ae9407` with compatible `^0.1`
+at exact revision `a3d4acd9ac0ff0517a71605bb291a4a844040d9a` with compatible `^0.1`
 versions. Rulebench has no sibling path dependency and no direct ASHA crate
 dependency. The extracted repo retains the exact governed ASHA revision
 `67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148` behind `rpg-runtime`.
@@ -50,9 +51,11 @@ surface.
 
 `asha-rpg/consumers/minimal-game` is an independent Cargo workspace. It fetches
 the public facade from Git at exact revision
-`d8701adcf34f58bc911df0669e3c92aa9919fc7f`, opens and resumes the typed
-pre-effect decision, validates and commits through a consumer-owned authority,
-and checks the deterministic readout. It has no Rulebench crate in its graph.
+`95907505ffcc942095953e5786186a18119cd97e`, compiles and executes a normalized
+action through the semantic kernel, then opens and resumes the typed pre-effect
+decision through a consumer-owned authority. It has no Rulebench crate in its
+graph. The enclosing repository commit advances after pinning so the consumer
+never relies on an unpublished sibling path.
 
 This proof belongs to the portable owner. Rulebench certification no longer
 contains a self-consuming portability facade or claims that product storage,
@@ -74,8 +77,9 @@ through `pnpm run generated:write`.
 
 ## Non-claims
 
-This extraction does not claim that the complete #5936 compiler or #5937
-TypeScript authoring language already exists. It does not make Rulebench
-content, automation, storage, archives, experiments, fixtures, certification,
-Angular, or filesystem concepts part of the public RPG graph. The temporary
+The initial #5936 semantic profile deliberately excludes the additional
+operations and scheduler/replay surfaces listed in `asha-rpg` non-claims. The
+#5937 TypeScript authoring language is not implemented yet. Rulebench content,
+automation, storage, archives, experiments, fixtures, certification, Angular,
+and filesystem concepts remain outside the public RPG graph. The temporary
 adapter is not a stable compatibility API.
