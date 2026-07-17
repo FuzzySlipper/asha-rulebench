@@ -1,6 +1,6 @@
 //! Rulebench-local command entrypoints and integration test harness.
 //!
-//! Authority behavior lives in `rulebench-rules`; authored scenario content and
+//! Authority behavior lives in `rulebench-rpg-adapter`; authored scenario content and
 //! regression evidence live in `rulebench-fixtures`; checked TypeScript artifact
 //! rendering lives in `rulebench-codegen`. This crate intentionally provides no
 //! library compatibility API: its two stable binary entrypoints preserve the

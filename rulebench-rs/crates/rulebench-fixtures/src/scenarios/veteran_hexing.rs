@@ -8,7 +8,7 @@ use crate::{
     ScenarioPackageEvidenceKind, ScenarioPackageIdentity, ScenarioPackageInitialState,
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRulesetReference,
 };
-use rulebench_rules::*;
+use rulebench_rpg_adapter::*;
 
 const PACKAGE_ID: &str = "asha-rulebench.hexing-bolt-veteran";
 const PACKAGE_VERSION: &str = "0.1.0";

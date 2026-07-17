@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
     CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec, CombatSessionIntentCommandSpec,
     GridPosition, UseActionIntent,

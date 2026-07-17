@@ -1,4 +1,4 @@
-use rulebench_ruleset::{
+use rpg_ir::{
     ActionResourceCost, CheckDeclaration, DamageEffectOperation, HealingEffectOperation,
     MovementActionDeclaration, MovementEffectOperation, OperationPipelineV2, ReactionWindow,
     ResourceChangeEffectOperation, TargetKind, TargetSelection, TargetTeamConstraint,

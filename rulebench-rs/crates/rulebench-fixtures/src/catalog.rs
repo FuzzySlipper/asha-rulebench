@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     ContentValidationReport, RulebenchReceipt, RulebenchScenario, RulesetMetadata, UseActionIntent,
 };
 

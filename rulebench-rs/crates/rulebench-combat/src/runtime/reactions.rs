@@ -457,7 +457,7 @@ struct CombatPreEffectOwner<'a> {
     action_id: &'a str,
 }
 
-impl RulebenchPreEffectOwner for CombatPreEffectOwner<'_> {
+impl RpgPreEffectOwner for CombatPreEffectOwner<'_> {
     fn revision_hash(&self) -> String {
         let projection = self.state.project("Gameplay pre-effect owner revision.");
         let fingerprint = fingerprint_projected_state(&projection);

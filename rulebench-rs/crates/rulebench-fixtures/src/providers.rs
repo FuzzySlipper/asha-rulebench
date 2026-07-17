@@ -1,4 +1,4 @@
-use rulebench_rules::*;
+use rulebench_rpg_adapter::*;
 
 pub const HEXING_BOLT_PROVIDER_ID: &str = "provider.asha-rulebench.hexing-bolt";
 pub const TURN_CONTROL_PROVIDER_ID: &str = "provider.asha-rulebench.turn-control";

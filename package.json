@@ -23,7 +23,6 @@
     "check:claims": "node tools/scripts/check-verification-claims.mjs",
     "check:claims:executable": "node tools/scripts/check-verification-claims.mjs --executable",
     "review:claims-and-limitations": "node tools/scripts/review-claims-and-limitations.mjs",
-    "check:portable-consumer": "node tools/scripts/check-portable-consumer.mjs",
     "check:docs": "node tools/scripts/check-docs-commands.mjs",
     "rust:check": "cargo check --manifest-path rulebench-rs/Cargo.toml",
     "rust:test": "cargo test --manifest-path rulebench-rs/Cargo.toml",

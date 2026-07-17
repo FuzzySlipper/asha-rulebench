@@ -15,13 +15,10 @@ export const profileOrder = [
 ];
 
 export const governedCrates = new Set([
-  "rulebench-core",
-  "rulebench-ruleset",
   "rulebench-content",
-  "rulebench-gameplay-module",
   "rulebench-combat",
   "rulebench-replay",
-  "rulebench-rules",
+  "rulebench-rpg-adapter",
   "rulebench-protocol",
   "rulebench-bridge",
   "rulebench-fixtures",
@@ -31,13 +28,7 @@ export const governedCrates = new Set([
 ]);
 
 export const portableCrates = new Set([
-  "rulebench-core",
-  "rulebench-ruleset",
-  "rulebench-content",
-  "rulebench-gameplay-module",
-  "rulebench-combat",
-  "rulebench-replay",
-  "rulebench-rules",
+  "rulebench-rpg-adapter",
 ]);
 
 const filterFlags = new Map([
@@ -223,7 +214,6 @@ export function buildVerifyChangePlan(selection) {
         )) {
           addCargoTest(crate);
         }
-        addScript("check:portable-consumer");
         break;
       case "docs":
         addScript("check:docs");

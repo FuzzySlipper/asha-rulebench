@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 
-use rulebench_rules::{validate_scenario_content, CombatSessionScriptSpec, RulebenchScenario};
+use rulebench_rpg_adapter::{
+    validate_scenario_content, CombatSessionScriptSpec, RulebenchScenario,
+};
 
 use crate::FixtureGoldenManifest;
 

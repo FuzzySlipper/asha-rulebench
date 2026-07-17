@@ -1,19 +1,13 @@
-//! Supported portable convenience facade for ASHA Rulebench rule authority.
+//! Temporary Rulebench product adapter over extracted RPG authority.
 //!
-//! This crate re-exports the stable public API from the portable authority
-//! layers: core values, ruleset declarations, canonical content, combat
-//! execution, and replay verification. New portable consumers may depend on
-//! the focused owner crates when they need a narrower surface; this facade is
-//! the supported one-crate entry point for consumers that need the complete
-//! authority contract.
+//! Existing protocol, bridge, and fixture consumers still need one combined
+//! product surface while task #5938 migrates them to their permanent owners.
+//! The reusable primitives, normalized rule declarations, and RuntimeSession
+//! fabric are imported from the exact public `asha-rpg` revision; this crate
+//! contains no duplicate implementation of those owners.
 //!
-//! Stability: public items re-exported here are the local `v0` portable
-//! contract. Rulebench-only fixtures, generated artifacts, bridge adapters,
-//! and UI concerns are intentionally absent.
-//!
-//! Non-claims: this is not a generic rules-engine API, a host runtime, or a
-//! promise that every currently public owner-crate item has cross-project
-//! compatibility beyond the documented Rulebench portable contract.
+//! Removal: #5938 deletes this adapter after product call sites import focused
+//! product owners and the supported `asha-rpg` boundary directly.
 
 #![forbid(unsafe_code)]
 
@@ -27,6 +21,13 @@ pub use capabilities::{
     CAPABILITY_MANIFEST_VERSION,
 };
 
+pub use rpg_core::Team;
+pub use rpg_ir::{
+    CombatEndPolicy, EffectOperationId, OperationPipelineV2, RuleModuleId,
+    RulesetArtifactProvenance, RulesetModuleProvenance, RulesetProviderCapability,
+    RulesetProviderCatalog, RulesetProviderCatalogError, RulesetProviderCompatibilityError,
+    RulesetProviderDescriptor, TargetingOperationId,
+};
 pub use rulebench_combat::model::*;
 pub use rulebench_combat::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
@@ -84,7 +85,6 @@ pub use rulebench_content::{
     CONTENT_PACK_FINGERPRINT_ALGORITHM, CONTENT_PACK_FINGERPRINT_ALGORITHM_V1,
     CONTENT_PACK_FINGERPRINT_ALGORITHM_V2, CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
-pub use rulebench_core::Team;
 pub use rulebench_replay::{
     canonical_replay_archive_payload, canonical_replay_archive_payload_fingerprint,
     compare_replay_packages, inspect_replay_package, record_replay_package,
@@ -102,12 +102,6 @@ pub use rulebench_replay::{
     SessionRecoveryStorage, SessionRecoveryStorageError, REPLAY_ARCHIVE_PAYLOAD_ENCODING_VERSION,
     REPLAY_ARCHIVE_PAYLOAD_FINGERPRINT_ALGORITHM, SESSION_RECOVERY_PACKAGE_VERSION,
 };
-pub use rulebench_ruleset::{
-    CombatEndPolicy, EffectOperationId, OperationPipelineV2, RuleModuleId,
-    RulesetArtifactProvenance, RulesetModuleProvenance, RulesetProviderCapability,
-    RulesetProviderCatalog, RulesetProviderCatalogError, RulesetProviderCompatibilityError,
-    RulesetProviderDescriptor, TargetingOperationId,
-};
 
 #[cfg(test)]
 mod tests {
@@ -118,7 +112,7 @@ mod tests {
     };
 
     #[test]
-    fn facade_exposes_the_documented_portable_contract() {
+    fn adapter_exposes_the_current_product_migration_contract() {
         let api = CombatSessionApi::new();
         let handle = CombatSessionHandle::new("portable-session");
         let ruleset = RulesetMetadata {

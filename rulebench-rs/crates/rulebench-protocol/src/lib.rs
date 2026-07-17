@@ -127,7 +127,7 @@ pub use viewer::{
 
 #[cfg(test)]
 mod tests {
-    use rulebench_rules::CombatSessionHandle;
+    use rulebench_rpg_adapter::CombatSessionHandle;
 
     use super::{render_api_types, CombatSessionHandleDto};
 

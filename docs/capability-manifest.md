@@ -6,7 +6,7 @@ from the same registries and host composition that own runtime behavior.
 
 ## Authority inputs
 
-- `rulebench-ruleset` owns the versioned effect-operation and targeting
+- public `rpg-ir` owns the versioned effect-operation and targeting
   declarations plus the validated compiled-provider catalog contract.
 - `rulebench-combat` owns the executable operation registries and the closed
   automation-policy registry.
@@ -14,8 +14,8 @@ from the same registries and host composition that own runtime behavior.
   package, ruleset, scenario, and regression evidence from provider-validated,
   executed registered cases. Declaration metadata or a test name is not
   coverage.
-- `rulebench-gameplay-module` exposes the exact governed ASHA Git revision
-  compiled from the workspace lockfile.
+- public `rpg-runtime` exposes the exact governed ASHA Git revision compiled
+  behind the pinned `asha-rpg` boundary.
 - `rulebench-process-host` adds the selected content, replay, and active-session
   recovery adapters. A memory host and a filesystem host therefore report
   different durability facts.

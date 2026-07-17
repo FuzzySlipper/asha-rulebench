@@ -256,7 +256,7 @@ fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndCondit
         .and_then(|ruleset| ruleset.validate_modules().ok())
         .and_then(|registry| registry.turn_control().cloned())
         .map(|configuration| configuration.combat_end_policy)
-        .unwrap_or(rulebench_ruleset::CombatEndPolicy::LastSideStanding);
+        .unwrap_or(rpg_ir::CombatEndPolicy::LastSideStanding);
     let active_sides = side_totals
         .keys()
         .filter(|side_id| side_active.get(*side_id).copied().unwrap_or_default() > 0)
@@ -269,12 +269,12 @@ fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndCondit
         .collect::<Vec<_>>();
 
     let (condition_kind, outcome_kind, winning_sides) = match &policy {
-        rulebench_ruleset::CombatEndPolicy::ExplicitOnly => (
+        rpg_ir::CombatEndPolicy::ExplicitOnly => (
             CombatEndConditionKind::ExplicitOnly,
             CombatOutcomeKind::Ongoing,
             Vec::new(),
         ),
-        rulebench_ruleset::CombatEndPolicy::LastSideStanding => {
+        rpg_ir::CombatEndPolicy::LastSideStanding => {
             let condition_kind = match active_sides.as_slice() {
                 [] => CombatEndConditionKind::NoActiveCombatants,
                 [side_id] if side_id == "ally" => CombatEndConditionKind::NoActiveEnemies,
@@ -294,7 +294,7 @@ fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndCondit
             };
             (condition_kind, outcome_kind, winning_sides)
         }
-        rulebench_ruleset::CombatEndPolicy::ObjectiveSideVictory { side_id } => {
+        rpg_ir::CombatEndPolicy::ObjectiveSideVictory { side_id } => {
             let objective_active = side_active.get(side_id).copied().unwrap_or_default();
             let opposing_active = active_sides
                 .iter()
@@ -347,11 +347,11 @@ fn combat_end_condition_readout(scenario: &RulebenchScenario) -> CombatEndCondit
 }
 
 fn combat_end_condition_reason(
-    policy: &rulebench_ruleset::CombatEndPolicy,
+    policy: &rpg_ir::CombatEndPolicy,
     kind: CombatEndConditionKind,
     outcome: CombatOutcomeKind,
 ) -> String {
-    if policy == &rulebench_ruleset::CombatEndPolicy::ExplicitOnly {
+    if policy == &rpg_ir::CombatEndPolicy::ExplicitOnly {
         return "Combat continues until an explicit end command under the configured policy."
             .to_string();
     }
@@ -384,10 +384,7 @@ fn combat_end_condition_reason(
             "Combat should end because the configured objective side has been defeated."
         }
     };
-    if matches!(
-        policy,
-        rulebench_ruleset::CombatEndPolicy::ObjectiveSideVictory { .. }
-    ) {
+    if matches!(policy, rpg_ir::CombatEndPolicy::ObjectiveSideVictory { .. }) {
         format!("{base} Configured objective outcome: {}.", outcome.code())
     } else {
         base.to_string()

@@ -6,7 +6,7 @@ use crate::{
     ContentPackSourceKind, EntityDefinition, ModifierDefinition, ModifierDurationPolicy,
     ModifierStackingPolicy, ModifierStatAdjustment, ReactionParticipantSelector,
 };
-use rulebench_ruleset::{
+use rpg_ir::{
     AbilityDefinition, AbilityDefinitionKind, ActionResolutionModuleConfiguration,
     ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DamageEffectOperation,
     DefenseReference, EffectOperationId, HealingEffectOperation, ModifierTenure,

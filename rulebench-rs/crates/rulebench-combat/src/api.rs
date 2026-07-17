@@ -343,7 +343,7 @@ impl CombatSessionApi {
 mod tests {
     use super::*;
     use crate::model::*;
-    use rulebench_ruleset::ActionResourceCost;
+    use rpg_ir::ActionResourceCost;
 
     #[test]
     fn api_owns_lifecycle_and_archives_immutable_session_readbacks() {
@@ -1374,19 +1374,15 @@ mod tests {
                 modifier_label: "marked".to_string(),
                 modifier_duration: "one turn".to_string(),
                 operations: vec![
-                    rulebench_ruleset::HitEffectOperation::Damage(
-                        rulebench_ruleset::DamageEffectOperation {
-                            damage_bonus: 1,
-                            damage_type: "force".to_string(),
-                        },
-                    ),
-                    rulebench_ruleset::HitEffectOperation::ApplyModifier(
-                        rulebench_ruleset::ModifierEffectOperation {
-                            modifier_id: "marked".to_string(),
-                            modifier_label: "marked".to_string(),
-                            modifier_duration: "one turn".to_string(),
-                        },
-                    ),
+                    rpg_ir::HitEffectOperation::Damage(rpg_ir::DamageEffectOperation {
+                        damage_bonus: 1,
+                        damage_type: "force".to_string(),
+                    }),
+                    rpg_ir::HitEffectOperation::ApplyModifier(rpg_ir::ModifierEffectOperation {
+                        modifier_id: "marked".to_string(),
+                        modifier_label: "marked".to_string(),
+                        modifier_duration: "one turn".to_string(),
+                    }),
                 ],
             },
             resource_costs: vec![ActionResourceCost::standard_action()],

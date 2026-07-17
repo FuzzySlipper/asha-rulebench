@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
+use rpg_ir::{EffectOperationId, OperationPipelineV2, TargetingOperationId};
 use rulebench_combat::{
     COMBAT_AUTOMATION_POLICY_REGISTRY, GOVERNED_ASHA_REVISION, RUNTIME_EFFECT_OPERATION_REGISTRY,
     RUNTIME_TARGETING_OPERATION_REGISTRY,
 };
-use rulebench_ruleset::{EffectOperationId, OperationPipelineV2, TargetingOperationId};
 
 pub const CAPABILITY_MANIFEST_ID: &str = "asha-rulebench.capabilities";
 pub const CAPABILITY_MANIFEST_VERSION: u32 = 4;
@@ -273,7 +273,7 @@ fn operation_capabilities(
                     durable_across_restart: runtime_executable && host.durable_finalized_replays,
                 },
                 evidence: vec![
-                    "rulebench-ruleset.effect-operation-registry".to_string(),
+                    "asha-rpg.effect-operation-registry".to_string(),
                     "rulebench-combat.runtime-effect-operation-registry".to_string(),
                 ],
             }
@@ -309,7 +309,7 @@ fn targeting_capabilities(
                     durable_across_restart: runtime_executable && host.durable_finalized_replays,
                 },
                 evidence: vec![
-                    "rulebench-ruleset.targeting-operation-registry".to_string(),
+                    "asha-rpg.targeting-operation-registry".to_string(),
                     "rulebench-combat.runtime-targeting-operation-registry".to_string(),
                 ],
             }

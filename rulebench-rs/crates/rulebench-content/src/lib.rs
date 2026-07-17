@@ -86,8 +86,8 @@ pub use validation::{validate_scenario_content, validate_scenario_content_report
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_core::GridPosition;
-    use rulebench_ruleset::{
+    use rpg_core::GridPosition;
+    use rpg_ir::{
         AbilityDefinition, ActionDefinition, ActionResourceCost, AttackCheckDeclaration,
         CheckDeclaration, DefenseReference, HitEffect, TargetKind, TargetSelection,
         TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,

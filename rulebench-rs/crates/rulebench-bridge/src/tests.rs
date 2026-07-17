@@ -4,7 +4,7 @@ use rulebench_protocol::{
     CombatSessionIntentCommandDto, CommandRollModeDto, ExperimentComparisonRequestDto,
     ExperimentMatrixRequestDto, ProtocolRequestContextDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
-use rulebench_rules::*;
+use rulebench_rpg_adapter::*;
 use std::collections::BTreeMap;
 
 use crate::{BridgeErrorKind, BridgeScenario, RulebenchBridge};

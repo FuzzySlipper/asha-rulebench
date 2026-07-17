@@ -8,7 +8,7 @@ use crate::{
     ScenarioPackageEvidenceKind, ScenarioPackageIdentity, ScenarioPackageInitialState,
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRulesetReference,
 };
-use rulebench_rules::*;
+use rulebench_rpg_adapter::*;
 
 const PACKAGE_ID: &str = "asha-rulebench.watchtower-skirmish";
 const SCENARIO_ID: &str = "watchtower-skirmish";

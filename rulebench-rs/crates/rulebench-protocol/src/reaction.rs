@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     ReactionAuditEntry, ReactionCommandReadout, ReactionCommandSpec, ReactionDecisionKind,
     ReactionOptionReadout, ReactionResponseEntry, ReactionResponseKind,
     ReactionWindowLifecycleEntry, ReactionWindowLifecycleKind, ReactionWindowReadout,

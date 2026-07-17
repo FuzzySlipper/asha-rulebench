@@ -1,5 +1,5 @@
 use crate::{ModifierDurationPolicy, ModifierStackingPolicy};
-use rulebench_ruleset::ModifierTenure;
+use rpg_ir::ModifierTenure;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveModifier {

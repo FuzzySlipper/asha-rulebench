@@ -6,7 +6,7 @@ use crate::{
     AUTHORED_ACTION_BINDING_VERSION, AUTHORED_ACTION_CHECK_VOCABULARY_VERSION,
     AUTHORED_ACTION_DEFINITION_FINGERPRINT_ALGORITHM, AUTHORED_SCENARIO_BINDING_VERSION,
 };
-use rulebench_ruleset::{
+use rpg_ir::{
     ActionDefinition, ActionResourceRefreshPolicy, AttackCheckDeclaration, CheckDeclaration,
     CombatEndPolicy, ContestedCheckDeclaration, ModifierTenure, RuleModuleValidationError,
     SavingThrowCheckDeclaration, TargetKind, TargetSelection,
@@ -249,9 +249,9 @@ fn validate_authored_action_binding(
         && binding.grant.ability_id == binding.ability_id
         && binding.check_vocabulary_version == AUTHORED_ACTION_CHECK_VOCABULARY_VERSION
         && binding.targeting_operation_vocabulary_version
-            == rulebench_ruleset::OperationPipelineV2::VOCABULARY_VERSION
+            == rpg_ir::OperationPipelineV2::VOCABULARY_VERSION
         && binding.effect_operation_vocabulary_version
-            == rulebench_ruleset::EffectOperationId::VOCABULARY_VERSION
+            == rpg_ir::EffectOperationId::VOCABULARY_VERSION
         && scenario.actions.iter().any(|action| {
             action.id == binding.action_id
                 && action.ability_id == binding.ability_id
@@ -1320,8 +1320,7 @@ fn validate_action_references(
             .operation_pipeline
             .as_ref()
             .is_some_and(|pipeline| {
-                let target_limit_valid = (1
-                    ..=rulebench_ruleset::OperationPipelineV2::MAXIMUM_TARGET_LIMIT)
+                let target_limit_valid = (1..=rpg_ir::OperationPipelineV2::MAXIMUM_TARGET_LIMIT)
                     .contains(&pipeline.maximum_targets);
                 let shape_valid = match (
                     action.targeting.target_kind,
@@ -1330,7 +1329,7 @@ fn validate_action_references(
                 ) {
                     (TargetKind::Combatant, TargetSelection::Multiple, None) => true,
                     (TargetKind::Area, TargetSelection::Multiple, Some(area)) => (1
-                        ..=rulebench_ruleset::OperationPipelineV2::MAXIMUM_AREA_RADIUS)
+                        ..=rpg_ir::OperationPipelineV2::MAXIMUM_AREA_RADIUS)
                         .contains(&area.radius),
                     _ => false,
                 };
@@ -1703,8 +1702,7 @@ fn validate_effect_operations(
             ));
         }
         match operation {
-            rulebench_ruleset::HitEffectOperation::Move(_)
-            | rulebench_ruleset::HitEffectOperation::ChangeResource(_)
+            rpg_ir::HitEffectOperation::Move(_) | rpg_ir::HitEffectOperation::ChangeResource(_)
                 if action.targeting.operation_pipeline.is_none() =>
             {
                 diagnostics.push(ContentDiagnostic::error(
@@ -1716,11 +1714,11 @@ fn validate_effect_operations(
                     ),
                 ));
             }
-            rulebench_ruleset::HitEffectOperation::Move(movement)
+            rpg_ir::HitEffectOperation::Move(movement)
                 if movement.maximum_distance == 0
                     || movement.maximum_distance
-                        > rulebench_ruleset::OperationPipelineV2::MAXIMUM_AREA_RADIUS
-                    || (movement.movement_kind == rulebench_ruleset::MovementKind::Shift
+                        > rpg_ir::OperationPipelineV2::MAXIMUM_AREA_RADIUS
+                    || (movement.movement_kind == rpg_ir::MovementKind::Shift
                         && movement.maximum_distance != 1) =>
             {
                 diagnostics.push(ContentDiagnostic::error(
@@ -1732,7 +1730,7 @@ fn validate_effect_operations(
                     ),
                 ));
             }
-            rulebench_ruleset::HitEffectOperation::ChangeResource(change)
+            rpg_ir::HitEffectOperation::ChangeResource(change)
                 if change.resource_id.is_empty() || change.delta == 0 =>
             {
                 diagnostics.push(ContentDiagnostic::error(
@@ -1746,7 +1744,7 @@ fn validate_effect_operations(
             }
             _ => {}
         }
-        if let rulebench_ruleset::HitEffectOperation::OpenReactionWindow(hook) = operation {
+        if let rpg_ir::HitEffectOperation::OpenReactionWindow(hook) = operation {
             reaction_hook_count += 1;
             if hook.hook_id.is_empty() {
                 diagnostics.push(ContentDiagnostic::error(

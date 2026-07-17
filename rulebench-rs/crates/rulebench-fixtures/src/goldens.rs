@@ -18,18 +18,18 @@ pub struct FixtureGoldenArtifact {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixtureGoldenContentReviewAttachment {
     pub artifact_id: String,
-    pub comparison: rulebench_rules::ContentPackDiffReadout,
+    pub comparison: rulebench_rpg_adapter::ContentPackDiffReadout,
 }
 
 impl FixtureGoldenContentReviewAttachment {
     pub fn compare(
         artifact_id: impl Into<String>,
-        before: &rulebench_rules::CanonicalContentPack,
-        after: &rulebench_rules::CanonicalContentPack,
+        before: &rulebench_rpg_adapter::CanonicalContentPack,
+        after: &rulebench_rpg_adapter::CanonicalContentPack,
     ) -> Self {
         Self {
             artifact_id: artifact_id.into(),
-            comparison: rulebench_rules::compare_content_packs(before, after),
+            comparison: rulebench_rpg_adapter::compare_content_packs(before, after),
         }
     }
 }
@@ -49,7 +49,7 @@ pub enum FixtureGoldenArtifactKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_rules::{
+    use rulebench_rpg_adapter::{
         canonicalize_content_pack, ContentPackCanonicalVersion, ContentPackCatalogs,
         ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
         ContentPackProvenance, ContentPackSourceKind, RulesetMetadata,

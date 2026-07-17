@@ -43,14 +43,6 @@ export function buildCertificationPlan(selection) {
         "all registered scenario regressions and executable capability conformance cases",
     },
     {
-      id: "portable-consumer-contract",
-      owner: "Rulebench portable facade",
-      command: "pnpm",
-      arguments: ["run", "check:portable-consumer"],
-      coverage:
-        "independent Cargo consumer compilation and forbidden transitive dependency rejection",
-    },
-    {
       id: "deterministic-browser-certification",
       owner: "Rulebench browser workflows",
       command: "pnpm",

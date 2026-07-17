@@ -9,7 +9,7 @@ description = "Authoritative combat state, resolution, and control runtime for A
 workspace = true
 
 [dependencies]
-rulebench-gameplay-module = { path = "../rulebench-gameplay-module" }
+rpg-runtime.workspace = true
 rulebench-content = { path = "../rulebench-content" }
-rulebench-core = { path = "../rulebench-core" }
-rulebench-ruleset = { path = "../rulebench-ruleset" }
+rpg-core.workspace = true
+rpg-ir.workspace = true

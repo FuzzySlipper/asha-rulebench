@@ -1,5 +1,6 @@
 //! Bounded automatic-combat replay specifications and evidence verification.
 
+use rpg_core::StateFingerprint;
 use rulebench_combat::RulebenchScenario;
 use rulebench_combat::{
     ActionResourceTransitionEntry, ClassBuildLedgerReadout, CombatAutomationPolicyDecisionEvidence,
@@ -8,7 +9,6 @@ use rulebench_combat::{
     ContentPackSetReference, EquipmentLedgerReadout, EquipmentTransitionEntry,
     ModifierDurationExpirationEntry, ReactionAuditEntry, ReactionWindowLifecycleEntry,
 };
-use rulebench_core::StateFingerprint;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionAutomaticRunReplaySpec {

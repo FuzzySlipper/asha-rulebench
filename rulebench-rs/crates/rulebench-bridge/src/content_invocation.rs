@@ -1,7 +1,7 @@
 use rulebench_protocol::{
     AuthoredContentPackDocumentDto, ContentImportDiagnosticDto, ContentPackIdentityDto,
 };
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     import_content_pack, AuthoredScenarioControlMode, CanonicalContentPack, ContentImportContext,
     ContentImportLimits, ImportedContentPack, RulesetProviderCatalog,
     COMBAT_AUTOMATION_POLICY_REGISTRY,

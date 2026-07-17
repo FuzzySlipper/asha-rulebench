@@ -3,7 +3,7 @@ use crate::{
     ContentValidationReadout, RulesetCatalogReadout, ScenarioCatalogCase, ScenarioCatalogSummary,
     ScenarioOutcomeClass,
 };
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     validate_scenario_content_report, HitEffectOperation, ReactionHookEffectOperation,
     ReactionOptionDeclaration, ReactionWindow, RulebenchScenario, ScenarioMetadata,
     UseActionIntent,

@@ -9,5 +9,5 @@ description = "Content packs, references, validation, and diagnostics for ASHA R
 workspace = true
 
 [dependencies]
-rulebench-core = { path = "../rulebench-core" }
-rulebench-ruleset = { path = "../rulebench-ruleset" }
+rpg-core.workspace = true
+rpg-ir.workspace = true

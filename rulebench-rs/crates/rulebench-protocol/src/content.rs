@@ -1,5 +1,5 @@
-use rulebench_rules::{AbilityDefinition, AbilityDefinitionKind};
-use rulebench_rules::{
+use rulebench_rpg_adapter::{AbilityDefinition, AbilityDefinitionKind};
+use rulebench_rpg_adapter::{
     ContentDefinitionChangeKind, ContentImportDiagnostic, ContentImportDiagnosticSeverity,
     ContentImportReport, ContentPackCanonicalVersion, ContentPackCatalogs,
     ContentPackCollisionPolicy, ContentPackDefinition, ContentPackDiffReadout, ContentPackIdentity,
@@ -995,7 +995,7 @@ impl ContentPackReferenceDto {
         ContentPackReference {
             id: self.id.clone(),
             version: self.version.clone(),
-            fingerprint: rulebench_rules::ContentFingerprint {
+            fingerprint: rulebench_rpg_adapter::ContentFingerprint {
                 algorithm: self.fingerprint.algorithm.clone(),
                 value: self.fingerprint.value.clone(),
             },
@@ -1422,7 +1422,7 @@ pub struct ContentWorkspaceDto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_rules::{ContentImportDiagnosticCode, ContentPackDiagnosticCode};
+    use rulebench_rpg_adapter::{ContentImportDiagnosticCode, ContentPackDiagnosticCode};
     use serde_json::json;
 
     #[test]

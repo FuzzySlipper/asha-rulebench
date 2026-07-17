@@ -7,9 +7,7 @@ use crate::{
     ContentPackCatalogs, ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity,
     ContentPackSourceKind, EntityDefinition,
 };
-use rulebench_ruleset::{
-    ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata,
-};
+use rpg_ir::{ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata};
 
 static TEST_DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 

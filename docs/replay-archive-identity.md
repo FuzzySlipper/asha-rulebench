@@ -28,9 +28,9 @@ The encoding does not use Rust `Debug`, private layout, declaration order,
 serde or host JSON, generated TypeScript, fixtures, bridge code, or protocol
 DTOs. A stable golden test therefore survives formatting and debug-shape
 changes, while mutation tests prove semantic changes alter the fingerprint.
-The standalone portable consumer exercises the same public encoder through
-`rulebench-rules` without fixtures, bridge, protocol, codegen, or host
-dependencies.
+The encoder is currently a Rulebench product owner. The former standalone
+consumer was retired when reusable authority moved to `asha-rpg`; replay
+archive extraction and its independent proof are assigned to #5942.
 
 Adding an integrity-relevant package field requires an intentional encoder
 change and a new canonical payload encoding version. Readers must never guess

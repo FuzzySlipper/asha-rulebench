@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     ActionResourceCost, ActionResourceRefreshPolicy, ActionResourceState,
     CombatEndConditionReadout, CombatFinalizationReadout, CombatLogEntry, CombatSessionSnapshot,
     CommandAuditEntry, CurrentActorActionOption, CurrentActorCellOption, CurrentActorOptionSummary,

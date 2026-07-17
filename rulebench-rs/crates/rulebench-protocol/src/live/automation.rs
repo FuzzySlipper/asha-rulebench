@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     CombatSessionAutomaticRunReadout, CombatSessionAutomaticStepExecutionReadout,
     CombatSessionSnapshot,
 };

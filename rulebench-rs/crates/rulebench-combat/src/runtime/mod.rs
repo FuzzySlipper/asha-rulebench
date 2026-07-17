@@ -7,11 +7,10 @@ use crate::resolver::{
 };
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
-use rulebench_gameplay_module::{
-    PreEffectWorkspace, RulebenchGameplayContinuation, RulebenchGameplayFabric,
-    RulebenchPreEffectOwner,
+use rpg_ir::ActionResourceCost;
+use rpg_runtime::{
+    PreEffectWorkspace, RpgGameplayContinuation, RpgGameplayFabric, RpgPreEffectOwner,
 };
-use rulebench_ruleset::ActionResourceCost;
 
 mod automation;
 mod control;
@@ -64,7 +63,7 @@ struct PendingReactionResolution {
     step: CombatSessionStepSummary,
     actor_id: String,
     resource_costs: Vec<ActionResourceCost>,
-    gameplay_continuation: RulebenchGameplayContinuation,
+    gameplay_continuation: RpgGameplayContinuation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,7 +145,7 @@ pub struct CombatSessionState {
     reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
     reaction_audit_log: Vec<ReactionAuditEntry>,
     pending_reaction_resolution: Option<PendingReactionResolution>,
-    gameplay_fabric: RulebenchGameplayFabric,
+    gameplay_fabric: RpgGameplayFabric,
     modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
@@ -174,7 +173,7 @@ impl CombatSessionState {
             reaction_window_lifecycle_log: Vec::new(),
             reaction_audit_log: Vec::new(),
             pending_reaction_resolution: None,
-            gameplay_fabric: RulebenchGameplayFabric::new(),
+            gameplay_fabric: RpgGameplayFabric::new(),
             modifier_duration_expiration_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),

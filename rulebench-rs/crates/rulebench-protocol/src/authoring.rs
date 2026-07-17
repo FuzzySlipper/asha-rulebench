@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, CheckHandlerKind,
     CombatEndPolicy, RuleModuleConfiguration, RuleModuleDeclaration, RuleModuleId,
     RuleModuleValidationError, RulesetMetadata, TurnControlModuleConfiguration, TurnOrderPolicy,

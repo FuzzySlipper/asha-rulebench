@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     record_replay_package, CombatControlCommandSpec, CombatSessionCreateRequest,
     CombatSessionIntentCommandSpec, ReplayCommand, ReplayCommandRecordingSpec, ReplayNarration,
     ReplayPackage, UseActionIntent,
@@ -92,7 +92,7 @@ fn replay_package(package_id: &str, session_id: &str, explicit_start: bool) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_rules::{compare_replay_packages, verify_replay_package};
+    use rulebench_rpg_adapter::{compare_replay_packages, verify_replay_package};
 
     #[test]
     fn review_packages_verify_and_expose_a_structural_comparison() {

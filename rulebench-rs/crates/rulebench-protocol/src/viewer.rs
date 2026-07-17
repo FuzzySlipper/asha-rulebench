@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     CombatLogEntry, CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary,
     CombatSessionTranscript, DomainEvent, FinalCombatantState, RulebenchReceipt, RulebenchScenario,
     ScenarioProjection, Team,

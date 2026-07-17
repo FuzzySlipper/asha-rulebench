@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use rulebench_ruleset::{
+use rpg_ir::{
     ActionResourceCost, AttackCheckDeclaration, CheckDeclaration, DefenseReference, HitEffect,
     TargetKind, TargetSelection, TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,
 };
@@ -271,8 +271,8 @@ fn collect_catalog<T: Clone>(
         .collect()
 }
 
-fn placeholder_action(ruleset_id: &str) -> rulebench_ruleset::ActionDefinition {
-    rulebench_ruleset::ActionDefinition {
+fn placeholder_action(ruleset_id: &str) -> rpg_ir::ActionDefinition {
+    rpg_ir::ActionDefinition {
         id: "authored-scenario-unbound".to_string(),
         ruleset_id: ruleset_id.to_string(),
         ability_id: "authored-scenario-unbound".to_string(),

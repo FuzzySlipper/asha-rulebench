@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     AuthoredActionAbilityGrantReceipt, AuthoredActionBindingReceipt, AuthoredActionBindingRequest,
 };
 use serde::{Deserialize, Serialize};

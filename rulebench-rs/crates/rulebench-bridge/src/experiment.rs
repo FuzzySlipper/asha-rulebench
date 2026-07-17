@@ -8,7 +8,7 @@ use rulebench_protocol::{
     ExperimentMetricsDto, ExperimentReadoutDto, ExperimentTrialReadoutDto,
     PolicyRulesetCompatibilityDto, ProtocolRequestContextDto,
 };
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     record_replay_package, verify_replay_package, CombatSessionAutomaticStepSpec,
     CombatSessionState, HitEffectOperation, ReplayArchiveError, ReplayPackage,
     COMBAT_AUTOMATION_POLICY_REGISTRY,
@@ -522,7 +522,9 @@ impl RulebenchBridge {
                 .delete(&session_id)
                 .map_err(BridgeError::from_recovery_storage_error)?;
             self.sessions
-                .discard_session(&rulebench_rules::CombatSessionHandle::new(&session_id))
+                .discard_session(&rulebench_rpg_adapter::CombatSessionHandle::new(
+                    &session_id,
+                ))
                 .map_err(BridgeError::from_session_error)?;
             self.recordings.remove(&session_id);
             Ok(trial)
@@ -560,7 +562,7 @@ impl RulebenchBridge {
         let _ = self.recovery.delete(session_id);
         let _ = self
             .sessions
-            .discard_session(&rulebench_rules::CombatSessionHandle::new(session_id));
+            .discard_session(&rulebench_rpg_adapter::CombatSessionHandle::new(session_id));
         self.recordings.remove(session_id);
     }
 

@@ -1,5 +1,5 @@
-use rulebench_core::{BoundedValue, GridPosition, NamedNumber, Team};
-use rulebench_ruleset::ActionResourcePool;
+use rpg_core::{BoundedValue, GridPosition, NamedNumber, Team};
+use rpg_ir::ActionResourcePool;
 
 use crate::{ClassLevelInput, ContentPackSetReference, Grid, StatBlock};
 

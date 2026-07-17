@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     ActionResourceCost, ActionRollPolicy, AreaShape, AreaTargetingDeclaration,
     AttackCheckDeclaration, AuthoredActionDefinition, AuthoredEffectOperation,
     AuthoredModifierEffectOperation, AuthoredReactionHookEffectOperation,

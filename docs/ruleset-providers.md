@@ -22,8 +22,8 @@ bridge, store, and UI code never switch on provider, package, or scenario ids.
 
 ## Adding or evolving a provider
 
-1. Express behavior through existing `rulebench-ruleset`, combat-operation, and
-   gameplay-module owner seams. Add a new Rust vocabulary only through its own
+1. Express behavior through public `rpg-ir`, combat-operation, and
+   `rpg-runtime` owner seams. Add a new Rust vocabulary only through its own
    reviewed compatibility change.
 2. Register the provider with an exact capability set and compatible vocabulary
    versions. Colliding provider or ruleset identities fail startup tests.

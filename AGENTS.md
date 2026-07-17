@@ -76,7 +76,7 @@ pnpm run certify
 
 # Explicit focused checks; repeat --profile to take the safe union
 pnpm run verify:change -- --profile frontend
-pnpm run verify:change -- --profile rust-owner --crate rulebench-rules
+pnpm run verify:change -- --profile rust-owner --crate rulebench-rpg-adapter
 pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
 
 # LAN-first development server

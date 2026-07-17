@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     inspect_replay_package, ReplayArchiveError, ReplayArchiveMetadata, ReplayCommandInspection,
     ReplayComparisonDifference, ReplayComparisonReadout, ReplayMismatch, ReplayPackage,
     ReplayStepEvidence, ReplayVerificationReadout, StateFingerprint,
@@ -347,7 +347,7 @@ impl From<&ReplayArchiveError> for ReplayArchiveErrorDto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_rules::{
+    use rulebench_rpg_adapter::{
         ReplayComparisonDifferenceCode, ReplayMismatchDimension, ReplayVerificationDecisionKind,
     };
 
@@ -381,7 +381,7 @@ mod tests {
         let readout = ReplayVerificationReadout {
             accepted: false,
             decision_kind: ReplayVerificationDecisionKind::MismatchedEvidence,
-            package_validation: rulebench_rules::ReplayPackageValidationReport {
+            package_validation: rulebench_rpg_adapter::ReplayPackageValidationReport {
                 accepted: true,
                 diagnostics: Vec::new(),
             },
@@ -408,7 +408,7 @@ mod tests {
             version: "2.0.0".to_string(),
         });
         let storage = ReplayArchiveErrorDto::from(&ReplayArchiveError::Storage(
-            rulebench_rules::ReplayArchiveStorageError::WriteFailed {
+            rulebench_rpg_adapter::ReplayArchiveStorageError::WriteFailed {
                 package_id: "replay".to_string(),
             },
         ));

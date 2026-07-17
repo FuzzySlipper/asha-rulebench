@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     CapabilityEntry, CapabilityIdentity, HostCapabilityProfile, RulebenchCapabilityManifest,
     RulesetProviderManifestEntry,
 };
@@ -178,7 +178,7 @@ impl From<&HostCapabilityProfile> for HostCapabilityProfileDto {
 
 #[cfg(test)]
 mod tests {
-    use rulebench_rules::{
+    use rulebench_rpg_adapter::{
         assemble_capability_manifest, CapabilityRegistryInput, HostCapabilityProfile,
     };
 

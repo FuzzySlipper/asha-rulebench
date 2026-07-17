@@ -1,5 +1,5 @@
 use super::fixture::hexing_bolt_fixture_scenario;
-use rulebench_rules::*;
+use rulebench_rpg_adapter::*;
 
 pub fn combat_session_transcripts() -> Vec<CombatSessionTranscript> {
     vec![hexing_bolt_opening_exchange_session()]

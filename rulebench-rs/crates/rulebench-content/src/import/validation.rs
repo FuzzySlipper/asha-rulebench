@@ -10,7 +10,7 @@ use crate::{
     CONTENT_PACK_FINGERPRINT_ALGORITHM_V2,
 };
 use crate::{ContentDefinitionKind, ContentPackDiagnostic, CONTENT_PACK_FINGERPRINT_ALGORITHM};
-use rulebench_ruleset::{
+use rpg_ir::{
     CheckDeclaration, EffectOperationId, ModifierTenure, OperationPipelineV2,
     RulesetProviderCatalog, RulesetProviderDescriptor, TargetKind, TargetSelection,
     TargetingOperationId,
@@ -354,7 +354,7 @@ fn validate_check(
     diagnostics: &mut Vec<ContentImportDiagnostic>,
     action: &crate::AuthoredActionDefinition,
     base: &str,
-    selected_ruleset: Option<&rulebench_ruleset::RulesetMetadata>,
+    selected_ruleset: Option<&rpg_ir::RulesetMetadata>,
 ) {
     let fields_valid = match &action.check {
         CheckDeclaration::Attack(attack) => {
@@ -449,7 +449,7 @@ fn validate_effects(
                 let has_pipeline = action.targeting.operation_pipeline.is_some();
                 let distance_valid = value.maximum_distance > 0
                     && value.maximum_distance <= OperationPipelineV2::MAXIMUM_AREA_RADIUS
-                    && (!matches!(value.movement_kind, rulebench_ruleset::MovementKind::Shift)
+                    && (!matches!(value.movement_kind, rpg_ir::MovementKind::Shift)
                         || value.maximum_distance == 1);
                 has_pipeline && distance_valid
             }

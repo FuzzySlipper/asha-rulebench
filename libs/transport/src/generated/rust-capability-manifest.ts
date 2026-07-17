@@ -228,7 +228,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -247,7 +247,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -266,7 +266,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -285,7 +285,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -304,7 +304,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -323,7 +323,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -342,7 +342,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.effect-operation-registry",
+        "asha-rpg.effect-operation-registry",
         "rulebench-combat.runtime-effect-operation-registry"
       ]
     },
@@ -361,7 +361,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.targeting-operation-registry",
+        "asha-rpg.targeting-operation-registry",
         "rulebench-combat.runtime-targeting-operation-registry"
       ]
     },
@@ -380,7 +380,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.targeting-operation-registry",
+        "asha-rpg.targeting-operation-registry",
         "rulebench-combat.runtime-targeting-operation-registry"
       ]
     },
@@ -399,7 +399,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.targeting-operation-registry",
+        "asha-rpg.targeting-operation-registry",
         "rulebench-combat.runtime-targeting-operation-registry"
       ]
     },
@@ -418,7 +418,7 @@ export const rustCapabilityManifest: RulebenchCapabilityManifestDto = {
         "durableAcrossRestart": true
       },
       "evidence": [
-        "rulebench-ruleset.targeting-operation-registry",
+        "asha-rpg.targeting-operation-registry",
         "rulebench-combat.runtime-targeting-operation-registry"
       ]
     },

@@ -4,7 +4,7 @@ use crate::{
     ContentPackCollisionPolicy, ContentPackDefinition, ContentPackIdentity, ContentPackProvenance,
     ContentPackSourceKind, EntityDefinition,
 };
-use rulebench_ruleset::RulesetMetadata;
+use rpg_ir::RulesetMetadata;
 
 #[test]
 fn ordering_independent_canonical_packs_have_no_diff() {

@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     AuthoredActionBindingError, CombatSessionApiError, ReplayArchiveError, SessionRecoveryError,
     SessionRecoveryStorageError,
 };

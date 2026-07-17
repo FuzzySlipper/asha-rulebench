@@ -4,7 +4,7 @@ use crate::{
     fingerprint_content_pack_set, CanonicalContentPack, ContentDefinitionKind, ContentPackIdentity,
     ContentPackReference, ContentPackSetReference,
 };
-use rulebench_ruleset::{RulesetCompatibilityError, RulesetMetadata};
+use rpg_ir::{RulesetCompatibilityError, RulesetMetadata};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContentPackDiagnosticCode {
@@ -474,9 +474,7 @@ mod tests {
         ContentPackCollisionPolicy, ContentPackDefinition, ContentPackProvenance,
         ContentPackSourceKind, EntityDefinition,
     };
-    use rulebench_ruleset::{
-        ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata,
-    };
+    use rpg_ir::{ActionResolutionModuleConfiguration, RuleModuleDeclaration, RulesetMetadata};
 
     #[test]
     fn exact_dependencies_resolve_into_a_deterministic_pack_set_reference() {

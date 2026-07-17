@@ -1,5 +1,5 @@
-use rulebench_rules::{ActionResourceKind, ActionResourcePool, ActionResourceRefreshPolicy};
-use rulebench_rules::{
+use rulebench_rpg_adapter::{ActionResourceKind, ActionResourcePool, ActionResourceRefreshPolicy};
+use rulebench_rpg_adapter::{
     AuthoredScenarioActionGrant, AuthoredScenarioControl, AuthoredScenarioControlMode,
     AuthoredScenarioDefinition, AuthoredScenarioParticipant, ClassDefinition, ClassLevelGrant,
     ClassLevelInput, DerivedStatFormula, Grid, GridCell, ItemDefinition, StatBlock, StatDefinition,
@@ -465,8 +465,8 @@ impl AuthoredGridDto {
 }
 
 impl AuthoredGridPositionDto {
-    fn to_authority(self) -> rulebench_rules::GridPosition {
-        rulebench_rules::GridPosition {
+    fn to_authority(self) -> rulebench_rpg_adapter::GridPosition {
+        rulebench_rpg_adapter::GridPosition {
             x: self.x,
             y: self.y,
         }
@@ -486,7 +486,7 @@ impl AuthoredScenarioParticipantDto {
             side_id: self.side_id.clone(),
             initiative: self.initiative,
             position: self.position.to_authority(),
-            hit_points: rulebench_rules::BoundedValue {
+            hit_points: rulebench_rpg_adapter::BoundedValue {
                 current: self.hit_points.current,
                 max: self.hit_points.max,
             },
@@ -537,8 +537,8 @@ impl AuthoredScenarioParticipantDto {
 }
 
 impl AuthoredNamedNumberDto {
-    fn to_authority(&self) -> rulebench_rules::NamedNumber {
-        rulebench_rules::NamedNumber {
+    fn to_authority(&self) -> rulebench_rpg_adapter::NamedNumber {
+        rulebench_rpg_adapter::NamedNumber {
             id: self.id.clone(),
             label: self.label.clone(),
             value: self.value,
@@ -559,8 +559,10 @@ impl AuthoredScenarioControlDto {
     }
 }
 
-impl From<&rulebench_rules::AuthoredScenarioBindingReceipt> for AuthoredScenarioBindingReceiptDto {
-    fn from(value: &rulebench_rules::AuthoredScenarioBindingReceipt) -> Self {
+impl From<&rulebench_rpg_adapter::AuthoredScenarioBindingReceipt>
+    for AuthoredScenarioBindingReceiptDto
+{
+    fn from(value: &rulebench_rpg_adapter::AuthoredScenarioBindingReceipt) -> Self {
         Self {
             binding_version: value.binding_version,
             content_pack_root: crate::ContentPackReferenceDto::from(&value.content_pack_set.root),

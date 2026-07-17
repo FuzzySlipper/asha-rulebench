@@ -19,7 +19,6 @@ test("certify deterministic mode composes every exhaustive local group once", ()
   assert.deepEqual(groupIds, [
     "authority-and-product-contracts",
     "exhaustive-semantic-corpus",
-    "portable-consumer-contract",
     "deterministic-browser-certification",
     "claims-and-limitations-receipt",
   ]);

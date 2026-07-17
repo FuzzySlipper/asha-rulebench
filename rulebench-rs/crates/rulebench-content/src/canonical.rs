@@ -4,7 +4,7 @@ use crate::{
     ContentPackDefinition, ContentPackReference, DerivedStatFormula, ModifierDurationPolicy,
     CONTENT_PACK_SET_FINGERPRINT_ALGORITHM,
 };
-use rulebench_ruleset::{
+use rpg_ir::{
     ActionResourcePool, ActionResourceRefreshPolicy, CheckDeclaration, CombatEndPolicy,
     MovementKind, RuleModuleConfiguration, RulesetArtifactProvenance,
 };
@@ -454,8 +454,8 @@ fn feed_scenario(encoder: &mut FingerprintEncoder, scenario: &AuthoredScenarioDe
         encoder.feed_str(&participant.entity_id);
         encoder.feed_str(&participant.name);
         encoder.feed_str(match participant.team {
-            rulebench_core::Team::Ally => "ally",
-            rulebench_core::Team::Enemy => "enemy",
+            rpg_core::Team::Ally => "ally",
+            rpg_core::Team::Enemy => "enemy",
         });
         encoder.feed_str(&participant.side_id);
         encoder.feed_i32(participant.initiative);
@@ -558,47 +558,47 @@ fn feed_action(encoder: &mut FingerprintEncoder, action: &AuthoredActionDefiniti
     encoder.feed_str(&action.ability_id);
     encoder.feed_str(&action.name);
     encoder.feed_str(match action.targeting.target_kind {
-        rulebench_ruleset::TargetKind::Combatant => "combatant",
-        rulebench_ruleset::TargetKind::Area => "area",
+        rpg_ir::TargetKind::Combatant => "combatant",
+        rpg_ir::TargetKind::Area => "area",
     });
     encoder.feed_str(match action.targeting.selection {
-        rulebench_ruleset::TargetSelection::Single => "single",
-        rulebench_ruleset::TargetSelection::Multiple => "multiple",
+        rpg_ir::TargetSelection::Single => "single",
+        rpg_ir::TargetSelection::Multiple => "multiple",
     });
     encoder.feed_str(match action.targeting.team_constraint {
-        rulebench_ruleset::TargetTeamConstraint::Hostile => "hostile",
-        rulebench_ruleset::TargetTeamConstraint::Ally => "ally",
-        rulebench_ruleset::TargetTeamConstraint::Any => "any",
+        rpg_ir::TargetTeamConstraint::Hostile => "hostile",
+        rpg_ir::TargetTeamConstraint::Ally => "ally",
+        rpg_ir::TargetTeamConstraint::Any => "any",
     });
     encoder.feed_u32(action.targeting.maximum_range);
     encoder.feed_str(match action.targeting.visibility_requirement {
-        rulebench_ruleset::VisibilityRequirement::Required => "required",
-        rulebench_ruleset::VisibilityRequirement::Ignored => "ignored",
+        rpg_ir::VisibilityRequirement::Required => "required",
+        rpg_ir::VisibilityRequirement::Ignored => "ignored",
     });
     match &action.targeting.operation_pipeline {
         Some(pipeline) => {
             encoder.feed_str("operationPipelineV2");
-            encoder.feed_str(rulebench_ruleset::OperationPipelineV2::VOCABULARY_VERSION);
+            encoder.feed_str(rpg_ir::OperationPipelineV2::VOCABULARY_VERSION);
             encoder.feed_u32(pipeline.maximum_targets);
             match &pipeline.area {
                 Some(area) => {
                     encoder.feed_str(match area.shape {
-                        rulebench_ruleset::AreaShape::ManhattanBurst => "manhattanBurst",
+                        rpg_ir::AreaShape::ManhattanBurst => "manhattanBurst",
                     });
                     encoder.feed_u32(area.radius);
                 }
                 None => encoder.feed_str("noArea"),
             }
             encoder.feed_str(match pipeline.roll_policy {
-                rulebench_ruleset::ActionRollPolicy::Shared => "shared",
-                rulebench_ruleset::ActionRollPolicy::PerTarget => "perTarget",
-                rulebench_ruleset::ActionRollPolicy::NoRoll => "noRoll",
+                rpg_ir::ActionRollPolicy::Shared => "shared",
+                rpg_ir::ActionRollPolicy::PerTarget => "perTarget",
+                rpg_ir::ActionRollPolicy::NoRoll => "noRoll",
             });
             encoder.feed_str(match pipeline.failure_policy {
-                rulebench_ruleset::TargetFailurePolicy::Atomic => "atomic",
+                rpg_ir::TargetFailurePolicy::Atomic => "atomic",
             });
             encoder.feed_str(match pipeline.target_order {
-                rulebench_ruleset::TargetOrderPolicy::CanonicalId => "canonicalId",
+                rpg_ir::TargetOrderPolicy::CanonicalId => "canonicalId",
             });
         }
         None => encoder.feed_str("noOperationPipeline"),
@@ -618,7 +618,7 @@ fn feed_action(encoder: &mut FingerprintEncoder, action: &AuthoredActionDefiniti
             encoder.feed_str("movement");
             encoder.feed_u32(movement.allowance);
             encoder.feed_str(match movement.topology {
-                rulebench_ruleset::MovementTopology::OrthogonalManhattan => "orthogonalManhattan",
+                rpg_ir::MovementTopology::OrthogonalManhattan => "orthogonalManhattan",
             });
             encoder.feed_strings(&movement.blocking_terrain_tags);
             encoder.feed_strings(&movement.difficult_terrain_tags);
@@ -790,7 +790,7 @@ mod tests {
         ContentPackProvenance, ContentPackSourceKind, ModifierDefinition, ModifierStackingPolicy,
         ModifierStatAdjustment, ReactionParticipantSelector,
     };
-    use rulebench_ruleset::{
+    use rpg_ir::{
         AbilityDefinition, AbilityDefinitionKind, ActionResourceCost, AttackCheckDeclaration,
         DamageEffectOperation, DefenseReference, ModifierTenure, MovementActionDeclaration,
         MovementTopology, ReactionWindow, RulesetModuleProvenance, TargetKind, TargetSelection,
@@ -1025,7 +1025,7 @@ mod tests {
                 ruleset_id: "test-rules".to_string(),
                 ruleset_version: "1".to_string(),
                 module_versions: vec![RulesetModuleProvenance {
-                    module: rulebench_ruleset::RuleModuleId::ActionResolution,
+                    module: rpg_ir::RuleModuleId::ActionResolution,
                     version: "1".to_string(),
                 }],
                 effect_operation_vocabulary_version: "1".to_string(),

@@ -747,6 +747,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e27ee8bb91ca0adcf0ecb116293afa12d393f9c2b9b9cd54d33e8078fe19839"
 
 [[package]]
+name = "rpg-core"
+version = "0.1.0"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=7d6430bb3fb9809a6d35636275ef2e3e36ae9407#7d6430bb3fb9809a6d35636275ef2e3e36ae9407"
+
+[[package]]
+name = "rpg-ir"
+version = "0.1.0"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=7d6430bb3fb9809a6d35636275ef2e3e36ae9407#7d6430bb3fb9809a6d35636275ef2e3e36ae9407"
+dependencies = [
+ "rpg-core",
+]
+
+[[package]]
+name = "rpg-runtime"
+version = "0.1.0"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=7d6430bb3fb9809a6d35636275ef2e3e36ae9407#7d6430bb3fb9809a6d35636275ef2e3e36ae9407"
+dependencies = [
+ "asha-gameplay-module-sdk",
+ "asha-runtime-session-composition",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rstar"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -906,7 +930,7 @@ name = "rulebench-bridge"
 version = "0.1.0"
 dependencies = [
  "rulebench-protocol",
- "rulebench-rules",
+ "rulebench-rpg-adapter",
 ]
 
 [[package]]
@@ -921,39 +945,25 @@ dependencies = [
 name = "rulebench-combat"
 version = "0.1.0"
 dependencies = [
+ "rpg-core",
+ "rpg-ir",
+ "rpg-runtime",
  "rulebench-content",
- "rulebench-core",
- "rulebench-gameplay-module",
- "rulebench-ruleset",
 ]
 
 [[package]]
 name = "rulebench-content"
 version = "0.1.0"
 dependencies = [
- "rulebench-core",
- "rulebench-ruleset",
+ "rpg-core",
+ "rpg-ir",
 ]
-
-[[package]]
-name = "rulebench-core"
-version = "0.1.0"
 
 [[package]]
 name = "rulebench-fixtures"
 version = "0.1.0"
 dependencies = [
- "rulebench-rules",
-]
-
-[[package]]
-name = "rulebench-gameplay-module"
-version = "0.1.0"
-dependencies = [
- "asha-gameplay-module-sdk",
- "asha-runtime-session-composition",
- "serde",
- "serde_json",
+ "rulebench-rpg-adapter",
 ]
 
 [[package]]
@@ -971,7 +981,7 @@ dependencies = [
 name = "rulebench-protocol"
 version = "0.1.0"
 dependencies = [
- "rulebench-rules",
+ "rulebench-rpg-adapter",
  "serde",
  "serde_json",
 ]
@@ -980,26 +990,19 @@ dependencies = [
 name = "rulebench-replay"
 version = "0.1.0"
 dependencies = [
+ "rpg-core",
  "rulebench-combat",
- "rulebench-core",
 ]
 
 [[package]]
-name = "rulebench-rules"
+name = "rulebench-rpg-adapter"
 version = "0.1.0"
 dependencies = [
+ "rpg-core",
+ "rpg-ir",
  "rulebench-combat",
  "rulebench-content",
- "rulebench-core",
  "rulebench-replay",
- "rulebench-ruleset",
-]
-
-[[package]]
-name = "rulebench-ruleset"
-version = "0.1.0"
-dependencies = [
- "rulebench-core",
 ]
 
 [[package]]

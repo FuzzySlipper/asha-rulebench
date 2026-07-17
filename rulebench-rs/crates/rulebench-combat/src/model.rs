@@ -20,9 +20,8 @@ pub use equipment::*;
 pub use movement::*;
 pub use projection::*;
 pub use reactions::*;
-pub use rulebench_content::*;
-pub use rulebench_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};
-pub use rulebench_ruleset::{
+pub use rpg_core::{BoundedValue, GridPosition, NamedNumber, StateFingerprint, Team};
+pub use rpg_ir::{
     validate_rule_modules, AbilityDefinition, AbilityDefinitionKind, ActionDefinition,
     ActionResolutionModuleConfiguration, ActionResolutionTargetingPolicy, ActionRollPolicy,
     AreaShape, AreaTargetingDeclaration, AttackCheckDeclaration, CheckDeclaration,
@@ -38,4 +37,5 @@ pub use rulebench_ruleset::{
     TemporaryVitalityEffectOperation, TurnControlModuleConfiguration, TurnOrderPolicy,
     ValidatedRuleModuleDeclaration, ValidatedRuleModuleRegistry, VisibilityRequirement,
 };
+pub use rulebench_content::*;
 pub use session::*;

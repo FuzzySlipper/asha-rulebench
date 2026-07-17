@@ -10,9 +10,9 @@ requiring another bespoke upstream access point.
 
 1. Rulebench resolves an authored hit far enough to open a local reaction
    window.
-2. `rulebench-gameplay-module` submits a typed pre-effect workspace to the
-   public `GameplayRuntimeHost` facade.
-3. The static module registry invokes Rulebench's declared Transform and React
+2. Public `rpg-runtime` submits a typed pre-effect workspace through ASHA's
+   RuntimeSession composition.
+3. The static module registry invokes the RPG fabric's declared Transform and React
    stages. Each invocation receives only its declared, frozen reads.
 4. React suspends. The ASHA host owns the continuation token and persists it in
    the host snapshot; Rulebench keeps the typed continuation beside its local
@@ -81,14 +81,14 @@ as a distinct machine-readable dimension.
 
 - The local reaction-window coordinator remains Rulebench-owned. This slice
   does not claim that ordered or nested RPG reactions belong upstream.
-- The `RulebenchPreEffectOwner` adapter is intentionally narrow and local. It
-  is evidence for future owner-query ergonomics, not a new generic ASHA owner
-  interface.
-- The module and host dependencies use ASHA's governed public Git workspace at
-  one reviewed 40-character revision and the compatible `^0.1` facade series.
-  Rulebench's boundary gate rejects sibling paths, private crates, mixed or
-  stale revisions, and incompatible versions. GitHub CI is the clean-checkout
-  proof: the portable consumer builds without an ASHA sibling tree.
+- The public `RpgPreEffectOwner` interface is intentionally narrow. It is the
+  consumer-owned commit border, not a mutable callback or generic ASHA owner
+  registry.
+- Rulebench consumes `rpg-runtime` from the governed public `asha-rpg` Git
+  repository at one exact revision and compatible `^0.1` version. The boundary
+  gate rejects sibling paths, direct ASHA crates, stale revisions, and
+  incompatible versions. The independent minimal consumer is owned and run in
+  `asha-rpg`.
 - ASHA #5797 supplied the composed downstream-combat-owner seam. Rulebench now
   installs one concrete owner through `StaticRuntimeSessionBuilder`, uses the
   composed transaction for continuation validation, routing, typed opened and

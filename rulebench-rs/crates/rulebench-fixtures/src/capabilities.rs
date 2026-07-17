@@ -1,4 +1,6 @@
-use rulebench_rules::{CapabilityIdentity, CapabilityRegistryInput, RulesetProviderManifestEntry};
+use rulebench_rpg_adapter::{
+    CapabilityIdentity, CapabilityRegistryInput, RulesetProviderManifestEntry,
+};
 
 use crate::{run_capability_conformance, CapabilityConformanceFilter, ScenarioPackageRegistry};
 

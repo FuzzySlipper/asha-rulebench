@@ -2,7 +2,7 @@ use crate::{
     AuthoredActionDefinition, AuthoredScenarioDefinition, ClassDefinition, EntityDefinition,
     ItemDefinition, ModifierDefinition, StatDefinition,
 };
-use rulebench_ruleset::{AbilityDefinition, RulesetArtifactProvenance, RulesetMetadata};
+use rpg_ir::{AbilityDefinition, RulesetArtifactProvenance, RulesetMetadata};
 
 pub const CONTENT_PACK_FINGERPRINT_ALGORITHM: &str = "fnv1a64.rulebench-content-pack.v0";
 pub const CONTENT_PACK_FINGERPRINT_ALGORITHM_V1: &str = "fnv1a64.rulebench-content-pack.v1";

@@ -52,7 +52,7 @@ pub use runtime::{
 };
 pub use state::CombatState;
 
-pub use rulebench_gameplay_module::GOVERNED_ASHA_REVISION;
+pub use rpg_runtime::GOVERNED_ASHA_REVISION;
 
 pub const RUNTIME_EFFECT_OPERATION_REGISTRY: &[model::EffectOperationId] = &[
     model::EffectOperationId::Damage,

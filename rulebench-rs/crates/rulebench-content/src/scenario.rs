@@ -2,8 +2,8 @@ use crate::{
     ActiveModifier, AuthoredActionBindingReceipt, ContentPackSetReference, ScenarioMetadata,
     StatBlock, StatDefinition,
 };
-use rulebench_core::{BoundedValue, GridPosition, NamedNumber, Team};
-use rulebench_ruleset::{
+use rpg_core::{BoundedValue, GridPosition, NamedNumber, Team};
+use rpg_ir::{
     AbilityDefinition, ActionDefinition, ActionResourcePool, ModifierTenure, RulesetMetadata,
 };
 

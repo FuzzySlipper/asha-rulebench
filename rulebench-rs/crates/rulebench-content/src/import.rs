@@ -3,7 +3,7 @@ use crate::{
     ContentDefinitionKind, ContentPackDefinition, ContentPackDiagnosticCode,
     ResolvedContentPackSet,
 };
-use rulebench_ruleset::{RulesetMetadata, RulesetProviderCatalog};
+use rpg_ir::{RulesetMetadata, RulesetProviderCatalog};
 
 mod validation;
 

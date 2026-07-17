@@ -9,8 +9,8 @@ use super::{
     RollRequestKind, RulebenchReceipt, RulebenchRejection, RulebenchScenario, ScenarioProjection,
     StateFingerprint, TargetKind, TargetLegality, TurnTransitionEntry, UseActionIntent,
 };
-use rulebench_gameplay_module::RulebenchGameplayFabricReadout;
-use rulebench_ruleset::{ActionResourceCost, CheckHandlerKind, CombatEndPolicy};
+use rpg_ir::{ActionResourceCost, CheckHandlerKind, CombatEndPolicy};
+use rpg_runtime::RpgGameplayFabricReadout;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatSessionSummary {
@@ -352,7 +352,7 @@ pub struct CurrentActorTargetSetOption {
     pub id: String,
     pub target_ids: Vec<String>,
     pub target_cell: Option<GridPosition>,
-    pub roll_policy: rulebench_ruleset::ActionRollPolicy,
+    pub roll_policy: rpg_ir::ActionRollPolicy,
     pub reason: String,
 }
 
@@ -471,7 +471,7 @@ pub struct CombatSessionSnapshot {
     pub equipment_transition_log: Vec<EquipmentTransitionEntry>,
     pub reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
     pub reaction_audit_log: Vec<ReactionAuditEntry>,
-    pub gameplay_fabric: RulebenchGameplayFabricReadout,
+    pub gameplay_fabric: RpgGameplayFabricReadout,
     pub current_reaction_window: Option<ReactionWindowReadout>,
     pub modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     pub turn_transition_log: Vec<TurnTransitionEntry>,

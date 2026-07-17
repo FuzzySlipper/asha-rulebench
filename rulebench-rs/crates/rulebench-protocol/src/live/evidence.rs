@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     CombatControlReadout, CombatSessionSnapshot, CombatSessionStepReadout, CommandCandidateEntry,
     CommandCandidateSummary, CommandPreflightReadout, DomainEvent, RollConsumptionEntry,
     TargetResolutionOutcome, TraceEntry, TracePhase, TraceStatus,
@@ -29,7 +29,7 @@ pub struct LiveReactionExecutionDto {
 
 impl LiveReactionExecutionDto {
     pub fn new(
-        reaction: &rulebench_rules::ReactionCommandReadout,
+        reaction: &rulebench_rpg_adapter::ReactionCommandReadout,
         snapshot: &CombatSessionSnapshot,
     ) -> Self {
         Self {
@@ -286,8 +286,8 @@ impl From<&TargetResolutionOutcome> for LiveTargetResolutionDto {
             accepted: value.target_legality.accepted,
             reason: value.target_legality.reason.clone(),
             attack_outcome: value.attack_roll.as_ref().map(|roll| match roll.outcome {
-                rulebench_rules::AttackOutcome::Hit => "hit".to_string(),
-                rulebench_rules::AttackOutcome::Miss => "miss".to_string(),
+                rulebench_rpg_adapter::AttackOutcome::Hit => "hit".to_string(),
+                rulebench_rpg_adapter::AttackOutcome::Miss => "miss".to_string(),
             }),
             damage_amount: value.damage.as_ref().map(|damage| damage.amount),
             movement_kind: value

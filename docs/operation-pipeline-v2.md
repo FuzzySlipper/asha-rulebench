@@ -71,12 +71,11 @@ host authority-verifies recognized legacy v0/v1 envelopes and atomically
 rewrites them to envelope v2 before exposure. See
 `replay-archive-identity.md` for compatibility and quarantine behavior.
 
-## Consumer example
+## Product example
 
-`rulebench-rs/portable-consumer-smoke` authors an explicit two-target,
-per-target-roll action, records and fingerprints its replay through
-`rulebench-rules`, and executes it without fixtures, protocol, bridge, codegen,
-or host dependencies. The Watchtower
-`Storm Pulse` fixture supplies the product proof for a shared-roll area action
+The old repository-local portability example was retired when portable
+authority moved to `asha-rpg`; multi-target product orchestration is not a
+public substrate claim. The Watchtower `Storm Pulse` fixture supplies product
+proof for a shared-roll area action
 with damage, push, target resource changes, actor cost, UI affordances, replay,
 and composed reaction behavior.

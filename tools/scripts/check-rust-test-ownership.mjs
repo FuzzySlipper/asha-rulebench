@@ -4,12 +4,10 @@ import { join, relative } from 'node:path';
 const root = process.cwd();
 const rustRoot = join(root, 'rulebench-rs');
 const owningCrates = [
-  'rulebench-core',
-  'rulebench-ruleset',
   'rulebench-content',
   'rulebench-combat',
-  'rulebench-gameplay-module',
   'rulebench-replay',
+  'rulebench-rpg-adapter',
   'rulebench-protocol',
   'rulebench-bridge',
   'rulebench-fixtures',

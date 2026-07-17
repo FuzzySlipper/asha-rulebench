@@ -1,25 +1,24 @@
 # Rulebench Rust Workspace
 
-This workspace incubates local Rust authority behavior for ASHA Rulebench.
-
-It is intentionally local to this repo. Crates here may use ASHA/ECRP vocabulary, but they are not upstream ASHA crates and should not pretend to be generic engine infrastructure until the behavior proves itself in Rulebench scenarios.
+This workspace owns Rulebench product behavior, adapters, storage, fixtures,
+protocol, generation, and its concrete process host. Portable RPG substrate is
+owned by the public `asha-rpg` repository and enters this workspace only
+through exact Git dependencies.
 
 ## Crate Structure
 
-The destination crate boundaries are present now so new work has an explicit
-home. The portable core, ruleset, content, combat, and replay crates now own
-their extracted concerns; Rulebench-local fixtures, codegen, bridge adapters,
-and the authority harness remain separate. Further changes move through focused
-tasks with behavior-preserving tests.
+Pinned public RPG dependencies:
 
-Portable authority layers:
+- `rpg-core`: dependency-free values and deterministic fingerprint vocabulary.
+- `rpg-ir`: normalized rules, operation vocabulary, and compatibility identity.
+- `rpg-runtime`: the public-ASHA RuntimeSession decision/reaction fabric.
 
-- `rulebench-core`: shared identifiers, values, event/trace primitives, and fingerprints.
-- `rulebench-ruleset`: behavior-module declarations and operation vocabulary.
+Rulebench product authority:
+
 - `rulebench-content`: content packs, references, validation, diagnostics, and indexing.
 - `rulebench-combat`: combat state, resolution, lifecycle, and manual/automatic control.
 - `rulebench-replay`: audit packages, replay specifications, verification, and mismatch diagnostics.
-- `rulebench-rules`: current portable implementation and eventual convenience facade over the layers above.
+- `rulebench-rpg-adapter`: temporary combined product surface for existing consumers; deleted by #5938.
 
 Boundary and adapter layers:
 
@@ -33,52 +32,34 @@ Rulebench-local layers:
 - `rulebench-fixtures`: authored scenarios, fixtures, goldens, and regression packs.
 - `rulebench-authority`: stable catalog/session emitter commands and the Rulebench integration test harness; it has no library compatibility API.
 
-The boundaries add useful friction. A game repo should be able to share portable
-rule behavior without inheriting Rulebench fixtures, generators, or UI machinery.
-Rulebench can exercise every portable layer through its harness.
-
-## Supported Portable Facade
-
-`rulebench-rules` is the supported local `v0` convenience facade for a consumer
-that wants the complete portable contract from one crate. It exposes:
-
-- authored content and validation values;
-- ruleset declarations, module validation, and compatibility identity;
-- combat session creation, commands, readbacks, state, resolver, and audit;
-- replay specifications and verification.
-
-Consumers that need a smaller dependency surface may use the focused owner
-crates directly. The facade does not expose Rulebench fixture catalogs, checked
-artifact generation, protocol/bridge adapters, or UI concerns. It is not a
-generic rules-engine or host-runtime compatibility promise.
+The reusable public facade is `asha-rpg` in its own repository. This workspace
+does not provide a game-consumer facade. The temporary adapter exists only to
+stage Rulebench product migration and explicitly is not a public portability
+claim.
 
 ## Dependency Direction
 
 ```text
-core
-  -> ruleset
-  -> content
-  -> combat
-  -> replay
-  -> rules (portable facade)
-       -> protocol -> bridge
-       -> fixtures -> codegen
-       -> bridge + fixtures + protocol -> process host
-                       \-> authority
+public asha-rpg: rpg-core + rpg-ir + rpg-runtime
+                    |          |          |
+                    +------> Rulebench content/combat/replay
+                                      |
+                         rulebench-rpg-adapter (temporary, #5938)
+                              |             |
+                         protocol       fixtures -> codegen
+                              |             |
+                            bridge       authority harness
+                              \-------------/
+                                      |
+                                process host
 ```
 
-The diagram is ownership shorthand rather than a complete Cargo edge list.
-Dependencies may point from a higher layer to the lower layers it consumes;
-portable layers must never depend on bridge, codegen, fixtures, authority, or UI.
-
 `pnpm run check:rust-boundaries` enforces this workspace graph and is part of
-`pnpm run verify`. It also runs focused invalid-dependency checks so the guard
-fails closed for reverse or unknown Rulebench edges, product fixtures imported
-by portable owners, ASHA imports outside the downstream module adapter, sibling
-ASHA paths, unapproved ASHA crates, forked repositories, stale revisions, and
-unbounded compatibility requirements. `pnpm run check:portable-consumer`
-separately compiles the supported `rulebench-rules` facade from an independent
-Cargo workspace and rejects product-only crates in its transitive tree.
+`pnpm run verify`. It fails closed for reverse or unknown Rulebench edges,
+product consumers bypassing the migration adapter, direct ASHA imports, sibling
+RPG paths, noncanonical repositories, stale revisions, and unbounded version
+requirements. The independent public consumer proof lives with `asha-rpg`, not
+inside this product repository.
 
 `pnpm run check:rust-test-ownership` keeps focused tests beside every active
 authority, adapter, protocol, fixture, and codegen owner while retaining the
@@ -145,7 +126,7 @@ and tests. Do not add a path dependency simply to preserve an old import path.
 ## Migration Posture
 
 - Every current workspace crate is an active owner, adapter, fixture, generator, harness, or host surface with focused tests; new empty reservation crates are forbidden as implementation claims.
-- Move behavior by concern, preserving portable compatibility through `rulebench-rules`; migrate Rulebench callers directly to fixture, protocol, bridge, or codegen owners rather than adding authority forwards.
+- Migrate callers away from `rulebench-rpg-adapter` in #5938; do not add another compatibility facade.
 - Do not create circular dependencies to preserve an old import path.
 - Keep scenario-specific assumptions in `rulebench-fixtures` or the Rulebench harness.
 - Keep host choice out of `rulebench-bridge`; the selected first concrete adapter lives under `hosts/rulebench-process-host`.
@@ -239,19 +220,16 @@ opaque ASHA continuations or arbitrary in-flight CPU state. See
 
 ## Dependency Posture
 
-`rulebench-gameplay-module` consumes governed ASHA public Rust facades through
-the canonical Git repository at one exact reviewed revision and compatible
-`^0.1` versions. No crate imports `asha-engine/engine-rs/crates/*`, and no
-sibling checkout is required. Update every ASHA dependency and the boundary
-gate to the same reviewed revision, regenerate the lockfiles, and require both
-the full local gate and the clean GitHub gate for upgrades. The gameplay module
-uses ASHA #5797's preferred composed RuntimeSession owner seam; the quarantined
-standalone gameplay host is not a direct Rulebench dependency.
+Rulebench consumes governed `asha-rpg` packages through the canonical public
+Git repository at one exact reviewed revision and compatible `^0.1` versions.
+No Rulebench crate imports ASHA directly or uses a sibling `asha-rpg` path.
+Update the shared RPG revision, boundary gate, and Cargo lock together, then
+require both the local and exact-SHA GitHub gates. `rpg-runtime` owns the ASHA
+RuntimeSession composition behind that public boundary.
 
 Planner approval in task #5560 authorizes `serde` with derive support for
-protocol DTOs and `serde_json` for the concrete process host. Portable authority
-crates remain serialization-free. Further external or ASHA dependencies still
-require planner approval.
+protocol DTOs and `serde_json` for the concrete process host. Further external
+dependencies still require planner approval.
 
 ## Non-Claims
 

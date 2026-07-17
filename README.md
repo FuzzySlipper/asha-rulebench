@@ -23,19 +23,16 @@ This repo is also a proving ground. Local Rust crates may incubate RPG-domain or
 
 ## Rust Authority Workspace
 
-Local Rust authority work lives under `rulebench-rs/`. It is an incubation
-workspace with explicit portable-authority, protocol/adapter, and
-Rulebench-local crate boundaries, not an upstream ASHA crate set.
+Local Rust product authority lives under `rulebench-rs/`. Portable primitives,
+normalized rule declarations, and the public-ASHA RuntimeSession fabric now
+live in the independent `FuzzySlipper/asha-rpg` repository. Rulebench consumes
+`rpg-core`, `rpg-ir`, and `rpg-runtime` from one exact public Git revision; no
+sibling path or direct ASHA dependency is allowed.
 
-The implemented crates have explicit portable-authority, product-adapter, and
-repository-harness owners. See `rulebench-rs/README.md` and
-`docs/rust-authority-reconciliation.md` for the supported consumer surface and
-dependency direction. The `rulebench-gameplay-module` crate consumes only
-governed public ASHA facades through one exact Git revision and compatible
-facade versions; it does not reach into upstream internal crates or require a
-sibling checkout. Its concrete combat owner is installed through the preferred
-composed RuntimeSession seam added by ASHA #5797, so Rulebench no longer
-declares the quarantined standalone gameplay host.
+See `rulebench-rs/README.md` and `docs/rust-authority-reconciliation.md` for the
+current dependency direction. `rulebench-rpg-adapter` is the one temporary
+combined product surface needed by protocol, bridge, and fixture consumers;
+task #5938 deletes it after those call sites reach their permanent owners.
 Planner-approved `serde` protocol DTOs and the `serde_json` process host
 provide the live local bridge.
 
@@ -265,7 +262,7 @@ profiles instead of guessing from a Git diff:
 
 ```bash
 pnpm run verify:change -- --profile frontend
-pnpm run verify:change -- --profile rust-owner --crate rulebench-rules
+pnpm run verify:change -- --profile rust-owner --crate rulebench-rpg-adapter
 pnpm run verify:change -- --profile protocol-generated --profile host-transport
 pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
 ```

@@ -533,7 +533,7 @@ fn board_from_scenario(scenario: &RulebenchScenario) -> SpatialBoardState {
 mod tests {
     use super::*;
     use crate::model::*;
-    use rulebench_ruleset::ActionResourceCost;
+    use rpg_ir::ActionResourceCost;
 
     fn test_scenario() -> RulebenchScenario {
         RulebenchScenario {

@@ -20,7 +20,7 @@ pub use invocation::{prepare_replay_scenario, BridgeScenario, RulebenchBridge};
 /// This is the bridge's deliberate storage-composition seam. Concrete hosts
 /// should not depend on the portable authority facade directly.
 pub mod replay_storage {
-    pub use rulebench_rules::{
+    pub use rulebench_rpg_adapter::{
         bind_authored_action, materialize_authored_scenario, record_replay_package,
         AuthoredActionAbilityGrantReceipt, AuthoredActionBindingReceipt,
         AuthoredActionBindingRequest, CombatAutomationNoCandidateBehavior,
@@ -40,7 +40,7 @@ pub mod replay_storage {
 
 /// Host-neutral types and operations needed by a concrete content repository.
 pub mod content_storage {
-    pub use rulebench_rules::{
+    pub use rulebench_rpg_adapter::{
         compare_content_packs, materialize_authored_scenario, AuthoredScenarioControlMode,
         CanonicalContentPack, ContentDefinitionKind, ContentImportDiagnostic,
         ContentImportDiagnosticSeverity, ContentImportLimits, ContentPackDiffReadout,

@@ -50,7 +50,7 @@ pub use regression::{
     ScenarioRegressionFilter, ScenarioRegressionReport,
 };
 pub use replay_review::replay_review_packages;
-pub use rulebench_rules::*;
+pub use rulebench_rpg_adapter::*;
 pub use scenarios::hexing_bolt::{
     accepted_hexing_bolt_fixture_receipt, combat_session_automatic_run_readouts,
     combat_session_automatic_run_replay_readouts, combat_session_control_history_readouts,
@@ -100,26 +100,27 @@ pub fn aggregated_content_validation_readouts() -> Vec<ContentValidationReadout>
     scenario_package_registry().content_validation_readouts()
 }
 
-pub fn aggregated_combat_session_transcripts() -> Vec<rulebench_rules::CombatSessionTranscript> {
+pub fn aggregated_combat_session_transcripts() -> Vec<rulebench_rpg_adapter::CombatSessionTranscript>
+{
     scenario_package_registry().combat_session_transcripts()
 }
 
 pub fn aggregated_combat_session_control_history_readouts(
-) -> Vec<rulebench_rules::CombatControlHistoryReadout> {
+) -> Vec<rulebench_rpg_adapter::CombatControlHistoryReadout> {
     scenario_package_registry().combat_session_control_history_readouts()
 }
 
 pub fn aggregated_combat_session_script_readouts(
-) -> Vec<rulebench_rules::CombatSessionScriptReadout> {
+) -> Vec<rulebench_rpg_adapter::CombatSessionScriptReadout> {
     scenario_package_registry().combat_session_script_readouts()
 }
 
 pub fn aggregated_combat_session_automatic_run_readouts(
-) -> Vec<rulebench_rules::CombatSessionAutomaticRunReadout> {
+) -> Vec<rulebench_rpg_adapter::CombatSessionAutomaticRunReadout> {
     scenario_package_registry().combat_session_automatic_run_readouts()
 }
 
 pub fn aggregated_combat_session_automatic_run_replay_readouts(
-) -> Vec<rulebench_rules::CombatSessionAutomaticRunReplayReadout> {
+) -> Vec<rulebench_rpg_adapter::CombatSessionAutomaticRunReplayReadout> {
     scenario_package_registry().combat_session_automatic_run_replay_readouts()
 }

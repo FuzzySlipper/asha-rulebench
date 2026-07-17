@@ -9,7 +9,7 @@ description = "Stable transport protocol surfaces for ASHA Rulebench authority."
 workspace = true
 
 [dependencies]
-rulebench-rules = { path = "../rulebench-rules" }
+rulebench-rpg-adapter = { path = "../rulebench-rpg-adapter" }
 serde.workspace = true
 
 [dev-dependencies]

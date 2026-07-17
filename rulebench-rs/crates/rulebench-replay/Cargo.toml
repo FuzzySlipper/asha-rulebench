@@ -10,4 +10,4 @@ workspace = true
 
 [dependencies]
 rulebench-combat = { path = "../rulebench-combat" }
-rulebench-core = { path = "../rulebench-core" }
+rpg-core.workspace = true

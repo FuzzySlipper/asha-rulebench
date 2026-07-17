@@ -1,9 +1,9 @@
 [package]
-name = "rulebench-rules"
+name = "rulebench-rpg-adapter"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Reusable ASHA RuleBench rule model, state, resolution, and runtime substrate."
+description = "Temporary Rulebench product adapter over pinned public RPG authority crates."
 
 [lints]
 workspace = true
@@ -11,6 +11,6 @@ workspace = true
 [dependencies]
 rulebench-combat = { path = "../rulebench-combat" }
 rulebench-content = { path = "../rulebench-content" }
-rulebench-core = { path = "../rulebench-core" }
+rpg-core.workspace = true
 rulebench-replay = { path = "../rulebench-replay" }
-rulebench-ruleset = { path = "../rulebench-ruleset" }
+rpg-ir.workspace = true

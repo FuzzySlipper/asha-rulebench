@@ -206,7 +206,7 @@ pub struct ModifierOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EffectMovementOutcome {
     pub target_id: String,
-    pub movement_kind: rulebench_ruleset::MovementKind,
+    pub movement_kind: rpg_ir::MovementKind,
     pub from: super::GridPosition,
     pub to: super::GridPosition,
     pub distance: u32,
@@ -277,7 +277,7 @@ pub enum DomainEvent {
     },
     EffectMovementApplied {
         target_id: String,
-        movement_kind: rulebench_ruleset::MovementKind,
+        movement_kind: rpg_ir::MovementKind,
         from: super::GridPosition,
         to: super::GridPosition,
     },

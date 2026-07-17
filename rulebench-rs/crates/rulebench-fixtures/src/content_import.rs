@@ -1,4 +1,4 @@
-use rulebench_rules::{
+use rulebench_rpg_adapter::{
     import_content_pack, ContentImportContext, ContentImportLimits, ContentImportReport,
     ContentPackCanonicalVersion, ContentPackCatalogs, ContentPackCollisionPolicy,
     ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackSourceKind,

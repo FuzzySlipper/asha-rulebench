@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use rulebench_ruleset::{
+use rpg_ir::{
     AreaShape, EffectOperationId, HitEffect, HitEffectOperation, ModifierEffectOperation,
     OperationPipelineV2, ReactionHookEffectOperation, ReactionOptionDeclaration, TargetKind,
     TargetTeamConstraint, TargetingDeclaration, VisibilityRequirement,
@@ -281,13 +281,7 @@ fn unique_action<'a>(
 fn unique_ability<'a>(
     packs: &'a [CanonicalContentPack],
     ability_id: &str,
-) -> Result<
-    (
-        &'a CanonicalContentPack,
-        &'a rulebench_ruleset::AbilityDefinition,
-    ),
-    AuthoredActionBindingError,
-> {
+) -> Result<(&'a CanonicalContentPack, &'a rpg_ir::AbilityDefinition), AuthoredActionBindingError> {
     let matches = packs
         .iter()
         .flat_map(|pack| {
@@ -343,7 +337,7 @@ fn unique_modifier<'a>(
 }
 
 fn validate_definition_ruleset(
-    selected_ruleset: &rulebench_ruleset::RulesetArtifactProvenance,
+    selected_ruleset: &rpg_ir::RulesetArtifactProvenance,
     owner: &CanonicalContentPack,
     definition_kind: &str,
     definition_id: &str,
@@ -364,7 +358,7 @@ fn validate_definition_ruleset(
     ))
 }
 
-fn merge_ability(scenario: &mut RulebenchScenario, ability: &rulebench_ruleset::AbilityDefinition) {
+fn merge_ability(scenario: &mut RulebenchScenario, ability: &rpg_ir::AbilityDefinition) {
     // The selected authored definition is authoritative for its ability id.
     // Replacing a same-id scenario placeholder keeps the materialized action
     // generic while the complete scenario validation below remains fail-closed.
@@ -542,7 +536,7 @@ fn materialize_action(
     action: &AuthoredActionDefinition,
     target_set: MaterializedTargetSet,
     operations: Vec<HitEffectOperation>,
-) -> rulebench_ruleset::ActionDefinition {
+) -> rpg_ir::ActionDefinition {
     let damage = operations.iter().find_map(|operation| match operation {
         HitEffectOperation::Damage(damage) => Some(damage),
         _ => None,
@@ -551,7 +545,7 @@ fn materialize_action(
         HitEffectOperation::ApplyModifier(modifier) => Some(modifier),
         _ => None,
     });
-    rulebench_ruleset::ActionDefinition {
+    rpg_ir::ActionDefinition {
         id: runtime_action_id.to_string(),
         ruleset_id: ruleset_id.to_string(),
         ability_id: action.ability_id.clone(),

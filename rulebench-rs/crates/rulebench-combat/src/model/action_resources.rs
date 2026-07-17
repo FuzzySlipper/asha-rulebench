@@ -1,6 +1,6 @@
 /// Combat action-resource state and readbacks.
 use super::ActiveModifier;
-pub use rulebench_ruleset::{
+pub use rpg_ir::{
     ActionResourceCost, ActionResourceKind, ActionResourcePool, ActionResourceRefreshPolicy,
 };
 
