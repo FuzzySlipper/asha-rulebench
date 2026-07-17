@@ -20,7 +20,7 @@ source-authority extraction.
 | `@asha-rpg/authoring` | Typed immutable builders and deterministic data-only normalization for action, archetype, item, and scenario sources.                                                                |
 
 The packages are fetched from `https://github.com/FuzzySlipper/asha-rpg.git`
-at exact revision `897b05d2a3fda372c2a9a24e3f188ce735a236be` with compatible `^0.1`
+at exact revision `ea3e3803d4736268f2a10996a34bc5b8dfefcffc` with compatible `^0.1`
 versions. Rulebench has no sibling path dependency and no direct ASHA crate
 dependency. The extracted repo retains the exact governed ASHA revision
 `67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148` behind `rpg-runtime`.

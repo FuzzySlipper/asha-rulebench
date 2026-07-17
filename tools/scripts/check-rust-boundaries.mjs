@@ -6,7 +6,7 @@ const workspaceManifestPath = join(root, "rulebench-rs", "Cargo.toml");
 const cratesRoot = join(root, "rulebench-rs", "crates");
 const hostsRoot = join(root, "rulebench-rs", "hosts");
 const rpgRepository = "https://github.com/FuzzySlipper/asha-rpg.git";
-const rpgRevision = "897b05d2a3fda372c2a9a24e3f188ce735a236be";
+const rpgRevision = "ea3e3803d4736268f2a10996a34bc5b8dfefcffc";
 const rpgVersionRequirement = "^0.1";
 
 const allowedDependencies = new Map([
@@ -237,7 +237,7 @@ function validateDependency(crateName, dependencyName, location) {
     return allowed.has(dependencyName)
       ? []
       : [
-          `${location}: ${crateName} may not bypass the temporary product adapter to consume ${dependencyName}.`,
+          `${location}: ${crateName} may not consume ${dependencyName} without an explicit focused-owner boundary.`,
         ];
   }
   if (dependencyName.startsWith("asha-")) return [];
@@ -311,7 +311,7 @@ function runFocusedFailureTests() {
       "rpg-runtime",
       "self-test:rpg-bypass",
     ),
-    "protocol bypassed the temporary RPG adapter",
+    "protocol bypassed its focused RPG dependency boundary",
   );
   assertRejected(
     validateRpgDistribution(

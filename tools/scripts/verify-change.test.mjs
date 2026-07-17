@@ -39,6 +39,7 @@ test("verify:change unions profiles and deduplicates shared commands", () => {
 
   assert.equal(commandIds.filter((id) => id === "pnpm:typecheck").length, 1);
   assert.ok(commandIds.includes("pnpm:check:typescript-authority"));
+  assert.ok(commandIds.includes("pnpm:check:rules-language-boundary"));
   assert.ok(commandIds.includes("pnpm:e2e:gate"));
 });
 

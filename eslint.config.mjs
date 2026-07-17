@@ -39,6 +39,12 @@ const depConstraints = [
     "onlyDependOnLibsWithTags": []
   },
   {
+    "sourceTag": "scope:rpg-policy",
+    "onlyDependOnLibsWithTags": [
+      "scope:protocol"
+    ]
+  },
+  {
     "sourceTag": "scope:platform",
     "onlyDependOnLibsWithTags": []
   },

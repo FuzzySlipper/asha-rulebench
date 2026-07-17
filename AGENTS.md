@@ -47,6 +47,7 @@ See `README.md` and Den doc `asha-rulebench/basic-design` for current repo orien
     /protocol            # generated protocol exports and shared result/error types
     /transport           # backend/native/WASM/fake communication through protocol types
     /domain              # pure protocol-to-view mapping, no Angular/browser APIs
+    /rpg-policy          # optional typed-view to typed-intent proposals; never authority
     /store               # app state mutation, AsyncState<T>, transport orchestration
     /renderer            # feature rendering composition
     /components          # reusable presentational Angular components
@@ -147,6 +148,7 @@ When a task seems to require breaking a boundary, stop and request planner revie
 | protocol   | `libs/protocol`                         | Duplicate generated backend types or hand-edit generated files |
 | transport  | `libs/transport`                        | Own app state or bypass protocol DTOs                          |
 | domain     | `libs/domain`                           | Import Angular, browser APIs, store, renderer, or components   |
+| rpg-policy | `libs/rpg-policy`                       | Inspect capability stores, execute semantics, or mutate state  |
 | store      | `libs/store`                            | Put rendering logic in state services                          |
 | renderer   | `libs/renderer`                         | Mutate application state directly or encode rule authority     |
 | components | `libs/components`                       | Know gameplay/domain logic                                     |
@@ -159,6 +161,14 @@ When a task seems to require breaking a boundary, stop and request planner revie
 TypeScript in this repo is written for agent governance, not clever human terseness.
 
 Prefer longer, clearer code over compact clever code. Use named intermediate values for meaningful decisions. Split work into small functions with explicit verbs. Avoid generic abstractions until duplication has stabilized. Keep mutation local and visible. Do not create ambient state, manager classes, global registries, or hidden runtime coupling.
+
+RPG authoring code may import only published `@asha-rpg` vocabulary/builders
+and owner-local modules. An optional `rpg-policy` lane may read generated typed
+views and propose typed intents through protocol contracts, but it may not
+inspect capability stores, execute semantics, mutate authority, or import
+browser, Angular, transport, store, or workbench feature surfaces. Run
+`pnpm run check:rules-language-boundary` to inspect the three-layer
+content-only path and the seven-layer Rust-first semantic-operation path.
 
 A good TypeScript diff should be easy for a reviewer agent to inspect mechanically: imports reveal lane boundaries, functions reveal intent, tests reveal behavior, and public API changes are explicit.
 

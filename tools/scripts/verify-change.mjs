@@ -134,6 +134,7 @@ export function buildVerifyChangePlan(selection) {
       case "frontend":
         addScript("check:pattern");
         addScript("check:typescript-authority");
+        addScript("check:rules-language-boundary");
         addScript("lint");
         addScript("typecheck");
         addScript("test");

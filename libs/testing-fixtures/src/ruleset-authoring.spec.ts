@@ -48,7 +48,7 @@ describe('ruleset authoring helpers', () => {
       exitCode: 1,
       output: 'error:incompatibleRuleModuleVersion',
     });
-  });
+  }, 30_000);
 });
 
 function validateWithRust(ruleset: RulebenchRulesetDefinitionDto): {

@@ -14,9 +14,10 @@
     "verify": "pnpm run verify:static && pnpm run regression:gate && pnpm run e2e:gate",
     "certify": "node tools/scripts/certify.mjs",
     "verify:change": "node tools/scripts/verify-change.mjs",
-    "verify:static": "pnpm run test:validation-scripts && pnpm run check:pattern && pnpm run check:typescript-authority && pnpm run generated:check && pnpm run check:protocol-compatibility && pnpm run check:rust-boundaries && pnpm run check:rust-test-ownership && pnpm run rust:test && pnpm run check:claims:executable && pnpm run check:docs && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "verify:static": "pnpm run test:validation-scripts && pnpm run check:pattern && pnpm run check:typescript-authority && pnpm run check:rules-language-boundary && pnpm run generated:check && pnpm run check:protocol-compatibility && pnpm run check:rust-boundaries && pnpm run check:rust-test-ownership && pnpm run rust:test && pnpm run check:claims:executable && pnpm run check:docs && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "check:pattern": "node tools/scripts/check-pattern.mjs",
     "check:typescript-authority": "node tools/scripts/check-typescript-authority.mjs",
+    "check:rules-language-boundary": "node tools/scripts/check-rules-language-boundary.mjs",
     "check:protocol-compatibility": "node tools/scripts/check-protocol-compatibility.mjs",
     "check:rust-boundaries": "node tools/scripts/check-rust-boundaries.mjs",
     "check:rust-test-ownership": "node tools/scripts/check-rust-test-ownership.mjs",
@@ -58,8 +59,8 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
-    "@asha-rpg/authoring": "github:FuzzySlipper/asha-rpg#897b05d2a3fda372c2a9a24e3f188ce735a236be&path:packages/authoring",
-    "@asha-rpg/ir": "github:FuzzySlipper/asha-rpg#897b05d2a3fda372c2a9a24e3f188ce735a236be&path:packages/ir",
+    "@asha-rpg/authoring": "github:FuzzySlipper/asha-rpg#ea3e3803d4736268f2a10996a34bc5b8dfefcffc&path:packages/authoring",
+    "@asha-rpg/ir": "github:FuzzySlipper/asha-rpg#ea3e3803d4736268f2a10996a34bc5b8dfefcffc&path:packages/ir",
     "@angular-devkit/core": "~21.2.0",
     "@angular-devkit/schematics": "~21.2.0",
     "@angular/build": "~21.2.0",

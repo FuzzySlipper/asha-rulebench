@@ -34,6 +34,7 @@ const authorityDerivationNames = new Set([
 ]);
 
 const semanticCallNames = new Set([
+  "advanceeffecttiming",
   "rolldie",
   "rolldice",
   "calculateattack",
@@ -45,7 +46,39 @@ const semanticCallNames = new Set([
   "resolvecheck",
   "resolvesavingthrow",
   "applymodifier",
+  "applyeffect",
+  "applystacking",
+  "evaluateformula",
+  "evaluatepredicate",
   "mutategameplaystate",
+  "testlegality",
+]);
+
+const publishedCompositionCallNames = new Set(["applymodifier"]);
+const semanticCallbackNames = new Set([
+  "apply",
+  "execute",
+  "evaluate",
+  "mutate",
+  "onhit",
+  "resolve",
+]);
+const privateAuthorityObjectNames = new Set([
+  "authority",
+  "authoritystate",
+  "capabilitystore",
+  "gameplaycontext",
+  "mutationcontext",
+  "resolutioncontext",
+]);
+const browserGlobalNames = new Set([
+  "document",
+  "fetch",
+  "localstorage",
+  "navigator",
+  "sessionstorage",
+  "websocket",
+  "window",
 ]);
 
 const computationOperators = new Set([
@@ -86,6 +119,13 @@ export function inspectTypeScriptAuthority(source, fileName = "fixture.ts") {
   );
   const diagnostics = [];
   const seen = new Set();
+  const contentAuthoringFile = fileName
+    .replaceAll("\\", "/")
+    .startsWith("libs/content-authoring/");
+  const rpgPolicyFile = fileName
+    .replaceAll("\\", "/")
+    .startsWith("libs/rpg-policy/");
+  const governedRpgTypeScript = contentAuthoringFile || rpgPolicyFile;
 
   const report = (node, message) => {
     const position = sourceFile.getLineAndCharacterOfPosition(
@@ -99,6 +139,43 @@ export function inspectTypeScriptAuthority(source, fileName = "fixture.ts") {
   };
 
   const visit = (node) => {
+    if (
+      contentAuthoringFile &&
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      const specifier = node.moduleSpecifier.text;
+      if (
+        specifier !== "@asha-rpg/authoring" &&
+        specifier !== "@asha-rpg/ir" &&
+        !specifier.startsWith("./") &&
+        !specifier.startsWith("../")
+      ) {
+        report(
+          node,
+          `content authoring may import only published Asha RPG vocabulary/builders and owner-local modules, not ${specifier}`,
+        );
+      }
+    }
+    if (
+      rpgPolicyFile &&
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      const specifier = node.moduleSpecifier.text;
+      if (
+        specifier !== "@asha-rpg/ir" &&
+        specifier !== "@asha-rulebench/protocol" &&
+        !specifier.startsWith("./") &&
+        !specifier.startsWith("../")
+      ) {
+        report(
+          node,
+          `RPG policy may import only published vocabulary, typed product views/intents, and owner-local modules, not ${specifier}`,
+        );
+      }
+    }
+
     if (ts.isCallExpression(node)) {
       const callName = normalizedCallName(node.expression);
       if (isRandomCall(node.expression)) {
@@ -106,12 +183,70 @@ export function inspectTypeScriptAuthority(source, fileName = "fixture.ts") {
           node,
           "production TypeScript may not generate authority randomness",
         );
-      } else if (semanticCallNames.has(callName)) {
+      } else if (
+        semanticCallNames.has(callName) &&
+        !(contentAuthoringFile && publishedCompositionCallNames.has(callName))
+      ) {
         report(
           node,
           `production TypeScript may not execute rule semantics through ${node.expression.getText(sourceFile)}`,
         );
       }
+      if (
+        governedRpgTypeScript &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        privateAuthorityObjectNames.has(
+          normalizedName(node.expression.expression),
+        )
+      ) {
+        report(
+          node,
+          `content authoring may not call private authority or capability-store surface ${node.expression.getText(sourceFile)}`,
+        );
+      }
+      if (governedRpgTypeScript && browserGlobalNames.has(callName)) {
+        report(node, `RPG TypeScript may not call browser global ${callName}`);
+      }
+    }
+
+    if (
+      governedRpgTypeScript &&
+      ts.isNewExpression(node) &&
+      browserGlobalNames.has(normalizedName(node.expression))
+    ) {
+      report(
+        node,
+        `RPG TypeScript may not construct browser global ${node.expression.getText(sourceFile)}`,
+      );
+    }
+
+    if (governedRpgTypeScript && ts.isPropertyAccessExpression(node)) {
+      const rootName = normalizedName(node.expression);
+      if (browserGlobalNames.has(rootName)) {
+        report(
+          node,
+          `RPG TypeScript may not access browser global ${node.expression.getText(sourceFile)}`,
+        );
+      }
+      if (privateAuthorityObjectNames.has(rootName)) {
+        report(
+          node,
+          `RPG TypeScript may not inspect private authority or capability-store surface ${node.expression.getText(sourceFile)}`,
+        );
+      }
+    }
+
+    if (
+      governedRpgTypeScript &&
+      ts.isPropertyAssignment(node) &&
+      semanticCallbackNames.has(normalizedName(node.name)) &&
+      (ts.isArrowFunction(node.initializer) ||
+        ts.isFunctionExpression(node.initializer))
+    ) {
+      report(
+        node,
+        `RPG TypeScript data may not contain executable semantic callback ${node.name.getText(sourceFile)}`,
+      );
     }
 
     if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
@@ -144,7 +279,12 @@ export function inspectTypeScriptAuthority(source, fileName = "fixture.ts") {
       ts.isBinaryExpression(node) &&
       assignmentOperators.has(node.operatorToken.kind)
     ) {
-      if (containsAuthorityName(node.left)) {
+      if (governedRpgTypeScript && containsPrivateAuthorityObject(node.left)) {
+        report(
+          node,
+          `RPG TypeScript may not mutate private authority context ${node.left.getText(sourceFile)}`,
+        );
+      } else if (containsAuthorityName(node.left)) {
         report(
           node,
           `production TypeScript may not mutate authoritative state through ${node.left.getText(sourceFile)}`,
@@ -226,6 +366,19 @@ function containsAuthorityName(node) {
       (ts.isStringLiteral(argument) &&
         authorityMutationNames.has(normalizedName(argument)))
     );
+  }
+  return false;
+}
+
+function containsPrivateAuthorityObject(node) {
+  if (ts.isIdentifier(node)) {
+    return privateAuthorityObjectNames.has(normalizedName(node));
+  }
+  if (
+    ts.isPropertyAccessExpression(node) ||
+    ts.isElementAccessExpression(node)
+  ) {
+    return containsPrivateAuthorityObject(node.expression);
   }
   return false;
 }
