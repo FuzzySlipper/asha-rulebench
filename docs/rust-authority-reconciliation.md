@@ -16,11 +16,11 @@ source-authority extraction.
 | `rpg-compiler` | Closed operation bindings, requirement/reference/semantic validation, opaque compiled programs, deterministic evaluation, owner staging, DomainEvents, trace, and typed diagnostics. |
 | `rpg-runtime` | Private semantic authority sessions plus the public-ASHA-backed decision/reaction fabric. |
 | `asha-rpg` | Supported public Rust facade over the active portable owners. |
-| `@asha-rpg/ir` | Immutable TypeScript IR package location; semantic execution is forbidden. |
-| `@asha-rpg/authoring` | Pure TypeScript authoring package location; complete syntax arrives in #5937. |
+| `@asha-rpg/ir` | Versioned immutable normalized IR and generated Rust-owned operation/capability vocabulary; semantic execution is forbidden. |
+| `@asha-rpg/authoring` | Typed immutable builders and deterministic data-only normalization for action, archetype, item, and scenario sources. |
 
 The packages are fetched from `https://github.com/FuzzySlipper/asha-rpg.git`
-at exact revision `a04dbc376db45a6ba5ae45e087d6a8f9869cb1ad` with compatible `^0.1`
+at exact revision `026889782c4e0b6e5f562ec78426a391269e0265` with compatible `^0.1`
 versions. Rulebench has no sibling path dependency and no direct ASHA crate
 dependency. The extracted repo retains the exact governed ASHA revision
 `67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148` behind `rpg-runtime`.
@@ -78,8 +78,8 @@ through `pnpm run generated:write`.
 ## Non-claims
 
 The initial #5936 semantic profile deliberately excludes the additional
-operations and scheduler/replay surfaces listed in `asha-rpg` non-claims. The
-#5937 TypeScript authoring language is not implemented yet. Rulebench content,
-automation, storage, archives, experiments, fixtures, certification, Angular,
-and filesystem concepts remain outside the public RPG graph. The temporary
-adapter is not a stable compatibility API.
+operations and scheduler/replay surfaces listed in `asha-rpg` non-claims.
+Rulebench content has not yet migrated to the #5937 authoring packages; #5938
+owns that conversion. Automation, storage, archives, experiments, fixtures,
+certification, Angular, and filesystem concepts remain outside the public RPG
+graph. The temporary adapter is not a stable compatibility API.
