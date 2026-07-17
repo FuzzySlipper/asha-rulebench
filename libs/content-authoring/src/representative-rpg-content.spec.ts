@@ -30,4 +30,18 @@ describe("representative RPG content", () => {
       "hexing_bolt",
     ]);
   });
+
+  it("grants the TypeScript-only runtime action to an explicit actor", () => {
+    const runtimeBindings = rulebenchActionBindings.filter(
+      (binding) => binding.actorIds.length > 0,
+    );
+
+    expect(runtimeBindings).toEqual([
+      expect.objectContaining({
+        actionId: "action.authored-reaction",
+        actorIds: ["entity-adept"],
+        rulesetIds: ["asha-rulebench.hexing-bolt.v0"],
+      }),
+    ]);
+  });
 });

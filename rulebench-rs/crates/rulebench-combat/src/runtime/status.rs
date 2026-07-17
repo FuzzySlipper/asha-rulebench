@@ -531,6 +531,13 @@ fn rpg_authored_action_options(
             {
                 return None;
             }
+            if !binding
+                .actor_ids
+                .iter()
+                .any(|candidate| candidate == actor_id)
+            {
+                return None;
+            }
             let check_kind = match action.check {
                 rpg_ir::RpgIrCheck::Attack { .. } => CheckHandlerKind::AttackVsDefense,
                 rpg_ir::RpgIrCheck::SavingThrow { .. } => CheckHandlerKind::SavingThrow,

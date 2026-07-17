@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn typescript_only_action_reaches_options_preflight_and_authority_runtime() {
-        let scenario = watchtower_skirmish_scenario();
+        let scenario = crate::hexing_bolt_fixture_scenario();
         let mut session = CombatSessionState::new("typescript-only-action", scenario.clone());
         let options = session.current_actor_options();
         let authored_option = options
@@ -556,7 +556,7 @@ mod tests {
             vec![20, 3],
         ));
 
-        assert!(result.receipt.accepted);
+        assert!(result.receipt.accepted, "{:?}", result.receipt);
         assert_eq!(result.receipt.authority_surface, ASHA_RPG_AUTHORITY_SURFACE);
         assert!(result
             .receipt

@@ -47,6 +47,7 @@ export interface RulebenchActionBindingMetadata {
   readonly actionText: string;
   readonly effectText: string;
   readonly rulesetIds: readonly string[];
+  readonly actorIds: readonly string[];
   readonly reaction: RulebenchReactionOrchestration | null;
 }
 
@@ -337,6 +338,8 @@ export const rulebenchActionBindings: readonly RulebenchActionBindingMetadata[] 
       "ability.authored-reaction",
       "Strike a visible hostile and allow product reaction orchestration.",
       "Deal arcane damage and apply Anchored on a hit.",
+      null,
+      ["entity-adept"],
     ),
   ]);
 
@@ -346,6 +349,7 @@ function metadata(
   actionText: string,
   effectText: string,
   reaction: RulebenchReactionOrchestration | null = null,
+  actorIds: readonly string[] = [],
 ): RulebenchActionBindingMetadata {
   return Object.freeze({
     actionId: actionIdValue,
@@ -353,6 +357,7 @@ function metadata(
     actionText,
     effectText,
     rulesetIds: rulebenchRuntimeRulesets,
+    actorIds: Object.freeze(actorIds.slice()),
     reaction,
   });
 }

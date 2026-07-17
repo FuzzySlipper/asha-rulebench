@@ -651,6 +651,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": {
         "window": "beforeEffect",
         "eligibleReactors": "declaredTargets",
@@ -665,6 +666,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -675,6 +677,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -685,6 +688,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -695,6 +699,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -705,6 +710,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -715,6 +721,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -725,6 +732,7 @@
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
       ],
+      "actorIds": [],
       "reaction": null
     },
     {
@@ -734,6 +742,9 @@
       "effectText": "Deal arcane damage and apply Anchored on a hit.",
       "rulesetIds": [
         "asha-rulebench.hexing-bolt.v0"
+      ],
+      "actorIds": [
+        "entity-adept"
       ],
       "reaction": null
     }
