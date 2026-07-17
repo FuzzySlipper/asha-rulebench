@@ -2,15 +2,15 @@
 
 use crate::model::*;
 use crate::resolver::{
-    operation_pipeline_targets, resolve_use_action, target_legality_rejection,
+    operation_pipeline_targets, resolve_legacy_use_action, target_legality_rejection,
     validate_operation_pipeline_target, validate_target_legality,
 };
+use crate::rpg_resolver::{RulebenchRpgAuthority, ASHA_RPG_AUTHORITY_SURFACE};
 use crate::state::CombatState;
 use crate::{fingerprint_projected_state, fingerprint_projection};
+use rpg_core::{RpgRandomRequest, RpgRandomRequestKind};
 use rpg_ir::ActionResourceCost;
-use rpg_runtime::{
-    PreEffectWorkspace, RpgGameplayContinuation, RpgGameplayFabric, RpgPreEffectOwner,
-};
+use rpg_runtime::{PreEffectWorkspace, RpgGameplayContinuation, RpgPreEffectOwner};
 
 mod automation;
 mod control;
@@ -145,7 +145,7 @@ pub struct CombatSessionState {
     reaction_window_lifecycle_log: Vec<ReactionWindowLifecycleEntry>,
     reaction_audit_log: Vec<ReactionAuditEntry>,
     pending_reaction_resolution: Option<PendingReactionResolution>,
-    gameplay_fabric: RpgGameplayFabric,
+    rpg_authority: RulebenchRpgAuthority,
     modifier_duration_expiration_log: Vec<ModifierDurationExpirationEntry>,
     control_history: Vec<CombatControlHistoryEntry>,
     turn_transition_log: Vec<TurnTransitionEntry>,
@@ -160,6 +160,8 @@ impl CombatSessionState {
     pub fn new(session_id: impl Into<String>, scenario: RulebenchScenario) -> Self {
         let state = CombatState::from_scenario(&scenario);
         let turn_order = CombatTurnOrder::from_combatants(&scenario.combatants);
+        let rpg_authority = RulebenchRpgAuthority::new(&scenario)
+            .expect("generated Rulebench RPG content must compile for the authority session");
         Self {
             session_id: session_id.into(),
             scenario,
@@ -173,7 +175,7 @@ impl CombatSessionState {
             reaction_window_lifecycle_log: Vec::new(),
             reaction_audit_log: Vec::new(),
             pending_reaction_resolution: None,
-            gameplay_fabric: RpgGameplayFabric::new(),
+            rpg_authority,
             modifier_duration_expiration_log: Vec::new(),
             control_history: Vec::new(),
             turn_transition_log: Vec::new(),
@@ -317,7 +319,22 @@ impl CombatSessionState {
                                 intent.clone(),
                             )
                         } else {
-                            resolve_use_action(&self.scenario, intent.clone(), &roll_stream)
+                            match crate::rpg_resolver::rpg_dispatch_action_id(
+                                &self.scenario,
+                                &intent.action_id,
+                            ) {
+                                Some(source_action_id) => self.rpg_authority.resolve(
+                                    &self.scenario,
+                                    intent.clone(),
+                                    &source_action_id,
+                                    &roll_stream,
+                                ),
+                                None => resolve_legacy_use_action(
+                                    &self.scenario,
+                                    intent.clone(),
+                                    &roll_stream,
+                                ),
+                            }
                         };
                         let state_after = receipt
                             .projection
@@ -433,7 +450,7 @@ impl CombatSessionState {
                 state_before_fingerprint.algorithm, state_before_fingerprint.value
             );
             Some(
-                self.gameplay_fabric
+                self.rpg_authority
                     .begin_before_effect(
                         PreEffectWorkspace {
                             decision_id: step.id.clone(),
@@ -454,11 +471,14 @@ impl CombatSessionState {
             self.apply_receipt_effects_to_state(&step, &receipt);
         }
         if receipt.accepted {
-            let resource_costs = self
-                .scenario
-                .action_by_id(&command.action_id)
-                .map(|action| action.resource_costs.clone())
-                .unwrap_or_default();
+            let resource_costs = if receipt.authority_surface == ASHA_RPG_AUTHORITY_SURFACE {
+                Vec::new()
+            } else {
+                self.scenario
+                    .action_by_id(&command.action_id)
+                    .map(|action| action.resource_costs.clone())
+                    .unwrap_or_default()
+            };
             if pauses_before_effect {
                 self.pending_reaction_resolution = Some(PendingReactionResolution {
                     receipt: receipt.clone(),
@@ -593,36 +613,26 @@ impl CombatSessionState {
             return (Vec::new(), Vec::new());
         }
 
-        let scenario = self.state.apply_to_scenario(self.scenario.clone());
+        let Some(source_action_id) =
+            crate::rpg_resolver::rpg_dispatch_action_id(&self.scenario, &intent.action_id)
+        else {
+            return materialize_legacy_generated_rolls(command_id, intent, seed, &self.scenario);
+        };
         let mut generator_state = seed;
         let mut values = Vec::new();
         let mut evidence = Vec::new();
-        for _ in 0..4 {
-            let receipt = resolve_use_action(&scenario, intent.clone(), &values);
-            let request_kind = match receipt.rejection {
-                Some(RulebenchRejection::MissingAttackRoll) => RollRequestKind::AttackRoll,
-                Some(RulebenchRejection::MissingCheckRoll) => RollRequestKind::SavingThrowRoll,
-                Some(RulebenchRejection::MissingDamageRoll) => RollRequestKind::DamageRoll,
-                _ => break,
-            };
-            let (die_expression, maximum) = match request_kind {
-                RollRequestKind::DamageRoll => ("1d8", 8),
-                RollRequestKind::AttackRoll
-                | RollRequestKind::SavingThrowRoll
-                | RollRequestKind::ContestedActorRoll
-                | RollRequestKind::ContestedTargetRoll => ("1d20", 20),
-            };
-            let value = next_generated_die(&mut generator_state, maximum);
-            let sequence = evidence.len() as u32;
-            values.push(value);
-            evidence.push(GeneratedCommandRoll {
-                sequence,
-                command_id: command_id.to_string(),
-                request_kind,
-                die_expression: die_expression.to_string(),
-                value,
-                source_mode: CommandRollMode::AuthorityGenerated { seed },
-            });
+        while let Some(request) =
+            self.rpg_authority
+                .random_request(intent, &source_action_id, &values)
+        {
+            materialize_random_request(
+                command_id,
+                seed,
+                &request,
+                &mut generator_state,
+                &mut values,
+                &mut evidence,
+            );
         }
         (values, evidence)
     }
@@ -634,27 +644,32 @@ impl CombatSessionState {
         seed: u64,
         values: &[i32],
     ) -> Vec<GeneratedCommandRoll> {
-        let scenario = self.state.apply_to_scenario(self.scenario.clone());
+        let source_action_id =
+            crate::rpg_resolver::rpg_dispatch_action_id(&self.scenario, &intent.action_id);
+        if source_action_id.is_none() {
+            return describe_legacy_generated_rolls(
+                command_id,
+                intent,
+                seed,
+                values,
+                &self.scenario,
+            );
+        }
         values
             .iter()
             .enumerate()
             .filter_map(|(index, value)| {
-                let receipt = resolve_use_action(&scenario, intent.clone(), &values[..index]);
-                let request_kind = match receipt.rejection {
-                    Some(RulebenchRejection::MissingAttackRoll) => RollRequestKind::AttackRoll,
-                    Some(RulebenchRejection::MissingCheckRoll) => RollRequestKind::SavingThrowRoll,
-                    Some(RulebenchRejection::MissingDamageRoll) => RollRequestKind::DamageRoll,
-                    _ => return None,
-                };
+                let source_action_id = source_action_id.as_deref()?;
+                let request = self.rpg_authority.random_request(
+                    intent,
+                    source_action_id,
+                    &values[..index],
+                )?;
                 Some(GeneratedCommandRoll {
                     sequence: index as u32,
                     command_id: command_id.to_string(),
-                    request_kind,
-                    die_expression: if request_kind == RollRequestKind::DamageRoll {
-                        "1d8".to_string()
-                    } else {
-                        "1d20".to_string()
-                    },
+                    request_kind: random_request_kind(request.kind),
+                    die_expression: format!("1d{}", request.sides),
                     value: *value,
                     source_mode: CommandRollMode::RecordedGenerated { seed },
                 })
@@ -678,6 +693,14 @@ impl CombatSessionState {
                     self.record_effect_resource_transition(step, resource);
                 }
             }
+        }
+
+        for resource in rpg_resource_outcomes(&self.state, receipt) {
+            self.state.apply_resource_change(&resource);
+            self.record_effect_resource_transition(step, &resource);
+        }
+
+        if !receipt.target_results.is_empty() {
             return;
         }
 
@@ -1212,7 +1235,102 @@ impl CombatSessionState {
     }
 }
 
-fn next_generated_die(state: &mut u64, maximum: i32) -> i32 {
+fn materialize_random_request(
+    command_id: &str,
+    seed: u64,
+    request: &RpgRandomRequest,
+    generator_state: &mut u64,
+    values: &mut Vec<i32>,
+    evidence: &mut Vec<GeneratedCommandRoll>,
+) {
+    for _ in 0..request.count {
+        let value = next_generated_die(generator_state, request.sides);
+        values.push(value);
+        evidence.push(GeneratedCommandRoll {
+            sequence: evidence.len() as u32,
+            command_id: command_id.to_string(),
+            request_kind: random_request_kind(request.kind),
+            die_expression: format!("1d{}", request.sides),
+            value,
+            source_mode: CommandRollMode::AuthorityGenerated { seed },
+        });
+    }
+}
+
+/// Compatibility-only generator for the isolated legacy preview resolver.
+/// TypeScript-authored RPG actions never enter this path; their shape comes
+/// from `RpgRandomRequest` above.
+fn materialize_legacy_generated_rolls(
+    command_id: &str,
+    intent: &UseActionIntent,
+    seed: u64,
+    scenario: &RulebenchScenario,
+) -> (Vec<i32>, Vec<GeneratedCommandRoll>) {
+    let mut generator_state = seed;
+    let mut values = Vec::new();
+    let mut evidence = Vec::new();
+    while let Some((request_kind, sides)) = legacy_random_request(scenario, intent, &values) {
+        let value = next_generated_die(&mut generator_state, sides);
+        values.push(value);
+        evidence.push(GeneratedCommandRoll {
+            sequence: evidence.len() as u32,
+            command_id: command_id.to_string(),
+            request_kind,
+            die_expression: format!("1d{sides}"),
+            value,
+            source_mode: CommandRollMode::AuthorityGenerated { seed },
+        });
+    }
+    (values, evidence)
+}
+
+fn describe_legacy_generated_rolls(
+    command_id: &str,
+    intent: &UseActionIntent,
+    seed: u64,
+    values: &[i32],
+    scenario: &RulebenchScenario,
+) -> Vec<GeneratedCommandRoll> {
+    values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| {
+            let (request_kind, sides) = legacy_random_request(scenario, intent, &values[..index])?;
+            Some(GeneratedCommandRoll {
+                sequence: index as u32,
+                command_id: command_id.to_string(),
+                request_kind,
+                die_expression: format!("1d{sides}"),
+                value: *value,
+                source_mode: CommandRollMode::RecordedGenerated { seed },
+            })
+        })
+        .collect()
+}
+
+fn legacy_random_request(
+    scenario: &RulebenchScenario,
+    intent: &UseActionIntent,
+    values: &[i32],
+) -> Option<(RollRequestKind, u32)> {
+    let receipt = crate::preview_use_action(scenario, intent.clone(), values);
+    match receipt.rejection {
+        Some(RulebenchRejection::MissingAttackRoll) => Some((RollRequestKind::AttackRoll, 20)),
+        Some(RulebenchRejection::MissingCheckRoll) => Some((RollRequestKind::SavingThrowRoll, 20)),
+        Some(RulebenchRejection::MissingDamageRoll) => Some((RollRequestKind::DamageRoll, 8)),
+        _ => None,
+    }
+}
+
+fn random_request_kind(kind: RpgRandomRequestKind) -> RollRequestKind {
+    match kind {
+        RpgRandomRequestKind::AttackCheck => RollRequestKind::AttackRoll,
+        RpgRandomRequestKind::SavingThrowCheck => RollRequestKind::SavingThrowRoll,
+        RpgRandomRequestKind::FormulaDice => RollRequestKind::DamageRoll,
+    }
+}
+
+fn next_generated_die(state: &mut u64, maximum: u32) -> i32 {
     let mut value = if *state == 0 {
         0x9e37_79b9_7f4a_7c15
     } else {
@@ -1223,7 +1341,7 @@ fn next_generated_die(state: &mut u64, maximum: i32) -> i32 {
     value ^= value >> 27;
     *state = value;
     let output = value.wrapping_mul(0x2545_f491_4f6c_dd1d);
-    (output % maximum as u64) as i32 + 1
+    i32::try_from(output % u64::from(maximum)).unwrap_or(i32::MAX - 1) + 1
 }
 
 fn ended_combat_receipt(
@@ -1366,16 +1484,31 @@ fn command_preflight_readout(
         );
     };
 
-    let Some(action) = scenario.action_by_id(&intent.action_id) else {
-        return rejected_command_preflight(
-            intent,
-            CommandPreflightDecisionKind::RejectedByActionLookup,
-            Some(RulebenchRejection::InvalidAction),
-            current_actor_id,
-            None,
-            None,
-            "Action is not present in the current scenario.",
-        );
+    let action = match scenario.action_by_id(&intent.action_id) {
+        Some(action) => action,
+        None => {
+            if let Some(source_action_id) =
+                crate::rpg_resolver::rpg_dispatch_action_id(scenario, &intent.action_id)
+            {
+                return rpg_authored_command_preflight(
+                    scenario,
+                    action_resources,
+                    current_actor_id,
+                    actor,
+                    intent,
+                    &source_action_id,
+                );
+            }
+            return rejected_command_preflight(
+                intent,
+                CommandPreflightDecisionKind::RejectedByActionLookup,
+                Some(RulebenchRejection::InvalidAction),
+                current_actor_id,
+                None,
+                None,
+                "Action is not present in the current scenario or compiled RPG package.",
+            );
+        }
     };
 
     if action.actor_id != intent.actor_id {
@@ -1568,6 +1701,133 @@ fn command_preflight_readout(
         resource_costs: action.resource_costs.clone(),
         action_resource,
         reason: "Command is admissible before roll resolution.".to_string(),
+    }
+}
+
+fn rpg_authored_command_preflight(
+    scenario: &RulebenchScenario,
+    action_resources: &ActionResourceLedgerReadout,
+    current_actor_id: Option<String>,
+    actor: &rulebench_content::Combatant,
+    intent: UseActionIntent,
+    source_action_id: &str,
+) -> CommandPreflightReadout {
+    let Ok(content) = rulebench_content::representative_rpg_content() else {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActionLookup,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            None,
+            "Generated RPG content failed its compile contract.",
+        );
+    };
+    let Some(action) = content
+        .normalized_ir
+        .actions
+        .iter()
+        .find(|action| action.id == source_action_id)
+    else {
+        return rejected_command_preflight(
+            intent,
+            CommandPreflightDecisionKind::RejectedByActionLookup,
+            Some(RulebenchRejection::InvalidAction),
+            current_actor_id,
+            None,
+            None,
+            "Action is absent from the compiled RPG package.",
+        );
+    };
+    let resource_costs = action
+        .costs
+        .iter()
+        .map(|cost| ActionResourceCost {
+            resource_id: cost.resource_id.clone(),
+            amount: u32::try_from(cost.amount).unwrap_or(u32::MAX),
+        })
+        .collect::<Vec<_>>();
+    let action_resources_for_costs = match action_resource_costs_available(
+        action_resources,
+        &intent.actor_id,
+        &resource_costs,
+    ) {
+        Ok(resources) => resources,
+        Err((resource, reason)) => {
+            let mut readout = rejected_command_preflight(
+                intent,
+                CommandPreflightDecisionKind::RejectedByActionResource,
+                Some(RulebenchRejection::InvalidAction),
+                current_actor_id,
+                None,
+                resource,
+                reason,
+            );
+            readout.resource_costs = resource_costs;
+            return readout;
+        }
+    };
+    let authority = RulebenchRpgAuthority::new(scenario)
+        .expect("representative RPG content already passed its compile contract");
+    let preview = authority.preview(&intent, source_action_id, &[]);
+    let authority_admitted = match &preview {
+        Ok(_) => true,
+        Err(rejection) => rejection.code == "RPG_RANDOM_EXHAUSTED",
+    };
+    if !authority_admitted {
+        let rejection = preview.expect_err("non-admitted preview has rejection evidence");
+        let target_legality = intent
+            .target_ids
+            .first()
+            .or_else(|| (!intent.target_id.is_empty()).then_some(&intent.target_id))
+            .map(|target_id| TargetLegality {
+                target_id: target_id.clone(),
+                accepted: false,
+                reason: rejection.message.clone(),
+            });
+        let decision_kind = if rejection.code.contains("TARGET") {
+            CommandPreflightDecisionKind::RejectedByTargetLegality
+        } else {
+            CommandPreflightDecisionKind::RejectedByActionLookup
+        };
+        return rejected_command_preflight(
+            intent,
+            decision_kind,
+            Some(if rejection.code.contains("TARGET") {
+                RulebenchRejection::TargetLegalityFailed
+            } else {
+                RulebenchRejection::InvalidAction
+            }),
+            current_actor_id,
+            target_legality,
+            action_resources_for_costs.first().cloned(),
+            format!("{}: {}", rejection.code, rejection.message),
+        );
+    }
+
+    let target_id = intent
+        .target_ids
+        .first()
+        .cloned()
+        .unwrap_or_else(|| intent.target_id.clone());
+    CommandPreflightReadout {
+        intent,
+        accepted: true,
+        decision_kind: CommandPreflightDecisionKind::Accepted,
+        rejection: None,
+        current_actor_id,
+        target_legality: Some(TargetLegality {
+            target_id,
+            accepted: true,
+            reason: format!(
+                "Compiled RPG package admitted the authored action for actor {}.",
+                actor.id
+            ),
+        }),
+        resource_costs,
+        action_resource: action_resources_for_costs.first().cloned(),
+        reason: "Generated TypeScript content compiled and passed Rust authority preflight."
+            .to_string(),
     }
 }
 
@@ -1814,6 +2074,62 @@ fn apply_target_results_to_state(state: &mut CombatState, receipt: &RulebenchRec
             state.apply_resource_change(resource);
         }
     }
+}
+
+fn rpg_resource_outcomes(
+    state: &CombatState,
+    receipt: &RulebenchReceipt,
+) -> Vec<ResourceChangeOutcome> {
+    if receipt.authority_surface != ASHA_RPG_AUTHORITY_SURFACE {
+        return Vec::new();
+    }
+    let ledger = state.action_resource_ledger();
+    receipt
+        .events
+        .iter()
+        .filter_map(|event| {
+            let DomainEvent::ResourceChanged {
+                target_id,
+                resource_id,
+                delta,
+                before,
+                after,
+            } = event
+            else {
+                return None;
+            };
+            let already_projected = receipt.target_results.iter().any(|target| {
+                target.resource_changes.iter().any(|resource| {
+                    resource.target_id == *target_id
+                        && resource.resource_id == *resource_id
+                        && resource.before == *before
+                        && resource.after == *after
+                })
+            });
+            if already_projected {
+                return None;
+            }
+            let maximum = ledger
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == *target_id)
+                .and_then(|combatant| {
+                    combatant
+                        .resources
+                        .iter()
+                        .find(|resource| resource.resource_id == *resource_id)
+                })
+                .map(|resource| resource.max)?;
+            Some(ResourceChangeOutcome {
+                target_id: target_id.clone(),
+                resource_id: resource_id.clone(),
+                requested_delta: *delta,
+                before: *before,
+                after: *after,
+                maximum,
+            })
+        })
+        .collect()
 }
 
 fn is_target_legality_rejection(rejection: RulebenchRejection) -> bool {

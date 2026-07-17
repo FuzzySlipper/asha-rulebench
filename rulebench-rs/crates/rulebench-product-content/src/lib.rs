@@ -42,7 +42,7 @@ pub use scenarios::hexing_bolt::{
     ruleset_catalog_readout, scenario_catalog_cases, turn_control_fixture_scenario,
 };
 
-use rulebench_combat::resolve_use_action;
+use rulebench_combat::preview_use_action;
 
 pub fn scenario_package_registry() -> ScenarioPackageRegistry {
     scenarios::registry()
@@ -69,7 +69,7 @@ pub fn resolve_catalog_scenario(
     else {
         return Err(ScenarioCatalogError::UnknownScenarioId);
     };
-    let receipt = resolve_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
+    let receipt = preview_use_action(&case.scenario, case.intent.clone(), &case.roll_stream);
     Ok(ScenarioCatalogResolution {
         case: case.summary,
         scenario: case.scenario,

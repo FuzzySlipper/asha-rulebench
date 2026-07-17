@@ -51,13 +51,12 @@ pub fn validate_intent_shape(intent: &UseActionIntent) -> RulebenchReceipt {
     accepted_shape(intent.clone(), trace)
 }
 
-/// Resolve a single action against the supplied scenario.
+/// Produce a stateless deterministic preview against the supplied scenario.
 ///
-/// The resolver is intentionally narrow and deterministic. It consumes a
-/// scenario, a typed intent, and an explicit roll stream. It returns accepted
-/// DomainEvents plus final projection, or a typed rejection with no accepted
-/// events and unchanged projection.
-pub fn resolve_use_action(
+/// Product commands do not use this entrypoint. `CombatSessionState` owns the
+/// persistent RPG authority session; this adapter exists for catalog examples
+/// and deterministic read-only comparison receipts.
+pub fn preview_use_action(
     scenario: &RulebenchScenario,
     intent: UseActionIntent,
     roll_stream: &[i32],
@@ -65,13 +64,21 @@ pub fn resolve_use_action(
     if let Some(source_action_id) =
         crate::rpg_resolver::rpg_dispatch_action_id(scenario, &intent.action_id)
     {
-        return crate::rpg_resolver::resolve_rpg_use_action(
+        return crate::rpg_resolver::preview_rpg_use_action(
             scenario,
             intent,
             &source_action_id,
             roll_stream,
         );
     }
+    resolve_legacy_use_action(scenario, intent, roll_stream)
+}
+
+pub(crate) fn resolve_legacy_use_action(
+    scenario: &RulebenchScenario,
+    intent: UseActionIntent,
+    roll_stream: &[i32],
+) -> RulebenchReceipt {
     let mut trace = vec![TraceEntry::new(
         1,
         TracePhase::Proposal,

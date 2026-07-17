@@ -508,7 +508,7 @@ mod tests {
     fn skirmish_supports_manual_and_generated_resolution() {
         let scenario = watchtower_skirmish_scenario();
         let intent = UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider");
-        assert!(resolve_use_action(&scenario, intent.clone(), &[17, 5]).accepted);
+        assert!(preview_use_action(&scenario, intent.clone(), &[17, 5]).accepted);
         let mut session = CombatSessionState::new("generated-skirmish", scenario);
         let result = session.submit_intent_command(
             CombatSessionIntentCommandSpec::new(
@@ -524,9 +524,51 @@ mod tests {
     }
 
     #[test]
+    fn typescript_only_action_reaches_options_preflight_and_authority_runtime() {
+        let scenario = watchtower_skirmish_scenario();
+        let mut session = CombatSessionState::new("typescript-only-action", scenario.clone());
+        let options = session.current_actor_options();
+        let authored_option = options
+            .actions
+            .iter()
+            .find(|action| {
+                scenario.action_by_id(&action.action_id).is_none()
+                    && action.available
+                    && !action.target_options.is_empty()
+            })
+            .expect("generated TypeScript action is visible without a Rust ActionDefinition");
+        let target_id = authored_option.target_options[0].target_id.clone();
+        let intent = UseActionIntent::new(
+            options
+                .current_actor_id
+                .clone()
+                .expect("current actor is projected"),
+            authored_option.action_id.clone(),
+            target_id,
+        );
+
+        assert!(session.preflight_command(intent.clone()).accepted);
+        let result = session.submit_intent_command(CombatSessionIntentCommandSpec::new(
+            "typescript-only-command",
+            authored_option.action_name.clone(),
+            "Exercise generated content through the user-facing session runtime.",
+            intent,
+            vec![20, 3],
+        ));
+
+        assert!(result.receipt.accepted);
+        assert_eq!(result.receipt.authority_surface, ASHA_RPG_AUTHORITY_SURFACE);
+        assert!(result
+            .receipt
+            .trace
+            .iter()
+            .any(|entry| entry.message == "RPG_RESOLUTION_COMMITTED"));
+    }
+
+    #[test]
     fn storm_pulse_resolves_canonical_targets_and_stateful_effects_atomically() {
         let scenario = watchtower_skirmish_scenario();
-        let receipt = resolve_use_action(
+        let receipt = preview_use_action(
             &scenario,
             UseActionIntent::for_area("entity-adept", "storm-pulse", GridPosition { x: 8, y: 3 }),
             &[17, 5],
@@ -579,7 +621,7 @@ mod tests {
             .expect("raider push cell exists")
             .terrain_tags = vec!["blocked".to_string()];
         let initial = CombatState::from_scenario(&scenario).project("initial");
-        let receipt = resolve_use_action(
+        let receipt = preview_use_action(
             &scenario,
             UseActionIntent::for_area("entity-adept", "storm-pulse", GridPosition { x: 8, y: 3 }),
             &[17, 5],
@@ -616,7 +658,7 @@ mod tests {
         operation.delta = 1;
         let intent =
             UseActionIntent::for_area("entity-adept", "storm-pulse", GridPosition { x: 8, y: 3 });
-        let receipt = resolve_use_action(&out_of_bounds, intent.clone(), &[17, 5]);
+        let receipt = preview_use_action(&out_of_bounds, intent.clone(), &[17, 5]);
         assert_eq!(
             receipt.rejection,
             Some(RulebenchRejection::EffectResourceOutOfBounds)
@@ -637,7 +679,7 @@ mod tests {
             })
             .expect("storm pulse resource operation exists")
             .resource_id = "missing-resource".to_string();
-        let receipt = resolve_use_action(&out_of_bounds, intent, &[17, 5]);
+        let receipt = preview_use_action(&out_of_bounds, intent, &[17, 5]);
         assert_eq!(
             receipt.rejection,
             Some(RulebenchRejection::EffectResourceMissing)
@@ -895,7 +937,7 @@ mod tests {
     fn explicit_multi_target_pipeline_classifies_duplicate_limit_defeat_and_range() {
         let target_ids = vec!["entity-raider".to_string(), "entity-bruiser".to_string()];
         let scenario = explicit_storm_scenario(ActionRollPolicy::Shared, 2);
-        let duplicate = resolve_use_action(
+        let duplicate = preview_use_action(
             &scenario,
             UseActionIntent::for_targets(
                 "entity-adept",
@@ -911,7 +953,7 @@ mod tests {
 
         let limited = explicit_storm_scenario(ActionRollPolicy::Shared, 1);
         assert_eq!(
-            resolve_use_action(
+            preview_use_action(
                 &limited,
                 UseActionIntent::for_targets("entity-adept", "storm-pulse", target_ids.clone()),
                 &[17, 5],
@@ -929,7 +971,7 @@ mod tests {
             .hit_points
             .current = 0;
         assert_eq!(
-            resolve_use_action(
+            preview_use_action(
                 &defeated,
                 UseActionIntent::for_targets(
                     "entity-adept",
@@ -951,7 +993,7 @@ mod tests {
             .targeting
             .maximum_range = 1;
         assert_eq!(
-            resolve_use_action(
+            preview_use_action(
                 &ranged,
                 UseActionIntent::for_targets(
                     "entity-adept",
@@ -968,7 +1010,7 @@ mod tests {
     #[test]
     fn per_target_rolls_preserve_miss_and_hit_evidence_in_canonical_order() {
         let scenario = explicit_storm_scenario(ActionRollPolicy::PerTarget, 2);
-        let receipt = resolve_use_action(
+        let receipt = preview_use_action(
             &scenario,
             UseActionIntent::for_targets(
                 "entity-adept",
@@ -1011,7 +1053,7 @@ mod tests {
                 maximum_distance: 1,
                 movement_kind: MovementKind::Shift,
             }));
-        let shifted_receipt = resolve_use_action(
+        let shifted_receipt = preview_use_action(
             &shifted,
             UseActionIntent::for_targets(
                 "entity-adept",
@@ -1059,7 +1101,7 @@ mod tests {
                 maximum_distance: 1,
                 movement_kind: MovementKind::Pull,
             }));
-        let pulled_receipt = resolve_use_action(
+        let pulled_receipt = preview_use_action(
             &pulled,
             UseActionIntent::for_targets(
                 "entity-adept",

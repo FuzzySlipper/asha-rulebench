@@ -151,7 +151,7 @@ pub fn automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayRea
 
 pub fn accepted_receipt() -> RulebenchReceipt {
     let scenario = scenario();
-    resolve_use_action(&scenario, veteran_intent(), &[17, 5])
+    preview_use_action(&scenario, veteran_intent(), &[17, 5])
 }
 
 fn scenario() -> RulebenchScenario {

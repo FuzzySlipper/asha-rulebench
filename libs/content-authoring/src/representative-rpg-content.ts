@@ -46,8 +46,13 @@ export interface RulebenchActionBindingMetadata {
   readonly abilityId: string;
   readonly actionText: string;
   readonly effectText: string;
+  readonly rulesetIds: readonly string[];
   readonly reaction: RulebenchReactionOrchestration | null;
 }
+
+const rulebenchRuntimeRulesets = Object.freeze([
+  "asha-rulebench.hexing-bolt.v0",
+]);
 
 const guard = defenseId("guard");
 const resolve = defenseId("resolve");
@@ -347,6 +352,7 @@ function metadata(
     abilityId,
     actionText,
     effectText,
+    rulesetIds: rulebenchRuntimeRulesets,
     reaction,
   });
 }

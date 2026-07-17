@@ -2,19 +2,170 @@ use std::collections::BTreeMap;
 
 use rpg_core::{
     DeterministicRandomStream, RpgCapabilityState, RpgDomainEvent, RpgEntityState, RpgIntent,
-    RpgModifierStackingPolicy, RpgResolutionReceipt, RpgResolutionRejection, RpgTraceStep,
+    RpgModifierStackingPolicy, RpgRandomRequest, RpgResolutionReceipt, RpgResolutionRejection,
+    RpgTraceStep,
 };
 use rpg_ir::RpgIrCheck;
-use rpg_runtime::RpgAuthoritySession;
-use rulebench_content::representative_rpg_content;
+use rpg_runtime::{
+    PreEffectWorkspace, RpgAuthoritySession, RpgGameplayContinuation, RpgGameplayFabricReadout,
+    RpgPreEffectOwner,
+};
+use rulebench_content::{
+    representative_rpg_content, RulebenchRpgContent, RulebenchRpgContentError,
+};
 
 use crate::model::*;
 use crate::state::CombatState;
 
 pub const ASHA_RPG_AUTHORITY_SURFACE: &str = "asha-rpg.semantic-kernel.v1";
 
+#[derive(Debug)]
+pub struct RulebenchRpgAuthority {
+    content: RulebenchRpgContent,
+    session: RpgAuthoritySession,
+}
+
+impl RulebenchRpgAuthority {
+    pub fn new(scenario: &RulebenchScenario) -> Result<Self, RulebenchRpgContentError> {
+        let content = representative_rpg_content()?;
+        let compiled = content.compile()?;
+        Ok(Self {
+            content,
+            session: RpgAuthoritySession::new(
+                compiled,
+                capability_state(scenario),
+                DeterministicRandomStream::new(Vec::new()),
+            ),
+        })
+    }
+
+    pub fn resolve(
+        &mut self,
+        scenario: &RulebenchScenario,
+        intent: UseActionIntent,
+        source_action_id: &str,
+        roll_stream: &[i32],
+    ) -> RulebenchReceipt {
+        let Some(action) = self
+            .content
+            .normalized_ir
+            .actions
+            .iter()
+            .find(|action| action.id == source_action_id)
+        else {
+            return rejected_receipt(
+                scenario,
+                intent,
+                RulebenchRejection::InvalidAction,
+                None,
+                "The action is not present in the compiled RPG content package.".to_string(),
+                Vec::new(),
+            );
+        };
+        let random_values = match random_values(roll_stream) {
+            Ok(values) => values,
+            Err(receipt) => {
+                return rejected_receipt(
+                    scenario,
+                    intent,
+                    receipt,
+                    None,
+                    "RPG authority random evidence must be a positive bounded integer.".to_string(),
+                    Vec::new(),
+                );
+            }
+        };
+        let rpg_intent = rpg_intent(&intent, source_action_id);
+        let mut result = match self.session.submit_with_random(&rpg_intent, random_values) {
+            Ok(receipt) => accepted_receipt(scenario, intent, receipt, &action.check, roll_stream),
+            Err(rejection) => {
+                rejected_rpg_receipt(scenario, intent, rejection, &action.check, roll_stream)
+            }
+        };
+        append_authored_binding_trace(scenario, &mut result);
+        result
+    }
+
+    pub fn random_request(
+        &self,
+        intent: &UseActionIntent,
+        source_action_id: &str,
+        roll_stream: &[i32],
+    ) -> Option<RpgRandomRequest> {
+        let random_values = random_values(roll_stream).ok()?;
+        self.session
+            .preview_with_random(&rpg_intent(intent, source_action_id), random_values)
+            .err()
+            .and_then(|rejection| rejection.random_request)
+    }
+
+    pub fn preview(
+        &self,
+        intent: &UseActionIntent,
+        source_action_id: &str,
+        roll_stream: &[i32],
+    ) -> Result<RpgResolutionReceipt, RpgResolutionRejection> {
+        let random_values = random_values(roll_stream).map_err(|_| RpgResolutionRejection {
+            code: "RPG_RANDOM_VALUE_OUT_OF_RANGE".to_string(),
+            path: "$.random".to_string(),
+            message: "random evidence is not a positive bounded integer".to_string(),
+            trace: Vec::new(),
+            random_attempted: 0,
+            random_request: None,
+        })?;
+        self.session
+            .preview_with_random(&rpg_intent(intent, source_action_id), random_values)
+    }
+
+    pub fn begin_before_effect(
+        &mut self,
+        workspace: PreEffectWorkspace,
+        expected_owner_revision: String,
+    ) -> Result<RpgGameplayContinuation, String> {
+        self.session
+            .begin_before_effect(workspace, expected_owner_revision)
+    }
+
+    pub fn resolve_before_effect(
+        &mut self,
+        pending: &RpgGameplayContinuation,
+        accepted: bool,
+        option_id: Option<String>,
+        owner: &mut dyn RpgPreEffectOwner,
+    ) -> Result<(), String> {
+        let receipt = self
+            .session
+            .resolve_before_effect(pending, accepted, option_id, owner)?;
+        if !receipt.accepted() {
+            return Err(format!(
+                "RPG gameplay pre-effect owner rejected: {:?}",
+                receipt.diagnostics
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn gameplay_fabric_readout(&self) -> RpgGameplayFabricReadout {
+        self.session.gameplay_fabric_readout()
+    }
+}
+
 pub fn resolves_through_rpg_language(action_id: &str) -> bool {
     representative_rpg_content().is_ok_and(|content| content.binding(action_id).is_some())
+}
+
+fn resolves_through_rpg_language_for_scenario(
+    scenario: &RulebenchScenario,
+    action_id: &str,
+) -> bool {
+    representative_rpg_content().is_ok_and(|content| {
+        content.binding(action_id).is_some_and(|binding| {
+            binding
+                .ruleset_ids
+                .iter()
+                .any(|ruleset_id| ruleset_id == &scenario.selected_ruleset_id)
+        })
+    })
 }
 
 /// Resolve a scenario-local runtime action identity to its TypeScript-authored
@@ -51,7 +202,7 @@ pub fn rpg_dispatch_action_id(
         .action_by_id(runtime_action_id)
         .is_none()
         .then(|| runtime_action_id.to_string())
-        .filter(|action_id| resolves_through_rpg_language(action_id))
+        .filter(|action_id| resolves_through_rpg_language_for_scenario(scenario, action_id))
 }
 
 pub(crate) fn rpg_reaction_hook(
@@ -83,14 +234,17 @@ pub(crate) fn rpg_reaction_hook(
     })
 }
 
-pub fn resolve_rpg_use_action(
+/// Stateless read-only adapter used by catalog previews, never by the product
+/// command runtime. Product execution owns one `RulebenchRpgAuthority` per
+/// `CombatSessionState`.
+pub fn preview_rpg_use_action(
     scenario: &RulebenchScenario,
     intent: UseActionIntent,
     source_action_id: &str,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
-    let content = match representative_rpg_content() {
-        Ok(content) => content,
+    let mut authority = match RulebenchRpgAuthority::new(scenario) {
+        Ok(authority) => authority,
         Err(error) => {
             return rejected_receipt(
                 scenario,
@@ -102,77 +256,28 @@ pub fn resolve_rpg_use_action(
             );
         }
     };
-    let Some(action) = content
-        .normalized_ir
-        .actions
-        .iter()
-        .find(|action| action.id == source_action_id)
-    else {
-        return rejected_receipt(
-            scenario,
-            intent,
-            RulebenchRejection::InvalidAction,
-            None,
-            "The action is not present in the compiled RPG content package.".to_string(),
-            Vec::new(),
-        );
-    };
-    let compiled = match content.compile() {
-        Ok(compiled) => compiled,
-        Err(error) => {
-            return rejected_receipt(
-                scenario,
-                intent,
-                RulebenchRejection::InvalidAction,
-                None,
-                format!("The normalized RPG package did not compile: {error:?}"),
-                Vec::new(),
-            );
-        }
-    };
-    let state = capability_state(scenario);
-    let random_values = match roll_stream
+    authority.resolve(scenario, intent, source_action_id, roll_stream)
+}
+
+fn random_values(roll_stream: &[i32]) -> Result<Vec<u32>, RulebenchRejection> {
+    roll_stream
         .iter()
         .copied()
         .map(u32::try_from)
         .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(values) => values,
-        Err(_) => {
-            return rejected_receipt(
-                scenario,
-                intent,
-                RulebenchRejection::InvalidRollValue,
-                None,
-                "RPG authority random evidence must be a positive bounded integer.".to_string(),
-                Vec::new(),
-            );
-        }
-    };
-    let mut session = RpgAuthoritySession::new(
-        compiled,
-        state,
-        DeterministicRandomStream::new(random_values),
-    );
-    let target_ids = if intent.target_ids.is_empty() {
-        vec![intent.target_id.clone()]
-    } else {
-        intent.target_ids.clone()
-    };
-    let rpg_intent = RpgIntent {
+        .map_err(|_| RulebenchRejection::InvalidRollValue)
+}
+
+fn rpg_intent(intent: &UseActionIntent, source_action_id: &str) -> RpgIntent {
+    RpgIntent {
         action_id: source_action_id.to_string(),
         actor_id: intent.actor_id.clone(),
-        target_ids,
-    };
-
-    let mut result = match session.submit(&rpg_intent) {
-        Ok(receipt) => accepted_receipt(scenario, intent, receipt, &action.check, roll_stream),
-        Err(rejection) => {
-            rejected_rpg_receipt(scenario, intent, rejection, &action.check, roll_stream)
-        }
-    };
-    append_authored_binding_trace(scenario, &mut result);
-    result
+        target_ids: if intent.target_ids.is_empty() {
+            vec![intent.target_id.clone()]
+        } else {
+            intent.target_ids.clone()
+        },
+    }
 }
 
 fn append_authored_binding_trace(scenario: &RulebenchScenario, receipt: &mut RulebenchReceipt) {
@@ -237,6 +342,7 @@ fn capability_state(scenario: &RulebenchScenario) -> RpgCapabilityState {
             .saturating_sub(combatant.hit_points.current);
         if missing_vitality > 0 {
             state
+                .vitality_owner()
                 .apply_damage(&combatant.id, missing_vitality)
                 .expect("inserted RPG entity accepts current vitality projection");
         }

@@ -27,7 +27,7 @@ pub use modifiers::{
     active_modifier_stat_adjustments_for_combatant, effective_stats_for_combatant,
     evaluate_effective_stats_for_combatant, EffectiveStatEvaluationError,
 };
-pub use resolver::{resolve_use_action, validate_intent_shape};
+pub use resolver::{preview_use_action, validate_intent_shape};
 pub use rpg_resolver::{resolves_through_rpg_language, ASHA_RPG_AUTHORITY_SURFACE};
 pub use runtime::{
     validate_combat_automation_policy, validate_combat_automation_policy_for_context,

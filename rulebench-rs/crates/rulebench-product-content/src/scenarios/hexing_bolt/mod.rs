@@ -33,7 +33,7 @@ pub fn registration() -> crate::ScenarioPackageRegistration {
 mod tests {
     use super::*;
     use rulebench_combat::{
-        resolve_use_action, ActionResourceKind, ActionResourcePool, ActionResourceRefreshPolicy,
+        preview_use_action, ActionResourceKind, ActionResourcePool, ActionResourceRefreshPolicy,
         CombatSessionIntentCommandSpec, CombatSessionState, DomainEvent, NamedNumber,
         ReactionCommandSpec, UseActionIntent, ASHA_RPG_AUTHORITY_SURFACE,
     };
@@ -143,7 +143,7 @@ mod tests {
         ];
 
         for (intent, rolls, label) in cases {
-            let receipt = resolve_use_action(&scenario, intent, &rolls);
+            let receipt = preview_use_action(&scenario, intent, &rolls);
             assert!(receipt.accepted, "{label}: {:?}", receipt.rejection);
             assert_eq!(receipt.authority_surface, ASHA_RPG_AUTHORITY_SURFACE);
             assert!(receipt
@@ -152,7 +152,7 @@ mod tests {
                 .any(|entry| entry.message.starts_with("RPG_")));
         }
 
-        let burst = resolve_use_action(
+        let burst = preview_use_action(
             &scenario,
             UseActionIntent::for_targets(
                 "entity-adept",

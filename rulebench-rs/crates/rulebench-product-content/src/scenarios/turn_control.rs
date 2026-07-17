@@ -198,7 +198,7 @@ pub fn automatic_run_replay_readouts() -> Vec<CombatSessionAutomaticRunReplayRea
 }
 
 pub fn accepted_receipt() -> RulebenchReceipt {
-    resolve_use_action(&scenario(), intent(), &[5, 4])
+    preview_use_action(&scenario(), intent(), &[5, 4])
 }
 
 pub fn replay_package() -> ReplayPackage {

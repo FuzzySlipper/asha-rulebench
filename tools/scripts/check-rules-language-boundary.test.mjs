@@ -2,23 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  declaredSurfaceFiles,
   inspectContentOnlyChange,
-  semanticOperationLayers,
+  inspectDeclaredRulesLanguage,
 } from "./check-rules-language-boundary.mjs";
+import { readFileSync } from "node:fs";
 
 const generated =
   "rulebench-rs/crates/rulebench-content/src/generated/representative-rpg-content.json";
 
 test("content-only action changes stay within three downstream layers", () => {
   const report = inspectContentOnlyChange([
-    "libs/content-authoring/src/frost-bolt.ts",
-    "libs/content-authoring/src/frost-bolt.spec.ts",
+    declaredSurfaceFiles[0],
+    declaredSurfaceFiles[1],
     generated,
   ]);
 
   assert.deepEqual(report.failures, []);
   assert.equal(report.contentOnlyLayerCount, 3);
-  assert.equal(report.semanticOperationLayerCount, 7);
 });
 
 test("content-only classification rejects Rust protocol host and proof amplification", () => {
@@ -53,10 +54,12 @@ test("content-only classification fails closed when generated IR is omitted", ()
   );
 });
 
-test("semantic operation path retains all seven Rust-first owner layers", () => {
-  assert.equal(semanticOperationLayers.length, 7);
-  assert.ok(
-    semanticOperationLayers.some((entry) => entry.includes("DomainEvents")),
+test("declared content reaches the persistent user-facing authority path", () => {
+  const report = inspectDeclaredRulesLanguage((file) =>
+    readFileSync(file, "utf8"),
   );
-  assert.ok(semanticOperationLayers.some((entry) => entry.includes("replay")));
+
+  assert.deepEqual(report.failures, []);
+  assert.ok(report.actionCount > 0);
+  assert.equal(report.actionCount, report.bindingCount);
 });

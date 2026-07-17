@@ -448,7 +448,7 @@ fn hexing_bolt_modifiers() -> Vec<ModifierDefinition> {
 }
 
 pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
-    rulebench_combat::resolve_use_action(
+    rulebench_combat::preview_use_action(
         &hexing_bolt_fixture_scenario(),
         UseActionIntent::new("entity-adept", "hexing_bolt", "entity-raider"),
         &[17, 5],
@@ -456,7 +456,7 @@ pub fn accepted_hexing_bolt_fixture_receipt() -> RulebenchReceipt {
 }
 
 pub fn rejected_target_fixture_receipt() -> RulebenchReceipt {
-    rulebench_combat::resolve_use_action(
+    rulebench_combat::preview_use_action(
         &hexing_bolt_fixture_scenario(),
         UseActionIntent::new("entity-adept", "hexing_bolt", "entity-adept"),
         &[17, 5],

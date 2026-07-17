@@ -346,14 +346,14 @@ impl CombatSessionState {
             .find(|response| response.response_kind == ReactionResponseKind::Accept);
         let accepted = accepted_response.is_some();
         let option_id = accepted_response.and_then(|response| response.option_id.clone());
-        let decision_receipt = {
+        {
             let mut owner = CombatPreEffectOwner {
                 state: &mut self.state,
                 receipt: &mut pending.receipt,
                 actor_id: &pending.actor_id,
                 action_id: &resolved_root.trigger_action_id,
             };
-            self.gameplay_fabric
+            self.rpg_authority
                 .resolve_before_effect(
                     &pending.gameplay_continuation,
                     accepted,
@@ -362,15 +362,14 @@ impl CombatSessionState {
                 )
                 .expect("static gameplay continuation resolves")
         };
-        assert!(
-            decision_receipt.accepted(),
-            "gameplay pre-effect owner route must accept the current Rulebench revision: {:?}",
-            decision_receipt.diagnostics
-        );
         for target in &pending.receipt.target_results {
             for resource in &target.resource_changes {
                 self.record_effect_resource_transition(&pending.step, resource);
             }
+        }
+        for resource in rpg_resource_outcomes(&self.state, &pending.receipt) {
+            self.state.apply_resource_change(&resource);
+            self.record_effect_resource_transition(&pending.step, &resource);
         }
         for cost in &pending.resource_costs {
             let spend =
@@ -515,6 +514,9 @@ impl RpgPreEffectOwner for CombatPreEffectOwner<'_> {
             self.state.apply_hit(damage, self.receipt.modifier.as_ref());
         } else {
             apply_target_results_to_state(self.state, self.receipt);
+        }
+        for resource in rpg_resource_outcomes(self.state, self.receipt) {
+            self.state.apply_resource_change(&resource);
         }
         let fingerprint =
             fingerprint_projected_state(&self.state.project("Gameplay pre-effect owner commit."));

@@ -6,7 +6,7 @@ const workspaceManifestPath = join(root, "rulebench-rs", "Cargo.toml");
 const cratesRoot = join(root, "rulebench-rs", "crates");
 const hostsRoot = join(root, "rulebench-rs", "hosts");
 const rpgRepository = "https://github.com/FuzzySlipper/asha-rpg.git";
-const rpgRevision = "ea3e3803d4736268f2a10996a34bc5b8dfefcffc";
+const rpgRevision = "ef463d2d0ea3f708f08605c0e9df42b385645397";
 const rpgVersionRequirement = "^0.1";
 
 const allowedDependencies = new Map([

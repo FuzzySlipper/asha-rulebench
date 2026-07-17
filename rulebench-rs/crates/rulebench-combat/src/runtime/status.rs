@@ -138,7 +138,7 @@ impl CombatSessionState {
             equipment_transition_log: self.equipment_transition_log.clone(),
             reaction_window_lifecycle_log: self.reaction_window_lifecycle_log.clone(),
             reaction_audit_log: self.reaction_audit_log.clone(),
-            gameplay_fabric: self.gameplay_fabric.readout(),
+            gameplay_fabric: self.rpg_authority.gameplay_fabric_readout(),
             current_reaction_window: self.current_reaction_window().cloned(),
             modifier_duration_expiration_log: self.modifier_duration_expiration_log.clone(),
             turn_transition_log: self.turn_transition_log.clone(),
@@ -450,7 +450,7 @@ fn current_actor_option_summary(
         );
     }
 
-    let actions = scenario
+    let mut actions = scenario
         .actions
         .iter()
         .filter(|action| action.actor_id == actor_id)
@@ -458,6 +458,12 @@ fn current_actor_option_summary(
             current_actor_action_option(action, projection, action_resources, equipment, actor_id)
         })
         .collect::<Vec<_>>();
+    actions.extend(rpg_authored_action_options(
+        scenario,
+        projection,
+        action_resources,
+        actor_id,
+    ));
 
     if actions.is_empty() {
         return unavailable_current_actor_options(
@@ -494,6 +500,157 @@ fn current_actor_option_summary(
         unavailable_reason,
         actions,
     }
+}
+
+fn rpg_authored_action_options(
+    scenario: &RulebenchScenario,
+    projection: &ScenarioProjection,
+    action_resources: &ActionResourceLedgerReadout,
+    actor_id: &str,
+) -> Vec<CurrentActorActionOption> {
+    let Ok(content) = rulebench_content::representative_rpg_content() else {
+        return Vec::new();
+    };
+    let bound_source_ids = scenario
+        .actions
+        .iter()
+        .filter_map(|action| crate::rpg_resolver::rpg_dispatch_action_id(scenario, &action.id))
+        .collect::<std::collections::BTreeSet<_>>();
+    content
+        .normalized_ir
+        .actions
+        .iter()
+        .filter(|action| scenario.action_by_id(&action.id).is_none())
+        .filter(|action| !bound_source_ids.contains(&action.id))
+        .filter_map(|action| {
+            let binding = content.binding(&action.id)?;
+            if !binding
+                .ruleset_ids
+                .iter()
+                .any(|ruleset_id| ruleset_id == &scenario.selected_ruleset_id)
+            {
+                return None;
+            }
+            let check_kind = match action.check {
+                rpg_ir::RpgIrCheck::Attack { .. } => CheckHandlerKind::AttackVsDefense,
+                rpg_ir::RpgIrCheck::SavingThrow { .. } => CheckHandlerKind::SavingThrow,
+                rpg_ir::RpgIrCheck::NoRoll => return None,
+            };
+            let resource_costs = action
+                .costs
+                .iter()
+                .map(|cost| ActionResourceCost {
+                    resource_id: cost.resource_id.clone(),
+                    amount: u32::try_from(cost.amount).unwrap_or(u32::MAX),
+                })
+                .collect::<Vec<_>>();
+            let resource_states = action_resources
+                .combatants
+                .iter()
+                .find(|combatant| combatant.combatant_id == actor_id)
+                .map(|combatant| {
+                    resource_costs
+                        .iter()
+                        .filter_map(|cost| {
+                            combatant
+                                .resources
+                                .iter()
+                                .find(|resource| resource.resource_id == cost.resource_id)
+                                .cloned()
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let availability =
+                action_resource_costs_available(action_resources, actor_id, &resource_costs);
+            let (available, unavailable_reason) = match availability {
+                Ok(_) => (true, None),
+                Err((_, reason)) => (false, Some(reason)),
+            };
+            let actor = projected_combatant_by_id(projection, actor_id)?;
+            let actor_team = scenario
+                .combatants
+                .iter()
+                .find(|combatant| combatant.id == actor_id)?
+                .team;
+            let target_options = projection
+                .combatants
+                .iter()
+                .filter(|target| target.hit_points.current > 0)
+                .filter(|target| {
+                    let target_team = scenario
+                        .combatants
+                        .iter()
+                        .find(|combatant| combatant.id == target.id)
+                        .map(|combatant| combatant.team);
+                    match action.targets.team {
+                        rpg_ir::RpgIrTeamConstraint::Hostile => {
+                            target_team.is_some_and(|team| team != actor_team)
+                        }
+                        rpg_ir::RpgIrTeamConstraint::Ally => {
+                            target_team.is_some_and(|team| team == actor_team)
+                        }
+                        rpg_ir::RpgIrTeamConstraint::Any => true,
+                    }
+                })
+                .filter(|target| {
+                    actor.position.x.abs_diff(target.position.x)
+                        + actor.position.y.abs_diff(target.position.y)
+                        <= action.targets.maximum_range
+                })
+                .map(|target| CurrentActorTargetOption {
+                    target_id: target.id.clone(),
+                    target_name: target.name.clone(),
+                    current_hit_points: target.hit_points.current,
+                    max_hit_points: target.hit_points.max,
+                    reason:
+                        "Compiled TypeScript-authored RPG target selector accepted this target."
+                            .to_string(),
+                })
+                .collect::<Vec<_>>();
+            let target_set_options = if action.targets.maximum_targets > 1 {
+                let target_ids = target_options
+                    .iter()
+                    .take(action.targets.maximum_targets as usize)
+                    .map(|target| target.target_id.clone())
+                    .collect::<Vec<_>>();
+                if target_ids.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![CurrentActorTargetSetOption {
+                        id: format!("{}:targets:{}", action.id, target_ids.join("+")),
+                        target_ids,
+                        target_cell: None,
+                        roll_policy: match action.roll_scope {
+                            rpg_ir::RpgIrRollScope::Shared => rpg_ir::ActionRollPolicy::Shared,
+                            rpg_ir::RpgIrRollScope::PerTarget => {
+                                rpg_ir::ActionRollPolicy::PerTarget
+                            }
+                            rpg_ir::RpgIrRollScope::None => rpg_ir::ActionRollPolicy::NoRoll,
+                        },
+                        reason: "Compiled RPG authority projected a bounded authored target set."
+                            .to_string(),
+                    }]
+                }
+            } else {
+                Vec::new()
+            };
+            Some(CurrentActorActionOption {
+                action_id: action.id.clone(),
+                ability_id: binding.ability_id.clone(),
+                action_name: action.name.clone(),
+                check_kind,
+                available,
+                unavailable_reason,
+                resource_costs,
+                resource_states,
+                target_mode: ActionTargetMode::Entity,
+                target_options,
+                target_set_options,
+                destination_options: Vec::new(),
+            })
+        })
+        .collect()
 }
 
 fn current_actor_command_candidates(

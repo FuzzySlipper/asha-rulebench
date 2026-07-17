@@ -648,6 +648,9 @@
       "abilityId": "ability.hexing-bolt",
       "actionText": "Mind vs Nerve at range ten.",
       "effectText": "Deal psychic damage and apply Rattled on a hit.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": {
         "window": "beforeEffect",
         "eligibleReactors": "declaredTargets",
@@ -659,6 +662,9 @@
       "abilityId": "ability.anchor-lash",
       "actionText": "Lash one hostile within three cells.",
       "effectText": "Deal kinetic damage on a hit.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -666,6 +672,9 @@
       "abilityId": "ability.binding-spark",
       "actionText": "Bind one hostile within five cells.",
       "effectText": "Deal arcane damage and refresh Anchored on a failed save.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -673,6 +682,9 @@
       "abilityId": "ability.rallying-mend",
       "actionText": "Restore a nearby ally.",
       "effectText": "Heal the ally and restore one focus to the actor.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -680,6 +692,9 @@
       "abilityId": "ability.shatterline-burst",
       "actionText": "Burst against up to three hostiles.",
       "effectText": "Each target saves independently for half force damage.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -687,6 +702,9 @@
       "abilityId": "ability.tactical-shift",
       "actionText": "Reposition a nearby ally.",
       "effectText": "Move the ally two cells without provoking.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -694,6 +712,9 @@
       "abilityId": "ability.intercepting-strike",
       "actionText": "Strike a nearby hostile.",
       "effectText": "Deal kinetic damage on a hit.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -701,6 +722,9 @@
       "abilityId": "ability.binding-glyph",
       "actionText": "Inscribe a binding glyph beneath a visible hostile combatant.",
       "effectText": "Deal arcane damage and apply Anchored on a failed save.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     },
     {
@@ -708,6 +732,9 @@
       "abilityId": "ability.authored-reaction",
       "actionText": "Strike a visible hostile and allow product reaction orchestration.",
       "effectText": "Deal arcane damage and apply Anchored on a hit.",
+      "rulesetIds": [
+        "asha-rulebench.hexing-bolt.v0"
+      ],
       "reaction": null
     }
   ]

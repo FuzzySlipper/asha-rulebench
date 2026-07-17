@@ -38,6 +38,7 @@ pub struct RpgActionBindingMetadata {
     pub ability_id: String,
     pub action_text: String,
     pub effect_text: String,
+    pub ruleset_ids: Vec<String>,
     pub reaction: Option<RulebenchReactionOrchestration>,
 }
 
