@@ -68,17 +68,13 @@ its generated-DTO-only API and fake/live implementation parity.
 ## Local Commands
 
 ```bash
-# Full local gate
+# Canonical blocking project gate (the GitHub required check)
 pnpm run verify
 
-# Focused gates
-pnpm run check:pattern
-pnpm run check:docs
-pnpm run lint
-pnpm run typecheck
-pnpm run test
-pnpm run build
-pnpm run e2e
+# Explicit focused checks; repeat --profile to take the safe union
+pnpm run verify:change -- --profile frontend
+pnpm run verify:change -- --profile rust-owner --crate rulebench-rules
+pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
 
 # LAN-first development server
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
@@ -87,6 +83,26 @@ den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
+
+`verify:change` has a closed profile vocabulary and never infers safety from a
+Git diff. Use `frontend` for production TypeScript, `browser` for routes and
+visible workflows, `rust-owner --crate <workspace-owner>` for a changed Rust
+owner, `protocol-generated` for protocol/emitter/generated-consumer changes,
+`fixtures-conformance` for fixture/registry/capability work, `host-transport`
+for bridge/process-host/transport/store work, `portable --crate
+<portable-owner>` for portable/public Cargo surfaces, and `docs` for command or
+support documentation. Combine profiles when a change crosses owners. Exact
+fixture filters are `--package`, `--package-version`, `--ruleset`,
+`--ruleset-version`, `--scenario`, and `--capability`; omitting a safe filter
+runs the full regression/conformance corpus. Use `--dry-run` to inspect the
+selected commands. Missing/unknown profiles, crates, filters, and arguments
+fail closed. If classification is uncertain, run `pnpm run verify`.
+
+The full deterministic browser set (`pnpm run e2e`), unfiltered semantic corpus
+(`pnpm run regression:check`), portable-consumer proof, governance claims, and
+live artifact run remain reachable certification surfaces. Task #5870 owns
+their single canonical certification composition and cadence; do not present a
+focused or blocking result as exhaustive certification.
 
 ## Frontend Boundary Rules
 

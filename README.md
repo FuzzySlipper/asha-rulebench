@@ -253,11 +253,30 @@ Verify the workspace:
 pnpm run verify
 ```
 
-The measured current verification inventory and approved target tier contract
-are documented in [docs/validation-tiers.md](docs/validation-tiers.md). The
-focused and certification command names in that document are implementation
-targets for Den tasks #5869 and #5870; until they land, `pnpm run verify`
-remains the blocking project gate.
+`pnpm run verify` is the canonical blocking project gate and the GitHub
+required check. For explicit owner-matched feedback, use the closed focused
+profiles instead of guessing from a Git diff:
+
+```bash
+pnpm run verify:change -- --profile frontend
+pnpm run verify:change -- --profile rust-owner --crate rulebench-rules
+pnpm run verify:change -- --profile protocol-generated --profile host-transport
+pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
+```
+
+Profiles may be repeated and their commands are deduplicated. The runner prints
+the complete selection before execution, rejects missing/unknown ownership,
+and supports `--dry-run`. Run the blocking gate when classification is
+uncertain. The pre-tiering measurements, exact profile contract, blocking
+membership, and retained certification paths are documented in
+[docs/validation-tiers.md](docs/validation-tiers.md).
+
+The exhaustive deterministic browser set (`pnpm run e2e`), unfiltered
+regression/conformance corpus (`pnpm run regression:check`), portable-consumer
+proof, full governance claims review, and opt-in live evidence remain runnable.
+Task #5870 owns their canonical `certify` composition and scheduled/milestone
+routing; until that lands, invoke the applicable exhaustive surfaces directly
+and do not call a focused or blocking receipt full certification.
 
 For opt-in live evidence:
 

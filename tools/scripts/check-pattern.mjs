@@ -35,6 +35,7 @@ validateManifest();
 validateSourceImports();
 validateLiveHarness();
 parseJson('.playwright-service.json');
+runFocusedFailureTests();
 
 if (failures.length > 0) {
   console.error(failures.join('\n'));
@@ -79,21 +80,27 @@ function validateSourceImports() {
   for (const file of files) {
     const rel = relative(root, file);
     const text = readFileSync(file, 'utf8');
-    if (/@(?:template|asha-rulebench)\/[^'"]+\/src\//.test(text)) {
-      failures.push(`${rel} deep-imports another lib src path`);
-    }
-    if (/from ['"](?:\.\.\/)*apps\//.test(text)) {
-      failures.push(`${rel} imports from apps/`);
-    }
-    if (
-      !rel.startsWith('libs/testing-fixtures/')
-      && !rel.includes('.spec.')
-      && !rel.startsWith('apps/app-e2e/')
-      && /(?:from|import)\s*['"]@(?:template|asha-rulebench)\/testing-fixtures['"]/.test(text)
-    ) {
-      failures.push(`${rel} imports testing-fixtures from production code`);
-    }
+    failures.push(...sourceImportFailures(rel, text));
   }
+}
+
+function sourceImportFailures(rel, text) {
+  const importFailures = [];
+  if (/@(?:template|asha-rulebench)\/[^'"]+\/src\//.test(text)) {
+    importFailures.push(`${rel} deep-imports another lib src path`);
+  }
+  if (/from ['"](?:\.\.\/)*apps\//.test(text)) {
+    importFailures.push(`${rel} imports from apps/`);
+  }
+  if (
+    !rel.startsWith('libs/testing-fixtures/') &&
+    !rel.includes('.spec.') &&
+    !rel.startsWith('apps/app-e2e/') &&
+    /(?:from|import)\s*['"]@(?:template|asha-rulebench)\/testing-fixtures['"]/.test(text)
+  ) {
+    importFailures.push(`${rel} imports testing-fixtures from production code`);
+  }
+  return importFailures;
 }
 
 function validateLiveHarness() {
@@ -120,6 +127,32 @@ function runCheck(command, args) {
   const result = spawnSync(command, args, { cwd: root, encoding: 'utf8' });
   if (result.status !== 0) {
     failures.push(result.stderr.trim() || result.stdout.trim() || `${command} ${args.join(' ')} failed`);
+  }
+}
+
+function runFocusedFailureTests() {
+  const deepImport = sourceImportFailures(
+    'libs/domain/src/failure-injection.ts',
+    ["import { secret } from '@asha-rulebench/store", "/src/internal';"].join(''),
+  );
+  if (deepImport.length === 0) {
+    throw new Error('Pattern self-test failed to reject a frontend deep import.');
+  }
+
+  const fixtureImport = sourceImportFailures(
+    'libs/store/src/failure-injection.ts',
+    ["import '@asha-rulebench/testing", "-fixtures';"].join(''),
+  );
+  if (fixtureImport.length === 0) {
+    throw new Error('Pattern self-test failed to reject a production testing-fixture import.');
+  }
+
+  const testImport = sourceImportFailures(
+    'libs/store/src/store.spec.ts',
+    ["import '@asha-rulebench/testing", "-fixtures';"].join(''),
+  );
+  if (testImport.length !== 0) {
+    throw new Error('Pattern self-test rejected an allowed test fixture import.');
   }
 }
 

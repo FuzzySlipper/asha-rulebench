@@ -6,34 +6,45 @@ const manifestPath = join(root, "docs", "verification-claims.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const capabilityManifest = readCapabilityManifest();
 const failures = [];
+const executableOnly = process.argv.includes("--executable");
+const unknownArguments = process.argv
+  .slice(2)
+  .filter((argument) => argument !== "--executable");
+if (unknownArguments.length > 0) {
+  failures.push(
+    `Unknown claims-check argument: ${unknownArguments.join(", ")}.`,
+  );
+}
 
 if (manifest.schemaVersion !== 1)
   failures.push("docs/verification-claims.json must use schemaVersion 1.");
-if (manifest.reviewedOn !== "2026-07-15")
-  failures.push("verification claims review date is stale.");
-for (const slug of [
-  "basic-design",
-  "north-star-systems-map",
-  "known-limitations",
-]) {
-  if (!manifest.denDocuments.includes(slug))
-    failures.push(`verification review omits Den document ${slug}.`);
-}
-for (const entry of manifest.requiredClaims)
-  requireText(entry, "required current claim");
-for (const entry of manifest.requiredNonClaims)
-  requireText(entry, "required non-claim");
-for (const entry of manifest.forbiddenClaims) forbidText(entry);
+if (!executableOnly) {
+  if (manifest.reviewedOn !== "2026-07-15")
+    failures.push("verification claims review date is stale.");
+  for (const slug of [
+    "basic-design",
+    "north-star-systems-map",
+    "known-limitations",
+  ]) {
+    if (!manifest.denDocuments.includes(slug))
+      failures.push(`verification review omits Den document ${slug}.`);
+  }
+  for (const entry of manifest.requiredClaims)
+    requireText(entry, "required current claim");
+  for (const entry of manifest.requiredNonClaims)
+    requireText(entry, "required non-claim");
+  for (const entry of manifest.forbiddenClaims) forbidText(entry);
 
-const limitationIds = new Set(
-  manifest.activeLimitations.map((entry) => entry.id),
-);
-for (const id of [
-  "trusted-local-process-host",
-  "authored-content-v3-vocabulary",
-]) {
-  if (!limitationIds.has(id))
-    failures.push(`verification review omits active limitation ${id}.`);
+  const limitationIds = new Set(
+    manifest.activeLimitations.map((entry) => entry.id),
+  );
+  for (const id of [
+    "trusted-local-process-host",
+    "authored-content-v3-vocabulary",
+  ]) {
+    if (!limitationIds.has(id))
+      failures.push(`verification review omits active limitation ${id}.`);
+  }
 }
 
 checkCapabilityManifest(capabilityManifest);
@@ -75,9 +86,15 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `check:claims ok (${manifest.requiredClaims.length} claims, ${manifest.requiredNonClaims.length} non-claims, ${manifest.activeLimitations.length} active limitations)`,
-);
+if (executableOnly) {
+  console.log(
+    `check:claims:executable ok (${capabilityManifest.capabilities.length} capability rows plus production Rust stub policy)`,
+  );
+} else {
+  console.log(
+    `check:claims ok (${manifest.requiredClaims.length} claims, ${manifest.requiredNonClaims.length} non-claims, ${manifest.activeLimitations.length} active limitations)`,
+  );
+}
 
 function requireText(entry, kind) {
   const text = readFileSync(join(root, entry.file), "utf8");

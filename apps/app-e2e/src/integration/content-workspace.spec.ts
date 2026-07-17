@@ -38,7 +38,7 @@ test.afterEach(async ({ page }) => {
   transport.disconnect();
 });
 
-test("authors, validates, binds, executes, and replays a Rust-owned action @live", async ({
+test("authors, validates, binds, executes, and replays a Rust-owned action @live @gate", async ({
   page,
 }, testInfo) => {
   const identitySuffix = `${testInfo.workerIndex}.${testInfo.repeatEachIndex}.${testInfo.retry}.${Date.now()}`;

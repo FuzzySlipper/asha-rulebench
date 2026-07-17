@@ -435,7 +435,7 @@ test("executes the exact active authored action through the live Rust host @live
   }
 });
 
-test("completes a supported scenario through the visible panel workbench", async ({
+test("completes a supported scenario through the visible panel workbench @gate", async ({
   page,
 }) => {
   const sessionId = `e2e-visible-panel-session-${Date.now()}`;
@@ -458,8 +458,16 @@ test("completes a supported scenario through the visible panel workbench", async
   await expect(recovery).toContainText(
     `${sessionId} · new this process · generation 0`,
   );
-  await expect(recovery.getByRole("button", { name: "Fork" })).toBeVisible();
-  await expect(recovery.getByRole("button", { name: "Discard" })).toBeVisible();
+  const recoveryEntry = recovery
+    .locator(".choice-row")
+    .filter({ hasText: `${sessionId} · new this process · generation 0` });
+  await expect(recoveryEntry).toHaveCount(1);
+  await expect(
+    recoveryEntry.getByRole("button", { name: "Fork" }),
+  ).toBeVisible();
+  await expect(
+    recoveryEntry.getByRole("button", { name: "Discard" }),
+  ).toBeVisible();
 
   await page
     .getByRole("dialog", { name: "Live combat setup" })
@@ -1154,7 +1162,7 @@ test("configures participants from Rust scenario readbacks", async ({
   await invokeApplicationCommand(page, "Run", "Close session");
 });
 
-test("reviews and compares archived Rust replay evidence", async ({ page }) => {
+test("reviews and compares archived Rust replay evidence @gate", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("menuitem", { name: "Replay" }).click();
   await page.getByRole("menuitem", { name: "Replay archive" }).click();

@@ -1,16 +1,16 @@
 # Validation Tiers And Risk Inventory
 
-Status: design contract for Den task #5868
+Status: approved contract; focused/blocking implementation in Den task #5869
 Baseline commit: `74623131d9c9e558773c2844a991df357bb30ede`
 Measured: 2026-07-16
 
 This document records the current Rulebench verification graph, the defects
 each stage is meant to catch, its measured cost, and the target three-tier
-contract. Task #5869 implements focused checks and the blocking project gate.
-Task #5870 implements certification routing, proof cleanup, and final guidance.
-Until those tasks land, `pnpm run verify` remains the current GitHub gate and
-the target command names below are design decisions rather than available
-scripts.
+contract. Task #5869 implements the focused checks and blocking project gate
+described below. Task #5870 owns certification routing, proof cleanup, and
+final guidance. The baseline commit/date and counts in the next section are
+historical measurement evidence, not current command guidance or synchronized
+support claims.
 
 The governing invariant is unchanged:
 
@@ -21,7 +21,7 @@ Reducing default proof cost must not weaken Rust authority, generated protocol
 ownership, deterministic replay, architecture direction, protocol
 compatibility, or fake/live transport parity.
 
-## Current Baseline
+## Recorded Pre-Tiering Baseline
 
 GitHub Actions has one `verify` job for every pull request and push to `main`.
 After dependency and Chromium installation, it runs `pnpm run verify`. That
@@ -102,6 +102,33 @@ corpus is inexpensive after generated checks have compiled the main Rust
 target, but it repeats authority cases and replay proof already exercised at
 other layers.
 
+### Focused and blocking implementation measurement
+
+Task #5869 measured the implemented commands with installed dependencies. The
+focused cold probe set `NX_SKIP_NX_CACHE=true`; its warm probe immediately
+repeated the same profile with normal Nx caching. The blocking cold probe used
+an empty isolated Cargo target and disabled Nx caching. Both blocking probes
+ran the four actual `e2e:gate` workflows against an already-running local
+`den-serve` URL so the user-visible development instance did not have to be
+stopped merely to acquire a second Nx continuous target.
+
+| Implemented path                          | Cold seconds | Warm seconds | Evidence boundary                                                                            |
+| ----------------------------------------- | -----------: | -----------: | -------------------------------------------------------------------------------------------- |
+| `verify:change --profile frontend`        |       12.110 |        5.310 | Actual pattern/authority checks and Vitest; cold lint/typecheck bypassed Nx cache            |
+| `verify` blocking composition             |       65.660 |       20.630 | Empty Cargo target for cold; both runs executed three regressions and four browser workflows |
+| Recorded pre-tiering `verify` for context |       89.280 |       11.615 | Baseline above; its warm E2E value was an Nx cache receipt rather than a browser execution   |
+
+The focused cold path is materially cheaper than the old all-purpose gate, and
+the blocking cold composition removes the portable-consumer rebuild, broad
+regression corpus, and broad browser permutations. Its measured warm wall time
+is intentionally higher than the old cached receipt because `e2e:gate` really
+executed the primary browser workflows. The after measurements exclude local
+web-server startup, while the recorded cold baseline included an isolated
+real-host browser stack; the exact-SHA GitHub gate remains the clean-checkout
+proof for normal self-starting CI composition. Task #5870 owns the final
+focused/blocking/certification comparison after the canonical certification
+runner exists.
+
 ## Verification Risk Inventory
 
 The target tier column is the decision for #5869 and #5870. “Focused” means the
@@ -159,14 +186,26 @@ caller that cannot classify a change must run the blocking project gate.
 
 | Profile                | Required contents                                                                                                                                                                                                                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `frontend`             | `check:pattern`, lint, typecheck, and all Vitest tests. Add `browser` when a user workflow, route, transport call, app composition, or E2E support surface changes.                                                                                                                                    |
+| `frontend`             | `check:pattern`, `check:typescript-authority`, lint, typecheck, and all Vitest tests. Add `browser` when a user workflow, route, transport call, app composition, or E2E support surface changes.                                                                                                      |
 | `browser`              | Typecheck plus the four `e2e:gate` workflows. Live/artifact evidence is additionally required when the task is user-deliverable UI work.                                                                                                                                                               |
 | `rust-owner`           | `check:rust-boundaries`, `check:rust-test-ownership`, and `cargo test -p <changed-owner>`. `--crate` is required and must be one of the governed workspace owners.                                                                                                                                     |
-| `protocol-generated`   | `check:rust-boundaries`, `generated:check`, executable claims checks, typecheck, and Vitest.                                                                                                                                                                                                           |
+| `protocol-generated`   | `check:rust-boundaries`, `generated:check`, `check:protocol-compatibility`, executable claims checks, typecheck, and Vitest.                                                                                                                                                                           |
 | `fixtures-conformance` | `cargo test -p rulebench-fixtures` plus filtered scenario/capability conformance selected by exact package, ruleset, scenario, or capability identity. With no safe exact filter, run unfiltered `regression:check`. Add `generated:check` when an emitted catalog/session/capability fact can change. |
 | `host-transport`       | Process-host and bridge owner tests plus transport/store Vitest. Add `browser` when a route, DTO, lifecycle, recovery, or user-visible error changes.                                                                                                                                                  |
 | `portable`             | `check:rust-boundaries`, the changed portable owner tests, and `check:portable-consumer`. Required for `rulebench-rules`, public portable Cargo edges, and governed ASHA revision/version changes.                                                                                                     |
-| `docs`                 | `check:docs` plus the executable claims check when a claims, limitation, authority, protocol, or support-level document changes.                                                                                                                                                                       |
+| `docs`                 | `check:docs` plus the cheap executable claims check. Governance/prose freshness remains a certification concern.                                                                                                                                                                                       |
+
+Repeat `--profile` to select the union of multiple owners. `rust-owner` and
+`portable` require one or more exact `--crate` values from their closed owner
+sets. `fixtures-conformance` accepts exact `--package`, `--package-version`,
+`--ruleset`, `--ruleset-version`, `--scenario`, and `--capability` filters; it
+runs the unfiltered corpus when no safe exact filter is supplied. Filters are
+rejected outside that profile. `--dry-run` prints the deduplicated command plan
+without executing it. Missing or unknown profiles, arguments, filters, and
+crate owners exit nonzero. Callers combine `fixtures-conformance` with
+`protocol-generated` when emitted catalog/session/capability facts can change,
+and combine frontend/host work with `browser` when the visible workflow can
+change.
 
 The focused runner may deduplicate identical commands selected by multiple
 profiles. It must fail closed for these surfaces:
@@ -190,8 +229,11 @@ The existing required check name stays `verify`. Its target composition is:
 
 ```text
 verify:static
+  test:validation-scripts
   check:pattern
+  check:typescript-authority
   generated:check
+  check:protocol-compatibility
   check:rust-boundaries
   check:rust-test-ownership
   rust:test
@@ -243,6 +285,11 @@ The four browser workflows cover the primary rules-designer loop:
    panels, including archive creation;
 4. verify and compare archived replay evidence.
 
+Those four tests carry the explicit `@gate` tag and `e2e:gate` selects that tag
+through the existing Playwright configuration. The public `e2e` command is not
+deleted or narrowed; it continues to reach the complete deterministic set for
+certification callers until #5870 composes the canonical certification command.
+
 Responsive permutations, broad capability-matrix rendering, specialized
 targeting/policy/recovery journeys, second-provider permutations, and complete
 accessibility-media coverage move to certification. No browser test moves
@@ -251,6 +298,13 @@ rather than integration-blocking.
 
 `verify:static` is an internal composition primitive, not a weaker public
 approval path. GitHub runs `verify`, not `verify:static`.
+
+`test:validation-scripts` injects one-sided protocol drift, TypeScript rule
+calculation/state mutation, and invalid focused selections into pure checker
+fixtures. `check:pattern`, `generated:check`, and the Rust boundary/regression
+owners retain their own synthetic rejection probes. These meta-checks are
+distinct from product semantics: they prove the lighter selectors themselves
+still recognize the defect classes they claim.
 
 ### Tier 3: certification suite
 
@@ -316,6 +370,7 @@ Rulebench path is removed:
 | Current duplication                                                            | Decision and retained detection path                                                                                                                                                                                                                                                                                |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `protocol:check`, `catalog:check`, or `session:check` beside `generated:check` | Never compose both in one tier. Focused aliases remain owner conveniences; project and certification gates use only `generated:check`.                                                                                                                                                                              |
+| Rust, TypeScript, and generated protocol identity/version                      | Keep `check:protocol-compatibility` beside generation equality. Generation proves emitted DTO equality; the compatibility check uniquely catches a one-sided hand-maintained live-client identity/version change before a host handshake.                                                                           |
 | Every scenario and conformance case plus all Rust tests                        | The project gate runs three representative regression cases plus all Rust owner tests. Certification runs the unfiltered regression/conformance corpus once. Rust tests remain because their narrow validation, rollback, storage, protocol, and error diagnostics are not supplied by catalog cases.               |
 | The same semantic outcome in Rust, regression, and browser tests               | Retain the Rust test for authority semantics, a regression case for deterministic package/replay compatibility, and a browser case only when it proves transport/rendered workflow behavior. Remove browser assertions that merely restate every event/fingerprint permutation without a visible integration claim. |
 | Four `@live` browser cases in both ordinary E2E and `e2e:live`                 | Replace ambiguous title tagging with explicit gate, certification, and live-artifact groups. Deterministic journeys run once in the selected tier; only artifact/managed-server claims run in the live group.                                                                                                       |

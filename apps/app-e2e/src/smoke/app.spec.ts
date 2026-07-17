@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("boots the rulebench shell", async ({ page }) => {
+test("boots the rulebench shell @gate", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByLabel("Rulebench panel layout")).toBeVisible();
