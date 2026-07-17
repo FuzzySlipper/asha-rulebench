@@ -3132,6 +3132,64 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
             }],
         },
         Interface {
+            name: "RulebenchContentDraftIdentityDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "version",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentTemplateDraftRequestDto",
+            fields: &[Field {
+                name: "identity",
+                ty: "RulebenchContentDraftIdentityDto",
+            }],
+        },
+        Interface {
+            name: "RulebenchContentCloneDraftRequestDto",
+            fields: &[
+                Field {
+                    name: "reference",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "identity",
+                    ty: "RulebenchContentDraftIdentityDto",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentAuthoringDraftDto",
+            fields: &[
+                Field {
+                    name: "authoredPayload",
+                    ty: "string",
+                },
+                Field {
+                    name: "sourceKind",
+                    ty: "string",
+                },
+                Field {
+                    name: "sourceLabel",
+                    ty: "string",
+                },
+                Field {
+                    name: "identity",
+                    ty: "RulebenchContentDraftIdentityDto",
+                },
+                Field {
+                    name: "identityExpectation",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
             name: "RulebenchContentDefinitionSummaryDto",
             fields: &[
                 Field {
@@ -3208,7 +3266,180 @@ pub fn interfaces() -> &'static [ProtocolInterface] {
                     name: "diagnostics",
                     ty: "readonly RulebenchContentImportDiagnosticDto[]",
                 },
+                Field {
+                    name: "abilities",
+                    ty: "readonly RulebenchContentAbilityDeclarationSummaryDto[]",
+                },
+                Field {
+                    name: "modifiers",
+                    ty: "readonly RulebenchContentModifierDeclarationSummaryDto[]",
+                },
+                Field {
+                    name: "actions",
+                    ty: "readonly RulebenchContentActionDeclarationSummaryDto[]",
+                },
             ],
+        },
+        Interface {
+            name: "RulebenchContentAbilityDeclarationSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "kind",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tags",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentModifierDeclarationSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "label",
+                    ty: "string",
+                },
+                Field {
+                    name: "summary",
+                    ty: "string",
+                },
+                Field {
+                    name: "tenure",
+                    ty: "string",
+                },
+                Field {
+                    name: "stacking",
+                    ty: "string",
+                },
+                Field {
+                    name: "duration",
+                    ty: "string",
+                },
+                Field {
+                    name: "statAdjustments",
+                    ty: "readonly string[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentActionDeclarationSummaryDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "targeting",
+                    ty: "string",
+                },
+                Field {
+                    name: "check",
+                    ty: "string",
+                },
+                Field {
+                    name: "effects",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "resourceCosts",
+                    ty: "readonly string[]",
+                },
+                Field {
+                    name: "actionText",
+                    ty: "string",
+                },
+                Field {
+                    name: "effectText",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentActionBindingActorDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "name",
+                    ty: "string",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentActionBindingScenarioDto",
+            fields: &[
+                Field {
+                    name: "id",
+                    ty: "string",
+                },
+                Field {
+                    name: "title",
+                    ty: "string",
+                },
+                Field {
+                    name: "actors",
+                    ty: "readonly RulebenchContentActionBindingActorDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentActionBindingCandidateDto",
+            fields: &[
+                Field {
+                    name: "contentPack",
+                    ty: "RulebenchContentPackReferenceDto",
+                },
+                Field {
+                    name: "actionId",
+                    ty: "string",
+                },
+                Field {
+                    name: "actionName",
+                    ty: "string",
+                },
+                Field {
+                    name: "abilityId",
+                    ty: "string",
+                },
+                Field {
+                    name: "scenarios",
+                    ty: "readonly RulebenchContentActionBindingScenarioDto[]",
+                },
+            ],
+        },
+        Interface {
+            name: "RulebenchContentActionBindingCatalogDto",
+            fields: &[Field {
+                name: "actions",
+                ty: "readonly RulebenchContentActionBindingCandidateDto[]",
+            }],
         },
         Interface {
             name: "RulebenchContentDefinitionChangeDto",

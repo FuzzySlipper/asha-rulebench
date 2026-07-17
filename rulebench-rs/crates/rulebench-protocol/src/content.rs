@@ -9,7 +9,13 @@ use rulebench_rules::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::authored_action::{AuthoredActionDefinitionDto, AuthoredModifierDefinitionDto};
+use crate::authored_action::{
+    AuthoredActionDefinitionDto, AuthoredCheckDeclarationDto, AuthoredEffectOperationDto,
+    AuthoredModifierDefinitionDto, AuthoredModifierDurationPolicyDto,
+    AuthoredModifierStackingPolicyDto, AuthoredModifierTenureDto, AuthoredMovementKindDto,
+    AuthoredTargetKindDto, AuthoredTargetSelectionDto, AuthoredTargetTeamConstraintDto,
+    AuthoredVisibilityRequirementDto,
+};
 use crate::{validate_ruleset_definition, RulesetDefinitionDto};
 
 pub const AUTHORED_CONTENT_PACK_FORMAT: &str = "asha-rulebench.content-pack";
@@ -839,6 +845,36 @@ pub struct ContentReferenceRequestDto {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentDraftIdentityDto {
+    pub id: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentTemplateDraftRequestDto {
+    pub identity: ContentDraftIdentityDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentCloneDraftRequestDto {
+    pub reference: ContentPackReferenceDto,
+    pub identity: ContentDraftIdentityDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentAuthoringDraftDto {
+    pub authored_payload: String,
+    pub source_kind: String,
+    pub source_label: String,
+    pub identity: ContentDraftIdentityDto,
+    pub identity_expectation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ContentDefinitionSummaryDto {
     pub kind: String,
     pub id: String,
@@ -866,6 +902,232 @@ pub struct ContentPackReviewDto {
     pub pack: StoredContentPackSummaryDto,
     pub authored_payload: String,
     pub diagnostics: Vec<ContentImportDiagnosticDto>,
+    pub abilities: Vec<ContentAbilityDeclarationSummaryDto>,
+    pub modifiers: Vec<ContentModifierDeclarationSummaryDto>,
+    pub actions: Vec<ContentActionDeclarationSummaryDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentAbilityDeclarationSummaryDto {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub summary: String,
+    pub tags: Vec<String>,
+}
+
+impl From<&AuthoredAbilityDefinitionDto> for ContentAbilityDeclarationSummaryDto {
+    fn from(value: &AuthoredAbilityDefinitionDto) -> Self {
+        Self {
+            id: value.id.clone(),
+            name: value.name.clone(),
+            kind: match value.kind {
+                AuthoredAbilityDefinitionKindDto::Ability => "ability",
+                AuthoredAbilityDefinitionKindDto::Spell => "spell",
+            }
+            .to_string(),
+            summary: value.summary.clone(),
+            tags: value.tags.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentModifierDeclarationSummaryDto {
+    pub id: String,
+    pub label: String,
+    pub summary: String,
+    pub tenure: String,
+    pub stacking: String,
+    pub duration: String,
+    pub stat_adjustments: Vec<String>,
+}
+
+impl From<&AuthoredModifierDefinitionDto> for ContentModifierDeclarationSummaryDto {
+    fn from(value: &AuthoredModifierDefinitionDto) -> Self {
+        let tenure = match value.default_tenure {
+            AuthoredModifierTenureDto::Temporary => "temporary",
+            AuthoredModifierTenureDto::Permanent => "permanent",
+        };
+        let stacking_policy = match value.stacking_policy {
+            AuthoredModifierStackingPolicyDto::Stack => "stack",
+            AuthoredModifierStackingPolicyDto::Replace => "replace",
+            AuthoredModifierStackingPolicyDto::Refresh => "refresh",
+        };
+        let duration = match &value.duration_policy {
+            AuthoredModifierDurationPolicyDto::Permanent => "permanent".to_string(),
+            AuthoredModifierDurationPolicyDto::Turns { turns } => format!("{turns} turns"),
+            AuthoredModifierDurationPolicyDto::Rounds { rounds } => format!("{rounds} rounds"),
+            AuthoredModifierDurationPolicyDto::UntilEvent { event } => {
+                format!("until event {event}")
+            }
+        };
+        Self {
+            id: value.id.clone(),
+            label: value.label.clone(),
+            summary: value.summary.clone(),
+            tenure: tenure.to_string(),
+            stacking: format!("{} · {stacking_policy}", value.stacking_group),
+            duration,
+            stat_adjustments: value
+                .stat_adjustments
+                .iter()
+                .map(|adjustment| {
+                    format!(
+                        "{} ({}) {:+}",
+                        adjustment.stat_label, adjustment.stat_id, adjustment.delta
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentActionDeclarationSummaryDto {
+    pub id: String,
+    pub name: String,
+    pub ability_id: String,
+    pub targeting: String,
+    pub check: String,
+    pub effects: Vec<String>,
+    pub resource_costs: Vec<String>,
+    pub action_text: String,
+    pub effect_text: String,
+}
+
+impl From<&AuthoredActionDefinitionDto> for ContentActionDeclarationSummaryDto {
+    fn from(value: &AuthoredActionDefinitionDto) -> Self {
+        let target_kind = match value.targeting.target_kind {
+            AuthoredTargetKindDto::Combatant => "combatant",
+            AuthoredTargetKindDto::Area => "area",
+        };
+        let selection = match value.targeting.selection {
+            AuthoredTargetSelectionDto::Single => "single",
+            AuthoredTargetSelectionDto::Multiple => "multiple",
+        };
+        let team = match value.targeting.team_constraint {
+            AuthoredTargetTeamConstraintDto::Hostile => "hostile",
+            AuthoredTargetTeamConstraintDto::Ally => "ally",
+            AuthoredTargetTeamConstraintDto::Any => "any team",
+        };
+        let visibility = match value.targeting.visibility_requirement {
+            AuthoredVisibilityRequirementDto::Required => "visible",
+            AuthoredVisibilityRequirementDto::Ignored => "visibility ignored",
+        };
+        let check = match &value.check {
+            AuthoredCheckDeclarationDto::Attack {
+                modifier,
+                modifier_stat_id,
+                defense,
+            } => format!(
+                "attack {modifier:+} + {modifier_stat_id} vs {} ({})",
+                defense.label, defense.id
+            ),
+            AuthoredCheckDeclarationDto::SavingThrow {
+                save_stat_id,
+                difficulty_class,
+            } => format!("{save_stat_id} saving throw vs DC {difficulty_class}"),
+            AuthoredCheckDeclarationDto::Contested {
+                actor_stat_id,
+                target_stat_id,
+            } => format!("contested {actor_stat_id} vs {target_stat_id}"),
+        };
+        Self {
+            id: value.id.clone(),
+            name: value.name.clone(),
+            ability_id: value.ability_id.clone(),
+            targeting: format!(
+                "{selection} {target_kind} · {team} · range {} · {visibility}",
+                value.targeting.maximum_range
+            ),
+            check,
+            effects: value.effects.iter().map(effect_operation_summary).collect(),
+            resource_costs: value
+                .resource_costs
+                .iter()
+                .map(|cost| format!("{} × {}", cost.resource_id, cost.amount))
+                .collect(),
+            action_text: value.action_text.clone(),
+            effect_text: value.effect_text.clone(),
+        }
+    }
+}
+
+fn effect_operation_summary(value: &AuthoredEffectOperationDto) -> String {
+    match value {
+        AuthoredEffectOperationDto::Damage {
+            damage_bonus,
+            damage_type,
+        } => format!("damage · {damage_type} {damage_bonus:+}"),
+        AuthoredEffectOperationDto::Heal {
+            healing_bonus,
+            healing_type,
+        } => format!("heal · {healing_type} {healing_bonus:+}"),
+        AuthoredEffectOperationDto::GrantTemporaryVitality { vitality_bonus } => {
+            format!("grant temporary vitality · {vitality_bonus:+}")
+        }
+        AuthoredEffectOperationDto::ApplyModifier { modifier_id } => {
+            format!("apply modifier · {modifier_id}")
+        }
+        AuthoredEffectOperationDto::Move {
+            maximum_distance,
+            movement_kind,
+        } => {
+            let movement_kind = match movement_kind {
+                AuthoredMovementKindDto::Push => "push",
+                AuthoredMovementKindDto::Pull => "pull",
+                AuthoredMovementKindDto::Shift => "shift",
+            };
+            format!("move · {movement_kind} · {maximum_distance}")
+        }
+        AuthoredEffectOperationDto::ChangeResource { resource_id, delta } => {
+            format!("change resource · {resource_id} {delta:+}")
+        }
+        AuthoredEffectOperationDto::OpenReactionWindow {
+            hook_id,
+            options,
+            maximum_nested_depth,
+            ..
+        } => format!(
+            "open reaction window · {hook_id} · {} options · depth {maximum_nested_depth}",
+            options.len()
+        ),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentActionBindingActorDto {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentActionBindingScenarioDto {
+    pub id: String,
+    pub title: String,
+    pub actors: Vec<ContentActionBindingActorDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentActionBindingCandidateDto {
+    pub content_pack: ContentPackReferenceDto,
+    pub action_id: String,
+    pub action_name: String,
+    pub ability_id: String,
+    pub scenarios: Vec<ContentActionBindingScenarioDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ContentActionBindingCatalogDto {
+    pub actions: Vec<ContentActionBindingCandidateDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

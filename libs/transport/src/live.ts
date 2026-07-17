@@ -6,6 +6,9 @@ import type {
   RulebenchCombatControlCommandDto,
   RulebenchCombatSessionCreateRequestDto,
   RulebenchCombatSessionIntentCommandDto,
+  RulebenchContentActionBindingCatalogDto,
+  RulebenchContentAuthoringDraftDto,
+  RulebenchContentDraftIdentityDto,
   RulebenchContentImportAttemptDto,
   RulebenchContentPackDiffDto,
   RulebenchContentPackReferenceDto,
@@ -47,7 +50,7 @@ import type {
 } from "./replay-review";
 
 export const RULEBENCH_PROTOCOL_ID = "asha-rulebench.protocol";
-export const RULEBENCH_PROTOCOL_VERSION = 8;
+export const RULEBENCH_PROTOCOL_VERSION = 9;
 
 const DEFAULT_API_BASE_URL = "/api/rulebench/v1";
 
@@ -214,6 +217,18 @@ export interface RulebenchLiveTransport extends ReplayReviewTransport {
   readonly listContentWorkspace: (
     options?: RulebenchLiveRequestOptions,
   ) => Promise<RulebenchLiveTransportResult<RulebenchContentWorkspaceDto>>;
+  readonly createContentTemplateDraft: (
+    identity: RulebenchContentDraftIdentityDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentAuthoringDraftDto>>;
+  readonly cloneContentDraft: (
+    reference: RulebenchContentPackReferenceDto,
+    identity: RulebenchContentDraftIdentityDto,
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentAuthoringDraftDto>>;
+  readonly listContentActionBindings: (
+    options?: RulebenchLiveRequestOptions,
+  ) => Promise<RulebenchLiveTransportResult<RulebenchContentActionBindingCatalogDto>>;
   readonly importContent: (
     authoredPayload: string,
     replacementPolicy: RulebenchContentReplacementPolicyDto,
@@ -522,6 +537,17 @@ export function createLiveRulebenchTransport(
       ),
     listContentWorkspace: (requestOptions) =>
       request("GET", "/content", undefined, requestOptions),
+    createContentTemplateDraft: (identity, requestOptions) =>
+      request("POST", "/content/template", { identity }, requestOptions),
+    cloneContentDraft: (reference, identity, requestOptions) =>
+      request(
+        "POST",
+        "/content/clone-draft",
+        { reference, identity },
+        requestOptions,
+      ),
+    listContentActionBindings: (requestOptions) =>
+      request("GET", "/content/action-bindings", undefined, requestOptions),
     importContent: (authoredPayload, replacementPolicy, requestOptions) =>
       request(
         "POST",

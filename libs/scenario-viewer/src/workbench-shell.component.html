@@ -125,6 +125,12 @@
             <span>State</span
             ><strong>{{ snapshot().value.fingerprintLabel }}</strong>
           </div>
+          @if (snapshot().value.authoredActionBinding; as binding) {
+            <div>
+              <span>Authored action</span
+              ><strong>{{ binding.actionId }} · {{ binding.actorId }}</strong>
+            </div>
+          }
           <div>
             <span>Combat end</span
             ><strong>{{ snapshot().value.combatEndLabel }}</strong>
@@ -742,6 +748,20 @@
                 ><span>{{
                   snapshot().value.finalizationLabel ?? "Not finalized"
                 }}</span>
+                @if (snapshot().value.authoredActionBinding; as binding) {
+                  <section aria-label="Live authored action binding">
+                    <h4>Exact Authored Action Binding</h4>
+                    <span>{{ binding.bindingVersionLabel }} · {{ binding.actionId }} · {{ binding.abilityId }}</span>
+                    <span>{{ binding.actorId }} · {{ binding.scenarioId }} · {{ binding.grantLabel }}</span>
+                    <span>{{ binding.contentPackRootLabel }}</span>
+                    <span>{{ binding.contentPackSetFingerprintLabel }}</span>
+                    <span>{{ binding.actionFingerprintLabel }}</span>
+                    <span>{{ binding.vocabularyLabel }}</span>
+                    @for (reference of binding.contentPackReferenceLabels; track reference) {
+                      <span>{{ reference }}</span>
+                    }
+                  </section>
+                }
                 @for (
                   participant of snapshot().value.participants;
                   track participant.id
@@ -850,6 +870,12 @@
                   <span>{{ replayReview().value.summary }}</span>
                   <span>{{ replayReview().value.provenanceLabel }}</span>
                   <span>{{ replayReview().value.finalFingerprintLabel }}</span>
+                  @if (replayReview().value.authoredActionBinding; as binding) {
+                    <span>{{ binding.actionId }} · {{ binding.abilityId }} · {{ binding.actorId }}</span>
+                    <span>{{ binding.contentPackRootLabel }} · {{ binding.contentPackSetFingerprintLabel }}</span>
+                    <span>{{ binding.actionFingerprintLabel }} · {{ binding.grantLabel }}</span>
+                    <span>{{ binding.vocabularyLabel }}</span>
+                  }
                 </section>
 
                 <div class="replay-summary-columns">
@@ -1040,7 +1066,7 @@
                     type="button"
                     [disabled]="!action.available"
                     [attr.aria-pressed]="intent().actionId === action.actionId"
-                    [attr.aria-label]="'Select ' + action.name"
+                    [attr.aria-label]="'Select ' + action.name + ' · ' + action.actionId"
                     (click)="
                       selectAction(
                         options().value.currentActorId,
@@ -1048,7 +1074,7 @@
                       )
                     "
                   >
-                    {{ action.name }}
+                    {{ action.name }} · {{ action.actionId }}
                   </button>
                   <span>{{ action.abilityId }}</span>
                   <span>

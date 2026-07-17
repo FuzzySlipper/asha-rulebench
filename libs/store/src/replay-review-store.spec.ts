@@ -46,7 +46,19 @@ describe("ReplayReviewStore", () => {
       contentPackRootLabel: "pack.authored@2.0.0 · pack:root",
       contentPackSetFingerprintLabel: "set:exact",
       contentPackReferenceLabels: ["pack.authored@2.0.0 · pack:root"],
-      authoredActionBindingLabel: "action.binding-glyph · entity-warden · action:exact-action",
+      authoredActionBinding: {
+        bindingVersionLabel: "Binding v1",
+        actionId: "action.binding-glyph",
+        abilityId: "ability.binding-glyph",
+        actorId: "entity-warden",
+        scenarioId: "scenario",
+        contentPackRootLabel: "pack.authored@2.0.0",
+        contentPackSetFingerprintLabel: "set:exact",
+        contentPackReferenceLabels: ["pack.authored@2.0.0 · pack:root"],
+        actionFingerprintLabel: "action:exact-action",
+        grantLabel: "sessionLocalBaseAbility · entity-warden · ability.binding-glyph",
+        vocabularyLabel: "targeting 2 · check 1 · effects 1",
+      },
       finalFingerprintLabel: "test:final", commands: [],
     } });
     expect(store.verification()).toEqual({ kind: "data", value: {

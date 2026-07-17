@@ -30,6 +30,10 @@ describe("ContentWorkbenchStore", () => {
     const initial = workspace(firstReference, true);
     const transport = createFakeRulebenchLiveTransport({
       listContentWorkspace: async () => ({ ok: true, value: initial }),
+      validateContent: async () => ({
+        ok: true,
+        value: acceptedValidation("pack.first", "1.0.0"),
+      }),
       importContent: async () => ({
         ok: true,
         value: {
@@ -55,6 +59,7 @@ describe("ContentWorkbenchStore", () => {
 
     await store.loadWorkspace();
     store.stagePayload("{}");
+    await store.validateDraft();
     await store.importStaged(true);
 
     expect(store.workspace()).toMatchObject({
@@ -68,6 +73,111 @@ describe("ContentWorkbenchStore", () => {
         diagnostics: [{ code: "unsupportedAuthoredContentVersion" }],
       },
     });
+  });
+
+  it("keeps JSON syntax and Rust semantic validation as separate draft states", async () => {
+    const payload = '{"formatVersion":3,"pack":{"id":"pack.draft"}}';
+    const transport = createFakeRulebenchLiveTransport({
+      createContentTemplateDraft: async (identity) => ({
+        ok: true,
+        value: {
+          authoredPayload: payload,
+          sourceKind: "rustTemplate",
+          sourceLabel: "Rust v3 authored-action starter",
+          identity,
+          identityExpectation: `New content identity ${identity.id}@${identity.version}.`,
+        },
+      }),
+      validateContent: async () => ({
+        ok: true,
+        value: {
+          accepted: false,
+          pack: { id: "pack.draft", version: "0.1.0", fingerprint: null },
+          outcome: null,
+          diagnostics: [
+            {
+              severity: "error",
+              code: "missingAuthoredContentField",
+              path: "pack.catalogs",
+              referenceId: "pack.draft",
+              definitionKind: null,
+              message: "The Rust authority requires pack.catalogs.",
+            },
+          ],
+          errorCode: "missingAuthoredContentField",
+          errorMessage: "The Rust authority requires pack.catalogs.",
+        },
+      }),
+    });
+    const store = new ContentWorkbenchStore(transport, clock);
+
+    store.setDraftIdentity("pack.draft", "0.1.0");
+    await store.startTemplateDraft();
+
+    expect(store.draft()).toMatchObject({
+      kind: "data",
+      value: {
+        sourceLabel: "Rust v3 authored-action starter",
+        authoredPayload: payload,
+      },
+    });
+    expect(store.draftSyntax()).toEqual({
+      kind: "valid",
+      message: "JSON syntax is valid. Rust semantic validation has not been inferred.",
+    });
+    expect(store.validation()).toEqual({ kind: "idle" });
+    expect(store.canImportDraft()).toBe(false);
+
+    await store.validateDraft();
+
+    expect(store.validation()).toMatchObject({
+      kind: "data",
+      value: {
+        accepted: false,
+        diagnostics: [
+          {
+            code: "missingAuthoredContentField",
+            locationLabel: "pack.catalogs / pack.draft",
+            message: "The Rust authority requires pack.catalogs.",
+          },
+        ],
+      },
+    });
+    expect(store.canImportDraft()).toBe(false);
+
+    store.updateDraftPayload("{");
+    expect(store.draftSyntax()).toMatchObject({ kind: "error" });
+    expect(store.validation()).toEqual({ kind: "idle" });
+  });
+
+  it("suppresses a stale semantic validation after the draft changes", async () => {
+    let resolveValidation:
+      | ((value: { ok: true; value: ReturnType<typeof acceptedValidation> }) => void)
+      | null = null;
+    const validation = new Promise<{
+      ok: true;
+      value: ReturnType<typeof acceptedValidation>;
+    }>((resolve) => {
+      resolveValidation = resolve;
+    });
+    const transport = createFakeRulebenchLiveTransport({
+      validateContent: async () => validation,
+    });
+    const store = new ContentWorkbenchStore(transport, clock);
+    store.stagePayload("{}");
+
+    const pending = store.validateDraft();
+    store.updateDraftPayload('{"changed":true}');
+    const completeValidation = resolveValidation;
+    if (completeValidation === null) throw new Error("validation was not requested");
+    completeValidation({
+      ok: true,
+      value: acceptedValidation("pack.old", "1.0.0"),
+    });
+    await pending;
+
+    expect(store.validation()).toEqual({ kind: "idle" });
+    expect(store.canImportDraft()).toBe(false);
   });
 
   it("ignores an older review response after a newer pack selection", async () => {
@@ -127,5 +237,26 @@ function review(
     },
     authoredPayload: "{}",
     diagnostics: [],
+    abilities: [],
+    modifiers: [],
+    actions: [],
   };
+}
+
+function acceptedValidation(
+  id: string,
+  version: string,
+) {
+  return {
+    accepted: true,
+    pack: {
+      id,
+      version,
+      fingerprint: { algorithm: "fnv1a64", value: "validated" },
+    },
+    outcome: null,
+    diagnostics: [],
+    errorCode: null,
+    errorMessage: null,
+  } as const;
 }

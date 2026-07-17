@@ -1,11 +1,16 @@
 import type {
   RulebenchContentAuditEntryDto,
+  RulebenchContentActionBindingCatalogDto,
+  RulebenchContentActionDeclarationSummaryDto,
+  RulebenchContentAuthoringDraftDto,
+  RulebenchContentAbilityDeclarationSummaryDto,
   RulebenchContentDefinitionChangeDto,
   RulebenchContentImportAttemptDto,
   RulebenchContentImportDiagnosticDto,
   RulebenchContentPackDiffDto,
   RulebenchContentPackReferenceDto,
   RulebenchContentPackReviewDto,
+  RulebenchContentModifierDeclarationSummaryDto,
   RulebenchContentWorkspaceDto,
   RulebenchStoredContentPackSummaryDto,
 } from "@asha-rulebench/protocol";
@@ -63,6 +68,39 @@ export interface RulebenchContentPackReviewView {
   readonly pack: RulebenchStoredContentPackView;
   readonly authoredPayload: string;
   readonly diagnostics: readonly RulebenchContentDiagnosticView[];
+  readonly abilities: readonly RulebenchContentAbilityDeclarationSummaryDto[];
+  readonly modifiers: readonly RulebenchContentModifierDeclarationSummaryDto[];
+  readonly actions: readonly RulebenchContentActionDeclarationSummaryDto[];
+}
+
+export interface RulebenchContentAuthoringDraftView {
+  readonly authoredPayload: string;
+  readonly sourceLabel: string;
+  readonly identityLabel: string;
+  readonly identityExpectation: string;
+}
+
+export interface RulebenchContentActionBindingActorView {
+  readonly id: string;
+  readonly name: string;
+  readonly label: string;
+}
+
+export interface RulebenchContentActionBindingScenarioView {
+  readonly id: string;
+  readonly title: string;
+  readonly actors: readonly RulebenchContentActionBindingActorView[];
+}
+
+export interface RulebenchContentActionBindingCandidateView {
+  readonly key: string;
+  readonly contentPack: RulebenchContentPackReferenceDto;
+  readonly packLabel: string;
+  readonly actionId: string;
+  readonly actionName: string;
+  readonly actionLabel: string;
+  readonly abilityId: string;
+  readonly scenarios: readonly RulebenchContentActionBindingScenarioView[];
 }
 
 export interface RulebenchContentDiffView {
@@ -106,7 +144,47 @@ export function projectContentPackReview(
     pack: projectStoredPack(review.pack),
     authoredPayload: review.authoredPayload,
     diagnostics: review.diagnostics.map(projectDiagnostic),
+    abilities: review.abilities,
+    modifiers: review.modifiers,
+    actions: review.actions,
   };
+}
+
+export function projectContentAuthoringDraft(
+  draft: RulebenchContentAuthoringDraftDto,
+): RulebenchContentAuthoringDraftView {
+  return {
+    authoredPayload: draft.authoredPayload,
+    sourceLabel: draft.sourceLabel,
+    identityLabel: `${draft.identity.id}@${draft.identity.version}`,
+    identityExpectation: draft.identityExpectation,
+  };
+}
+
+export function projectContentActionBindingCatalog(
+  catalog: RulebenchContentActionBindingCatalogDto,
+): readonly RulebenchContentActionBindingCandidateView[] {
+  return catalog.actions.map((action) => {
+    const packLabel = `${action.contentPack.id}@${action.contentPack.version}`;
+    return {
+      key: `${action.contentPack.fingerprint.value}:${action.actionId}`,
+      contentPack: action.contentPack,
+      packLabel,
+      actionId: action.actionId,
+      actionName: action.actionName,
+      actionLabel: `${action.actionName} · ${action.actionId}`,
+      abilityId: action.abilityId,
+      scenarios: action.scenarios.map((scenario) => ({
+        id: scenario.id,
+        title: scenario.title,
+        actors: scenario.actors.map((actor) => ({
+          id: actor.id,
+          name: actor.name,
+          label: `${actor.name} · ${actor.id}`,
+        })),
+      })),
+    };
+  });
 }
 
 export function projectContentDiff(

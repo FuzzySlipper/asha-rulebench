@@ -8,6 +8,7 @@ import type {
   RulebenchLivePreflightDto,
   RulebenchLiveReactionExecutionDto,
   RulebenchLiveSessionSnapshotDto,
+  RulebenchAuthoredActionBindingReceiptDto,
 } from "@asha-rulebench/protocol";
 
 export interface RulebenchLiveAutomaticStepView {
@@ -59,11 +60,14 @@ export interface RulebenchLiveSessionView {
 }
 
 export interface RulebenchAuthoredActionBindingView {
+  readonly bindingVersionLabel: string;
   readonly actionId: string;
   readonly abilityId: string;
   readonly actorId: string;
   readonly scenarioId: string;
   readonly contentPackRootLabel: string;
+  readonly contentPackSetFingerprintLabel: string;
+  readonly contentPackReferenceLabels: readonly string[];
   readonly actionFingerprintLabel: string;
   readonly grantLabel: string;
   readonly vocabularyLabel: string;
@@ -260,16 +264,7 @@ export function projectLiveSessionSnapshot(
     authoredActionBinding:
       snapshot.authoredActionBinding === null
         ? null
-        : {
-            actionId: snapshot.authoredActionBinding.actionId,
-            abilityId: snapshot.authoredActionBinding.abilityId,
-            actorId: snapshot.authoredActionBinding.actorId,
-            scenarioId: snapshot.authoredActionBinding.scenarioId,
-            contentPackRootLabel: `${snapshot.authoredActionBinding.contentPackRoot.id}@${snapshot.authoredActionBinding.contentPackRoot.version}`,
-            actionFingerprintLabel: `${snapshot.authoredActionBinding.actionDefinitionFingerprint.algorithm}:${snapshot.authoredActionBinding.actionDefinitionFingerprint.value}`,
-            grantLabel: `${snapshot.authoredActionBinding.grant.actorId} · ${snapshot.authoredActionBinding.grant.abilityId}`,
-            vocabularyLabel: `targeting ${snapshot.authoredActionBinding.targetingOperationVocabularyVersion} · check ${snapshot.authoredActionBinding.checkVocabularyVersion} · effects ${snapshot.authoredActionBinding.effectOperationVocabularyVersion}`,
-          },
+        : projectAuthoredActionBinding(snapshot.authoredActionBinding),
     lifecycleLabel: labelCode(snapshot.lifecyclePhase),
     roundLabel: String(snapshot.roundNumber),
     turnLabel: String(snapshot.turnIndex + 1),
@@ -358,6 +353,27 @@ export function projectLiveSessionSnapshot(
     reactionAuditLabels: snapshot.reactionAuditLog.map(
       (entry) => `${entry.reactorId}: ${labelCode(entry.decisionKind)} · ${entry.reason}`,
     ),
+  };
+}
+
+export function projectAuthoredActionBinding(
+  binding: RulebenchAuthoredActionBindingReceiptDto,
+): RulebenchAuthoredActionBindingView {
+  return {
+    bindingVersionLabel: `Binding v${binding.bindingVersion}`,
+    actionId: binding.actionId,
+    abilityId: binding.abilityId,
+    actorId: binding.actorId,
+    scenarioId: binding.scenarioId,
+    contentPackRootLabel: `${binding.contentPackRoot.id}@${binding.contentPackRoot.version}`,
+    contentPackSetFingerprintLabel: `${binding.contentPackSetFingerprint.algorithm}:${binding.contentPackSetFingerprint.value}`,
+    contentPackReferenceLabels: binding.contentPackReferences.map(
+      (reference) =>
+        `${reference.id}@${reference.version} · ${reference.fingerprint.algorithm}:${reference.fingerprint.value}`,
+    ),
+    actionFingerprintLabel: `${binding.actionDefinitionFingerprint.algorithm}:${binding.actionDefinitionFingerprint.value}`,
+    grantLabel: `${binding.grant.grantKind} · ${binding.grant.actorId} · ${binding.grant.abilityId}`,
+    vocabularyLabel: `targeting ${binding.targetingOperationVocabularyVersion} · check ${binding.checkVocabularyVersion} · effects ${binding.effectOperationVocabularyVersion}`,
   };
 }
 

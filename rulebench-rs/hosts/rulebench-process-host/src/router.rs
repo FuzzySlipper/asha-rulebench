@@ -18,15 +18,15 @@ use rulebench_fixtures::{
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
-    ContentImportRequestDto, ContentPayloadRequestDto, ContentReferenceRequestDto,
-    ExperimentComparisonRequestDto, ExperimentMatrixRequestDto, LiveAutomaticRunDto,
-    LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
-    LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
-    LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
-    ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, SessionRecoveryCatalogDto,
-    SessionRecoveryForkRequestDto, SessionRecoveryIssueDto, UseActionIntentDto,
-    ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionTranscriptDto,
-    PROTOCOL_VERSION,
+    ContentCloneDraftRequestDto, ContentImportRequestDto, ContentPayloadRequestDto,
+    ContentReferenceRequestDto, ContentTemplateDraftRequestDto, ExperimentComparisonRequestDto,
+    ExperimentMatrixRequestDto, LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto,
+    LiveCommandExecutionDto, LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto,
+    LiveSessionSnapshotDto, LiveTransportErrorDto, ProtocolRequestContextDto,
+    ReactionCommandSpecDto, ReplayComparisonRequestDto, RulebenchCapabilityManifestDto,
+    SessionRecoveryCatalogDto, SessionRecoveryForkRequestDto, SessionRecoveryIssueDto,
+    UseActionIntentDto, ViewerScenarioReadoutDto, ViewerScenarioSummaryDto,
+    ViewerSessionTranscriptDto, PROTOCOL_VERSION,
 };
 
 const API_PREFIX: &str = "/api/rulebench/v1";
@@ -661,6 +661,42 @@ impl ProcessHostRouter {
                 Some(workspace) => json_ok(workspace.snapshot()),
                 None => content_repository_required(),
             },
+            (HttpMethod::Post, ["content", "template"]) => {
+                let request = match decode_body::<ContentTemplateDraftRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                match self.content_workspace.as_ref() {
+                    Some(_) => match ContentWorkspace::template_draft(&request.identity) {
+                        Ok(draft) => json_ok(draft),
+                        Err(error) => content_error(error),
+                    },
+                    None => content_repository_required(),
+                }
+            }
+            (HttpMethod::Post, ["content", "clone-draft"]) => {
+                let request = match decode_body::<ContentCloneDraftRequestDto>(request) {
+                    Ok(request) => request,
+                    Err(response) => return response,
+                };
+                match self.content_workspace.as_ref() {
+                    Some(workspace) => match workspace
+                        .clone_draft(&request.reference.to_authority(), &request.identity)
+                    {
+                        Ok(draft) => json_ok(draft),
+                        Err(error) => content_error(error),
+                    },
+                    None => content_repository_required(),
+                }
+            }
+            (HttpMethod::Get, ["content", "action-bindings"]) => {
+                match self.content_workspace.as_ref() {
+                    Some(workspace) => {
+                        json_ok(workspace.action_binding_catalog(&bridge_scenarios()))
+                    }
+                    None => content_repository_required(),
+                }
+            }
             (HttpMethod::Post, ["content", "import"]) => {
                 let request = match decode_body::<ContentImportRequestDto>(request) {
                     Ok(request) => request,

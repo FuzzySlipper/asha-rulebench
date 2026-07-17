@@ -49,7 +49,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       ok: true,
       value: {
         protocolId: "asha-rulebench.protocol",
-        protocolVersion: 8,
+        protocolVersion: 9,
         authoritySurface: "asha-rulebench.local-authority.v0",
       },
     });
@@ -273,7 +273,7 @@ test("invokes live Rust authority through the Angular origin", async ({
       error: {
         kind: "protocol",
         code: "protocolVersionMismatch",
-        message: "Unsupported protocol version 999; expected 8.",
+        message: "Unsupported protocol version 999; expected 9.",
         retryable: false,
       },
     });
@@ -686,7 +686,7 @@ test("resolves a bounded area target set and renders every v2 result @live", asy
   const gridPanel = page.getByRole("region", { name: "1. Combat grid" });
   const unitsPanel = page.getByRole("region", { name: "7. Active units" });
   await actionsPanel
-    .getByRole("button", { name: "Select Storm Pulse", exact: true })
+    .getByRole("button", { name: "Select Storm Pulse · storm-pulse", exact: true })
     .click();
   await expect(actionsPanel).toContainText("Shared");
   const area = gridPanel.getByRole("gridcell", {
@@ -759,7 +759,7 @@ test("runs and archives the second compiled ruleset through the visible workbenc
   });
   const unitsPanel = page.getByRole("region", { name: "7. Active units" });
   await actionsPanel
-    .getByRole("button", { name: "Select Binding Glyph", exact: true })
+    .getByRole("button", { name: "Select Binding Glyph · binding_glyph", exact: true })
     .click();
   await expect(actionsPanel.getByLabel("Saving throw roll")).toBeVisible();
   await actionsPanel.getByLabel("Saving throw roll").fill("5");

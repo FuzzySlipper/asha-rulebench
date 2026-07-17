@@ -9,18 +9,25 @@ use rulebench_bridge::content_storage::{
     ContentStorageError, ContentStorageRecord, ImportedContentPack, RulesetArtifactProvenance,
     StorageReplacementPolicy,
 };
-use rulebench_bridge::{import_authored_content, ContentInvocationError};
+use rulebench_bridge::replay_storage::{bind_authored_action, AuthoredActionBindingRequest};
+use rulebench_bridge::{import_authored_content, BridgeScenario, ContentInvocationError};
 use rulebench_protocol::{
-    AuthoredContentPackDocumentDto, ContentAuditEntryDto, ContentDefinitionSummaryDto,
+    AuthoredContentPackDocumentDto, AuthoredContentSourceKindDto,
+    ContentAbilityDeclarationSummaryDto, ContentActionBindingActorDto,
+    ContentActionBindingCandidateDto, ContentActionBindingCatalogDto,
+    ContentActionBindingScenarioDto, ContentActionDeclarationSummaryDto, ContentAuditEntryDto,
+    ContentAuthoringDraftDto, ContentDefinitionSummaryDto, ContentDraftIdentityDto,
     ContentImportAttemptDto, ContentImportDiagnosticDto, ContentImportOutcomeDto,
-    ContentPackDiffDto, ContentPackIdentityDto, ContentPackReferenceDto, ContentPackReviewDto,
-    ContentReplacementPolicyDto, ContentWorkspaceDto, StoredContentPackSummaryDto,
+    ContentModifierDeclarationSummaryDto, ContentPackDiffDto, ContentPackIdentityDto,
+    ContentPackReferenceDto, ContentPackReviewDto, ContentReplacementPolicyDto,
+    ContentWorkspaceDto, StoredContentPackSummaryDto, AUTHORED_CONTENT_PACK_VERSION,
 };
 
 use crate::ArtifactRepositoryIssue;
 
 const MAX_AUTHORED_PAYLOAD_BYTES: usize = 512 * 1024;
 const AUDIT_FILE_NAME: &str = "content-audit-v1.jsonl";
+const AUTHORED_ACTION_TEMPLATE_V3: &str = include_str!("fixtures/authored-content-v3.json");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentWorkspaceError {
@@ -169,6 +176,126 @@ impl ContentWorkspace {
                 .collect(),
             audit: self.audit.clone(),
         }
+    }
+
+    pub fn template_draft(
+        identity: &ContentDraftIdentityDto,
+    ) -> Result<ContentAuthoringDraftDto, ContentWorkspaceError> {
+        validate_draft_identity(identity)?;
+        let mut document = decode_document(AUTHORED_ACTION_TEMPLATE_V3.as_bytes())?;
+        document.format_version = AUTHORED_CONTENT_PACK_VERSION;
+        document.pack.id = identity.id.clone();
+        document.pack.version = identity.version.clone();
+        document.pack.title = "Authored Action Starter".to_string();
+        document.pack.summary =
+            "Editable v3 action starter supplied by the Rust content authority.".to_string();
+        document.pack.tags = vec!["authored-action".to_string(), "draft".to_string()];
+        document.pack.provenance.source_kind = AuthoredContentSourceKindDto::BridgeSubmission;
+        document.pack.provenance.source_id = "product:authored-action-template-v3".to_string();
+        document.pack.provenance.authored_by = None;
+        authoring_draft(
+            document,
+            "rustTemplate",
+            "Rust v3 authored-action starter",
+            identity,
+        )
+    }
+
+    pub fn clone_draft(
+        &self,
+        reference: &ContentPackReference,
+        identity: &ContentDraftIdentityDto,
+    ) -> Result<ContentAuthoringDraftDto, ContentWorkspaceError> {
+        validate_draft_identity(identity)?;
+        if reference.id == identity.id && reference.version == identity.version {
+            return Err(ContentWorkspaceError {
+                code: "contentDraftIdentityMustBeNew".to_string(),
+                message: "A cloned draft must declare a new pack id or version.".to_string(),
+                retryable: false,
+            });
+        }
+        let stored = self
+            .storage
+            .retrieve(reference)
+            .map_err(ContentWorkspaceError::storage)?;
+        let mut document = decode_document(&stored.bytes)?;
+        document.format_version = AUTHORED_CONTENT_PACK_VERSION;
+        document.pack.id = identity.id.clone();
+        document.pack.version = identity.version.clone();
+        document.pack.provenance.source_kind = AuthoredContentSourceKindDto::BridgeSubmission;
+        document.pack.provenance.source_id = format!(
+            "clone:{}@{}#{}",
+            reference.id, reference.version, reference.fingerprint.value
+        );
+        document.pack.provenance.authored_by = None;
+        authoring_draft(
+            document,
+            "storedPackClone",
+            &format!("Clone of {}@{}", reference.id, reference.version),
+            identity,
+        )
+    }
+
+    pub fn action_binding_catalog(
+        &self,
+        scenarios: &[BridgeScenario],
+    ) -> ContentActionBindingCatalogDto {
+        let mut actions = Vec::new();
+        for (reference, imported) in &self.imported {
+            if !self.storage.is_active(reference) {
+                continue;
+            }
+            for action in &imported.pack.catalogs.actions {
+                let mut compatible_scenarios = Vec::new();
+                for scenario in scenarios {
+                    let actors = scenario
+                        .option
+                        .participants
+                        .iter()
+                        .filter(|participant| {
+                            bind_authored_action(
+                                scenario.scenario.clone(),
+                                imported,
+                                &AuthoredActionBindingRequest {
+                                    content_pack: reference.clone(),
+                                    action_id: action.id.clone(),
+                                    actor_id: participant.id.clone(),
+                                },
+                            )
+                            .is_ok()
+                        })
+                        .map(|participant| ContentActionBindingActorDto {
+                            id: participant.id.clone(),
+                            name: participant.name.clone(),
+                        })
+                        .collect::<Vec<_>>();
+                    if !actors.is_empty() {
+                        compatible_scenarios.push(ContentActionBindingScenarioDto {
+                            id: scenario.option.id.clone(),
+                            title: scenario.option.title.clone(),
+                            actors,
+                        });
+                    }
+                }
+                if !compatible_scenarios.is_empty() {
+                    actions.push(ContentActionBindingCandidateDto {
+                        content_pack: ContentPackReferenceDto::from(reference),
+                        action_id: action.id.clone(),
+                        action_name: action.name.clone(),
+                        ability_id: action.ability_id.clone(),
+                        scenarios: compatible_scenarios,
+                    });
+                }
+            }
+        }
+        actions.sort_by(|left, right| {
+            left.content_pack
+                .id
+                .cmp(&right.content_pack.id)
+                .then(left.content_pack.version.cmp(&right.content_pack.version))
+                .then(left.action_id.cmp(&right.action_id))
+        });
+        ContentActionBindingCatalogDto { actions }
     }
 
     pub fn import(
@@ -519,6 +646,7 @@ impl ContentWorkspace {
                     .to_string(),
                 retryable: false,
             })?;
+        let document = decode_document(&stored.bytes)?;
         let authored_payload =
             String::from_utf8(stored.bytes).map_err(|_| ContentWorkspaceError {
                 code: "invalidStoredContentEncoding".to_string(),
@@ -532,6 +660,27 @@ impl ContentWorkspace {
                 .diagnostics
                 .iter()
                 .map(ContentImportDiagnosticDto::from)
+                .collect(),
+            abilities: document
+                .pack
+                .catalogs
+                .abilities
+                .iter()
+                .map(ContentAbilityDeclarationSummaryDto::from)
+                .collect(),
+            modifiers: document
+                .pack
+                .catalogs
+                .modifiers
+                .iter()
+                .map(ContentModifierDeclarationSummaryDto::from)
+                .collect(),
+            actions: document
+                .pack
+                .catalogs
+                .actions
+                .iter()
+                .map(ContentActionDeclarationSummaryDto::from)
                 .collect(),
         })
     }
@@ -616,6 +765,50 @@ fn decode_document(bytes: &[u8]) -> Result<AuthoredContentPackDocumentDto, Conte
         code: "invalidAuthoredContentPayload".to_string(),
         message: format!("Authored payload did not match the Rust protocol DTO: {error}"),
         retryable: false,
+    })
+}
+
+fn validate_draft_identity(
+    identity: &ContentDraftIdentityDto,
+) -> Result<(), ContentWorkspaceError> {
+    if identity.id.trim().is_empty() || identity.version.trim().is_empty() {
+        return Err(ContentWorkspaceError {
+            code: "invalidContentDraftIdentity".to_string(),
+            message: "A draft requires a non-empty new pack id and version.".to_string(),
+            retryable: false,
+        });
+    }
+    if identity.id.len() > 128 || identity.version.len() > 64 {
+        return Err(ContentWorkspaceError {
+            code: "contentDraftIdentityTooLong".to_string(),
+            message: "The draft pack id or version exceeds the Rust authoring limit.".to_string(),
+            retryable: false,
+        });
+    }
+    Ok(())
+}
+
+fn authoring_draft(
+    document: AuthoredContentPackDocumentDto,
+    source_kind: &str,
+    source_label: &str,
+    identity: &ContentDraftIdentityDto,
+) -> Result<ContentAuthoringDraftDto, ContentWorkspaceError> {
+    let authored_payload =
+        serde_json::to_string_pretty(&document).map_err(|error| ContentWorkspaceError {
+            code: "contentDraftSerializationFailed".to_string(),
+            message: format!("Rust could not serialize the authored content draft: {error}"),
+            retryable: false,
+        })?;
+    Ok(ContentAuthoringDraftDto {
+        authored_payload,
+        source_kind: source_kind.to_string(),
+        source_label: source_label.to_string(),
+        identity: identity.clone(),
+        identity_expectation: format!(
+            "This draft must be imported as the new exact identity {}@{}; existing stored content is unchanged until import succeeds.",
+            identity.id, identity.version
+        ),
     })
 }
 

@@ -5,7 +5,12 @@ import type {
   RulebenchReplayStepEvidenceDto,
   RulebenchReplayVerificationReadoutDto,
 } from "@asha-rulebench/protocol";
-import { projectLiveSessionSnapshot, type RulebenchLiveSessionView } from "./live-combat";
+import {
+  projectAuthoredActionBinding,
+  projectLiveSessionSnapshot,
+  type RulebenchAuthoredActionBindingView,
+  type RulebenchLiveSessionView,
+} from "./live-combat";
 
 export interface RulebenchReplayArchiveItemView {
   readonly packageId: string;
@@ -23,7 +28,7 @@ export interface RulebenchReplayReviewView {
   readonly contentPackRootLabel: string | null;
   readonly contentPackSetFingerprintLabel: string | null;
   readonly contentPackReferenceLabels: readonly string[];
-  readonly authoredActionBindingLabel: string | null;
+  readonly authoredActionBinding: RulebenchAuthoredActionBindingView | null;
   readonly finalFingerprintLabel: string;
   readonly commands: readonly RulebenchReplayCommandView[];
 }
@@ -116,10 +121,10 @@ export function projectReplayReview(
     contentPackReferenceLabels: review.contentPackReferences.map(
       contentPackReferenceLabel,
     ),
-    authoredActionBindingLabel:
+    authoredActionBinding:
       review.authoredActionBinding === null
         ? null
-        : `${review.authoredActionBinding.actionId} · ${review.authoredActionBinding.actorId} · ${review.authoredActionBinding.actionDefinitionFingerprint.algorithm}:${review.authoredActionBinding.actionDefinitionFingerprint.value}`,
+        : projectAuthoredActionBinding(review.authoredActionBinding),
     finalFingerprintLabel: `${review.finalStateFingerprint.algorithm}:${review.finalStateFingerprint.value}`,
     commands: review.commands.map((command) => ({
       sequence: command.sequence,

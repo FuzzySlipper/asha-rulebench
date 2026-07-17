@@ -88,8 +88,15 @@ liveScenario(
       mimeType: "application/json",
       buffer: Buffer.from(authoredPack(livePackId, 2, "Live Evidence Pack")),
     });
+    const semanticValidation = contentDialog.getByRole("region", {
+      name: "Rust semantic validation",
+    });
     await contentDialog
-      .getByRole("button", { name: "Import", exact: true })
+      .getByRole("button", { name: "Validate with Rust" })
+      .click();
+    await expect(semanticValidation).toContainText("Accepted");
+    await contentDialog
+      .getByRole("button", { name: "Import validated draft" })
       .click();
     await expect(
       contentDialog.getByText("Accepted", { exact: true }),
@@ -122,11 +129,11 @@ liveScenario(
       ),
     });
     await contentDialog
-      .getByRole("button", { name: "Import", exact: true })
+      .getByRole("button", { name: "Validate with Rust" })
       .click();
-    await expect(
-      contentDialog.getByText("unsupportedAuthoredContentVersion"),
-    ).toBeVisible();
+    await expect(semanticValidation).toContainText(
+      "unsupportedAuthoredContentVersion",
+    );
     await expect(
       selectedContent.getByText("Active", { exact: true }),
     ).toBeVisible();
@@ -135,9 +142,7 @@ liveScenario(
       {
         screenshot: true,
         layerSnapshot: {
-          rejection: await contentDialog
-            .getByRole("region", { name: "Import authored content" })
-            .innerText(),
+          rejection: await semanticValidation.innerText(),
           retainedPack: await selectedContent.innerText(),
         },
       },

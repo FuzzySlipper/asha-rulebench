@@ -203,6 +203,24 @@ import { ReplayReviewStore } from "@asha-rulebench/store";
             } @else {
               <p class="meta">No authored content pack was bound to this replay.</p>
             }
+            @if (review().value.authoredActionBinding; as binding) {
+              <section aria-label="Replay authored action binding">
+                <h4>Exact Authored Action Binding</h4>
+                <p>{{ binding.bindingVersionLabel }} · {{ binding.actionId }} · {{ binding.abilityId }}</p>
+                <p>{{ binding.actorId }} · {{ binding.scenarioId }} · {{ binding.grantLabel }}</p>
+                <p>{{ binding.contentPackRootLabel }}</p>
+                <p class="fingerprint">Set {{ binding.contentPackSetFingerprintLabel }}</p>
+                <p class="fingerprint">Action {{ binding.actionFingerprintLabel }}</p>
+                <p class="meta">{{ binding.vocabularyLabel }}</p>
+                <ul class="evidence-list">
+                  @for (reference of binding.contentPackReferenceLabels; track reference) {
+                    <li>{{ reference }}</li>
+                  }
+                </ul>
+              </section>
+            } @else {
+              <p class="meta">No authored action binding was recorded for this replay.</p>
+            }
             <div class="choice-row" aria-label="Replay commands">
               @for (
                 command of review().value.commands;
@@ -443,6 +461,13 @@ import { ReplayReviewStore } from "@asha-rulebench/store";
               {{ command.snapshot.turnLabel }} ·
               {{ command.snapshot.lifecycleLabel }}
             </p>
+            @if (command.snapshot.authoredActionBinding; as binding) {
+              <div class="evidence-line" aria-label="Replay command authored action binding">
+                <strong>{{ binding.actionId }} · {{ binding.actorId }}</strong>
+                <p>{{ binding.abilityId }} · {{ binding.grantLabel }}</p>
+                <p class="fingerprint">{{ binding.actionFingerprintLabel }}</p>
+              </div>
+            }
             <div class="participant-row">
               @for (
                 participant of command.snapshot.participants;

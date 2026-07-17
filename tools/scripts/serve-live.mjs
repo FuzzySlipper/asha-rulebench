@@ -100,7 +100,7 @@ async function waitForHost(child, baseUrl) {
     }
     try {
       const response = await fetch(`${baseUrl}/api/rulebench/v1/handshake`, {
-        headers: { 'x-rulebench-protocol-version': '8' },
+        headers: { 'x-rulebench-protocol-version': '9' },
         signal: AbortSignal.timeout(500),
       });
       if (response.ok) return;

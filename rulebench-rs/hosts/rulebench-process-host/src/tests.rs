@@ -10,7 +10,8 @@ use rulebench_protocol::{
     AuthoredActionBindingRequestDto, AutomaticRunRequestDto, AutomationPolicyCatalogEntryDto,
     CombatAutomationNoCandidateBehaviorDto, CombatAutomationPolicyDto, CombatControlCommandDto,
     CombatControlCommandKindDto, CombatSessionCreateRequestDto, CombatSessionIntentCommandDto,
-    CommandRollModeDto, ContentImportAttemptDto, ContentPackReferenceDto, ContentWorkspaceDto,
+    CommandRollModeDto, ContentActionBindingCatalogDto, ContentAuthoringDraftDto,
+    ContentImportAttemptDto, ContentPackReferenceDto, ContentPackReviewDto, ContentWorkspaceDto,
     ExperimentComparisonReadoutDto, ExperimentComparisonRequestDto, ExperimentMatrixRequestDto,
     ExperimentReadoutDto, LiveAutomaticRunDto, LiveCommandExecutionDto, LiveControlExecutionDto,
     LiveReactionExecutionDto, LiveSessionSnapshotDto, ProtocolHandshakeDto, ReactionCommandSpecDto,
@@ -1110,6 +1111,171 @@ fn authored_content_validation_returns_a_receipt_without_mutating_the_workspace(
     let restarted: ContentWorkspaceDto =
         serde_json::from_slice(&restarted.body).expect("restarted workspace is JSON");
     assert_eq!(restarted, before);
+    fs::remove_dir_all(directory).expect("test repository cleans up");
+}
+
+#[test]
+fn authored_action_template_clone_review_and_binding_catalog_use_rust_authority() {
+    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let directory = std::env::temp_dir().join(format!(
+        "asha-rulebench-authored-action-authoring-{}-{sequence}",
+        std::process::id()
+    ));
+    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
+    let initial = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let initial: ContentWorkspaceDto =
+        serde_json::from_slice(&initial.body).expect("initial workspace is JSON");
+
+    let template = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/template",
+        &serde_json::json!({
+            "identity": { "id": "pack.test.authored-template", "version": "1.0.0" }
+        }),
+    ));
+    assert_eq!(
+        template.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&template.body)
+    );
+    let template: ContentAuthoringDraftDto =
+        serde_json::from_slice(&template.body).expect("template draft is JSON");
+    assert_eq!(template.identity.id, "pack.test.authored-template");
+    assert_eq!(template.identity.version, "1.0.0");
+    assert_eq!(template.source_kind, "rustTemplate");
+    let template_document: serde_json::Value =
+        serde_json::from_str(&template.authored_payload).expect("template payload is JSON");
+    assert_eq!(template_document["formatVersion"], 3);
+    assert_eq!(
+        template_document["pack"]["id"],
+        "pack.test.authored-template"
+    );
+    assert_eq!(template_document["pack"]["version"], "1.0.0");
+    assert_eq!(
+        template_document["pack"]["catalogs"]["actions"][0]["id"],
+        "action.binding-glyph"
+    );
+    let after_template = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let after_template: ContentWorkspaceDto =
+        serde_json::from_slice(&after_template.body).expect("workspace remains JSON");
+    assert_eq!(after_template, initial);
+
+    let imported = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/import",
+        &serde_json::json!({
+            "authoredPayload": template.authored_payload,
+            "replacementPolicy": "reject"
+        }),
+    ));
+    let imported: ContentImportAttemptDto =
+        serde_json::from_slice(&imported.body).expect("template import is JSON");
+    assert!(imported.accepted, "{imported:?}");
+    let reference = imported
+        .outcome
+        .as_ref()
+        .expect("accepted import has an outcome")
+        .review
+        .pack
+        .reference
+        .clone();
+
+    let review = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/review",
+        &serde_json::json!({ "reference": reference }),
+    ));
+    let review: ContentPackReviewDto =
+        serde_json::from_slice(&review.body).expect("pack review is JSON");
+    assert_eq!(review.abilities[0].id, "ability.binding-glyph");
+    assert_eq!(review.modifiers[0].id, "modifier.binding-glyph.anchored");
+    assert_eq!(review.actions[0].id, "action.binding-glyph");
+    assert!(review.actions[0].check.contains("saving throw"));
+    assert!(review.actions[0]
+        .effects
+        .iter()
+        .any(|effect| effect.contains("apply modifier")));
+
+    let before_clone = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let before_clone: ContentWorkspaceDto =
+        serde_json::from_slice(&before_clone.body).expect("workspace before clone is JSON");
+    let clone = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/clone-draft",
+        &serde_json::json!({
+            "reference": reference,
+            "identity": { "id": "pack.test.authored-clone", "version": "2.0.0" }
+        }),
+    ));
+    assert_eq!(
+        clone.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&clone.body)
+    );
+    let clone: ContentAuthoringDraftDto =
+        serde_json::from_slice(&clone.body).expect("clone draft is JSON");
+    assert_eq!(clone.identity.id, "pack.test.authored-clone");
+    assert_eq!(clone.identity.version, "2.0.0");
+    assert_eq!(clone.source_kind, "storedPackClone");
+    let clone_document: serde_json::Value =
+        serde_json::from_str(&clone.authored_payload).expect("clone payload is JSON");
+    assert_eq!(clone_document["pack"]["id"], "pack.test.authored-clone");
+    assert_eq!(clone_document["pack"]["version"], "2.0.0");
+    let after_clone = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
+    let after_clone: ContentWorkspaceDto =
+        serde_json::from_slice(&after_clone.body).expect("workspace after clone is JSON");
+    assert_eq!(after_clone, before_clone);
+
+    let same_identity = router.handle(&json_request(
+        HttpMethod::Post,
+        "/api/rulebench/v1/content/clone-draft",
+        &serde_json::json!({
+            "reference": reference,
+            "identity": { "id": reference.id, "version": reference.version }
+        }),
+    ));
+    assert_eq!(same_identity.status, 422);
+    let same_identity: serde_json::Value =
+        serde_json::from_slice(&same_identity.body).expect("clone rejection is JSON");
+    assert_eq!(same_identity["code"], "contentDraftIdentityMustBeNew");
+
+    assert_eq!(
+        router
+            .handle(&json_request(
+                HttpMethod::Post,
+                "/api/rulebench/v1/content/activate",
+                &serde_json::json!({ "reference": reference }),
+            ))
+            .status,
+        200
+    );
+    let catalog = router.handle(&request(
+        HttpMethod::Get,
+        "/api/rulebench/v1/content/action-bindings",
+    ));
+    let catalog: ContentActionBindingCatalogDto =
+        serde_json::from_slice(&catalog.body).expect("binding catalog is JSON");
+    let action = catalog
+        .actions
+        .iter()
+        .find(|action| action.action_id == "action.binding-glyph")
+        .expect("active authored action is listed");
+    let scenario = action
+        .scenarios
+        .iter()
+        .find(|scenario| scenario.id == "binding-glyph-failed-save")
+        .expect("compatible scenario is listed");
+    assert!(scenario
+        .actors
+        .iter()
+        .any(|actor| actor.id == "entity-warden"));
+    assert!(!scenario
+        .actors
+        .iter()
+        .any(|actor| actor.id == "entity-missing"));
+
     fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 

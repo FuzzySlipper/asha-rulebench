@@ -231,6 +231,50 @@ import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol"
                       </button>
                     }
                   </div>
+                  <h4>Executable authored action</h4>
+                  <p class="meta">Rust lists only active action, scenario, and actor bindings that pass complete materialization validation.</p>
+                  @switch (bindingCatalog().kind) {
+                    @case ("loading") {
+                      <p class="state" aria-busy="true">Loading Rust binding choices</p>
+                    }
+                    @case ("error") {
+                      <p role="alert">{{ bindingCatalog().error.code }} · {{ bindingCatalog().error.message }}</p>
+                    }
+                    @case ("data") {
+                      <div class="choice-row" aria-label="Compatible active authored actions">
+                        <button
+                          type="button"
+                          [attr.aria-pressed]="selectedAuthoredActionKey() === null"
+                          (click)="selectAuthoredAction(null)"
+                        >
+                          No action binding
+                        </button>
+                        @for (binding of compatibleActionBindings(); track binding.key) {
+                          <button
+                            type="button"
+                            [attr.aria-pressed]="selectedAuthoredActionKey() === binding.key"
+                            (click)="selectAuthoredAction(binding.key)"
+                          >
+                            {{ binding.actionLabel }} · {{ binding.packLabel }}
+                          </button>
+                        }
+                      </div>
+                      @if (selectedAuthoredAction(); as binding) {
+                        <p class="meta">Ability {{ binding.abilityId }} · exact root {{ binding.packLabel }}</p>
+                        <div class="choice-row" aria-label="Rust-authorized action actors">
+                          @for (actor of bindingActors(); track actor.id) {
+                            <button
+                              type="button"
+                              [attr.aria-pressed]="selectedAuthoredActorId() === actor.id"
+                              (click)="selectAuthoredActor(actor.id)"
+                            >
+                              {{ actor.label }}
+                            </button>
+                          }
+                        </div>
+                      }
+                    }
+                  }
                   @if (contentWorkspace().kind === "error") {
                     <p role="alert">
                       {{ contentWorkspace().error.code }} ·
@@ -390,8 +434,13 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   protected readonly participantOrder = signal<readonly string[]>([]);
   protected readonly selectedContentPack =
     signal<RulebenchContentPackReferenceDto | null>(null);
+  protected readonly selectedAuthoredActionKey = signal<string | null>(null);
+  protected readonly selectedAuthoredActorId = signal<string | null>(null);
   protected readonly contentWorkspace = computed(() =>
     this.contentStore.workspace(),
+  );
+  protected readonly bindingCatalog = computed(() =>
+    this.contentStore.bindingCatalog(),
   );
   protected readonly compatibleActivePacks = computed(() => {
     const workspace = this.contentWorkspace();
@@ -404,11 +453,35 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
           `${scenario.rulesetId}@${scenario.rulesetVersion}`,
     );
   });
+  protected readonly compatibleActionBindings = computed(() => {
+    const catalog = this.bindingCatalog();
+    const scenarioId = this.selectedScenarioId();
+    if (catalog.kind !== "data" || scenarioId === null) return [];
+    return catalog.value.filter((binding) =>
+      binding.scenarios.some((scenario) => scenario.id === scenarioId),
+    );
+  });
+  protected readonly selectedAuthoredAction = computed(() =>
+    this.compatibleActionBindings().find(
+      (binding) => binding.key === this.selectedAuthoredActionKey(),
+    ) ?? null,
+  );
+  protected readonly bindingActors = computed(() => {
+    const binding = this.selectedAuthoredAction();
+    const scenarioId = this.selectedScenarioId();
+    if (binding === null || scenarioId === null) return [];
+    return (
+      binding.scenarios.find((scenario) => scenario.id === scenarioId)?.actors ??
+      []
+    );
+  });
   protected readonly canCreateSession = computed(
     () =>
       this.connection().kind === "data" &&
       this.selectedScenarioId() !== null &&
-      this.sessionIdInput().trim().length > 0,
+      this.sessionIdInput().trim().length > 0 &&
+      (this.selectedAuthoredAction() === null ||
+        this.selectedAuthoredActorId() !== null),
   );
 
   ngOnInit(): void {
@@ -453,6 +526,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   protected selectScenario(id: string): void {
     this.store.selectScenario(id);
     this.syncParticipantOrder();
+    this.syncAuthoredBinding();
   }
 
   protected setSessionId(value: string): void {
@@ -463,6 +537,25 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
     reference: RulebenchContentPackReferenceDto | null,
   ): void {
     this.selectedContentPack.set(reference);
+    if (reference !== null) {
+      this.selectedAuthoredActionKey.set(null);
+      this.selectedAuthoredActorId.set(null);
+    }
+  }
+
+  protected selectAuthoredAction(key: string | null): void {
+    this.selectedAuthoredActionKey.set(key);
+    if (key === null) {
+      this.selectedAuthoredActorId.set(null);
+      return;
+    }
+    this.selectedContentPack.set(null);
+    this.selectedAuthoredActorId.set(this.bindingActors()[0]?.id ?? null);
+  }
+
+  protected selectAuthoredActor(actorId: string): void {
+    if (!this.bindingActors().some((actor) => actor.id === actorId)) return;
+    this.selectedAuthoredActorId.set(actorId);
   }
 
   protected participantById(participantId: string) {
@@ -487,11 +580,22 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   protected createSession(): void {
     const scenarioId = this.selectedScenarioId();
     if (scenarioId === null) return;
+    const authoredAction = this.selectedAuthoredAction();
+    const authoredActorId = this.selectedAuthoredActorId();
+    const authoredActionBinding =
+      authoredAction === null || authoredActorId === null
+        ? null
+        : {
+            contentPack: authoredAction.contentPack,
+            actionId: authoredAction.actionId,
+            actorId: authoredActorId,
+          };
     void this.store.createSession(
       this.sessionIdInput().trim(),
       scenarioId,
       this.participantOrder(),
-      this.selectedContentPack(),
+      authoredActionBinding === null ? this.selectedContentPack() : null,
+      authoredActionBinding,
     );
   }
 
@@ -507,6 +611,7 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
       this.store.loadSessions(),
       this.store.loadRecovery(),
       this.contentStore.loadWorkspace(),
+      this.contentStore.loadBindingCatalog(),
     ]);
     this.syncParticipantOrder();
   }
@@ -517,5 +622,15 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
         (participant) => participant.id,
       ) ?? [],
     );
+  }
+
+  private syncAuthoredBinding(): void {
+    const selected = this.selectedAuthoredAction();
+    if (selected === null) {
+      this.selectedAuthoredActionKey.set(null);
+      this.selectedAuthoredActorId.set(null);
+      return;
+    }
+    this.selectedAuthoredActorId.set(this.bindingActors()[0]?.id ?? null);
   }
 }

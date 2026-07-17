@@ -148,6 +148,15 @@ export function createFakeRulebenchLiveTransport(
     listContentWorkspace: (requestOptions) =>
       handlers.listContentWorkspace?.(requestOptions) ??
       unavailable("listContentWorkspace"),
+    createContentTemplateDraft: (identity, requestOptions) =>
+      handlers.createContentTemplateDraft?.(identity, requestOptions) ??
+      unavailable("createContentTemplateDraft"),
+    cloneContentDraft: (reference, identity, requestOptions) =>
+      handlers.cloneContentDraft?.(reference, identity, requestOptions) ??
+      unavailable("cloneContentDraft"),
+    listContentActionBindings: (requestOptions) =>
+      handlers.listContentActionBindings?.(requestOptions) ??
+      unavailable("listContentActionBindings"),
     importContent: (authoredPayload, replacementPolicy, requestOptions) =>
       handlers.importContent?.(
         authoredPayload,
