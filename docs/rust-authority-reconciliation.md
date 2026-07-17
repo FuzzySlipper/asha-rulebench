@@ -20,7 +20,7 @@ source-authority extraction.
 | `@asha-rpg/authoring` | Pure TypeScript authoring package location; complete syntax arrives in #5937. |
 
 The packages are fetched from `https://github.com/FuzzySlipper/asha-rpg.git`
-at exact revision `a3d4acd9ac0ff0517a71605bb291a4a844040d9a` with compatible `^0.1`
+at exact revision `a04dbc376db45a6ba5ae45e087d6a8f9869cb1ad` with compatible `^0.1`
 versions. Rulebench has no sibling path dependency and no direct ASHA crate
 dependency. The extracted repo retains the exact governed ASHA revision
 `67ce55dba602ad61e1b9ca3b0ad01a22fa4fe148` behind `rpg-runtime`.

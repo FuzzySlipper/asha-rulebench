@@ -25,6 +25,6 @@ unsafe_code = "forbid"
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rpg-core = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "a3d4acd9ac0ff0517a71605bb291a4a844040d9a", version = "^0.1" }
-rpg-ir = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "a3d4acd9ac0ff0517a71605bb291a4a844040d9a", version = "^0.1" }
-rpg-runtime = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "a3d4acd9ac0ff0517a71605bb291a4a844040d9a", version = "^0.1" }
+rpg-core = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "a04dbc376db45a6ba5ae45e087d6a8f9869cb1ad", version = "^0.1" }
+rpg-ir = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "a04dbc376db45a6ba5ae45e087d6a8f9869cb1ad", version = "^0.1" }
+rpg-runtime = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "a04dbc376db45a6ba5ae45e087d6a8f9869cb1ad", version = "^0.1" }
