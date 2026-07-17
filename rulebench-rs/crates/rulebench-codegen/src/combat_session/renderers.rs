@@ -2,11 +2,12 @@ use crate::combat_session::fragments::*;
 use crate::combat_session::scalars::*;
 use crate::ts_emit::{render_scenario_readout, ts_string};
 
-use rulebench_fixtures::{
-    CombatControlHistoryReadout, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunReplayReadout, CombatSessionScriptReadout, CombatSessionStepReadout,
-    CombatSessionSummary, ScenarioMetadata,
+use rulebench_combat::{
+    CombatControlHistoryReadout, CombatSessionAutomaticRunReadout, CombatSessionScriptReadout,
+    CombatSessionStepReadout, CombatSessionSummary,
 };
+use rulebench_content::ScenarioMetadata;
+use rulebench_replay::CombatSessionAutomaticRunReplayReadout;
 
 pub(crate) fn render_session_summary(summary: &CombatSessionSummary) -> String {
     let mut out = String::from("    {\n");

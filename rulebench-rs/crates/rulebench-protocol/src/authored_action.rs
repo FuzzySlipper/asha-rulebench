@@ -1,15 +1,17 @@
-use rulebench_rpg_adapter::{
+use rpg_ir::{
     ActionResourceCost, ActionRollPolicy, AreaShape, AreaTargetingDeclaration,
-    AttackCheckDeclaration, AuthoredActionDefinition, AuthoredEffectOperation,
-    AuthoredModifierEffectOperation, AuthoredReactionHookEffectOperation,
-    AuthoredReactionOptionDeclaration, AuthoredTargetingDeclaration, CheckDeclaration,
-    ContestedCheckDeclaration, DamageEffectOperation, DefenseReference, HealingEffectOperation,
-    ModifierDefinition, ModifierDurationPolicy, ModifierStackingPolicy, ModifierStatAdjustment,
-    ModifierTenure, MovementActionDeclaration, MovementEffectOperation, MovementKind,
-    MovementTopology, OperationPipelineV2, ReactionParticipantSelector, ReactionWindow,
+    AttackCheckDeclaration, CheckDeclaration, ContestedCheckDeclaration, DamageEffectOperation,
+    DefenseReference, HealingEffectOperation, ModifierTenure, MovementActionDeclaration,
+    MovementEffectOperation, MovementKind, MovementTopology, OperationPipelineV2, ReactionWindow,
     ResourceChangeEffectOperation, SavingThrowCheckDeclaration, TargetFailurePolicy, TargetKind,
     TargetOrderPolicy, TargetSelection, TargetTeamConstraint, TemporaryVitalityEffectOperation,
     VisibilityRequirement,
+};
+use rulebench_content::{
+    AuthoredActionDefinition, AuthoredEffectOperation, AuthoredModifierEffectOperation,
+    AuthoredReactionHookEffectOperation, AuthoredReactionOptionDeclaration,
+    AuthoredTargetingDeclaration, ModifierDefinition, ModifierDurationPolicy,
+    ModifierStackingPolicy, ModifierStatAdjustment, ReactionParticipantSelector,
 };
 use serde::{Deserialize, Serialize};
 

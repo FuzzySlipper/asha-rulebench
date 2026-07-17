@@ -1,4 +1,9 @@
-use rulebench_rpg_adapter::*;
+use rpg_ir::*;
+use rulebench_combat::{
+    FIRST_ACCEPTED_CANDIDATE_POLICY_VERSION, LOWEST_VITALITY_TARGET_POLICY_VERSION,
+    OBJECTIVE_SIDE_PRESSURE_POLICY_VERSION,
+};
+use rulebench_protocol::executable_conformance_capabilities;
 
 pub const HEXING_BOLT_PROVIDER_ID: &str = "provider.asha-rulebench.hexing-bolt";
 pub const TURN_CONTROL_PROVIDER_ID: &str = "provider.asha-rulebench.turn-control";

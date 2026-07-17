@@ -1,8 +1,9 @@
-use rulebench_rpg_adapter::{
+use rpg_core::GridPosition;
+use rulebench_combat::{
     CombatAutomationNoCandidateBehavior, CombatAutomationPolicySpec, CombatControlCommandSpec,
     CombatSessionAutomaticRunSpec, CombatSessionAutomaticStepSpec, CombatSessionIntentCommandSpec,
-    GridPosition, UseActionIntent,
 };
+use rulebench_content::UseActionIntent;
 use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_ID: &str = "asha-rulebench.protocol";

@@ -390,11 +390,22 @@ impl CombatSessionState {
         if let Some(entry) = action_usage_entry {
             self.action_usage_log.push(entry);
         }
-        let reaction_hook = self
-            .scenario
-            .action_by_id(&command.action_id)
-            .and_then(|action| action.hit.reaction_hook_operation())
-            .cloned();
+        let declared_target_ids = if receipt.intent.target_ids.is_empty() {
+            vec![command.target_id.clone()]
+        } else {
+            receipt.intent.target_ids.clone()
+        };
+        let reaction_hook = crate::rpg_resolver::rpg_reaction_hook(
+            &self.scenario,
+            &command.action_id,
+            &declared_target_ids,
+        )
+        .or_else(|| {
+            self.scenario
+                .action_by_id(&command.action_id)
+                .and_then(|action| action.hit.reaction_hook_operation())
+                .cloned()
+        });
         let opened_reaction_window =
             if receipt.accepted && step.outcome_class == CommandOutcomeClass::AcceptedHit {
                 reaction_hook

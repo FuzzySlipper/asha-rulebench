@@ -1,10 +1,13 @@
+use rpg_core::*;
+use rpg_ir::*;
+use rulebench_combat::*;
 use rulebench_protocol::{
     CombatAutomationNoCandidateBehaviorDto, CombatAutomationPolicyDto, CombatControlCommandDto,
     CombatControlCommandKindDto, CombatSessionCreateRequestDto, CombatSessionHandleDto,
     CombatSessionIntentCommandDto, CommandRollModeDto, ExperimentComparisonRequestDto,
     ExperimentMatrixRequestDto, ProtocolRequestContextDto, UseActionIntentDto, PROTOCOL_VERSION,
 };
-use rulebench_rpg_adapter::*;
+use rulebench_replay::*;
 use std::collections::BTreeMap;
 
 use crate::{BridgeErrorKind, BridgeScenario, RulebenchBridge};

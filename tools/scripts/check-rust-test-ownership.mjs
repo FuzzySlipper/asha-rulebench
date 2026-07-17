@@ -1,46 +1,57 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 const root = process.cwd();
-const rustRoot = join(root, 'rulebench-rs');
+const rustRoot = join(root, "rulebench-rs");
 const owningCrates = [
-  'rulebench-content',
-  'rulebench-combat',
-  'rulebench-replay',
-  'rulebench-rpg-adapter',
-  'rulebench-protocol',
-  'rulebench-bridge',
-  'rulebench-fixtures',
-  'rulebench-codegen',
+  "rulebench-content",
+  "rulebench-combat",
+  "rulebench-replay",
+  "rulebench-protocol",
+  "rulebench-bridge",
+  "rulebench-fixtures",
+  "rulebench-codegen",
 ];
 const failures = [];
 
 for (const crate of owningCrates) {
-  const sourceRoot = join(rustRoot, 'crates', crate, 'src');
+  const sourceRoot = join(rustRoot, "crates", crate, "src");
   const testCount = collectRustFiles(sourceRoot)
-    .map((file) => countTests(readFileSync(file, 'utf8')))
+    .map((file) => countTests(readFileSync(file, "utf8")))
     .reduce((sum, count) => sum + count, 0);
   if (testCount === 0) {
-    failures.push(`${crate} has no focused owning-crate #[test] coverage under ${relative(root, sourceRoot)}.`);
+    failures.push(
+      `${crate} has no focused owning-crate #[test] coverage under ${relative(root, sourceRoot)}.`,
+    );
   }
 }
 
-const authorityHarness = join(rustRoot, 'crates', 'rulebench-authority', 'src', 'tests');
+const authorityHarness = join(
+  rustRoot,
+  "crates",
+  "rulebench-authority",
+  "src",
+  "tests",
+);
 const authorityTestCount = collectRustFiles(authorityHarness)
-  .map((file) => countTests(readFileSync(file, 'utf8')))
+  .map((file) => countTests(readFileSync(file, "utf8")))
   .reduce((sum, count) => sum + count, 0);
 if (authorityTestCount === 0) {
-  failures.push('rulebench-authority must retain cross-crate product harness tests under src/tests.');
+  failures.push(
+    "rulebench-authority must retain cross-crate product harness tests under src/tests.",
+  );
 }
 
 runFocusedFailureTests();
 
 if (failures.length > 0) {
-  console.error(failures.join('\n'));
+  console.error(failures.join("\n"));
   process.exit(1);
 }
 
-console.log(`check:rust-test-ownership ok (${owningCrates.length} owners, ${authorityTestCount} authority harness tests)`);
+console.log(
+  `check:rust-test-ownership ok (${owningCrates.length} owners, ${authorityTestCount} authority harness tests)`,
+);
 
 function collectRustFiles(directory) {
   const files = [];
@@ -49,7 +60,7 @@ function collectRustFiles(directory) {
     const stats = statSync(path);
     if (stats.isDirectory()) {
       files.push(...collectRustFiles(path));
-    } else if (entry.endsWith('.rs')) {
+    } else if (entry.endsWith(".rs")) {
       files.push(path);
     }
   }
@@ -61,10 +72,14 @@ function countTests(source) {
 }
 
 function runFocusedFailureTests() {
-  if (countTests('fn helper() {}') !== 0) {
-    throw new Error('Test-ownership self-test failed: ordinary functions count as tests.');
+  if (countTests("fn helper() {}") !== 0) {
+    throw new Error(
+      "Test-ownership self-test failed: ordinary functions count as tests.",
+    );
   }
-  if (countTests('#[test]\nfn focused_contract() {}') !== 1) {
-    throw new Error('Test-ownership self-test failed: a focused Rust test was not counted.');
+  if (countTests("#[test]\nfn focused_contract() {}") !== 1) {
+    throw new Error(
+      "Test-ownership self-test failed: a focused Rust test was not counted.",
+    );
   }
 }

@@ -1,4 +1,4 @@
-use rulebench_rpg_adapter::{
+use rulebench_combat::{
     fingerprint_projected_state, resolve_use_action, AttackOutcome, CombatSessionIntentCommandSpec,
     CombatSessionState, ContestedCheckOutcome, DomainEvent, RulebenchReceipt, RulebenchRejection,
     SavingThrowOutcome,

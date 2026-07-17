@@ -1,4 +1,4 @@
-use rulebench_rpg_adapter::CombatSessionHandle;
+use rulebench_combat::CombatSessionHandle;
 use serde::{Deserialize, Serialize};
 
 /// Stable wire representation of an opaque combat-session identity.

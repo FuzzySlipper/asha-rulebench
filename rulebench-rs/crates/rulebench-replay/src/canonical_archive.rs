@@ -962,7 +962,7 @@ mod tests {
 
         assert_eq!(
             canonical_replay_archive_payload_fingerprint(&entry),
-            "1740f63e804cb349"
+            "6970326cc57ffa2d"
         );
         assert_eq!(
             entry.payload_fingerprint,

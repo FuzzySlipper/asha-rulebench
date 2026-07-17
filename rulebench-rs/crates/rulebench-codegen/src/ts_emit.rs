@@ -1,8 +1,10 @@
-use rulebench_fixtures::{
-    AttackOutcome, CheckDeclaration, Combatant, DomainEvent, FinalCombatantState,
-    RulebenchScenario, ScenarioProjection, TargetLegality, Team, TraceEntry, TracePhase,
-    TraceStatus, VisibilityRequirement,
+use rpg_core::Team;
+use rpg_ir::{CheckDeclaration, VisibilityRequirement};
+use rulebench_combat::{
+    AttackOutcome, DomainEvent, FinalCombatantState, ScenarioProjection, TargetLegality,
+    TraceEntry, TracePhase, TraceStatus,
 };
+use rulebench_content::{Combatant, RulebenchScenario};
 
 pub(crate) fn render_scenario_readout(
     scenario: &RulebenchScenario,
@@ -360,8 +362,8 @@ fn render_event(sequence: u32, event: &DomainEvent, indent: &str) -> String {
             &format!(
                 "Saving throw total {total} against DC {difficulty_class}: {}.",
                 match outcome {
-                    rulebench_fixtures::SavingThrowOutcome::Saved => "saved",
-                    rulebench_fixtures::SavingThrowOutcome::Failed => "failed",
+                    rulebench_combat::SavingThrowOutcome::Saved => "saved",
+                    rulebench_combat::SavingThrowOutcome::Failed => "failed",
                 }
             ),
             &[actor_id.as_str(), target_id.as_str()],
@@ -379,8 +381,8 @@ fn render_event(sequence: u32, event: &DomainEvent, indent: &str) -> String {
             &format!(
                 "Contested totals {actor_total} versus {target_total}: {}.",
                 match outcome {
-                    rulebench_fixtures::ContestedCheckOutcome::ActorWins => "actor wins",
-                    rulebench_fixtures::ContestedCheckOutcome::TargetWins => "target wins",
+                    rulebench_combat::ContestedCheckOutcome::ActorWins => "actor wins",
+                    rulebench_combat::ContestedCheckOutcome::TargetWins => "target wins",
                 }
             ),
             &[actor_id.as_str(), target_id.as_str()],

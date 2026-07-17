@@ -35,6 +35,10 @@ const depConstraints = [
     "onlyDependOnLibsWithTags": []
   },
   {
+    "sourceTag": "scope:content-authoring",
+    "onlyDependOnLibsWithTags": []
+  },
+  {
     "sourceTag": "scope:platform",
     "onlyDependOnLibsWithTags": []
   },

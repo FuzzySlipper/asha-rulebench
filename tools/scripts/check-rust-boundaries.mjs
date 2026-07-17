@@ -1,59 +1,118 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 
 const root = process.cwd();
-const workspaceManifestPath = join(root, 'rulebench-rs', 'Cargo.toml');
-const cratesRoot = join(root, 'rulebench-rs', 'crates');
-const hostsRoot = join(root, 'rulebench-rs', 'hosts');
-const rpgRepository = 'https://github.com/FuzzySlipper/asha-rpg.git';
-const rpgRevision = '026889782c4e0b6e5f562ec78426a391269e0265';
-const rpgVersionRequirement = '^0.1';
+const workspaceManifestPath = join(root, "rulebench-rs", "Cargo.toml");
+const cratesRoot = join(root, "rulebench-rs", "crates");
+const hostsRoot = join(root, "rulebench-rs", "hosts");
+const rpgRepository = "https://github.com/FuzzySlipper/asha-rpg.git";
+const rpgRevision = "897b05d2a3fda372c2a9a24e3f188ce735a236be";
+const rpgVersionRequirement = "^0.1";
 
 const allowedDependencies = new Map([
-  ['rulebench-content', new Set(['rpg-core', 'rpg-ir'])],
-  ['rulebench-combat', new Set(['rpg-core', 'rpg-ir', 'rpg-runtime', 'rulebench-content'])],
-  ['rulebench-replay', new Set(['rpg-core', 'rulebench-combat'])],
+  ["rulebench-content", new Set(["rpg-compiler", "rpg-core", "rpg-ir"])],
   [
-    'rulebench-rpg-adapter',
-    new Set(['rpg-core', 'rpg-ir', 'rulebench-content', 'rulebench-combat', 'rulebench-replay']),
+    "rulebench-combat",
+    new Set(["rpg-core", "rpg-ir", "rpg-runtime", "rulebench-content"]),
   ],
-  ['rulebench-protocol', new Set(['rulebench-rpg-adapter'])],
-  ['rulebench-bridge', new Set(['rulebench-protocol', 'rulebench-rpg-adapter'])],
-  ['rulebench-fixtures', new Set(['rulebench-rpg-adapter'])],
-  ['rulebench-codegen', new Set(['rulebench-fixtures', 'rulebench-protocol'])],
-  ['rulebench-authority', new Set(['rulebench-fixtures', 'rulebench-codegen'])],
-  ['rulebench-process-host', new Set(['rulebench-bridge', 'rulebench-fixtures', 'rulebench-protocol'])],
+  ["rulebench-replay", new Set(["rpg-core", "rulebench-combat"])],
+  [
+    "rulebench-protocol",
+    new Set([
+      "rpg-core",
+      "rpg-ir",
+      "rulebench-combat",
+      "rulebench-content",
+      "rulebench-replay",
+    ]),
+  ],
+  [
+    "rulebench-bridge",
+    new Set([
+      "rpg-core",
+      "rpg-ir",
+      "rulebench-combat",
+      "rulebench-content",
+      "rulebench-protocol",
+      "rulebench-replay",
+    ]),
+  ],
+  [
+    "rulebench-fixtures",
+    new Set([
+      "rpg-core",
+      "rpg-ir",
+      "rulebench-combat",
+      "rulebench-content",
+      "rulebench-protocol",
+      "rulebench-replay",
+    ]),
+  ],
+  [
+    "rulebench-codegen",
+    new Set([
+      "rpg-core",
+      "rpg-ir",
+      "rulebench-combat",
+      "rulebench-content",
+      "rulebench-fixtures",
+      "rulebench-protocol",
+      "rulebench-replay",
+    ]),
+  ],
+  [
+    "rulebench-authority",
+    new Set([
+      "rpg-core",
+      "rpg-ir",
+      "rulebench-codegen",
+      "rulebench-combat",
+      "rulebench-fixtures",
+      "rulebench-replay",
+    ]),
+  ],
+  [
+    "rulebench-process-host",
+    new Set(["rulebench-bridge", "rulebench-fixtures", "rulebench-protocol"]),
+  ],
 ]);
 
-const publicRpgDependencies = new Set(['rpg-core', 'rpg-ir', 'rpg-runtime']);
+const publicRpgDependencies = new Set([
+  "rpg-compiler",
+  "rpg-core",
+  "rpg-ir",
+  "rpg-runtime",
+]);
 const manifests = readWorkspaceManifests();
 const workspaceDependencies = parseDependencies(
-  readFileSync(workspaceManifestPath, 'utf8'),
-  new Set(['workspace.dependencies']),
+  readFileSync(workspaceManifestPath, "utf8"),
+  new Set(["workspace.dependencies"]),
 );
 const failures = validateWorkspace(manifests, workspaceDependencies);
 
 runFocusedFailureTests();
 
 if (failures.length > 0) {
-  console.error(failures.join('\n'));
+  console.error(failures.join("\n"));
   process.exit(1);
 }
 
-console.log(`check:rust-boundaries ok (${manifests.size} Rulebench crates; pinned public RPG revision ${rpgRevision.slice(0, 8)})`);
+console.log(
+  `check:rust-boundaries ok (${manifests.size} Rulebench crates; pinned public RPG revision ${rpgRevision.slice(0, 8)})`,
+);
 
 function readWorkspaceManifests() {
   const manifests = new Map();
   for (const workspaceRoot of [cratesRoot, hostsRoot]) {
     for (const entry of readdirSync(workspaceRoot, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const manifestPath = join(workspaceRoot, entry.name, 'Cargo.toml');
-      const manifest = readFileSync(manifestPath, 'utf8');
+      const manifestPath = join(workspaceRoot, entry.name, "Cargo.toml");
+      const manifest = readFileSync(manifestPath, "utf8");
       manifests.set(entry.name, {
         manifestPath,
         dependencies: parseDependencies(
           manifest,
-          new Set(['dependencies', 'dev-dependencies', 'build-dependencies']),
+          new Set(["dependencies", "dev-dependencies", "build-dependencies"]),
         ),
       });
     }
@@ -63,8 +122,8 @@ function readWorkspaceManifests() {
 
 function parseDependencies(manifest, includedSections) {
   const dependencies = [];
-  let section = '';
-  for (const [index, line] of manifest.split('\n').entries()) {
+  let section = "";
+  for (const [index, line] of manifest.split("\n").entries()) {
     const sectionMatch = /^\[([^\]]+)]\s*$/.exec(line);
     if (sectionMatch !== null) {
       section = sectionMatch[1];
@@ -72,15 +131,17 @@ function parseDependencies(manifest, includedSections) {
     }
     if (!includedSections.has(section)) continue;
 
-    const dependencyMatch = /^([A-Za-z0-9_-]+)(\.workspace)?\s*=\s*(.*)$/.exec(line);
+    const dependencyMatch = /^([A-Za-z0-9_-]+)(\.workspace)?\s*=\s*(.*)$/.exec(
+      line,
+    );
     if (dependencyMatch === null) continue;
     const specification = dependencyMatch[3];
     const path = /\bpath\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null;
     const name = dependencyMatch[1];
     const relevant =
-      name.startsWith('rulebench-') ||
-      name.startsWith('rpg-') ||
-      name.startsWith('asha-') ||
+      name.startsWith("rulebench-") ||
+      name.startsWith("rpg-") ||
+      name.startsWith("asha-") ||
       path !== null;
     if (!relevant) continue;
 
@@ -88,7 +149,8 @@ function parseDependencies(manifest, includedSections) {
       name,
       path,
       workspace:
-        dependencyMatch[2] !== undefined || /\bworkspace\s*=\s*true\b/.test(specification),
+        dependencyMatch[2] !== undefined ||
+        /\bworkspace\s*=\s*true\b/.test(specification),
       git: /\bgit\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null,
       revision: /\brev\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null,
       version: /\bversion\s*=\s*"([^"]+)"/.exec(specification)?.[1] ?? null,
@@ -101,23 +163,37 @@ function parseDependencies(manifest, includedSections) {
 function validateWorkspace(currentManifests, rootDependencies) {
   const errors = [];
   const actualCrates = new Set(currentManifests.keys());
-  const rootByName = new Map(rootDependencies.map((dependency) => [dependency.name, dependency]));
+  const rootByName = new Map(
+    rootDependencies.map((dependency) => [dependency.name, dependency]),
+  );
 
   for (const crateName of actualCrates) {
     if (!allowedDependencies.has(crateName)) {
-      errors.push(`Unknown Rust workspace crate: ${crateName}. Add an explicit boundary policy before it can join the workspace.`);
+      errors.push(
+        `Unknown Rust workspace crate: ${crateName}. Add an explicit boundary policy before it can join the workspace.`,
+      );
     }
   }
   for (const crateName of allowedDependencies.keys()) {
-    if (!actualCrates.has(crateName)) errors.push(`Boundary policy names missing workspace crate: ${crateName}.`);
+    if (!actualCrates.has(crateName))
+      errors.push(
+        `Boundary policy names missing workspace crate: ${crateName}.`,
+      );
   }
 
   for (const dependencyName of publicRpgDependencies) {
     const dependency = rootByName.get(dependencyName);
     if (dependency === undefined) {
-      errors.push(`rulebench-rs/Cargo.toml must pin public RPG package ${dependencyName}.`);
+      errors.push(
+        `rulebench-rs/Cargo.toml must pin public RPG package ${dependencyName}.`,
+      );
     } else {
-      errors.push(...validateRpgDistribution(dependency, `rulebench-rs/Cargo.toml:${dependency.line}`));
+      errors.push(
+        ...validateRpgDistribution(
+          dependency,
+          `rulebench-rs/Cargo.toml:${dependency.line}`,
+        ),
+      );
     }
   }
 
@@ -127,14 +203,26 @@ function validateWorkspace(currentManifests, rootDependencies) {
       errors.push(...validateDependency(crateName, dependency.name, location));
       if (publicRpgDependencies.has(dependency.name)) {
         if (!dependency.workspace) {
-          errors.push(`${location}: ${dependency.name} must inherit the governed exact workspace pin.`);
+          errors.push(
+            `${location}: ${dependency.name} must inherit the governed exact workspace pin.`,
+          );
         }
       }
-      if (dependency.name.startsWith('asha-')) {
-        errors.push(`${location}: Rulebench must consume ASHA-backed RPG behavior through asha-rpg, not ASHA directly.`);
+      if (dependency.name.startsWith("asha-")) {
+        errors.push(
+          `${location}: Rulebench must consume ASHA-backed RPG behavior through asha-rpg, not ASHA directly.`,
+        );
       }
       if (dependency.path !== null) {
-        errors.push(...validateLocalPath(dependency.name, manifest.manifestPath, dependency.path, location, actualCrates));
+        errors.push(
+          ...validateLocalPath(
+            dependency.name,
+            manifest.manifestPath,
+            dependency.path,
+            location,
+            actualCrates,
+          ),
+        );
       }
     }
   }
@@ -148,12 +236,16 @@ function validateDependency(crateName, dependencyName, location) {
   if (publicRpgDependencies.has(dependencyName)) {
     return allowed.has(dependencyName)
       ? []
-      : [`${location}: ${crateName} may not bypass the temporary product adapter to consume ${dependencyName}.`];
+      : [
+          `${location}: ${crateName} may not bypass the temporary product adapter to consume ${dependencyName}.`,
+        ];
   }
-  if (dependencyName.startsWith('asha-')) return [];
-  if (!dependencyName.startsWith('rulebench-')) return [];
+  if (dependencyName.startsWith("asha-")) return [];
+  if (!dependencyName.startsWith("rulebench-")) return [];
   if (!allowedDependencies.has(dependencyName)) {
-    return [`${location}: ${crateName} depends on unknown local crate ${dependencyName}.`];
+    return [
+      `${location}: ${crateName} depends on unknown local crate ${dependencyName}.`,
+    ];
   }
   return allowed.has(dependencyName)
     ? []
@@ -162,52 +254,94 @@ function validateDependency(crateName, dependencyName, location) {
 
 function validateRpgDistribution(dependency, location) {
   const errors = [];
-  if (dependency.path !== null) errors.push(`${location}: public RPG dependencies must not use sibling paths.`);
-  if (dependency.git !== rpgRepository) errors.push(`${location}: RPG dependency must use ${rpgRepository}.`);
-  if (dependency.revision !== rpgRevision) errors.push(`${location}: RPG dependency must use exact revision ${rpgRevision}.`);
-  if (dependency.version !== rpgVersionRequirement) errors.push(`${location}: RPG dependency must use compatible version ${rpgVersionRequirement}.`);
+  if (dependency.path !== null)
+    errors.push(
+      `${location}: public RPG dependencies must not use sibling paths.`,
+    );
+  if (dependency.git !== rpgRepository)
+    errors.push(`${location}: RPG dependency must use ${rpgRepository}.`);
+  if (dependency.revision !== rpgRevision)
+    errors.push(
+      `${location}: RPG dependency must use exact revision ${rpgRevision}.`,
+    );
+  if (dependency.version !== rpgVersionRequirement)
+    errors.push(
+      `${location}: RPG dependency must use compatible version ${rpgVersionRequirement}.`,
+    );
   return errors;
 }
 
-function validateLocalPath(dependencyName, manifestPath, dependencyPath, location, actualCrates) {
-  if (!dependencyName.startsWith('rulebench-')) {
-    return [`${location}: non-Rulebench path dependency ${dependencyName} is forbidden.`];
+function validateLocalPath(
+  dependencyName,
+  manifestPath,
+  dependencyPath,
+  location,
+  actualCrates,
+) {
+  if (!dependencyName.startsWith("rulebench-")) {
+    return [
+      `${location}: non-Rulebench path dependency ${dependencyName} is forbidden.`,
+    ];
   }
   const resolvedPath = resolve(dirname(manifestPath), dependencyPath);
   const relativeToCrates = relative(cratesRoot, resolvedPath);
   const relativeToHosts = relative(hostsRoot, resolvedPath);
-  const targetName =
-    !relativeToCrates.startsWith('..') ? relativeToCrates.split('/')[0] : relativeToHosts.split('/')[0];
+  const targetName = !relativeToCrates.startsWith("..")
+    ? relativeToCrates.split("/")[0]
+    : relativeToHosts.split("/")[0];
   return actualCrates.has(targetName)
     ? []
-    : [`${location}: local path does not resolve to a governed Rulebench crate (${dependencyPath}).`];
+    : [
+        `${location}: local path does not resolve to a governed Rulebench crate (${dependencyPath}).`,
+      ];
 }
 
 function runFocusedFailureTests() {
   assertRejected(
-    validateDependency('rulebench-content', 'rulebench-authority', 'self-test:reverse-dependency'),
-    'a product authority reverse dependency was accepted',
+    validateDependency(
+      "rulebench-content",
+      "rulebench-authority",
+      "self-test:reverse-dependency",
+    ),
+    "a product authority reverse dependency was accepted",
   );
   assertRejected(
-    validateDependency('rulebench-protocol', 'rpg-runtime', 'self-test:rpg-bypass'),
-    'protocol bypassed the temporary RPG adapter',
+    validateDependency(
+      "rulebench-protocol",
+      "rpg-runtime",
+      "self-test:rpg-bypass",
+    ),
+    "protocol bypassed the temporary RPG adapter",
   );
   assertRejected(
     validateRpgDistribution(
-      { name: 'rpg-core', path: null, git: rpgRepository, revision: '0'.repeat(40), version: rpgVersionRequirement },
-      'self-test:stale-rpg-revision',
+      {
+        name: "rpg-core",
+        path: null,
+        git: rpgRepository,
+        revision: "0".repeat(40),
+        version: rpgVersionRequirement,
+      },
+      "self-test:stale-rpg-revision",
     ),
-    'a stale RPG revision was accepted',
+    "a stale RPG revision was accepted",
   );
   assertRejected(
     validateRpgDistribution(
-      { name: 'rpg-core', path: '../../asha-rpg', git: null, revision: null, version: null },
-      'self-test:sibling-rpg-path',
+      {
+        name: "rpg-core",
+        path: "../../asha-rpg",
+        git: null,
+        revision: null,
+        version: null,
+      },
+      "self-test:sibling-rpg-path",
     ),
-    'a sibling RPG path was accepted',
+    "a sibling RPG path was accepted",
   );
 }
 
 function assertRejected(errors, message) {
-  if (errors.length === 0) throw new Error(`Boundary self-test failed: ${message}.`);
+  if (errors.length === 0)
+    throw new Error(`Boundary self-test failed: ${message}.`);
 }

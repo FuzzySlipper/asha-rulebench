@@ -1,21 +1,23 @@
 use crate::combat_session::scalars::*;
 use crate::ts_emit::{ts_string, ts_string_array};
 
-use rulebench_fixtures::{
-    ActionResourceLedgerReadout, ActionResourceRefreshPolicy, ActionResourceState,
-    ActionResourceTransitionEntry, ActionUsageEntry, ActionUsageSummary, ActiveModifier,
-    ClassBuildLedgerReadout, CombatAutomationCandidateEvidence,
-    CombatAutomationPolicyDecisionEvidence, CombatAutomationPolicySpec,
-    CombatAutomationPolicyValidationReadout, CombatControlHistoryEntry, CombatEndConditionReadout,
-    CombatEndPolicy, CombatFinalizationReadout, CombatLogEntry, CombatSessionScriptStepReadout,
-    CombatSessionStepSummary, CombatTurnOrder, CombatantEquipmentReadout, CombatantVitalityEntry,
-    CombatantVitalitySummary, CommandAttempt, CommandAuditEntry, CommandPreflightDecisionKind,
-    CurrentActorActionOption, CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason,
-    CurrentActorTargetOption, EquipmentLedgerReadout, EquipmentTransitionEntry,
-    LifecycleTransitionEntry, ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger,
-    ReactionAuditEntry, ReactionOptionReadout, ReactionResponseEntry, ReactionWindowLifecycleEntry,
+use rpg_ir::ActionResourceRefreshPolicy;
+use rulebench_combat::{
+    ActionResourceLedgerReadout, ActionResourceState, ActionResourceTransitionEntry,
+    ActionUsageEntry, ActionUsageSummary, ClassBuildLedgerReadout,
+    CombatAutomationCandidateEvidence, CombatAutomationPolicyDecisionEvidence,
+    CombatAutomationPolicySpec, CombatAutomationPolicyValidationReadout, CombatControlHistoryEntry,
+    CombatEndConditionReadout, CombatEndPolicy, CombatFinalizationReadout, CombatLogEntry,
+    CombatSessionScriptStepReadout, CombatSessionStepSummary, CombatTurnOrder,
+    CombatantEquipmentReadout, CombatantVitalityEntry, CombatantVitalitySummary, CommandAttempt,
+    CommandAuditEntry, CommandPreflightDecisionKind, CurrentActorActionOption,
+    CurrentActorOptionSummary, CurrentActorOptionsUnavailableReason, CurrentActorTargetOption,
+    EquipmentLedgerReadout, EquipmentTransitionEntry, LifecycleTransitionEntry,
+    ModifierDurationExpirationEntry, ModifierDurationTransitionTrigger, ReactionAuditEntry,
+    ReactionOptionReadout, ReactionResponseEntry, ReactionWindowLifecycleEntry,
     ReactionWindowReadout, RulebenchRejection, ScenarioProjection, TraceEntry, TurnTransitionEntry,
 };
+use rulebench_content::ActiveModifier;
 
 pub(crate) fn render_automation_policy(
     policy: &CombatAutomationPolicySpec,
@@ -1285,18 +1287,18 @@ pub(crate) fn render_active_modifier(modifier: &ActiveModifier) -> String {
     )
 }
 
-fn render_modifier_duration_policy(policy: &rulebench_fixtures::ModifierDurationPolicy) -> String {
+fn render_modifier_duration_policy(policy: &rulebench_content::ModifierDurationPolicy) -> String {
     match policy {
-        rulebench_fixtures::ModifierDurationPolicy::Permanent => {
+        rulebench_content::ModifierDurationPolicy::Permanent => {
             "{ kind: 'permanent', value: null, event: null }".to_string()
         }
-        rulebench_fixtures::ModifierDurationPolicy::Turns(turns) => {
+        rulebench_content::ModifierDurationPolicy::Turns(turns) => {
             format!("{{ kind: 'turns', value: {}, event: null }}", turns)
         }
-        rulebench_fixtures::ModifierDurationPolicy::Rounds(rounds) => {
+        rulebench_content::ModifierDurationPolicy::Rounds(rounds) => {
             format!("{{ kind: 'rounds', value: {}, event: null }}", rounds)
         }
-        rulebench_fixtures::ModifierDurationPolicy::UntilEvent(event) => format!(
+        rulebench_content::ModifierDurationPolicy::UntilEvent(event) => format!(
             "{{ kind: 'untilEvent', value: null, event: {} }}",
             ts_string(event)
         ),

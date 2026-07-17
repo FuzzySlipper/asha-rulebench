@@ -10,7 +10,6 @@ members = [
     "crates/rulebench-fixtures",
     "crates/rulebench-protocol",
     "crates/rulebench-replay",
-    "crates/rulebench-rpg-adapter",
     "hosts/rulebench-process-host",
 ]
 
@@ -25,6 +24,7 @@ unsafe_code = "forbid"
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rpg-core = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "026889782c4e0b6e5f562ec78426a391269e0265", version = "^0.1" }
-rpg-ir = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "026889782c4e0b6e5f562ec78426a391269e0265", version = "^0.1" }
-rpg-runtime = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "026889782c4e0b6e5f562ec78426a391269e0265", version = "^0.1" }
+rpg-compiler = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "897b05d2a3fda372c2a9a24e3f188ce735a236be", version = "^0.1" }
+rpg-core = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "897b05d2a3fda372c2a9a24e3f188ce735a236be", version = "^0.1" }
+rpg-ir = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "897b05d2a3fda372c2a9a24e3f188ce735a236be", version = "^0.1" }
+rpg-runtime = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "897b05d2a3fda372c2a9a24e3f188ce735a236be", version = "^0.1" }

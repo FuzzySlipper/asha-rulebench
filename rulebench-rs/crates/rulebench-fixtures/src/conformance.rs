@@ -1,13 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rulebench_rpg_adapter::{
-    executable_conformance_capabilities, fingerprint_projected_state, record_replay_package,
-    resolve_use_action, verify_automatic_run_replay, verify_replay_package, CapabilityIdentity,
-    CombatSessionAutomaticRunReadout, CombatSessionAutomaticRunReplayReadout,
-    CombatSessionAutomaticRunReplaySpec, CombatSessionAutomaticRunSpec, CombatSessionCreateRequest,
-    CombatSessionIntentCommandSpec, CombatSessionState, DomainEvent, EffectOperationId,
-    HitEffectOperation, ReplayCommand, ReplayCommandRecordingSpec, RulebenchReceipt,
-    RulebenchRejection, TargetKind, TargetSelection, TargetingOperationId, UseActionIntent,
+use rpg_ir::{
+    EffectOperationId, HitEffectOperation, TargetKind, TargetSelection, TargetingOperationId,
+};
+use rulebench_combat::{
+    fingerprint_projected_state, resolve_use_action, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticRunSpec, CombatSessionCreateRequest, CombatSessionIntentCommandSpec,
+    CombatSessionState, DomainEvent, RulebenchReceipt, RulebenchRejection,
+};
+use rulebench_content::UseActionIntent;
+use rulebench_protocol::{executable_conformance_capabilities, CapabilityIdentity};
+use rulebench_replay::{
+    record_replay_package, verify_automatic_run_replay, verify_replay_package,
+    CombatSessionAutomaticRunReplayReadout, CombatSessionAutomaticRunReplaySpec, ReplayCommand,
+    ReplayCommandRecordingSpec,
 };
 
 use crate::{
@@ -197,7 +203,7 @@ fn append_movement_cases(
 ) {
     let capability = CapabilityIdentity {
         id: "targeting.cellMovement".to_string(),
-        version: rulebench_rpg_adapter::OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+        version: rpg_ir::OperationPipelineV2::VOCABULARY_VERSION.to_string(),
     };
     if !matches_filter(filter.capability_id.as_deref(), &capability.id) {
         return;
@@ -304,7 +310,7 @@ fn execute_scenario_case(
             receipt_has_capability_evidence(&case.scenario, &case.intent, &first, identity)
         });
     let initial_state_fingerprint = fingerprint_projected_state(
-        &rulebench_rpg_adapter::CombatState::from_scenario(&case.scenario)
+        &rulebench_combat::CombatState::from_scenario(&case.scenario)
             .project("conformance-initial"),
     )
     .value;
@@ -366,9 +372,7 @@ fn execute_case_receipt(case: &ScenarioCatalogCase) -> RulebenchReceipt {
         .receipt
 }
 
-fn action_capabilities(
-    action: &rulebench_rpg_adapter::ActionDefinition,
-) -> Vec<CapabilityIdentity> {
+fn action_capabilities(action: &rpg_ir::ActionDefinition) -> Vec<CapabilityIdentity> {
     let targeting = if action.movement.is_some() {
         TargetingOperationId::CellMovement
     } else {
@@ -384,7 +388,7 @@ fn action_capabilities(
     };
     let mut capabilities = vec![CapabilityIdentity {
         id: format!("targeting.{}", targeting.code()),
-        version: rulebench_rpg_adapter::OperationPipelineV2::VOCABULARY_VERSION.to_string(),
+        version: rpg_ir::OperationPipelineV2::VOCABULARY_VERSION.to_string(),
     }];
     if action.movement.is_none() {
         capabilities.extend(
@@ -404,7 +408,7 @@ fn action_capabilities(
 }
 
 fn receipt_has_capability_evidence(
-    scenario: &rulebench_rpg_adapter::RulebenchScenario,
+    scenario: &rulebench_content::RulebenchScenario,
     intent: &UseActionIntent,
     receipt: &RulebenchReceipt,
     capability: &CapabilityIdentity,
@@ -495,7 +499,7 @@ fn receipt_has_capability_evidence(
 }
 
 fn reaction_window_opens(
-    scenario: &rulebench_rpg_adapter::RulebenchScenario,
+    scenario: &rulebench_content::RulebenchScenario,
     intent: &UseActionIntent,
     receipt: &RulebenchReceipt,
 ) -> bool {
@@ -652,7 +656,7 @@ fn execute_rejection_probes(
                 .find(|cell| cell.position == destination)
                 .expect("effect movement destination is registered")
                 .terrain_tags = vec!["blocked".to_string()];
-            let initial = rulebench_rpg_adapter::CombatState::from_scenario(&blocked_scenario)
+            let initial = rulebench_combat::CombatState::from_scenario(&blocked_scenario)
                 .project("rollback-initial");
             let blocked =
                 resolve_use_action(&blocked_scenario, case.intent.clone(), &case.roll_stream);
@@ -713,11 +717,9 @@ fn execute_replay_proof(case: &ScenarioCatalogCase) -> (bool, bool) {
     if let Some(command) = mismatched.commands.first_mut() {
         if let ReplayCommand::Intent(intent) = &mut command.command {
             if intent.intent.target_cell.is_some() {
-                intent.intent.target_cell =
-                    Some(rulebench_rpg_adapter::GridPosition { x: 0, y: 0 });
+                intent.intent.target_cell = Some(rpg_core::GridPosition { x: 0, y: 0 });
             } else if intent.intent.destination_cell.is_some() {
-                intent.intent.destination_cell =
-                    Some(rulebench_rpg_adapter::GridPosition { x: 0, y: 0 });
+                intent.intent.destination_cell = Some(rpg_core::GridPosition { x: 0, y: 0 });
             } else if intent.intent.target_ids.len() > 1 {
                 intent.intent.target_ids.pop();
                 intent.intent.target_id = intent
@@ -803,7 +805,7 @@ fn append_policy_cases(
 }
 
 fn execute_policy_replay_mismatch(
-    scenario: &rulebench_rpg_adapter::RulebenchScenario,
+    scenario: &rulebench_content::RulebenchScenario,
     replay: &CombatSessionAutomaticRunReplayReadout,
 ) -> bool {
     let run = &replay.replayed_run;

@@ -50,7 +50,6 @@ pub use regression::{
     ScenarioRegressionFilter, ScenarioRegressionReport,
 };
 pub use replay_review::replay_review_packages;
-pub use rulebench_rpg_adapter::*;
 pub use scenarios::hexing_bolt::{
     accepted_hexing_bolt_fixture_receipt, combat_session_automatic_run_readouts,
     combat_session_automatic_run_replay_readouts, combat_session_control_history_readouts,
@@ -58,6 +57,8 @@ pub use scenarios::hexing_bolt::{
     hexing_bolt_fixture_scenario, hexing_bolt_scenario_package, rejected_target_fixture_receipt,
     ruleset_catalog_readout, scenario_catalog_cases, turn_control_fixture_scenario,
 };
+
+use rulebench_combat::resolve_use_action;
 
 pub fn scenario_package_registry() -> ScenarioPackageRegistry {
     scenarios::registry()
@@ -100,27 +101,26 @@ pub fn aggregated_content_validation_readouts() -> Vec<ContentValidationReadout>
     scenario_package_registry().content_validation_readouts()
 }
 
-pub fn aggregated_combat_session_transcripts() -> Vec<rulebench_rpg_adapter::CombatSessionTranscript>
-{
+pub fn aggregated_combat_session_transcripts() -> Vec<rulebench_combat::CombatSessionTranscript> {
     scenario_package_registry().combat_session_transcripts()
 }
 
 pub fn aggregated_combat_session_control_history_readouts(
-) -> Vec<rulebench_rpg_adapter::CombatControlHistoryReadout> {
+) -> Vec<rulebench_combat::CombatControlHistoryReadout> {
     scenario_package_registry().combat_session_control_history_readouts()
 }
 
 pub fn aggregated_combat_session_script_readouts(
-) -> Vec<rulebench_rpg_adapter::CombatSessionScriptReadout> {
+) -> Vec<rulebench_combat::CombatSessionScriptReadout> {
     scenario_package_registry().combat_session_script_readouts()
 }
 
 pub fn aggregated_combat_session_automatic_run_readouts(
-) -> Vec<rulebench_rpg_adapter::CombatSessionAutomaticRunReadout> {
+) -> Vec<rulebench_combat::CombatSessionAutomaticRunReadout> {
     scenario_package_registry().combat_session_automatic_run_readouts()
 }
 
 pub fn aggregated_combat_session_automatic_run_replay_readouts(
-) -> Vec<rulebench_rpg_adapter::CombatSessionAutomaticRunReplayReadout> {
+) -> Vec<rulebench_replay::CombatSessionAutomaticRunReplayReadout> {
     scenario_package_registry().combat_session_automatic_run_replay_readouts()
 }

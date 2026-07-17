@@ -749,7 +749,7 @@ checksum = "4e27ee8bb91ca0adcf0ecb116293afa12d393f9c2b9b9cd54d33e8078fe19839"
 [[package]]
 name = "rpg-compiler"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=026889782c4e0b6e5f562ec78426a391269e0265#026889782c4e0b6e5f562ec78426a391269e0265"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=897b05d2a3fda372c2a9a24e3f188ce735a236be#897b05d2a3fda372c2a9a24e3f188ce735a236be"
 dependencies = [
  "rpg-core",
  "rpg-ir",
@@ -759,12 +759,12 @@ dependencies = [
 [[package]]
 name = "rpg-core"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=026889782c4e0b6e5f562ec78426a391269e0265#026889782c4e0b6e5f562ec78426a391269e0265"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=897b05d2a3fda372c2a9a24e3f188ce735a236be#897b05d2a3fda372c2a9a24e3f188ce735a236be"
 
 [[package]]
 name = "rpg-ir"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=026889782c4e0b6e5f562ec78426a391269e0265#026889782c4e0b6e5f562ec78426a391269e0265"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=897b05d2a3fda372c2a9a24e3f188ce735a236be#897b05d2a3fda372c2a9a24e3f188ce735a236be"
 dependencies = [
  "rpg-core",
  "serde",
@@ -774,7 +774,7 @@ dependencies = [
 [[package]]
 name = "rpg-runtime"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=026889782c4e0b6e5f562ec78426a391269e0265#026889782c4e0b6e5f562ec78426a391269e0265"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=897b05d2a3fda372c2a9a24e3f188ce735a236be#897b05d2a3fda372c2a9a24e3f188ce735a236be"
 dependencies = [
  "asha-gameplay-module-sdk",
  "asha-runtime-session-composition",
@@ -935,24 +935,37 @@ dependencies = [
 name = "rulebench-authority"
 version = "0.1.0"
 dependencies = [
+ "rpg-core",
+ "rpg-ir",
  "rulebench-codegen",
+ "rulebench-combat",
  "rulebench-fixtures",
+ "rulebench-replay",
 ]
 
 [[package]]
 name = "rulebench-bridge"
 version = "0.1.0"
 dependencies = [
+ "rpg-core",
+ "rpg-ir",
+ "rulebench-combat",
+ "rulebench-content",
  "rulebench-protocol",
- "rulebench-rpg-adapter",
+ "rulebench-replay",
 ]
 
 [[package]]
 name = "rulebench-codegen"
 version = "0.1.0"
 dependencies = [
+ "rpg-core",
+ "rpg-ir",
+ "rulebench-combat",
+ "rulebench-content",
  "rulebench-fixtures",
  "rulebench-protocol",
+ "rulebench-replay",
 ]
 
 [[package]]
@@ -969,15 +982,23 @@ dependencies = [
 name = "rulebench-content"
 version = "0.1.0"
 dependencies = [
+ "rpg-compiler",
  "rpg-core",
  "rpg-ir",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "rulebench-fixtures"
 version = "0.1.0"
 dependencies = [
- "rulebench-rpg-adapter",
+ "rpg-core",
+ "rpg-ir",
+ "rulebench-combat",
+ "rulebench-content",
+ "rulebench-protocol",
+ "rulebench-replay",
 ]
 
 [[package]]
@@ -995,7 +1016,11 @@ dependencies = [
 name = "rulebench-protocol"
 version = "0.1.0"
 dependencies = [
- "rulebench-rpg-adapter",
+ "rpg-core",
+ "rpg-ir",
+ "rulebench-combat",
+ "rulebench-content",
+ "rulebench-replay",
  "serde",
  "serde_json",
 ]
@@ -1006,17 +1031,6 @@ version = "0.1.0"
 dependencies = [
  "rpg-core",
  "rulebench-combat",
-]
-
-[[package]]
-name = "rulebench-rpg-adapter"
-version = "0.1.0"
-dependencies = [
- "rpg-core",
- "rpg-ir",
- "rulebench-combat",
- "rulebench-content",
- "rulebench-replay",
 ]
 
 [[package]]

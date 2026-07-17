@@ -1,6 +1,6 @@
 //! Rulebench-local command entrypoints and integration test harness.
 //!
-//! Authority behavior lives in `rulebench-rpg-adapter`; authored scenario content and
+//! Authority behavior lives in focused product owners; authored scenario content and
 //! regression evidence live in `rulebench-fixtures`; checked TypeScript artifact
 //! rendering lives in `rulebench-codegen`. This crate intentionally provides no
 //! library compatibility API: its two stable binary entrypoints preserve the
@@ -17,7 +17,11 @@ mod tests;
 
 #[cfg(test)]
 pub(crate) mod test_support {
+    pub(crate) use rpg_core::*;
+    pub(crate) use rpg_ir::*;
+    pub(crate) use rulebench_combat::*;
     pub(crate) use rulebench_fixtures::*;
+    pub(crate) use rulebench_replay::*;
 
     pub(crate) fn scenario_catalog_summaries() -> Vec<ScenarioCatalogSummary> {
         aggregated_scenario_catalog_cases()

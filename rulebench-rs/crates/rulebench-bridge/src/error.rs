@@ -1,7 +1,6 @@
-use rulebench_rpg_adapter::{
-    AuthoredActionBindingError, CombatSessionApiError, ReplayArchiveError, SessionRecoveryError,
-    SessionRecoveryStorageError,
-};
+use rulebench_combat::CombatSessionApiError;
+use rulebench_content::AuthoredActionBindingError;
+use rulebench_replay::{ReplayArchiveError, SessionRecoveryError, SessionRecoveryStorageError};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

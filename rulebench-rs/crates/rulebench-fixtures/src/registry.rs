@@ -1,10 +1,11 @@
 use std::collections::HashSet;
 
-use rulebench_rpg_adapter::{
-    CombatControlHistoryReadout, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticRunReplayReadout, CombatSessionScriptReadout, CombatSessionTranscript,
-    EffectOperationId, OperationPipelineV2, RulesetProviderCatalog,
+use rpg_ir::{EffectOperationId, OperationPipelineV2, RulesetProviderCatalog};
+use rulebench_combat::{
+    CombatControlHistoryReadout, CombatSessionAutomaticRunReadout, CombatSessionScriptReadout,
+    CombatSessionTranscript,
 };
+use rulebench_replay::CombatSessionAutomaticRunReplayReadout;
 
 use crate::{
     ContentValidationReadout, RulesetCatalogReadout, ScenarioCatalogCase, ScenarioPackage,
@@ -285,16 +286,16 @@ fn validate_package_provider(
     }
 }
 
-fn check_capability(check: &rulebench_rpg_adapter::CheckDeclaration) -> (String, String) {
+fn check_capability(check: &rpg_ir::CheckDeclaration) -> (String, String) {
     let id = match check {
-        rulebench_rpg_adapter::CheckDeclaration::Attack(_) => "check.attackVsDefense",
-        rulebench_rpg_adapter::CheckDeclaration::SavingThrow(_) => "check.savingThrow",
-        rulebench_rpg_adapter::CheckDeclaration::Contested(_) => "check.contested",
+        rpg_ir::CheckDeclaration::Attack(_) => "check.attackVsDefense",
+        rpg_ir::CheckDeclaration::SavingThrow(_) => "check.savingThrow",
+        rpg_ir::CheckDeclaration::Contested(_) => "check.contested",
     };
     (id.to_string(), "1".to_string())
 }
 
-fn targeting_capability(action: &rulebench_rpg_adapter::ActionDefinition) -> (String, String) {
+fn targeting_capability(action: &rpg_ir::ActionDefinition) -> (String, String) {
     let id = if action.movement.is_some() {
         "targeting.cellMovement"
     } else {
@@ -303,18 +304,14 @@ fn targeting_capability(action: &rulebench_rpg_adapter::ActionDefinition) -> (St
             action.targeting.selection,
             action.targeting.operation_pipeline.as_ref(),
         ) {
-            (
-                rulebench_rpg_adapter::TargetKind::Combatant,
-                rulebench_rpg_adapter::TargetSelection::Single,
-                _,
-            ) => "targeting.singleCombatant",
-            (
-                rulebench_rpg_adapter::TargetKind::Combatant,
-                rulebench_rpg_adapter::TargetSelection::Multiple,
-                _,
-            ) => "targeting.multipleCombatants",
-            (rulebench_rpg_adapter::TargetKind::Area, _, Some(_)) => "targeting.manhattanBurstArea",
-            (rulebench_rpg_adapter::TargetKind::Area, _, None) => "targeting.cellMovement",
+            (rpg_ir::TargetKind::Combatant, rpg_ir::TargetSelection::Single, _) => {
+                "targeting.singleCombatant"
+            }
+            (rpg_ir::TargetKind::Combatant, rpg_ir::TargetSelection::Multiple, _) => {
+                "targeting.multipleCombatants"
+            }
+            (rpg_ir::TargetKind::Area, _, Some(_)) => "targeting.manhattanBurstArea",
+            (rpg_ir::TargetKind::Area, _, None) => "targeting.cellMovement",
         }
     };
     (

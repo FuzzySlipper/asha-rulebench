@@ -1,4 +1,4 @@
-use rulebench_rpg_adapter::{
+use crate::{
     CapabilityEntry, CapabilityIdentity, HostCapabilityProfile, RulebenchCapabilityManifest,
     RulesetProviderManifestEntry,
 };
@@ -178,9 +178,7 @@ impl From<&HostCapabilityProfile> for HostCapabilityProfileDto {
 
 #[cfg(test)]
 mod tests {
-    use rulebench_rpg_adapter::{
-        assemble_capability_manifest, CapabilityRegistryInput, HostCapabilityProfile,
-    };
+    use crate::{assemble_capability_manifest, CapabilityRegistryInput, HostCapabilityProfile};
 
     use super::*;
 

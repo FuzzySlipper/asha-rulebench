@@ -1,7 +1,10 @@
-use rulebench_rpg_adapter::{
-    record_replay_package, CombatControlCommandSpec, CombatSessionCreateRequest,
-    CombatSessionIntentCommandSpec, ReplayCommand, ReplayCommandRecordingSpec, ReplayNarration,
-    ReplayPackage, UseActionIntent,
+use rulebench_combat::{
+    CombatControlCommandSpec, CombatSessionCreateRequest, CombatSessionIntentCommandSpec,
+};
+use rulebench_content::UseActionIntent;
+use rulebench_replay::{
+    record_replay_package, ReplayCommand, ReplayCommandRecordingSpec, ReplayNarration,
+    ReplayPackage,
 };
 
 use crate::{content_import_examples, hexing_bolt_fixture_scenario, ContentImportExampleOutcome};
@@ -92,7 +95,7 @@ fn replay_package(package_id: &str, session_id: &str, explicit_start: bool) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_rpg_adapter::{compare_replay_packages, verify_replay_package};
+    use rulebench_replay::{compare_replay_packages, verify_replay_package};
 
     #[test]
     fn review_packages_verify_and_expose_a_structural_comparison() {

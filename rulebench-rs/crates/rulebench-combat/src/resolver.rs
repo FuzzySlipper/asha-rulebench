@@ -62,6 +62,16 @@ pub fn resolve_use_action(
     intent: UseActionIntent,
     roll_stream: &[i32],
 ) -> RulebenchReceipt {
+    if let Some(source_action_id) =
+        crate::rpg_resolver::rpg_dispatch_action_id(scenario, &intent.action_id)
+    {
+        return crate::rpg_resolver::resolve_rpg_use_action(
+            scenario,
+            intent,
+            &source_action_id,
+            roll_stream,
+        );
+    }
     let mut trace = vec![TraceEntry::new(
         1,
         TracePhase::Proposal,

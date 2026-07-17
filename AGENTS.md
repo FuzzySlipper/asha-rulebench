@@ -76,7 +76,7 @@ pnpm run certify
 
 # Explicit focused checks; repeat --profile to take the safe union
 pnpm run verify:change -- --profile frontend
-pnpm run verify:change -- --profile rust-owner --crate rulebench-rpg-adapter
+pnpm run verify:change -- --profile rust-owner --crate rulebench-combat
 pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
 
 # LAN-first development server
@@ -95,9 +95,8 @@ Git diff. Use `frontend` for production TypeScript, `browser` for routes and
 visible workflows, `rust-owner --crate <workspace-owner>` for a changed Rust
 owner, `protocol-generated` for protocol/emitter/generated-consumer changes,
 `fixtures-conformance` for fixture/registry/capability work, `host-transport`
-for bridge/process-host/transport/store work, `portable --crate
-<portable-owner>` for portable/public Cargo surfaces, and `docs` for command or
-support documentation. Combine profiles when a change crosses owners. Exact
+for bridge/process-host/transport/store work, and `docs` for command or support
+documentation. Combine profiles when a change crosses owners. Exact
 fixture filters are `--package`, `--package-version`, `--ruleset`,
 `--ruleset-version`, `--scenario`, and `--capability`; omitting a safe filter
 runs the full regression/conformance corpus. Use `--dry-run` to inspect the

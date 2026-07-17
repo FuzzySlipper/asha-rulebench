@@ -12,21 +12,21 @@ use rulebench_fixtures::{
     replay_review_packages, resolve_catalog_scenario,
 };
 use rulebench_fixtures::{
-    assemble_capability_manifest, capability_registry_input, compiled_ruleset_provider_catalog,
-    scenario_package_registry, HostCapabilityProfile,
+    capability_registry_input, compiled_ruleset_provider_catalog, scenario_package_registry,
 };
 use rulebench_protocol::{
-    AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
-    CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
-    ContentCloneDraftRequestDto, ContentImportRequestDto, ContentPayloadRequestDto,
-    ContentReferenceRequestDto, ContentTemplateDraftRequestDto, ExperimentComparisonRequestDto,
-    ExperimentMatrixRequestDto, LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto,
-    LiveCommandExecutionDto, LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto,
-    LiveSessionSnapshotDto, LiveTransportErrorDto, ProtocolRequestContextDto,
-    ReactionCommandSpecDto, ReplayComparisonRequestDto, RulebenchCapabilityManifestDto,
-    SessionRecoveryCatalogDto, SessionRecoveryForkRequestDto, SessionRecoveryIssueDto,
-    UseActionIntentDto, ViewerScenarioReadoutDto, ViewerScenarioSummaryDto,
-    ViewerSessionTranscriptDto, PROTOCOL_VERSION,
+    assemble_capability_manifest, AutomaticRunRequestDto, AutomaticStepRequestDto,
+    CombatControlCommandDto, CombatSessionCreateRequestDto, CombatSessionHandleDto,
+    CombatSessionIntentCommandDto, ContentCloneDraftRequestDto, ContentImportRequestDto,
+    ContentPayloadRequestDto, ContentReferenceRequestDto, ContentTemplateDraftRequestDto,
+    ExperimentComparisonRequestDto, ExperimentMatrixRequestDto, HostCapabilityProfile,
+    LiveAutomaticRunDto, LiveAutomaticStepDto, LiveCandidateSummaryDto, LiveCommandExecutionDto,
+    LiveControlExecutionDto, LivePreflightDto, LiveReactionExecutionDto, LiveSessionSnapshotDto,
+    LiveTransportErrorDto, ProtocolRequestContextDto, ReactionCommandSpecDto,
+    ReplayComparisonRequestDto, RulebenchCapabilityManifestDto, SessionRecoveryCatalogDto,
+    SessionRecoveryForkRequestDto, SessionRecoveryIssueDto, UseActionIntentDto,
+    ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionTranscriptDto,
+    PROTOCOL_VERSION,
 };
 
 const API_PREFIX: &str = "/api/rulebench/v1";

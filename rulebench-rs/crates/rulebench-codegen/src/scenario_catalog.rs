@@ -1,11 +1,17 @@
+use rpg_core::Team;
+use rpg_ir::{CheckDeclaration, RulesetMetadata, VisibilityRequirement};
+use rulebench_combat::{
+    AttackOutcome, DomainEvent, FinalCombatantState, ScenarioProjection, TargetLegality,
+    TraceEntry, TracePhase, TraceStatus,
+};
+use rulebench_content::{
+    Combatant, ContentDiagnostic, ContentDiagnosticSeverity, ContentValidationReport,
+    RulebenchScenario,
+};
 use rulebench_fixtures::{
     aggregated_content_validation_readouts, aggregated_ruleset_catalog_readout,
-    aggregated_scenario_catalog_cases, resolve_catalog_scenario, AttackOutcome, CheckDeclaration,
-    Combatant, ContentDiagnostic, ContentDiagnosticSeverity, ContentImportExampleOutcome,
-    ContentValidationReadout, ContentValidationReport, DomainEvent, FinalCombatantState,
-    RulebenchScenario, RulesetCatalogReadout, RulesetMetadata, ScenarioCatalogSummary,
-    ScenarioOutcomeClass, ScenarioProjection, TargetLegality, Team, TraceEntry, TracePhase,
-    TraceStatus, VisibilityRequirement,
+    aggregated_scenario_catalog_cases, resolve_catalog_scenario, ContentImportExampleOutcome,
+    ContentValidationReadout, RulesetCatalogReadout, ScenarioCatalogSummary, ScenarioOutcomeClass,
 };
 use rulebench_protocol::ContentImportReadoutDto;
 
@@ -540,8 +546,8 @@ fn render_event(sequence: u32, event: &DomainEvent) -> String {
             &format!(
                 "Saving throw total {total} against DC {difficulty_class}: {}.",
                 match outcome {
-                    rulebench_fixtures::SavingThrowOutcome::Saved => "saved",
-                    rulebench_fixtures::SavingThrowOutcome::Failed => "failed",
+                    rulebench_combat::SavingThrowOutcome::Saved => "saved",
+                    rulebench_combat::SavingThrowOutcome::Failed => "failed",
                 }
             ),
             &[actor_id.as_str(), target_id.as_str()],
@@ -558,8 +564,8 @@ fn render_event(sequence: u32, event: &DomainEvent) -> String {
             &format!(
                 "Contested totals {actor_total} versus {target_total}: {}.",
                 match outcome {
-                    rulebench_fixtures::ContestedCheckOutcome::ActorWins => "actor wins",
-                    rulebench_fixtures::ContestedCheckOutcome::TargetWins => "target wins",
+                    rulebench_combat::ContestedCheckOutcome::ActorWins => "actor wins",
+                    rulebench_combat::ContestedCheckOutcome::TargetWins => "target wins",
                 }
             ),
             &[actor_id.as_str(), target_id.as_str()],

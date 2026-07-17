@@ -948,7 +948,7 @@ fn resolver_rejects_invalid_action_without_events() {
 }
 
 #[test]
-fn resolver_rejects_action_missing_from_catalog() {
+fn typescript_authored_action_executes_without_a_parallel_legacy_catalog_entry() {
     let mut scenario = hexing_bolt_fixture_scenario();
     scenario.actions.clear();
 
@@ -958,10 +958,17 @@ fn resolver_rejects_action_missing_from_catalog() {
         &[17, 5],
     );
 
-    assert!(!receipt.accepted);
-    assert_eq!(receipt.rejection, Some(RulebenchRejection::InvalidAction));
-    assert!(receipt.events.is_empty());
-    assert!(receipt.attack_roll.is_none());
+    assert!(receipt.accepted);
+    assert_eq!(receipt.authority_surface, ASHA_RPG_AUTHORITY_SURFACE);
+    assert_eq!(receipt.attack_roll.map(|roll| roll.total), Some(25));
+    assert!(receipt.events.iter().any(|event| matches!(
+        event,
+        DomainEvent::DamageApplied {
+            target_id,
+            amount: 9,
+            ..
+        } if target_id == "entity-raider"
+    )));
 }
 
 #[test]

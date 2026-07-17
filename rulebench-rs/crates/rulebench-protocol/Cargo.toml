@@ -9,7 +9,11 @@ description = "Stable transport protocol surfaces for ASHA Rulebench authority."
 workspace = true
 
 [dependencies]
-rulebench-rpg-adapter = { path = "../rulebench-rpg-adapter" }
+rulebench-combat = { path = "../rulebench-combat" }
+rulebench-content = { path = "../rulebench-content" }
+rulebench-replay = { path = "../rulebench-replay" }
+rpg-core.workspace = true
+rpg-ir.workspace = true
 serde.workspace = true
 
 [dev-dependencies]

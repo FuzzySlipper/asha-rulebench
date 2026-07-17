@@ -1,6 +1,6 @@
-use rulebench_rpg_adapter::{
-    ContentValidationReport, RulebenchReceipt, RulebenchScenario, RulesetMetadata, UseActionIntent,
-};
+use rpg_ir::RulesetMetadata;
+use rulebench_combat::RulebenchReceipt;
+use rulebench_content::{ContentValidationReport, RulebenchScenario, UseActionIntent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScenarioOutcomeClass {

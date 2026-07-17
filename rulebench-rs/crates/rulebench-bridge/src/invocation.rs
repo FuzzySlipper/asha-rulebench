@@ -1,5 +1,15 @@
 use std::collections::BTreeMap;
 
+use rpg_ir::RulesetArtifactProvenance;
+use rulebench_combat::{
+    CombatControlReadout, CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
+    CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
+    CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
+    CurrentActorOptionSummary, ReactionCommandReadout, AUTHORITY_SURFACE,
+};
+use rulebench_content::{
+    bind_authored_action, ContentPackSetReference, ImportedContentPack, RulebenchScenario,
+};
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomaticStepRequestDto, CombatControlCommandDto,
     CombatSessionCreateRequestDto, CombatSessionHandleDto, CombatSessionIntentCommandDto,
@@ -10,16 +20,11 @@ use rulebench_protocol::{
     ViewerScenarioReadoutDto, ViewerScenarioSummaryDto, ViewerSessionStepReadoutDto,
     ViewerSessionSummaryDto, ViewerSessionTranscriptDto, PROTOCOL_ID, PROTOCOL_VERSION,
 };
-use rulebench_rpg_adapter::{
-    bind_authored_action, compare_replay_packages, record_replay_package, verify_replay_package,
-    CombatControlReadout, CombatSessionApi, CombatSessionArchive, CombatSessionAutomaticRunReadout,
-    CombatSessionAutomaticStepExecutionReadout, CombatSessionCreateReadout, CombatSessionSnapshot,
-    CombatSessionStepReadout, CommandCandidateSummary, CommandPreflightReadout,
-    ContentPackSetReference, CurrentActorOptionSummary, ImportedContentPack,
-    InMemoryReplayArchiveStorage, InMemorySessionRecoveryStorage, ReactionCommandReadout,
-    ReplayArchive, ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand,
-    ReplayCommandRecordingSpec, ReplayPackage, RulebenchScenario, RulesetArtifactProvenance,
-    SessionRecoveryPackage, SessionRecoveryStorage, AUTHORITY_SURFACE,
+use rulebench_replay::{
+    compare_replay_packages, record_replay_package, verify_replay_package,
+    InMemoryReplayArchiveStorage, InMemorySessionRecoveryStorage, ReplayArchive,
+    ReplayArchiveQuery, ReplayArchiveStorage, ReplayCommand, ReplayCommandRecordingSpec,
+    ReplayPackage, SessionRecoveryPackage, SessionRecoveryStorage,
 };
 
 use crate::{BridgeError, BridgeErrorKind};
@@ -87,13 +92,13 @@ impl BridgeScenario {
 
     pub fn with_authored_control(
         mut self,
-        control: &rulebench_rpg_adapter::AuthoredScenarioControl,
+        control: &rulebench_content::AuthoredScenarioControl,
     ) -> Self {
         self.option.control_mode = match control.mode {
-            rulebench_rpg_adapter::AuthoredScenarioControlMode::Manual => {
+            rulebench_content::AuthoredScenarioControlMode::Manual => {
                 ScenarioControlModeDto::Manual
             }
-            rulebench_rpg_adapter::AuthoredScenarioControlMode::Automatic => {
+            rulebench_content::AuthoredScenarioControlMode::Automatic => {
                 ScenarioControlModeDto::Automatic
             }
         };
@@ -126,7 +131,7 @@ impl std::fmt::Debug for RulebenchBridge {
 
 #[derive(Debug, Clone)]
 pub(crate) struct LiveReplayRecording {
-    pub(crate) initial_session: rulebench_rpg_adapter::CombatSessionCreateRequest,
+    pub(crate) initial_session: rulebench_combat::CombatSessionCreateRequest,
     pub(crate) commands: Vec<ReplayCommandRecordingSpec>,
     pub(crate) origin: String,
 }
@@ -408,7 +413,7 @@ impl RulebenchBridge {
         content_ruleset: Option<RulesetArtifactProvenance>,
         authored_action: Option<(
             &ImportedContentPack,
-            rulebench_rpg_adapter::AuthoredActionBindingRequest,
+            rulebench_content::AuthoredActionBindingRequest,
         )>,
         scenario_override: Option<RulebenchScenario>,
     ) -> Result<CombatSessionCreateReadout, BridgeError> {
@@ -462,13 +467,13 @@ impl RulebenchBridge {
         } else if let Some(content_pack_set) = content_pack_set {
             configured_scenario.content_pack_set = Some(content_pack_set);
         }
-        let initial_session = rulebench_rpg_adapter::CombatSessionCreateRequest::new(
+        let initial_session = rulebench_combat::CombatSessionCreateRequest::new(
             &request.session_id,
             prepare_replay_scenario(configured_scenario.clone()),
         );
         let readout = self
             .sessions
-            .create_session(rulebench_rpg_adapter::CombatSessionCreateRequest::new(
+            .create_session(rulebench_combat::CombatSessionCreateRequest::new(
                 &request.session_id,
                 configured_scenario,
             ))
@@ -1023,17 +1028,17 @@ pub fn prepare_replay_scenario(mut scenario: RulebenchScenario) -> RulebenchScen
     if scenario.content_pack_set.is_some() {
         return scenario;
     }
-    let root = rulebench_rpg_adapter::ContentPackReference {
+    let root = rulebench_content::ContentPackReference {
         id: format!("scenario.{}", scenario.metadata.id),
         version: "0.1.0".to_string(),
-        fingerprint: rulebench_rpg_adapter::ContentFingerprint {
+        fingerprint: rulebench_content::ContentFingerprint {
             algorithm: "rulebench-scenario.v0".to_string(),
             value: scenario.metadata.id.clone(),
         },
     };
     let packs = vec![root.clone()];
-    scenario.content_pack_set = Some(rulebench_rpg_adapter::ContentPackSetReference {
-        fingerprint: rulebench_rpg_adapter::fingerprint_content_pack_set(&root, &packs),
+    scenario.content_pack_set = Some(rulebench_content::ContentPackSetReference {
+        fingerprint: rulebench_content::fingerprint_content_pack_set(&root, &packs),
         root,
         packs,
     });

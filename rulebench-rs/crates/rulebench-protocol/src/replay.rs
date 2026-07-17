@@ -1,7 +1,8 @@
-use rulebench_rpg_adapter::{
+use rulebench_combat::StateFingerprint;
+use rulebench_replay::{
     inspect_replay_package, ReplayArchiveError, ReplayArchiveMetadata, ReplayCommandInspection,
     ReplayComparisonDifference, ReplayComparisonReadout, ReplayMismatch, ReplayPackage,
-    ReplayStepEvidence, ReplayVerificationReadout, StateFingerprint,
+    ReplayStepEvidence, ReplayVerificationReadout,
 };
 use serde::{Deserialize, Serialize};
 
@@ -347,7 +348,7 @@ impl From<&ReplayArchiveError> for ReplayArchiveErrorDto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rulebench_rpg_adapter::{
+    use rulebench_replay::{
         ReplayComparisonDifferenceCode, ReplayMismatchDimension, ReplayVerificationDecisionKind,
     };
 
@@ -381,7 +382,7 @@ mod tests {
         let readout = ReplayVerificationReadout {
             accepted: false,
             decision_kind: ReplayVerificationDecisionKind::MismatchedEvidence,
-            package_validation: rulebench_rpg_adapter::ReplayPackageValidationReport {
+            package_validation: rulebench_replay::ReplayPackageValidationReport {
                 accepted: true,
                 diagnostics: Vec::new(),
             },
@@ -408,7 +409,7 @@ mod tests {
             version: "2.0.0".to_string(),
         });
         let storage = ReplayArchiveErrorDto::from(&ReplayArchiveError::Storage(
-            rulebench_rpg_adapter::ReplayArchiveStorageError::WriteFailed {
+            rulebench_replay::ReplayArchiveStorageError::WriteFailed {
                 package_id: "replay".to_string(),
             },
         ));

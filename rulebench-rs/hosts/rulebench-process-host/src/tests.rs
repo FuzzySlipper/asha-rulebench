@@ -1118,7 +1118,7 @@ fn shatterline_v4_scenarios_materialize_run_and_recover_from_exact_authored_cont
     ));
     let executed: LiveCommandExecutionDto =
         serde_json::from_slice(&executed.body).expect("authored action execution is JSON");
-    assert!(executed.step.accepted);
+    assert!(executed.step.accepted, "{:?}", executed.step);
     drop(router);
 
     let mut restarted =
@@ -2121,7 +2121,7 @@ fn active_authored_action_executes_and_rebinds_across_recovery_fork_and_replay_r
     );
     let executed: LiveCommandExecutionDto =
         serde_json::from_slice(&executed.body).expect("authored execution is JSON");
-    assert!(executed.step.accepted);
+    assert!(executed.step.accepted, "{:?}", executed.step);
     assert_eq!(
         executed.snapshot.authored_action_binding,
         Some(receipt.clone())

@@ -1,0 +1,714 @@
+{
+  "_generated": {
+    "emitter": "libs/content-authoring",
+    "schema": "asha-rulebench.rpg-content@1"
+  },
+  "normalizedIr": {
+    "actions": [
+      {
+        "check": {
+          "defenseId": "guard",
+          "kind": "attack",
+          "modifier": {
+            "kind": "add",
+            "terms": [
+              {
+                "kind": "constant",
+                "value": 1
+              },
+              {
+                "kind": "readStat",
+                "statId": "focus",
+                "subject": "actor"
+              }
+            ]
+          }
+        },
+        "costs": [
+          {
+            "amount": 1,
+            "resourceId": "standard-action"
+          }
+        ],
+        "id": "action.anchor-lash",
+        "name": "Anchor Lash",
+        "program": {
+          "body": {
+            "hit": {
+              "kind": "operation",
+              "operation": {
+                "amount": {
+                  "bonus": 2,
+                  "count": 1,
+                  "kind": "dice",
+                  "sides": 6
+                },
+                "damageType": "kinetic",
+                "kind": "damage"
+              }
+            },
+            "kind": "onCheck"
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/actions/anchor-lash",
+        "targets": {
+          "maximumRange": 3,
+          "maximumTargets": 1,
+          "team": "hostile"
+        }
+      },
+      {
+        "check": {
+          "defenseId": "nerve",
+          "kind": "attack",
+          "modifier": {
+            "kind": "add",
+            "terms": [
+              {
+                "kind": "constant",
+                "value": 4
+              },
+              {
+                "kind": "readStat",
+                "statId": "mind",
+                "subject": "actor"
+              }
+            ]
+          }
+        },
+        "costs": [
+          {
+            "amount": 1,
+            "resourceId": "standard-action"
+          }
+        ],
+        "id": "action.authored-reaction",
+        "name": "Authored Reaction Compatibility",
+        "program": {
+          "body": {
+            "hit": {
+              "kind": "sequence",
+              "steps": [
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "amount": {
+                      "bonus": 4,
+                      "count": 1,
+                      "kind": "dice",
+                      "sides": 6
+                    },
+                    "damageType": "arcane",
+                    "kind": "damage"
+                  }
+                },
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "durationTurns": 1,
+                    "kind": "applyModifier",
+                    "modifierId": "modifier.binding-glyph.anchored",
+                    "stacking": "refresh",
+                    "stackingGroup": "binding-glyph-anchor",
+                    "value": {
+                      "kind": "constant",
+                      "value": -1
+                    }
+                  }
+                }
+              ]
+            },
+            "kind": "onCheck"
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/compatibility/authored-reaction",
+        "targets": {
+          "maximumRange": 10,
+          "maximumTargets": 1,
+          "team": "hostile"
+        }
+      },
+      {
+        "check": {
+          "defenseId": "body",
+          "difficulty": {
+            "kind": "constant",
+            "value": 12
+          },
+          "kind": "savingThrow"
+        },
+        "costs": [
+          {
+            "amount": 1,
+            "resourceId": "standard-action"
+          }
+        ],
+        "id": "action.binding-glyph",
+        "name": "Binding Glyph",
+        "program": {
+          "body": {
+            "failed": {
+              "kind": "sequence",
+              "steps": [
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "amount": {
+                      "bonus": 4,
+                      "count": 1,
+                      "kind": "dice",
+                      "sides": 6
+                    },
+                    "damageType": "arcane",
+                    "kind": "damage"
+                  }
+                },
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "durationTurns": 1,
+                    "kind": "applyModifier",
+                    "modifierId": "modifier.binding-glyph.anchored",
+                    "stacking": "refresh",
+                    "stackingGroup": "binding-glyph-anchor",
+                    "value": {
+                      "kind": "constant",
+                      "value": -1
+                    }
+                  }
+                }
+              ]
+            },
+            "kind": "onCheck"
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/compatibility/binding-glyph",
+        "targets": {
+          "maximumRange": 6,
+          "maximumTargets": 1,
+          "team": "hostile"
+        }
+      },
+      {
+        "check": {
+          "defenseId": "resolve",
+          "difficulty": {
+            "kind": "constant",
+            "value": 11
+          },
+          "kind": "savingThrow"
+        },
+        "costs": [
+          {
+            "amount": 1,
+            "resourceId": "standard-action"
+          }
+        ],
+        "id": "action.binding-spark",
+        "name": "Binding Spark",
+        "program": {
+          "body": {
+            "failed": {
+              "kind": "sequence",
+              "steps": [
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "amount": {
+                      "bonus": 1,
+                      "count": 1,
+                      "kind": "dice",
+                      "sides": 6
+                    },
+                    "damageType": "arcane",
+                    "kind": "damage"
+                  }
+                },
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "durationTurns": 2,
+                    "kind": "applyModifier",
+                    "modifierId": "modifier.binding-spark.anchored",
+                    "stacking": "refresh",
+                    "stackingGroup": "movement-control",
+                    "value": {
+                      "kind": "constant",
+                      "value": -2
+                    }
+                  }
+                }
+              ]
+            },
+            "kind": "onCheck",
+            "saved": {
+              "kind": "operation",
+              "operation": {
+                "amount": {
+                  "kind": "half",
+                  "value": {
+                    "bonus": 1,
+                    "count": 1,
+                    "kind": "dice",
+                    "sides": 6
+                  }
+                },
+                "damageType": "arcane",
+                "kind": "damage"
+              }
+            }
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/actions/binding-spark",
+        "targets": {
+          "maximumRange": 5,
+          "maximumTargets": 1,
+          "team": "hostile"
+        }
+      },
+      {
+        "check": {
+          "defenseId": "guard",
+          "kind": "attack",
+          "modifier": {
+            "kind": "readStat",
+            "statId": "power",
+            "subject": "actor"
+          }
+        },
+        "costs": [],
+        "id": "action.intercepting-strike",
+        "name": "Intercepting Strike",
+        "program": {
+          "body": {
+            "hit": {
+              "kind": "operation",
+              "operation": {
+                "amount": {
+                  "bonus": 0,
+                  "count": 1,
+                  "kind": "dice",
+                  "sides": 8
+                },
+                "damageType": "kinetic",
+                "kind": "damage"
+              }
+            },
+            "kind": "onCheck"
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/scenarios/shatterline/intercepting-strike",
+        "targets": {
+          "maximumRange": 2,
+          "maximumTargets": 1,
+          "team": "hostile"
+        }
+      },
+      {
+        "check": {
+          "kind": "noRoll"
+        },
+        "costs": [],
+        "id": "action.rallying-mend",
+        "name": "Rallying Mend",
+        "program": {
+          "body": {
+            "kind": "onCheck",
+            "noRoll": {
+              "kind": "sequence",
+              "steps": [
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "amount": {
+                      "bonus": 2,
+                      "count": 1,
+                      "kind": "dice",
+                      "sides": 6
+                    },
+                    "kind": "heal"
+                  }
+                },
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "delta": {
+                      "kind": "constant",
+                      "value": 1
+                    },
+                    "kind": "changeResource",
+                    "resourceId": "focus",
+                    "subject": "actor"
+                  }
+                }
+              ]
+            }
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "none",
+        "sourcePath": "rulebench/archetypes/anchor/rallying-mend",
+        "targets": {
+          "maximumRange": 4,
+          "maximumTargets": 1,
+          "team": "ally"
+        }
+      },
+      {
+        "check": {
+          "defenseId": "resolve",
+          "difficulty": {
+            "kind": "constant",
+            "value": 13
+          },
+          "kind": "savingThrow"
+        },
+        "costs": [
+          {
+            "amount": 1,
+            "resourceId": "standard-action"
+          }
+        ],
+        "id": "action.shatterline-burst",
+        "name": "Shatterline Burst",
+        "program": {
+          "body": {
+            "body": {
+              "failed": {
+                "kind": "operation",
+                "operation": {
+                  "amount": {
+                    "bonus": 0,
+                    "count": 2,
+                    "kind": "dice",
+                    "sides": 4
+                  },
+                  "damageType": "force",
+                  "kind": "damage"
+                }
+              },
+              "kind": "onCheck",
+              "saved": {
+                "kind": "operation",
+                "operation": {
+                  "amount": {
+                    "kind": "half",
+                    "value": {
+                      "bonus": 0,
+                      "count": 2,
+                      "kind": "dice",
+                      "sides": 4
+                    }
+                  },
+                  "damageType": "force",
+                  "kind": "damage"
+                }
+              }
+            },
+            "kind": "forEachTarget",
+            "maximum": 3
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/items/shatterline-focus",
+        "targets": {
+          "maximumRange": 6,
+          "maximumTargets": 3,
+          "team": "hostile"
+        }
+      },
+      {
+        "check": {
+          "kind": "noRoll"
+        },
+        "costs": [],
+        "id": "action.tactical-shift",
+        "name": "Tactical Shift",
+        "program": {
+          "body": {
+            "kind": "onCheck",
+            "noRoll": {
+              "kind": "operation",
+              "operation": {
+                "deltaX": {
+                  "kind": "constant",
+                  "value": 2
+                },
+                "deltaY": {
+                  "kind": "constant",
+                  "value": 0
+                },
+                "kind": "move",
+                "maximumDistance": 2,
+                "provokes": false,
+                "subject": "target"
+              }
+            }
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "none",
+        "sourcePath": "rulebench/scenarios/shatterline/tactical-shift",
+        "targets": {
+          "maximumRange": 4,
+          "maximumTargets": 1,
+          "team": "ally"
+        }
+      },
+      {
+        "check": {
+          "defenseId": "nerve",
+          "kind": "attack",
+          "modifier": {
+            "kind": "add",
+            "terms": [
+              {
+                "kind": "constant",
+                "value": 4
+              },
+              {
+                "kind": "readStat",
+                "statId": "mind",
+                "subject": "actor"
+              }
+            ]
+          }
+        },
+        "costs": [
+          {
+            "amount": 1,
+            "resourceId": "standard-action"
+          }
+        ],
+        "id": "hexing_bolt",
+        "name": "Hexing Bolt",
+        "program": {
+          "body": {
+            "hit": {
+              "kind": "sequence",
+              "steps": [
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "amount": {
+                      "bonus": 4,
+                      "count": 1,
+                      "kind": "dice",
+                      "sides": 8
+                    },
+                    "damageType": "psychic",
+                    "kind": "damage"
+                  }
+                },
+                {
+                  "kind": "operation",
+                  "operation": {
+                    "durationTurns": 1,
+                    "kind": "applyModifier",
+                    "modifierId": "rattled",
+                    "stacking": "refresh",
+                    "stackingGroup": "rattled",
+                    "value": {
+                      "kind": "constant",
+                      "value": -2
+                    }
+                  }
+                }
+              ]
+            },
+            "kind": "onCheck"
+          },
+          "kind": "atomic"
+        },
+        "rollScope": "perTarget",
+        "sourcePath": "rulebench/scenarios/hexing-bolt",
+        "targets": {
+          "maximumRange": 10,
+          "maximumTargets": 1,
+          "team": "hostile"
+        }
+      }
+    ],
+    "catalogs": {
+      "capabilities": [
+        "capability.defenses",
+        "capability.modifiers",
+        "capability.position",
+        "capability.random",
+        "capability.resources",
+        "capability.stats",
+        "capability.vitality"
+      ],
+      "defenses": [
+        "body",
+        "guard",
+        "nerve",
+        "resolve"
+      ],
+      "modifiers": [
+        "modifier.binding-glyph.anchored",
+        "modifier.binding-spark.anchored",
+        "rattled"
+      ],
+      "resources": [
+        "focus",
+        "standard-action"
+      ],
+      "stats": [
+        "focus",
+        "mind",
+        "power"
+      ]
+    },
+    "package": {
+      "id": "asha-rulebench.representative-rpg",
+      "version": "1.0.0"
+    },
+    "requirements": [
+      {
+        "id": "operation.applyModifier",
+        "kind": "operation",
+        "version": 1
+      },
+      {
+        "id": "operation.changeResource",
+        "kind": "operation",
+        "version": 1
+      },
+      {
+        "id": "operation.damage",
+        "kind": "operation",
+        "version": 1
+      },
+      {
+        "id": "operation.heal",
+        "kind": "operation",
+        "version": 1
+      },
+      {
+        "id": "operation.move",
+        "kind": "operation",
+        "version": 1
+      },
+      {
+        "id": "capability.defenses",
+        "kind": "capability",
+        "version": 1
+      },
+      {
+        "id": "capability.modifiers",
+        "kind": "capability",
+        "version": 1
+      },
+      {
+        "id": "capability.position",
+        "kind": "capability",
+        "version": 1
+      },
+      {
+        "id": "capability.random",
+        "kind": "capability",
+        "version": 1
+      },
+      {
+        "id": "capability.resources",
+        "kind": "capability",
+        "version": 1
+      },
+      {
+        "id": "capability.stats",
+        "kind": "capability",
+        "version": 1
+      },
+      {
+        "id": "capability.vitality",
+        "kind": "capability",
+        "version": 1
+      }
+    ],
+    "schema": {
+      "identity": "asha.rpg.ir",
+      "major": 1
+    }
+  },
+  "bindings": [
+    {
+      "actionId": "hexing_bolt",
+      "abilityId": "ability.hexing-bolt",
+      "actionText": "Mind vs Nerve at range ten.",
+      "effectText": "Deal psychic damage and apply Rattled on a hit.",
+      "reaction": {
+        "window": "beforeEffect",
+        "eligibleReactors": "declaredTargets",
+        "optionId": "reaction.brace"
+      }
+    },
+    {
+      "actionId": "action.anchor-lash",
+      "abilityId": "ability.anchor-lash",
+      "actionText": "Lash one hostile within three cells.",
+      "effectText": "Deal kinetic damage on a hit.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.binding-spark",
+      "abilityId": "ability.binding-spark",
+      "actionText": "Bind one hostile within five cells.",
+      "effectText": "Deal arcane damage and refresh Anchored on a failed save.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.rallying-mend",
+      "abilityId": "ability.rallying-mend",
+      "actionText": "Restore a nearby ally.",
+      "effectText": "Heal the ally and restore one focus to the actor.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.shatterline-burst",
+      "abilityId": "ability.shatterline-burst",
+      "actionText": "Burst against up to three hostiles.",
+      "effectText": "Each target saves independently for half force damage.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.tactical-shift",
+      "abilityId": "ability.tactical-shift",
+      "actionText": "Reposition a nearby ally.",
+      "effectText": "Move the ally two cells without provoking.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.intercepting-strike",
+      "abilityId": "ability.intercepting-strike",
+      "actionText": "Strike a nearby hostile.",
+      "effectText": "Deal kinetic damage on a hit.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.binding-glyph",
+      "abilityId": "ability.binding-glyph",
+      "actionText": "Inscribe a binding glyph beneath a visible hostile combatant.",
+      "effectText": "Deal arcane damage and apply Anchored on a failed save.",
+      "reaction": null
+    },
+    {
+      "actionId": "action.authored-reaction",
+      "abilityId": "ability.authored-reaction",
+      "actionText": "Strike a visible hostile and allow product reaction orchestration.",
+      "effectText": "Deal arcane damage and apply Anchored on a hit.",
+      "reaction": null
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "scopes": [
     "protocol",
+    "content-authoring",
     "platform",
     "transport",
     "domain",
@@ -20,6 +21,7 @@
   ],
   "scopeConstraints": [
     { "sourceTag": "scope:protocol", "onlyDependOnLibsWithTags": [] },
+    { "sourceTag": "scope:content-authoring", "onlyDependOnLibsWithTags": [] },
     { "sourceTag": "scope:platform", "onlyDependOnLibsWithTags": [] },
     { "sourceTag": "scope:transport", "onlyDependOnLibsWithTags": ["scope:protocol"] },
     { "sourceTag": "scope:domain", "onlyDependOnLibsWithTags": ["scope:protocol"] },

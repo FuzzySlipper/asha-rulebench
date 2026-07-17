@@ -222,9 +222,11 @@ or provider implementation surface. Its scenario-bound ids, initial state, and
 visibility are authored inputs, but target legality, derived stats, grants,
 runtime resources, automation choice, and mutation remain Rust authority.
 Neither version adds arbitrary scripts, plugins, callbacks, or mutable
-TypeScript authority. Support is guaranteed only for the closed v3/v4
-vocabulary and exact compiled-provider capabilities described above. The
-filesystem adapter remains trusted-local and
+TypeScript authority. Migrated Shatterline action semantics are owned by the
+TypeScript SDK sources and compiled Rust RPG language described in
+`rpg-rules-language-integration.md`; the duplicated v3/v4 Rust action shapes
+are legacy proof inputs pending #5942, not an extension surface. The filesystem
+adapter remains trusted-local and
 single-writer. It does not claim multi-process locking, authenticated upload,
 network-filesystem atomicity, power-loss durability, or durable in-progress
 policy experiments.

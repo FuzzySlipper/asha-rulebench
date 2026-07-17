@@ -1,5 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use rpg_ir::HitEffectOperation;
+use rulebench_combat::{
+    CombatSessionAutomaticStepSpec, CombatSessionState, COMBAT_AUTOMATION_POLICY_REGISTRY,
+};
 use rulebench_protocol::{
     AutomaticRunRequestDto, AutomationPolicyCatalogEntryDto, CombatAutomationPolicyDto,
     CombatControlCommandDto, CombatControlCommandKindDto, CombatSessionCreateRequestDto,
@@ -8,10 +12,8 @@ use rulebench_protocol::{
     ExperimentMetricsDto, ExperimentReadoutDto, ExperimentTrialReadoutDto,
     PolicyRulesetCompatibilityDto, ProtocolRequestContextDto,
 };
-use rulebench_rpg_adapter::{
-    record_replay_package, verify_replay_package, CombatSessionAutomaticStepSpec,
-    CombatSessionState, HitEffectOperation, ReplayArchiveError, ReplayPackage,
-    COMBAT_AUTOMATION_POLICY_REGISTRY,
+use rulebench_replay::{
+    record_replay_package, verify_replay_package, ReplayArchiveError, ReplayPackage,
 };
 
 use crate::{BridgeError, BridgeErrorKind, RulebenchBridge};
@@ -522,9 +524,7 @@ impl RulebenchBridge {
                 .delete(&session_id)
                 .map_err(BridgeError::from_recovery_storage_error)?;
             self.sessions
-                .discard_session(&rulebench_rpg_adapter::CombatSessionHandle::new(
-                    &session_id,
-                ))
+                .discard_session(&rulebench_combat::CombatSessionHandle::new(&session_id))
                 .map_err(BridgeError::from_session_error)?;
             self.recordings.remove(&session_id);
             Ok(trial)
@@ -562,7 +562,7 @@ impl RulebenchBridge {
         let _ = self.recovery.delete(session_id);
         let _ = self
             .sessions
-            .discard_session(&rulebench_rpg_adapter::CombatSessionHandle::new(session_id));
+            .discard_session(&rulebench_combat::CombatSessionHandle::new(session_id));
         self.recordings.remove(session_id);
     }
 

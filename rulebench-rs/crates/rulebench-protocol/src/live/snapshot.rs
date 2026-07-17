@@ -1,9 +1,9 @@
-use rulebench_rpg_adapter::{
-    ActionResourceCost, ActionResourceRefreshPolicy, ActionResourceState,
-    CombatEndConditionReadout, CombatFinalizationReadout, CombatLogEntry, CombatSessionSnapshot,
-    CommandAuditEntry, CurrentActorActionOption, CurrentActorCellOption, CurrentActorOptionSummary,
-    CurrentActorTargetOption, CurrentActorTargetSetOption, FinalCombatantState, SpatialBoardState,
-    SpatialCellState, StateFingerprint,
+use rpg_ir::{ActionResourceCost, ActionResourceRefreshPolicy};
+use rulebench_combat::{
+    ActionResourceState, CombatEndConditionReadout, CombatFinalizationReadout, CombatLogEntry,
+    CombatSessionSnapshot, CommandAuditEntry, CurrentActorActionOption, CurrentActorCellOption,
+    CurrentActorOptionSummary, CurrentActorTargetOption, CurrentActorTargetSetOption,
+    FinalCombatantState, SpatialBoardState, SpatialCellState, StateFingerprint,
 };
 use serde::{Deserialize, Serialize};
 

@@ -15,6 +15,7 @@ mod diff;
 mod import;
 mod pack;
 mod pack_validation;
+mod rpg_content;
 mod scenario;
 mod scenario_binding;
 mod stats;
@@ -65,6 +66,11 @@ pub use pack::{
 pub use pack_validation::{
     resolve_content_pack_set, ContentPackDiagnostic, ContentPackDiagnosticCode,
     ContentPackValidationReport, ResolvedContentPackSet,
+};
+pub use rpg_content::{
+    representative_rpg_content, RpgActionBindingMetadata, RulebenchEligibleReactors,
+    RulebenchReactionOrchestration, RulebenchReactionWindow, RulebenchRpgContent,
+    RulebenchRpgContentError, RULEBENCH_RPG_CONTENT_SCHEMA,
 };
 pub use scenario::{
     ClassDefinition, ClassLevelGrant, ClassLevelInput, Combatant, CombatantEffectiveStatReadout,

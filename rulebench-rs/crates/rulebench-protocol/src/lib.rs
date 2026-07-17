@@ -12,6 +12,7 @@ mod authored_scenario;
 mod authoring;
 mod bridge;
 mod capabilities;
+mod capability_manifest;
 mod content;
 mod experiment;
 mod live;
@@ -64,6 +65,13 @@ pub use bridge::{
 pub use capabilities::{
     CapabilityEntryDto, CapabilityIdentityDto, CapabilitySupportDto, HostCapabilityProfileDto,
     RulebenchCapabilityManifestDto, RulesetProviderDto,
+};
+pub use capability_manifest::{
+    assemble_capability_manifest, executable_conformance_capabilities, CapabilityEntry,
+    CapabilityIdentity, CapabilityKind, CapabilityManifestError, CapabilityRegistryInput,
+    CapabilitySupport, HostCapabilityProfile, RulebenchCapabilityManifest,
+    RulesetProviderManifestEntry, CAPABILITY_ARTIFACT_SCHEMA, CAPABILITY_MANIFEST_ID,
+    CAPABILITY_MANIFEST_VERSION,
 };
 pub use content::{
     AuthoredAbilityDefinitionDto, AuthoredAbilityDefinitionKindDto, AuthoredContentCatalogsDto,
@@ -127,7 +135,7 @@ pub use viewer::{
 
 #[cfg(test)]
 mod tests {
-    use rulebench_rpg_adapter::CombatSessionHandle;
+    use rulebench_combat::CombatSessionHandle;
 
     use super::{render_api_types, CombatSessionHandleDto};
 

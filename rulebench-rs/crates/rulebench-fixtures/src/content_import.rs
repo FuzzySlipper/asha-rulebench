@@ -1,8 +1,9 @@
-use rulebench_rpg_adapter::{
+use rpg_ir::RulesetMetadata;
+use rulebench_content::{
     import_content_pack, ContentImportContext, ContentImportLimits, ContentImportReport,
     ContentPackCanonicalVersion, ContentPackCatalogs, ContentPackCollisionPolicy,
     ContentPackDefinition, ContentPackIdentity, ContentPackProvenance, ContentPackSourceKind,
-    EntityDefinition, ImportedContentPack, RulesetMetadata,
+    EntityDefinition, ImportedContentPack,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

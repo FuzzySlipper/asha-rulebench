@@ -8,7 +8,9 @@ use crate::{
     ScenarioPackageEvidenceKind, ScenarioPackageIdentity, ScenarioPackageInitialState,
     ScenarioPackageReadbackFactories, ScenarioPackageRegistration, ScenarioPackageRulesetReference,
 };
-use rulebench_rpg_adapter::*;
+use rpg_core::*;
+use rpg_ir::*;
+use rulebench_combat::*;
 
 const PACKAGE_ID: &str = "asha-rulebench.watchtower-skirmish";
 const SCENARIO_ID: &str = "watchtower-skirmish";
@@ -445,6 +447,9 @@ fn content_validation_readouts() -> Vec<ContentValidationReadout> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rulebench_replay::{
+        record_replay_package, verify_replay_package, ReplayCommand, ReplayCommandRecordingSpec,
+    };
 
     fn explicit_storm_scenario(
         roll_policy: ActionRollPolicy,

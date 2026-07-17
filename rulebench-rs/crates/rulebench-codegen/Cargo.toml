@@ -11,3 +11,8 @@ workspace = true
 [dependencies]
 rulebench-fixtures = { path = "../rulebench-fixtures" }
 rulebench-protocol = { path = "../rulebench-protocol" }
+rulebench-combat = { path = "../rulebench-combat" }
+rulebench-content = { path = "../rulebench-content" }
+rulebench-replay = { path = "../rulebench-replay" }
+rpg-core.workspace = true
+rpg-ir.workspace = true

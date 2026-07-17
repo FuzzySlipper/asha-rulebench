@@ -58,6 +58,8 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
+    "@asha-rpg/authoring": "github:FuzzySlipper/asha-rpg#897b05d2a3fda372c2a9a24e3f188ce735a236be&path:packages/authoring",
+    "@asha-rpg/ir": "github:FuzzySlipper/asha-rpg#897b05d2a3fda372c2a9a24e3f188ce735a236be&path:packages/ir",
     "@angular-devkit/core": "~21.2.0",
     "@angular-devkit/schematics": "~21.2.0",
     "@angular/build": "~21.2.0",

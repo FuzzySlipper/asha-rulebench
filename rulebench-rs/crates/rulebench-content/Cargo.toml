@@ -9,5 +9,8 @@ description = "Content packs, references, validation, and diagnostics for ASHA R
 workspace = true
 
 [dependencies]
+rpg-compiler.workspace = true
 rpg-core.workspace = true
 rpg-ir.workspace = true
+serde.workspace = true
+serde_json.workspace = true

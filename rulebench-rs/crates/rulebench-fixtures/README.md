@@ -50,9 +50,8 @@ honest incubation rows and do not require executable conformance evidence.
 
 ## Compiled ruleset providers
 
-Provider types live in the pinned public `rpg-ir` owner and are temporarily
-re-exported by `rulebench-rpg-adapter`; the concrete closed catalog lives in
-`providers.rs`. Task #5938 removes that adapter edge.
+Provider types live in the pinned public `rpg-ir` owner and are imported
+directly by the concrete closed catalog in `providers.rs`.
 Adding a provider requires an exact provider id/version, exact ruleset metadata,
 module configuration, operation/effect vocabulary versions, and a sorted
 capability set. Register a separate package with independently owned content,

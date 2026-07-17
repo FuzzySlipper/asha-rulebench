@@ -10,7 +10,6 @@ export const profileOrder = [
   "protocol-generated",
   "fixtures-conformance",
   "host-transport",
-  "portable",
   "docs",
 ];
 
@@ -18,17 +17,12 @@ export const governedCrates = new Set([
   "rulebench-content",
   "rulebench-combat",
   "rulebench-replay",
-  "rulebench-rpg-adapter",
   "rulebench-protocol",
   "rulebench-bridge",
   "rulebench-fixtures",
   "rulebench-codegen",
   "rulebench-authority",
   "rulebench-process-host",
-]);
-
-export const portableCrates = new Set([
-  "rulebench-rpg-adapter",
 ]);
 
 const filterFlags = new Map([
@@ -96,37 +90,11 @@ export function parseVerifyChangeArguments(argumentsList) {
   }
 
   const selectsRustOwner = uniqueProfiles.includes("rust-owner");
-  const selectsPortable = uniqueProfiles.includes("portable");
-  if ((selectsRustOwner || selectsPortable) && uniqueCrates.length === 0) {
-    throw new Error(
-      "--crate is required for the rust-owner and portable profiles.",
-    );
+  if (selectsRustOwner && uniqueCrates.length === 0) {
+    throw new Error("--crate is required for the rust-owner profile.");
   }
-  if (!selectsRustOwner && !selectsPortable && uniqueCrates.length > 0) {
-    throw new Error(
-      "--crate is valid only with the rust-owner or portable profile.",
-    );
-  }
-  if (selectsPortable) {
-    const selectedPortableCrates = uniqueCrates.filter((crate) =>
-      portableCrates.has(crate),
-    );
-    if (selectedPortableCrates.length === 0) {
-      throw new Error(
-        "The portable profile requires at least one portable --crate owner.",
-      );
-    }
-    if (
-      !selectsRustOwner &&
-      selectedPortableCrates.length !== uniqueCrates.length
-    ) {
-      const invalid = uniqueCrates.filter(
-        (crate) => !portableCrates.has(crate),
-      );
-      throw new Error(
-        `The portable profile cannot select non-portable crates: ${invalid.join(", ")}.`,
-      );
-    }
+  if (!selectsRustOwner && uniqueCrates.length > 0) {
+    throw new Error("--crate is valid only with the rust-owner profile.");
   }
 
   const hasFilters = Object.keys(filters).length > 0;
@@ -206,14 +174,6 @@ export function buildVerifyChangePlan(selection) {
             "--passWithNoTests",
           ],
         });
-        break;
-      case "portable":
-        addScript("check:rust-boundaries");
-        for (const crate of selection.crates.filter((crate) =>
-          portableCrates.has(crate),
-        )) {
-          addCargoTest(crate);
-        }
         break;
       case "docs":
         addScript("check:docs");

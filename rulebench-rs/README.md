@@ -18,7 +18,6 @@ Rulebench product authority:
 - `rulebench-content`: content packs, references, validation, diagnostics, and indexing.
 - `rulebench-combat`: combat state, resolution, lifecycle, and manual/automatic control.
 - `rulebench-replay`: audit packages, replay specifications, verification, and mismatch diagnostics.
-- `rulebench-rpg-adapter`: temporary combined product surface for existing consumers; deleted by #5938.
 
 Boundary and adapter layers:
 
@@ -33,33 +32,30 @@ Rulebench-local layers:
 - `rulebench-authority`: stable catalog/session emitter commands and the Rulebench integration test harness; it has no library compatibility API.
 
 The reusable public facade is `asha-rpg` in its own repository. This workspace
-does not provide a game-consumer facade. The temporary adapter exists only to
-stage Rulebench product migration and explicitly is not a public portability
-claim.
+does not provide a game-consumer facade or a combined product compatibility
+facade.
 
 ## Dependency Direction
 
 ```text
-public asha-rpg: rpg-core + rpg-ir + rpg-runtime
-                    |          |          |
-                    +------> Rulebench content/combat/replay
-                                      |
-                         rulebench-rpg-adapter (temporary, #5938)
-                              |             |
-                         protocol       fixtures -> codegen
-                              |             |
-                            bridge       authority harness
-                              \-------------/
-                                      |
-                                process host
+public asha-rpg: rpg-core + rpg-ir + rpg-compiler + rpg-runtime
+                    |          |            |             |
+                    +------> content ----> combat ----> replay
+                                |            |            |
+                                +--------> protocol <-----+
+                                             |
+                                           bridge
+                                             |
+                                      process host
+
+fixtures import focused owners directly and feed codegen plus the authority harness.
 ```
 
 `pnpm run check:rust-boundaries` enforces this workspace graph and is part of
 `pnpm run verify`. It fails closed for reverse or unknown Rulebench edges,
-product consumers bypassing the migration adapter, direct ASHA imports, sibling
-RPG paths, noncanonical repositories, stale revisions, and unbounded version
-requirements. The independent public consumer proof lives with `asha-rpg`, not
-inside this product repository.
+direct ASHA imports, sibling RPG paths, noncanonical repositories, stale
+revisions, and unbounded version requirements. The independent public consumer
+proof lives with `asha-rpg`, not inside this product repository.
 
 `pnpm run check:rust-test-ownership` keeps focused tests beside every active
 authority, adapter, protocol, fixture, and codegen owner while retaining the
@@ -126,7 +122,7 @@ and tests. Do not add a path dependency simply to preserve an old import path.
 ## Migration Posture
 
 - Every current workspace crate is an active owner, adapter, fixture, generator, harness, or host surface with focused tests; new empty reservation crates are forbidden as implementation claims.
-- Migrate callers away from `rulebench-rpg-adapter` in #5938; do not add another compatibility facade.
+- Import focused owners directly; do not add a combined compatibility facade.
 - Do not create circular dependencies to preserve an old import path.
 - Keep scenario-specific assumptions in `rulebench-fixtures` or the Rulebench harness.
 - Keep host choice out of `rulebench-bridge`; the selected first concrete adapter lives under `hosts/rulebench-process-host`.

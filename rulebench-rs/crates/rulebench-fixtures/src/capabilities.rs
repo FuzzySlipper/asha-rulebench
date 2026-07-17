@@ -1,4 +1,4 @@
-use rulebench_rpg_adapter::{
+use rulebench_protocol::{
     CapabilityIdentity, CapabilityRegistryInput, RulesetProviderManifestEntry,
 };
 

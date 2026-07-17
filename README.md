@@ -30,11 +30,10 @@ live in the independent `FuzzySlipper/asha-rpg` repository. Rulebench consumes
 sibling path or direct ASHA dependency is allowed.
 
 See `rulebench-rs/README.md` and `docs/rust-authority-reconciliation.md` for the
-current dependency direction. `rulebench-rpg-adapter` is the one temporary
-combined product surface needed by protocol, bridge, and fixture consumers;
-task #5938 deletes it after those call sites reach their permanent owners.
-Planner-approved `serde` protocol DTOs and the `serde_json` process host
-provide the live local bridge.
+current dependency direction. Protocol, bridge, fixtures, and generators
+import focused product and public RPG owners directly; no combined Rust
+compatibility facade remains. Planner-approved `serde` protocol DTOs and the
+`serde_json` process host provide the live local bridge.
 
 The current gameplay-fabric slice and its explicit local/upstream ownership
 boundary are documented in
@@ -89,17 +88,17 @@ repository, and exposes cancellation and first-divergence comparison. See
 Stored authored packs are re-decoded and re-imported on every host start before
 their exact activation can be used. A new session may select a compatible
 activated pack set; its exact references and set fingerprint are then retained
-in the finalized replay. Authored-content v3 adds strict portable modifier and
-action declarations. V4 adds dependency-closed archetypes/build inputs,
+in the finalized replay. Authored-content v3 added the legacy strict modifier
+and action declarations. V4 adds dependency-closed archetypes/build inputs,
 participant state, loadouts, multiple action grants, configured scenarios, and
 manual or exact automatic control while preserving the permanent strict v1-v3
 readers.
-Through the `content.authored-action@1` product boundary, Rust binds one exact
-active action and actor, derives targets and reaction participants, grants its
-ability for that session, executes the selected provider's closed vocabulary,
-and retains exact pack/action/ability/fingerprint/grant provenance through
-replay-verified restart recovery. See `docs/authored-content-format.md` for the
-wire contracts, executable profile, migration posture, and non-claims.
+Through the migrated RPG-language boundary, Rust binds an exact runtime action
+to its TypeScript-authored source identity, compiles canonical normalized IR,
+executes the public semantic kernel, and retains product provenance through
+replay-verified restart recovery. See
+`docs/rpg-rules-language-integration.md` and
+`docs/authored-content-format.md` for the semantic and wire boundaries.
 Through `content.authored-scenario@1`, Rust materializes an active v4 scenario,
 retains its exact pack/scenario/archetype/loadout/action/control receipt, and
 reconstructs that composition for recovery and finalized replay verification.
@@ -262,7 +261,7 @@ profiles instead of guessing from a Git diff:
 
 ```bash
 pnpm run verify:change -- --profile frontend
-pnpm run verify:change -- --profile rust-owner --crate rulebench-rpg-adapter
+pnpm run verify:change -- --profile rust-owner --crate rulebench-combat
 pnpm run verify:change -- --profile protocol-generated --profile host-transport
 pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
 ```

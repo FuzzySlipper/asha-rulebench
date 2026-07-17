@@ -3,10 +3,11 @@ use crate::{
     ContentValidationReadout, RulesetCatalogReadout, ScenarioCatalogCase, ScenarioCatalogSummary,
     ScenarioOutcomeClass,
 };
-use rulebench_rpg_adapter::{
-    validate_scenario_content_report, HitEffectOperation, ReactionHookEffectOperation,
-    ReactionOptionDeclaration, ReactionWindow, RulebenchScenario, ScenarioMetadata,
-    UseActionIntent,
+use rpg_ir::{
+    HitEffectOperation, ReactionHookEffectOperation, ReactionOptionDeclaration, ReactionWindow,
+};
+use rulebench_content::{
+    validate_scenario_content_report, RulebenchScenario, ScenarioMetadata, UseActionIntent,
 };
 
 pub fn scenario_catalog_cases() -> Vec<ScenarioCatalogCase> {

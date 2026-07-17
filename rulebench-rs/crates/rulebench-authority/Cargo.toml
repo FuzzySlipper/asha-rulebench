@@ -11,3 +11,7 @@ workspace = true
 [dependencies]
 rulebench-codegen = { path = "../rulebench-codegen" }
 rulebench-fixtures = { path = "../rulebench-fixtures" }
+rulebench-combat = { path = "../rulebench-combat" }
+rulebench-replay = { path = "../rulebench-replay" }
+rpg-core.workspace = true
+rpg-ir.workspace = true

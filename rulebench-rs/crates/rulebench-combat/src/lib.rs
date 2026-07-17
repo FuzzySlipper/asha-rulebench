@@ -10,6 +10,7 @@ mod api;
 mod audit;
 mod modifiers;
 mod resolver;
+mod rpg_resolver;
 mod runtime;
 mod state;
 
@@ -27,6 +28,7 @@ pub use modifiers::{
     evaluate_effective_stats_for_combatant, EffectiveStatEvaluationError,
 };
 pub use resolver::{resolve_use_action, validate_intent_shape};
+pub use rpg_resolver::{resolves_through_rpg_language, ASHA_RPG_AUTHORITY_SURFACE};
 pub use runtime::{
     validate_combat_automation_policy, validate_combat_automation_policy_for_context,
     CombatAutomationCandidateEvidence, CombatAutomationNoCandidateBehavior,

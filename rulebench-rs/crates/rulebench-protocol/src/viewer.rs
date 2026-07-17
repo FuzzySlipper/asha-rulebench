@@ -1,7 +1,8 @@
-use rulebench_rpg_adapter::{
+use rpg_core::Team;
+use rulebench_combat::{
     CombatLogEntry, CombatSessionStepReadout, CombatSessionStepSummary, CombatSessionSummary,
     CombatSessionTranscript, DomainEvent, FinalCombatantState, RulebenchReceipt, RulebenchScenario,
-    ScenarioProjection, Team,
+    ScenarioProjection,
 };
 use serde::{Deserialize, Serialize};
 

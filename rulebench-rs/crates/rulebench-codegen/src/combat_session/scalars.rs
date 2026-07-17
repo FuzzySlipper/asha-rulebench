@@ -1,15 +1,16 @@
 use crate::ts_emit::ts_string;
 
-use rulebench_fixtures::{
-    ActionResourceKind, ActionResourceTransitionKind, CombatAutomationNoCandidateBehavior,
+use rpg_ir::{ActionResourceKind, CombatEndPolicy, ModifierTenure, ReactionWindow};
+use rulebench_combat::{
+    ActionResourceTransitionKind, CombatAutomationNoCandidateBehavior,
     CombatAutomationPolicyValidationCode, CombatControlCommandKind, CombatControlDecisionKind,
-    CombatEndConditionKind, CombatEndPolicy, CombatLifecyclePhase, CombatOutcomeKind,
+    CombatEndConditionKind, CombatLifecyclePhase, CombatOutcomeKind,
     CombatSessionAutomaticRunDecisionKind, CombatSessionAutomaticStepDecisionKind,
     CombatSessionAutomaticStepOperationKind, CombatSessionCandidateSelectionDecisionKind,
     CombatSessionScriptCommandKind, CombatSessionScriptDecisionKind, CommandDecisionKind,
-    CommandOutcomeClass, CommandPreflightDecisionKind, LifecycleTransitionTrigger, ModifierTenure,
-    ReactionDecisionKind, ReactionResponseKind, ReactionWindow, ReactionWindowLifecycleKind,
-    ReactionWindowStatus, StateFingerprint, TracePhase, TraceStatus,
+    CommandOutcomeClass, CommandPreflightDecisionKind, LifecycleTransitionTrigger,
+    ReactionDecisionKind, ReactionResponseKind, ReactionWindowLifecycleKind, ReactionWindowStatus,
+    StateFingerprint, TracePhase, TraceStatus,
 };
 
 pub(crate) fn render_fingerprint(fingerprint: &StateFingerprint, _indent: &str) -> String {
