@@ -1,15 +1,24 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 const root = process.cwd();
-const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const packageJson = JSON.parse(
+  readFileSync(join(root, "package.json"), "utf8"),
+);
 const scripts = new Set(Object.keys(packageJson.scripts ?? {}));
-const docs = collectDocs(['README.md', 'README.template.md', 'AGENTS.md', 'apps/app-e2e/src/live/docs']);
+const references = collectReferences([
+  "README.md",
+  "README.template.md",
+  "AGENTS.md",
+  "docs",
+  "apps/app-e2e/src/live/docs",
+  ".github/workflows",
+]);
 const failures = [];
 
-for (const docPath of docs) {
-  const rel = relative(root, docPath);
-  const text = readFileSync(docPath, 'utf8');
+for (const referencePath of references) {
+  const rel = relative(root, referencePath);
+  const text = readFileSync(referencePath, "utf8");
   for (const match of text.matchAll(/\b(?:pnpm|npm) run ([a-zA-Z0-9:_-]+)/g)) {
     const script = match[1];
     if (!scripts.has(script)) {
@@ -19,38 +28,42 @@ for (const docPath of docs) {
 }
 
 if (failures.length > 0) {
-  console.error(failures.join('\n'));
+  console.error(failures.join("\n"));
   process.exit(1);
 }
 
-console.log('docs command references ok');
+console.log(`docs/workflow command references ok (${references.length} files)`);
 
-function collectDocs(entries) {
-  const docs = [];
+function collectReferences(entries) {
+  const references = [];
   for (const entry of entries) {
     const path = join(root, entry);
     try {
       const stats = statSync(path);
       if (stats.isDirectory()) {
-        docs.push(...collectMarkdown(path));
+        references.push(...collectReferenceFiles(path));
       } else {
-        docs.push(path);
+        references.push(path);
       }
     } catch {
       // Optional docs paths are allowed to be absent.
     }
   }
-  return docs;
+  return references;
 }
 
-function collectMarkdown(directory) {
+function collectReferenceFiles(directory) {
   const files = [];
   for (const entry of readdirSync(directory)) {
     const path = join(directory, entry);
     const stats = statSync(path);
     if (stats.isDirectory()) {
-      files.push(...collectMarkdown(path));
-    } else if (entry.endsWith('.md')) {
+      files.push(...collectReferenceFiles(path));
+    } else if (
+      entry.endsWith(".md") ||
+      entry.endsWith(".yml") ||
+      entry.endsWith(".yaml")
+    ) {
       files.push(path);
     }
   }

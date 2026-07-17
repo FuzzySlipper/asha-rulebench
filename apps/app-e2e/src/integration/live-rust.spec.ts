@@ -287,7 +287,7 @@ test("invokes live Rust authority through the Angular origin", async ({
   }
 });
 
-test("executes the exact active authored action through the live Rust host @live", async ({
+test("executes the exact active authored action through the live Rust host", async ({
   page,
 }) => {
   await page.goto("/");
@@ -325,7 +325,8 @@ test("executes the exact active authored action through the live Rust host @live
     if (!activated.ok) return;
     expect(
       activated.value.packs.find(
-        (pack) => pack.reference.fingerprint.value === reference.fingerprint.value,
+        (pack) =>
+          pack.reference.fingerprint.value === reference.fingerprint.value,
       )?.active,
     ).toBe(true);
 
@@ -368,9 +369,7 @@ test("executes the exact active authored action through the live Rust host @live
           actionId: "action.binding-glyph",
           checkKind: "savingThrow",
           available: true,
-          targets: [
-            expect.objectContaining({ targetId: "entity-saboteur" }),
-          ],
+          targets: [expect.objectContaining({ targetId: "entity-saboteur" })],
         }),
       ]),
     );
@@ -422,7 +421,9 @@ test("executes the exact active authored action through the live Rust host @live
       expect(replay.value.authoredActionBinding).toEqual(receipt);
       expect(
         replay.value.commands.every(
-          (command) => command.snapshot.authoredActionBinding?.actionId === "action.binding-glyph",
+          (command) =>
+            command.snapshot.authoredActionBinding?.actionId ===
+            "action.binding-glyph",
         ),
       ).toBe(true);
     }
@@ -671,7 +672,7 @@ test("renders restored and quarantined recovery states without conflating them",
   });
 });
 
-test("resolves a bounded area target set and renders every v2 result @live", async ({
+test("resolves a bounded area target set and renders every v2 result", async ({
   page,
 }) => {
   const sessionId = `e2e-operation-pipeline-v2-${Date.now()}`;
@@ -694,7 +695,10 @@ test("resolves a bounded area target set and renders every v2 result @live", asy
   const gridPanel = page.getByRole("region", { name: "1. Combat grid" });
   const unitsPanel = page.getByRole("region", { name: "7. Active units" });
   await actionsPanel
-    .getByRole("button", { name: "Select Storm Pulse · storm-pulse", exact: true })
+    .getByRole("button", {
+      name: "Select Storm Pulse · storm-pulse",
+      exact: true,
+    })
     .click();
   await expect(actionsPanel).toContainText("Shared");
   const area = gridPanel.getByRole("gridcell", {
@@ -733,7 +737,7 @@ test("resolves a bounded area target set and renders every v2 result @live", asy
   await invokeApplicationCommand(page, "Run", "Close session");
 });
 
-test("runs and archives the second compiled ruleset through the visible workbench @live", async ({
+test("runs and archives the second compiled ruleset through the visible workbench", async ({
   page,
 }) => {
   const sessionId = `e2e-turn-control-manual-${Date.now()}`;
@@ -767,7 +771,10 @@ test("runs and archives the second compiled ruleset through the visible workbenc
   });
   const unitsPanel = page.getByRole("region", { name: "7. Active units" });
   await actionsPanel
-    .getByRole("button", { name: "Select Binding Glyph · binding_glyph", exact: true })
+    .getByRole("button", {
+      name: "Select Binding Glyph · binding_glyph",
+      exact: true,
+    })
     .click();
   await expect(actionsPanel.getByLabel("Saving throw roll")).toBeVisible();
   await actionsPanel.getByLabel("Saving throw roll").fill("5");
@@ -811,7 +818,7 @@ test("runs and archives the second compiled ruleset through the visible workbenc
   ).toContainText("Verified · Finalized");
 });
 
-test("runs the second compiled ruleset through automatic policy controls @live", async ({
+test("runs the second compiled ruleset through automatic policy controls", async ({
   page,
 }) => {
   await page.goto("/");
@@ -854,7 +861,7 @@ test("runs the second compiled ruleset through automatic policy controls @live",
   await invokeApplicationCommand(page, "Run", "Close session");
 });
 
-test("completes and archives a Rust-owned gameplay-fabric reaction @live", async ({
+test("completes and archives a Rust-owned gameplay-fabric reaction", async ({
   page,
 }) => {
   const sessionId = `e2e-visible-gameplay-fabric-${Date.now()}`;
@@ -1038,9 +1045,11 @@ test("configures, monitors, cancels, compares, and opens policy laboratory trial
     .selectOption("lowestVitalityTarget");
   await laboratory.getByLabel("Roll seeds").fill("7");
   await laboratory.getByLabel("Max steps per trial").fill("8");
-  await laboratory.getByRole("button", { name: "Create bounded matrix" }).click();
+  await laboratory
+    .getByRole("button", { name: "Create bounded matrix" })
+    .click();
 
-  const experiment = laboratory.locator("article").last();
+  const experiment = laboratory.locator("article.selected");
   await expect(experiment).toContainText("0 / 2 trials");
   await experiment.getByRole("button", { name: "Run next trial" }).click();
   await expect(experiment).toContainText("1 / 2 trials");
@@ -1063,8 +1072,10 @@ test("configures, monitors, cancels, compares, and opens policy laboratory trial
 
   await laboratory.getByLabel("Comparison policy").selectOption("");
   await laboratory.getByLabel("Roll seeds").fill("3,5");
-  await laboratory.getByRole("button", { name: "Create bounded matrix" }).click();
-  const cancellable = laboratory.locator("article").last();
+  await laboratory
+    .getByRole("button", { name: "Create bounded matrix" })
+    .click();
+  const cancellable = laboratory.locator("article.selected");
   await expect(cancellable).toContainText("0 / 2 trials");
   await cancellable.getByRole("button", { name: "Cancel" }).click();
   await expect(cancellable).toContainText("cancelled");
@@ -1073,7 +1084,9 @@ test("configures, monitors, cancels, compares, and opens policy laboratory trial
     .getByLabel("Scenario and ruleset")
     .selectOption("hexing-bolt-reaction");
   await laboratory.getByLabel("Roll seeds").fill("7");
-  await laboratory.getByRole("button", { name: "Create bounded matrix" }).click();
+  await laboratory
+    .getByRole("button", { name: "Create bounded matrix" })
+    .click();
   await expect(laboratory.getByRole("alert")).toContainText(
     "requires the explicit manual reaction workflow",
   );
@@ -1162,7 +1175,9 @@ test("configures participants from Rust scenario readbacks", async ({
   await invokeApplicationCommand(page, "Run", "Close session");
 });
 
-test("reviews and compares archived Rust replay evidence @gate", async ({ page }) => {
+test("reviews and compares archived Rust replay evidence @gate", async ({
+  page,
+}) => {
   await page.goto("/");
   await page.getByRole("menuitem", { name: "Replay" }).click();
   await page.getByRole("menuitem", { name: "Replay archive" }).click();

@@ -34,8 +34,8 @@ still cannot promote any runtime or exposure level.
 `rulebench-process-host/emit_capability_manifest` emits
 `libs/transport/src/generated/rust-capability-manifest.ts` from a real durable
 host composition. `pnpm run generated:check` reconstructs and compares it, and
-`pnpm run check:claims` validates its identity, ordering, owner evidence, and
-support invariants.
+`pnpm run check:claims:executable` validates its identity, ordering, owner
+evidence, and support invariants.
 
 The running process host serves `GET /api/rulebench/v1/capabilities`. The
 transport, `LiveCombatStore`, domain projector, and Runtime capabilities dialog
@@ -85,8 +85,11 @@ recovery mode:
    reproduction, and replay mismatch diagnostics. Multi-target additions also
    prove canonical ordering and atomic rollback.
 4. Regenerate protocol and manifest artifacts with `pnpm run generated:write`.
-5. Reconcile `docs/verification-claims.json` and Den's basic design, systems
-   map, and known-limitations documents.
+5. Run `pnpm run review:claims-and-limitations` to emit the current executable
+   inventory together with the last Den-reviewed claims and limitation
+   snapshot. Refresh that snapshot from Den when policy requires a governance
+   review; do not copy counts, prose, or a literal freshness date into the
+   source gate.
 6. Run focused owner tests, `pnpm run verify`, and live browser inspection for
    user-visible changes.
 

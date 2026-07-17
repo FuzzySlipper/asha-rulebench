@@ -7,6 +7,15 @@ den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
+`e2e:live` is a compatibility alias for the artifact-only
+`e2e:live-artifacts` group. Deterministic integration journeys belong to
+`e2e:certification` and are not rerun merely because they use a live Rust host.
+For milestone or release certification, use the canonical composition:
+
+```bash
+BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run certify -- --require-live
+```
+
 Use the printed `local:` URL for Playwright probes. Report the printed `lan:`
 URL for human inspection from another machine.
 

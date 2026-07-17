@@ -1,85 +1,42 @@
 {
-  "schemaVersion": 1,
-  "reviewedOn": "2026-07-15",
-  "denDocuments": [
-    "basic-design",
-    "north-star-systems-map",
-    "known-limitations"
-  ],
-  "requiredClaims": [
-    {
-      "file": "README.md",
-      "text": "governed public ASHA facades through one exact Git revision"
-    },
-    {
-      "file": "README.md",
-      "text": "composed RuntimeSession seam added by ASHA #5797"
-    },
-    {
-      "file": "rulebench-rs/README.md",
-      "text": "pnpm run generated:check"
-    },
-    {
-      "file": "rulebench-rs/README.md",
-      "text": "pnpm run regression:check"
-    },
-    {
-      "file": "docs/rust-authority-reconciliation.md",
-      "text": "StaticRuntimeSessionBuilder::with_gameplay_owner"
-    },
-    {
-      "file": "docs/gameplay-fabric-integration.md",
-      "text": "one concrete owner through `StaticRuntimeSessionBuilder`"
-    },
-    {
-      "file": "docs/capability-manifest.md",
-      "text": "The Rulebench capability manifest is executable evidence"
-    },
-    {
-      "file": "README.md",
-      "text": "2 compiled providers, 2 ruleset identities, 4 registered packages, 11 scenario cases, 3 automation policies"
-    },
-    {
-      "file": "docs/replay-archive-identity.md",
-      "text": "The encoding does not use Rust `Debug`"
+  "schemaVersion": 2,
+  "authority": {
+    "claimsDocuments": [
+      {
+        "projectId": "asha-rulebench",
+        "slug": "basic-design"
+      },
+      {
+        "projectId": "asha-rulebench",
+        "slug": "north-star-systems-map"
+      }
+    ],
+    "limitationsDocument": {
+      "projectId": "asha-rulebench",
+      "slug": "known-limitations"
     }
-  ],
-  "requiredNonClaims": [
-    {
-      "file": "README.md",
-      "text": "ASHA Rulebench is not:"
-    },
-    {
-      "file": "rulebench-rs/README.md",
-      "text": "authenticated, internet-facing, multi-user"
-    },
-    {
-      "file": "docs/gameplay-fabric-integration.md",
-      "text": "does not claim that ordered or nested RPG reactions belong upstream"
-    }
-  ],
-  "forbiddenClaims": [
-    {
-      "file": "rulebench-rs/README.md",
-      "text": "Empty crates are intentional reservation boundaries"
-    },
-    {
-      "file": "README.md",
-      "text": "no live bridge"
-    },
-    {
-      "file": "README.md",
-      "text": "requires a sibling ASHA checkout"
-    }
-  ],
-  "activeLimitations": [
-    {
-      "id": "trusted-local-process-host",
-      "denHeading": "Trusted-local single-writer process host"
-    },
-    {
-      "id": "authored-content-v3-vocabulary",
-      "denHeading": "Authored content wire remains intentionally bounded"
-    }
-  ]
+  },
+  "limitationSnapshot": {
+    "sourceDocumentUpdatedAt": "2026-07-17T05:47:32.029363Z",
+    "reviewedAt": "2026-07-17T05:47:32.029363Z",
+    "reviewedBy": "codex-task-5870",
+    "active": [
+      {
+        "id": "trusted-local-process-host",
+        "heading": "Trusted-local single-writer process host"
+      },
+      {
+        "id": "authored-content-v3-vocabulary",
+        "heading": "Authored content wire remains intentionally bounded"
+      }
+    ],
+    "resolved": [
+      {
+        "id": "process-host-client-disconnect",
+        "heading": "Process host disconnect can stop the development server",
+        "resolvedByTask": 5573
+      }
+    ]
+  },
+  "freshnessPolicy": "report-snapshot-provenance-without-blocking-unrelated-source-edits"
 }

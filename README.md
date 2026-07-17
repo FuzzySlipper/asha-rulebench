@@ -271,12 +271,33 @@ uncertain. The pre-tiering measurements, exact profile contract, blocking
 membership, and retained certification paths are documented in
 [docs/validation-tiers.md](docs/validation-tiers.md).
 
-The exhaustive deterministic browser set (`pnpm run e2e`), unfiltered
-regression/conformance corpus (`pnpm run regression:check`), portable-consumer
-proof, full governance claims review, and opt-in live evidence remain runnable.
-Task #5870 owns their canonical `certify` composition and scheduled/milestone
-routing; until that lands, invoke the applicable exhaustive surfaces directly
-and do not call a focused or blocking receipt full certification.
+Complete deterministic certification is one Rulebench-owned command:
+
+```bash
+pnpm run certify
+```
+
+It runs static authority/product contracts, the unfiltered
+regression/conformance corpus, the independent portable consumer, every
+deterministic browser journey (including mobile and accessibility coverage),
+and a claims/limitations receipt. It runs nightly and by manual GitHub workflow
+dispatch, not as the required check for every edit. The receipt derives current
+inventory counts from generated Rust evidence and records the last reviewed Den
+limitation snapshot without letting a literal date or copied prose block fail
+unrelated source changes.
+
+For a milestone or release with user-visible UI claims, run the live-required
+mode against a managed server and inspect the emitted artifacts:
+
+```bash
+den-serve up asha-rulebench -repo /home/dev/asha-rulebench
+BASE_URL=<local-url> LIVE_RUN=1 pnpm run certify -- --require-live
+```
+
+Without `--require-live`, certification explicitly does not claim managed/LAN
+visual evidence. See
+[docs/validation-evidence-template.md](docs/validation-evidence-template.md)
+for task handoff evidence.
 
 For opt-in live evidence:
 
@@ -315,10 +336,12 @@ plugins, callbacks, general character/class/item/resource authoring, or
 TypeScript rule authority, and no guarantee beyond the exact closed v3
 vocabulary and capabilities of the selected compiled provider.
 
-The executable capability manifest currently reports 2 compiled providers, 2
-ruleset identities, 4 registered packages, 11 scenario cases, 3 automation
-policies, and operation pipeline v2. Its checked TypeScript projection records
-provider capability/vocabulary compatibility, the exact governed ASHA revision,
-and the configured durable-host support matrix; the live workbench always reads
-the current process-host manifest instead. See `docs/capability-manifest.md`
-and `docs/ruleset-providers.md` for the authority and evolution contracts.
+The executable capability manifest reports the current compiled providers,
+rulesets, packages, scenarios, automation policies, and operation-pipeline
+identity. Its checked TypeScript projection records provider
+capability/vocabulary compatibility, the exact governed ASHA revision, and the
+configured durable-host support matrix; the live workbench always reads the
+current process-host manifest instead. The certification receipt derives its
+inventory from that generated evidence instead of synchronizing prose counts.
+See `docs/capability-manifest.md` and `docs/ruleset-providers.md` for the
+authority and evolution contracts.

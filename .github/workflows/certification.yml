@@ -1,0 +1,54 @@
+name: Certification
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: certification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  certification:
+    name: certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Complete deterministic certification
+        run: pnpm run certify
+        env:
+          RULEBENCH_CERTIFICATION_REVIEWER: github:${{ github.actor }}
+      - name: Record certification boundary
+        if: always()
+        run: |
+          {
+            echo "## Rulebench certification"
+            echo
+            echo "This workflow owns exhaustive deterministic Rulebench certification."
+            echo "It does not establish managed/LAN visual evidence; milestone UI claims require the documented local --require-live mode and inspected artifacts."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rulebench-certification-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            local/certification/claims-and-limitations.json
+            dist/.playwright/
+            playwright-report/
+            test-results/

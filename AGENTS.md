@@ -71,6 +71,9 @@ its generated-DTO-only API and fake/live implementation parity.
 # Canonical blocking project gate (the GitHub required check)
 pnpm run verify
 
+# Complete deterministic certification (nightly/manual workflow surface)
+pnpm run certify
+
 # Explicit focused checks; repeat --profile to take the safe union
 pnpm run verify:change -- --profile frontend
 pnpm run verify:change -- --profile rust-owner --crate rulebench-rules
@@ -82,6 +85,9 @@ den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 # Opt-in live browser evidence
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
+
+# Milestone/release certification with inspected live artifacts
+BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run certify -- --require-live
 ```
 
 `verify:change` has a closed profile vocabulary and never infers safety from a
@@ -98,11 +104,22 @@ runs the full regression/conformance corpus. Use `--dry-run` to inspect the
 selected commands. Missing/unknown profiles, crates, filters, and arguments
 fail closed. If classification is uncertain, run `pnpm run verify`.
 
-The full deterministic browser set (`pnpm run e2e`), unfiltered semantic corpus
-(`pnpm run regression:check`), portable-consumer proof, governance claims, and
-live artifact run remain reachable certification surfaces. Task #5870 owns
-their single canonical certification composition and cadence; do not present a
-focused or blocking result as exhaustive certification.
+`pnpm run certify` is the Rulebench-owned exhaustive deterministic suite. It
+composes static authority/product contracts, the unfiltered semantic corpus,
+the independent portable consumer, the complete deterministic browser set,
+and a generated claims/limitations receipt exactly once. GitHub runs it
+nightly and on manual dispatch through `.github/workflows/certification.yml`.
+It is not a required check for every edit. Use `--require-live` for milestone
+or release UI claims; that mode fails closed unless both `BASE_URL` and
+`LIVE_RUN=1` are present and collects the managed live-artifact scenario after
+deterministic certification. Inspect its screenshots and evidence packet;
+process exit alone is not visual proof.
+
+Use [docs/validation-evidence-template.md](docs/validation-evidence-template.md)
+for Den task handoffs. Record which tier was selected, why narrower tiers were
+safe, whether browser work actually executed or came from cache, and the
+explicit non-claims. Do not present a focused or blocking receipt as exhaustive
+certification.
 
 ## Frontend Boundary Rules
 
@@ -126,17 +143,17 @@ When a task seems to require breaking a boundary, stop and request planner revie
 
 ## Agent Lane Quick Reference
 
-| Lane | Location | May not |
-|------|----------|---------|
-| protocol | `libs/protocol` | Duplicate generated backend types or hand-edit generated files |
-| transport | `libs/transport` | Own app state or bypass protocol DTOs |
-| domain | `libs/domain` | Import Angular, browser APIs, store, renderer, or components |
-| store | `libs/store` | Put rendering logic in state services |
-| renderer | `libs/renderer` | Mutate application state directly or encode rule authority |
-| components | `libs/components` | Know gameplay/domain logic |
-| platform | `libs/platform` | Reach into application state or transport |
-| shell | `libs/shell`, `apps/app` | Contain feature/domain logic |
-| testing | `libs/testing-fixtures`, `apps/app-e2e` | Become the only proof for a user-facing UI task |
+| Lane       | Location                                | May not                                                        |
+| ---------- | --------------------------------------- | -------------------------------------------------------------- |
+| protocol   | `libs/protocol`                         | Duplicate generated backend types or hand-edit generated files |
+| transport  | `libs/transport`                        | Own app state or bypass protocol DTOs                          |
+| domain     | `libs/domain`                           | Import Angular, browser APIs, store, renderer, or components   |
+| store      | `libs/store`                            | Put rendering logic in state services                          |
+| renderer   | `libs/renderer`                         | Mutate application state directly or encode rule authority     |
+| components | `libs/components`                       | Know gameplay/domain logic                                     |
+| platform   | `libs/platform`                         | Reach into application state or transport                      |
+| shell      | `libs/shell`, `apps/app`                | Contain feature/domain logic                                   |
+| testing    | `libs/testing-fixtures`, `apps/app-e2e` | Become the only proof for a user-facing UI task                |
 
 ## TypeScript House Style
 

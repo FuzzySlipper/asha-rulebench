@@ -2,8 +2,6 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const root = process.cwd();
-const manifestPath = join(root, "docs", "verification-claims.json");
-const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const capabilityManifest = readCapabilityManifest();
 const failures = [];
 const executableOnly = process.argv.includes("--executable");
@@ -14,37 +12,6 @@ if (unknownArguments.length > 0) {
   failures.push(
     `Unknown claims-check argument: ${unknownArguments.join(", ")}.`,
   );
-}
-
-if (manifest.schemaVersion !== 1)
-  failures.push("docs/verification-claims.json must use schemaVersion 1.");
-if (!executableOnly) {
-  if (manifest.reviewedOn !== "2026-07-15")
-    failures.push("verification claims review date is stale.");
-  for (const slug of [
-    "basic-design",
-    "north-star-systems-map",
-    "known-limitations",
-  ]) {
-    if (!manifest.denDocuments.includes(slug))
-      failures.push(`verification review omits Den document ${slug}.`);
-  }
-  for (const entry of manifest.requiredClaims)
-    requireText(entry, "required current claim");
-  for (const entry of manifest.requiredNonClaims)
-    requireText(entry, "required non-claim");
-  for (const entry of manifest.forbiddenClaims) forbidText(entry);
-
-  const limitationIds = new Set(
-    manifest.activeLimitations.map((entry) => entry.id),
-  );
-  for (const id of [
-    "trusted-local-process-host",
-    "authored-content-v3-vocabulary",
-  ]) {
-    if (!limitationIds.has(id))
-      failures.push(`verification review omits active limitation ${id}.`);
-  }
 }
 
 checkCapabilityManifest(capabilityManifest);
@@ -86,28 +53,9 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-if (executableOnly) {
-  console.log(
-    `check:claims:executable ok (${capabilityManifest.capabilities.length} capability rows plus production Rust stub policy)`,
-  );
-} else {
-  console.log(
-    `check:claims ok (${manifest.requiredClaims.length} claims, ${manifest.requiredNonClaims.length} non-claims, ${manifest.activeLimitations.length} active limitations)`,
-  );
-}
-
-function requireText(entry, kind) {
-  const text = readFileSync(join(root, entry.file), "utf8");
-  if (!normalizeWhitespace(text).includes(normalizeWhitespace(entry.text))) {
-    failures.push(`${entry.file} is missing ${kind}: ${entry.text}`);
-  }
-}
-
-function forbidText(entry) {
-  const text = readFileSync(join(root, entry.file), "utf8");
-  if (text.includes(entry.text))
-    failures.push(`${entry.file} contains stale claim: ${entry.text}`);
-}
+console.log(
+  `${executableOnly ? "check:claims:executable" : "check:claims"} ok (${capabilityManifest.capabilities.length} capability rows plus production Rust stub policy)`,
+);
 
 function collectRustFiles(directory) {
   const files = [];
@@ -203,7 +151,9 @@ function checkCapabilityManifest(capabilities) {
     "provider id",
   );
   if (providerRows.join("\n") !== [...providerRows].sort().join("\n")) {
-    failures.push("compiled providers must use deterministic identity ordering.");
+    failures.push(
+      "compiled providers must use deterministic identity ordering.",
+    );
   }
   for (const provider of capabilities.providers) {
     if (
@@ -217,7 +167,9 @@ function checkCapabilityManifest(capabilities) {
       );
     }
     if (provider.capabilities.length === 0) {
-      failures.push(`${provider.provider.id} declares no provider capabilities.`);
+      failures.push(
+        `${provider.provider.id} declares no provider capabilities.`,
+      );
     }
     const providerCapabilities = provider.capabilities.map(
       (capability) => `${capability.id}@${capability.version}`,
@@ -250,7 +202,9 @@ function checkCapabilityManifest(capabilities) {
   const capabilityIds = capabilities.capabilities.map((entry) => entry.id);
   requireUnique(capabilityIds, "capability id");
   if (capabilities.host.authorityViewerMode !== "liveAuthorityReadback") {
-    failures.push("process-host capability artifact must declare live authority viewer readbacks.");
+    failures.push(
+      "process-host capability artifact must declare live authority viewer readbacks.",
+    );
   }
   const viewerReadback = capabilities.capabilities.find(
     (entry) => entry.id === "viewer.authority-readback",
@@ -263,7 +217,9 @@ function checkCapabilityManifest(capabilities) {
     !viewerReadback.support.regressionCovered ||
     viewerReadback.support.durableAcrossRestart
   ) {
-    failures.push("viewer authority readback capability support is inconsistent.");
+    failures.push(
+      "viewer authority readback capability support is inconsistent.",
+    );
   }
   const capabilityRows = capabilities.capabilities.map(
     (entry) => `${capabilityKindRank(entry.kind)}:${entry.id}:${entry.version}`,
@@ -368,10 +324,6 @@ function requireProgression(
   if (claimed && !prerequisite) {
     failures.push(`${id} reports ${claimLabel} without ${prerequisiteLabel}.`);
   }
-}
-
-function normalizeWhitespace(value) {
-  return value.replace(/\s+/g, " ").trim();
 }
 
 function capabilityKindRank(kind) {

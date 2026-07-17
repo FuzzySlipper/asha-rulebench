@@ -38,7 +38,7 @@ test.afterEach(async ({ page }) => {
   transport.disconnect();
 });
 
-test("authors, validates, binds, executes, and replays a Rust-owned action @live @gate", async ({
+test("authors, validates, binds, executes, and replays a Rust-owned action @gate", async ({
   page,
 }, testInfo) => {
   const identitySuffix = `${testInfo.workerIndex}.${testInfo.repeatEachIndex}.${testInfo.retry}.${Date.now()}`;
@@ -61,7 +61,9 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
   await templateButton.focus();
   await templateButton.press("Enter");
   const editor = contentDialog.getByLabel("Authored JSON draft");
-  await expect(editor).toHaveValue(new RegExp(`"id": "${packId.replaceAll(".", "\\.")}"`));
+  await expect(editor).toHaveValue(
+    new RegExp(`"id": "${packId.replaceAll(".", "\\.")}"`),
+  );
   await expect(contentDialog).toContainText(
     "JSON syntax is valid. Rust semantic validation has not been inferred.",
   );
@@ -110,7 +112,9 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
   await expect(semanticValidation).toContainText(
     "unsupportedAuthoredActionEffect",
   );
-  await expect(semanticValidation).toContainText("catalogs.actions[0].effects[2]");
+  await expect(semanticValidation).toContainText(
+    "catalogs.actions[0].effects[2]",
+  );
 
   await editor.fill(templatePayload);
   await contentDialog
@@ -157,8 +161,12 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
 
   await contentDialog.getByLabel("New pack id").fill(cloneId);
   await contentDialog.getByLabel("New pack version").fill("2.0.0");
-  await contentDialog.getByRole("button", { name: "Clone selected pack" }).click();
-  await expect(editor).toHaveValue(new RegExp(`"id": "${cloneId.replaceAll(".", "\\.")}"`));
+  await contentDialog
+    .getByRole("button", { name: "Clone selected pack" })
+    .click();
+  await expect(editor).toHaveValue(
+    new RegExp(`"id": "${cloneId.replaceAll(".", "\\.")}"`),
+  );
   await expect(contentDialog).toContainText(`Clone of ${packId}@1.0.0`);
   await expect(
     contentDialog.getByText(`${cloneId}@2.0.0`, { exact: true }),
@@ -171,7 +179,9 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
     .getByRole("button", { name: "Binding Glyph Failed Save", exact: true })
     .click();
   const authoredAction = liveDialog.getByRole("button", {
-    name: new RegExp(`Binding Glyph · action\\.binding-glyph · ${packId.replaceAll(".", "\\.")}@1\\.0\\.0`),
+    name: new RegExp(
+      `Binding Glyph · action\\.binding-glyph · ${packId.replaceAll(".", "\\.")}@1\\.0\\.0`,
+    ),
   });
   await expect(authoredAction).toBeVisible();
   await authoredAction.click();
@@ -191,7 +201,9 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
   await liveDialog.getByRole("button", { name: "Close" }).click();
 
   const statusPanel = page.getByRole("region", { name: "4. Turn status" });
-  await expect(statusPanel).toContainText("action.binding-glyph · entity-warden");
+  await expect(statusPanel).toContainText(
+    "action.binding-glyph · entity-warden",
+  );
   await openMenuCommand(page, "Run", "Start combat");
   const actionsPanel = page.getByRole("region", {
     name: "6. Available actions",
@@ -244,7 +256,9 @@ test("authors, validates, binds, executes, and replays a Rust-owned action @live
   await expect(replayBinding).toContainText("ability.binding-glyph");
   await expect(replayBinding).toContainText("entity-warden");
   await expect(replayBinding).toContainText(`${packId}@1.0.0`);
-  await expect(replayBinding).toContainText("targeting 2 · check 1 · effects 1");
+  await expect(replayBinding).toContainText(
+    "targeting 2 · check 1 · effects 1",
+  );
 });
 
 async function openMenuDialog(

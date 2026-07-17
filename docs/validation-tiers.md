@@ -1,14 +1,14 @@
 # Validation Tiers And Risk Inventory
 
-Status: approved contract; focused/blocking implementation in Den task #5869
+Status: implemented three-tier contract through Den tasks #5868–#5870
 Baseline commit: `74623131d9c9e558773c2844a991df357bb30ede`
 Measured: 2026-07-16
 
 This document records the current Rulebench verification graph, the defects
 each stage is meant to catch, its measured cost, and the target three-tier
-contract. Task #5869 implements the focused checks and blocking project gate
-described below. Task #5870 owns certification routing, proof cleanup, and
-final guidance. The baseline commit/date and counts in the next section are
+contract. Task #5869 implemented the focused checks and blocking project gate.
+Task #5870 implemented certification routing, proof cleanup, and final
+guidance. The baseline commit/date and counts in the next section are
 historical measurement evidence, not current command guidance or synchronized
 support claims.
 
@@ -53,7 +53,7 @@ The baseline contains:
   artifact-collecting live scenario skips unless live mode is enabled;
 - four Rust-generated TypeScript artifacts totaling 610,543 bytes.
 
-Five Playwright titles currently contain `@live`. Four are in
+At the recorded baseline, five Playwright titles contained `@live`. Four were in
 `integration/live-rust.spec.ts` and still execute under ordinary `e2e`; the
 artifact-collecting `boot.live.spec.ts` scenario is the one that skips without
 live mode. `e2e:live` selects all five, so four browser journeys are executed
@@ -125,9 +125,25 @@ is intentionally higher than the old cached receipt because `e2e:gate` really
 executed the primary browser workflows. The after measurements exclude local
 web-server startup, while the recorded cold baseline included an isolated
 real-host browser stack; the exact-SHA GitHub gate remains the clean-checkout
-proof for normal self-starting CI composition. Task #5870 owns the final
-focused/blocking/certification comparison after the canonical certification
-runner exists.
+proof for normal self-starting CI composition.
+
+Task #5870 measured the canonical deterministic certification command against
+the managed local URL. The cold probe used an empty isolated Cargo target and
+disabled Nx cache reuse. The warm probe immediately repeated the same command;
+unlike the historical warm baseline, all 22 deterministic browser journeys
+executed in both probes.
+
+| Final path                                | Cold seconds | Warm seconds | Evidence boundary                                                                  |
+| ----------------------------------------- | -----------: | -----------: | ---------------------------------------------------------------------------------- |
+| `verify:change --profile frontend`        |       12.110 |        5.310 | Focused frontend feedback; actual lint/typecheck/Vitest work                       |
+| `verify` blocking composition             |       65.660 |       20.630 | Three regressions and four primary browser workflows                               |
+| `certify` deterministic certification     |       83.200 |       38.700 | Full static suite, unfiltered corpus, portable consumer, and 22 browser journeys   |
+| Recorded pre-tiering `verify` for context |       89.280 |       11.615 | Warm result included cached lint/typecheck/build/E2E receipts, not a browser rerun |
+
+The certification command is intentionally more expensive than the blocking
+gate and materially cheaper cold than the recorded pre-tiering composition.
+Its warmer number remains honest about actual browser execution instead of
+presenting an Nx E2E cache receipt as a second run.
 
 ## Verification Risk Inventory
 
@@ -135,23 +151,23 @@ The target tier column is the decision for #5869 and #5870. “Focused” means 
 stage is selected when its owning surface changes; it does not imply that the
 stage is safe to omit for that owner.
 
-| Stage                       | Concrete defect or drift detected                                                                                                                                                                                                             | Scope and current overlap                                                                                                                                                                                                                                 | Target tier, owner, and cadence                                                                                                                                                                                                        |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check:pattern`             | Missing template/governance files, malformed library tags, deep imports, production imports of testing fixtures, stale generated ESLint boundary policy, and an ungated live harness                                                          | Local frontend structure. Partially overlaps ESLint module boundaries, but also checks repository shape and live-test conventions that lint does not.                                                                                                     | Focused for any frontend/tooling change and blocking project gate. Rulebench-owned; run on every applicable edit and every integration.                                                                                                |
-| `generated:check`           | A missing, hand-edited, unmarked, or stale protocol, capability, scenario, or combat-session projection from four Rust emitters                                                                                                               | Crosses Rust authority into TypeScript. `protocol:check`, `catalog:check`, and `session:check` are narrower duplicate entrypoints. Typecheck and fixture tests consume the artifacts but cannot prove emitter equality.                                   | Focused whenever an emitter, protocol, registry, fixture, host composition, or generated consumer changes; blocking project gate. Rulebench-owned and fail-closed.                                                                     |
-| `regression:check`          | Scenario outcome/event/trace/fingerprint drift, nondeterminism, rejection drift, executable capability coverage gaps, replay failure, and unclassified replay mismatches                                                                      | Local semantic certification. It runs 11 registered scenarios twice and 16 conformance cases, several of which reuse the same Hexing Bolt, Watchtower, movement, policy, and replay behavior covered by Rust tests and browser journeys.                  | A three-case representative subset blocks the project gate; the unfiltered corpus belongs to certification and focused fixture/capability work. Rulebench-owned.                                                                       |
-| `check:rust-boundaries`     | Reverse, unknown, or forbidden crate edges; fixture imports from portable owners; unapproved ASHA crates, paths, repositories, versions, or revisions                                                                                         | Local plus pinned upstream compatibility. Cargo compilation will accept many policy-invalid graphs, so this is not replaced by `rust:test`.                                                                                                               | Focused for Cargo/Rust ownership changes and blocking project gate. Rulebench-owned and fail-closed.                                                                                                                                   |
-| `check:rust-test-ownership` | An active owner crate or authority harness losing all colocated `#[test]` coverage                                                                                                                                                            | Local governance. It does not prove semantics and partially overlaps the existence of tests run by Cargo, but Cargo succeeds for a crate with zero tests.                                                                                                 | Focused for Rust owner/test moves and blocking project gate because it costs less than 0.4 seconds. Rulebench-owned.                                                                                                                   |
-| `check:portable-consumer`   | The supported `rulebench-rules` facade failing from an independent Cargo workspace or transitively acquiring protocol, fixture, authority, bridge, codegen, or host crates                                                                    | Portable-consumer certification. It recompiles the portable graph separately and overlaps workspace compilation/tests, but uniquely proves the external workspace and transitive-tree boundary.                                                           | Focused for portable facade/Cargo/ASHA revision changes; otherwise certification. Rulebench-owned until an explicit external owner invokes it and reports failures.                                                                    |
-| `rust:test`                 | Owner semantics, validation and resolution, replay/recovery, protocol mapping, bridge behavior, host lifecycle/storage/TCP, and cross-crate authority integration regressions                                                                 | Local authority truth. The 488 tests overlap scenario fixtures and host/browser paths, but provide narrower diagnostics and many rejection/rollback cases absent elsewhere.                                                                               | Focused owner package tests during edits; the full workspace remains in the blocking project gate as core semantic coverage. Rulebench-owned.                                                                                          |
-| `check:claims`              | Capability manifest identity/order/progression, evidence ownership, executable-without-conformance claims, host composition, production Rust stubs, exact required prose, exact non-claims, exact limitations, and one hard-coded review date | Mixes executable invariants with manually synchronized policy prose. Manifest checks overlap generation/regression but uniquely prevent capability promotion. Exact text/date checks create documentation ceremony without proving behavior.              | Split: executable manifest/stub invariants remain focused and blocking; prose, review date, exact counts, and Den-document review move to milestone certification/governance without hard-coded source-gate literals. Rulebench-owned. |
-| `check:docs`                | Markdown referencing a package script that does not exist                                                                                                                                                                                     | Local documentation freshness with no semantic overlap.                                                                                                                                                                                                   | Focused for command/doc edits and blocking project gate because it is cheap. Rulebench-owned.                                                                                                                                          |
-| `lint`                      | TypeScript/Angular/Playwright style, unsafe constructs, and Nx module-boundary violations                                                                                                                                                     | Local frontend quality. Boundary rules partially overlap `check:pattern`; the two use different enforcement mechanisms and catch different defects.                                                                                                       | Focused for frontend changes and blocking project gate. Rulebench-owned.                                                                                                                                                               |
-| `typecheck`                 | TypeScript contract and public API incompatibility, including generated DTO consumer drift                                                                                                                                                    | Local frontend/protocol consumer compatibility. It complements generation equality and unit tests.                                                                                                                                                        | Focused for frontend/generated changes and blocking project gate. Rulebench-owned.                                                                                                                                                     |
-| `test`                      | Transport parity/error handling, AsyncState orchestration, stale-response behavior, protocol-to-view projection, and fixture usage regressions                                                                                                | Local frontend behavior. Some fixture assertions repeat generated/Rust outcomes, but the unique value is proving TypeScript carries rather than re-derives authority facts.                                                                               | Focused for frontend/generated changes and blocking project gate. Rulebench-owned.                                                                                                                                                     |
-| `build`                     | Angular compilation, bundling, entrypoint/style/asset failures, and size-budget violations                                                                                                                                                    | Local product integration. Typecheck overlaps compilation but not the production builder or budgets.                                                                                                                                                      | Blocking project gate; focused when app/build/theme composition changes. Rulebench-owned.                                                                                                                                              |
-| `e2e`                       | Same-origin Rust host integration, handshake/error mapping, content lifecycle, live sessions, visible rule evidence, replay review, policy laboratory, responsive/mobile behavior, and accessibility interactions                             | Product integration plus broad certification. It repeats Rust scenario/replay semantics for visible proof; those repetitions are justified only when they prove the transport or rendered user workflow. Four `@live` cases are also rerun by `e2e:live`. | Four primary workflows block the project gate; the remaining deterministic journeys belong to certification. Rulebench-owned.                                                                                                          |
-| `e2e:live`                  | LAN-served rendered behavior and artifact collection, screenshots, console/page errors, visible text, and explicit non-claims                                                                                                                 | User-deliverable evidence. It is opt-in, and four of five selected cases currently overlap ordinary E2E. A passing process is not sufficient; artifacts must be inspected.                                                                                | Milestone/release certification and every user-deliverable UI task. Rulebench-owned until a separately scoped browser certification owner exists.                                                                                      |
+| Stage                       | Concrete defect or drift detected                                                                                                                                                                                                             | Scope and current overlap                                                                                                                                                                                                                    | Target tier, owner, and cadence                                                                                                                                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check:pattern`             | Missing template/governance files, malformed library tags, deep imports, production imports of testing fixtures, stale generated ESLint boundary policy, and an ungated live harness                                                          | Local frontend structure. Partially overlaps ESLint module boundaries, but also checks repository shape and live-test conventions that lint does not.                                                                                        | Focused for any frontend/tooling change and blocking project gate. Rulebench-owned; run on every applicable edit and every integration.                                                                                                |
+| `generated:check`           | A missing, hand-edited, unmarked, or stale protocol, capability, scenario, or combat-session projection from four Rust emitters                                                                                                               | Crosses Rust authority into TypeScript. `protocol:check`, `catalog:check`, and `session:check` are narrower duplicate entrypoints. Typecheck and fixture tests consume the artifacts but cannot prove emitter equality.                      | Focused whenever an emitter, protocol, registry, fixture, host composition, or generated consumer changes; blocking project gate. Rulebench-owned and fail-closed.                                                                     |
+| `regression:check`          | Scenario outcome/event/trace/fingerprint drift, nondeterminism, rejection drift, executable capability coverage gaps, replay failure, and unclassified replay mismatches                                                                      | Local semantic certification. It runs 11 registered scenarios twice and 16 conformance cases, several of which reuse the same Hexing Bolt, Watchtower, movement, policy, and replay behavior covered by Rust tests and browser journeys.     | A three-case representative subset blocks the project gate; the unfiltered corpus belongs to certification and focused fixture/capability work. Rulebench-owned.                                                                       |
+| `check:rust-boundaries`     | Reverse, unknown, or forbidden crate edges; fixture imports from portable owners; unapproved ASHA crates, paths, repositories, versions, or revisions                                                                                         | Local plus pinned upstream compatibility. Cargo compilation will accept many policy-invalid graphs, so this is not replaced by `rust:test`.                                                                                                  | Focused for Cargo/Rust ownership changes and blocking project gate. Rulebench-owned and fail-closed.                                                                                                                                   |
+| `check:rust-test-ownership` | An active owner crate or authority harness losing all colocated `#[test]` coverage                                                                                                                                                            | Local governance. It does not prove semantics and partially overlaps the existence of tests run by Cargo, but Cargo succeeds for a crate with zero tests.                                                                                    | Focused for Rust owner/test moves and blocking project gate because it costs less than 0.4 seconds. Rulebench-owned.                                                                                                                   |
+| `check:portable-consumer`   | The supported `rulebench-rules` facade failing from an independent Cargo workspace or transitively acquiring protocol, fixture, authority, bridge, codegen, or host crates                                                                    | Portable-consumer certification. It recompiles the portable graph separately and overlaps workspace compilation/tests, but uniquely proves the external workspace and transitive-tree boundary.                                              | Focused for portable facade/Cargo/ASHA revision changes; otherwise certification. Rulebench-owned until an explicit external owner invokes it and reports failures.                                                                    |
+| `rust:test`                 | Owner semantics, validation and resolution, replay/recovery, protocol mapping, bridge behavior, host lifecycle/storage/TCP, and cross-crate authority integration regressions                                                                 | Local authority truth. The 488 tests overlap scenario fixtures and host/browser paths, but provide narrower diagnostics and many rejection/rollback cases absent elsewhere.                                                                  | Focused owner package tests during edits; the full workspace remains in the blocking project gate as core semantic coverage. Rulebench-owned.                                                                                          |
+| `check:claims`              | Capability manifest identity/order/progression, evidence ownership, executable-without-conformance claims, host composition, production Rust stubs, exact required prose, exact non-claims, exact limitations, and one hard-coded review date | Mixes executable invariants with manually synchronized policy prose. Manifest checks overlap generation/regression but uniquely prevent capability promotion. Exact text/date checks create documentation ceremony without proving behavior. | Split: executable manifest/stub invariants remain focused and blocking; prose, review date, exact counts, and Den-document review move to milestone certification/governance without hard-coded source-gate literals. Rulebench-owned. |
+| `check:docs`                | Markdown referencing a package script that does not exist                                                                                                                                                                                     | Local documentation freshness with no semantic overlap.                                                                                                                                                                                      | Focused for command/doc edits and blocking project gate because it is cheap. Rulebench-owned.                                                                                                                                          |
+| `lint`                      | TypeScript/Angular/Playwright style, unsafe constructs, and Nx module-boundary violations                                                                                                                                                     | Local frontend quality. Boundary rules partially overlap `check:pattern`; the two use different enforcement mechanisms and catch different defects.                                                                                          | Focused for frontend changes and blocking project gate. Rulebench-owned.                                                                                                                                                               |
+| `typecheck`                 | TypeScript contract and public API incompatibility, including generated DTO consumer drift                                                                                                                                                    | Local frontend/protocol consumer compatibility. It complements generation equality and unit tests.                                                                                                                                           | Focused for frontend/generated changes and blocking project gate. Rulebench-owned.                                                                                                                                                     |
+| `test`                      | Transport parity/error handling, AsyncState orchestration, stale-response behavior, protocol-to-view projection, and fixture usage regressions                                                                                                | Local frontend behavior. Some fixture assertions repeat generated/Rust outcomes, but the unique value is proving TypeScript carries rather than re-derives authority facts.                                                                  | Focused for frontend/generated changes and blocking project gate. Rulebench-owned.                                                                                                                                                     |
+| `build`                     | Angular compilation, bundling, entrypoint/style/asset failures, and size-budget violations                                                                                                                                                    | Local product integration. Typecheck overlaps compilation but not the production builder or budgets.                                                                                                                                         | Blocking project gate; focused when app/build/theme composition changes. Rulebench-owned.                                                                                                                                              |
+| `e2e:certification`         | Same-origin Rust host integration, handshake/error mapping, content lifecycle, live sessions, visible rule evidence, replay review, policy laboratory, responsive/mobile behavior, and accessibility interactions                             | Product integration plus broad deterministic certification. It repeats Rust scenario/replay semantics only where the transport or rendered user workflow is the distinct defect boundary. The live artifact scenario is excluded.            | Complete deterministic browser group inside `certify`; Rulebench-owned and run nightly, on manual dispatch, and for milestones/releases.                                                                                               |
+| `e2e:live-artifacts`        | LAN-served rendered behavior and artifact collection, screenshots, console/page errors, visible text, and explicit non-claims                                                                                                                 | One opt-in managed-server scenario. Deterministic journeys are no longer selected merely because they talk to the live Rust host. A passing process is not sufficient; artifacts must be inspected.                                          | Required for milestone/release user-visible claims and user-deliverable UI tasks. `e2e:live` remains a compatibility alias. Rulebench-owned.                                                                                           |
 
 ### Other current package entrypoints
 
@@ -168,6 +184,10 @@ stage is safe to omit for that owner.
   paths, not verification stages.
 - `dev`, `serve:local`, and `rust:host` start development surfaces and do not
   themselves establish a verification claim.
+- `certify` is the exhaustive deterministic composition. It deliberately calls
+  shared primitives rather than `verify`, so regression and browser subsets
+  are not executed twice. `--require-live` adds only the managed artifact
+  group after deterministic certification.
 
 ## Target Tier Contract
 
@@ -287,8 +307,9 @@ The four browser workflows cover the primary rules-designer loop:
 
 Those four tests carry the explicit `@gate` tag and `e2e:gate` selects that tag
 through the existing Playwright configuration. The public `e2e` command is not
-deleted or narrowed; it continues to reach the complete deterministic set for
-certification callers until #5870 composes the canonical certification command.
+deleted or narrowed; it continues to reach the complete deterministic set. The
+canonical `certify` command selects that set through the explicit
+`e2e:certification` group.
 
 Responsive permutations, broad capability-matrix rendering, specialized
 targeting/policy/recovery journeys, second-provider permutations, and complete
@@ -320,16 +341,17 @@ then rerun subsets already executed by `verify`:
 ```text
 certify
   verify:static
-  regression:check             # unfiltered 11 scenarios / 16 conformance cases
+  regression:check             # unfiltered registered semantic corpus
   check:portable-consumer
   e2e:certification            # complete deterministic browser set, once
   review:claims-and-limitations # governance freshness without hard-coded prose/date/counts
-  e2e:live                     # only in explicit --require-live mode
+  e2e:live-artifacts           # only in explicit --require-live mode
 ```
 
-Cadence and triggers:
+Implemented cadence and triggers:
 
-- nightly scheduled GitHub workflow;
+- nightly scheduled and manual GitHub workflow in
+  `.github/workflows/certification.yml`;
 - every milestone and release candidate;
 - every governed ASHA revision/version update;
 - every protocol/storage/replay compatibility or migration change;
@@ -344,13 +366,13 @@ BASE_URL=<local-url> LIVE_RUN=1 pnpm run certify -- --require-live
 ```
 
 `--require-live` must fail when `BASE_URL` or `LIVE_RUN=1` is missing and must
-invoke the artifact-collecting `e2e:live` group after deterministic
+invoke the artifact-collecting `e2e:live-artifacts` group after deterministic
 certification. That live result is accepted only with inspected screenshots/artifacts,
 rendered behavior, console/page-error evidence, and explicit non-claims. A
 scheduled deterministic certification run without live artifacts must say that
 it did not establish live/LAN visual evidence.
 
-Certification remains Rulebench-owned for this milestone. A read-only scan of
+Certification remains Rulebench-owned. A read-only scan of
 the local `asha-testing` checkout and other local repository GitHub/package/
 Cargo entrypoints found no Rulebench caller. Den also has no registered
 `asha-testing` project scope. Therefore there is no current destination owner,
@@ -367,28 +389,32 @@ Rulebench path is removed:
 
 ## Duplicate Execution Decisions
 
-| Current duplication                                                            | Decision and retained detection path                                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `protocol:check`, `catalog:check`, or `session:check` beside `generated:check` | Never compose both in one tier. Focused aliases remain owner conveniences; project and certification gates use only `generated:check`.                                                                                                                                                                              |
-| Rust, TypeScript, and generated protocol identity/version                      | Keep `check:protocol-compatibility` beside generation equality. Generation proves emitted DTO equality; the compatibility check uniquely catches a one-sided hand-maintained live-client identity/version change before a host handshake.                                                                           |
-| Every scenario and conformance case plus all Rust tests                        | The project gate runs three representative regression cases plus all Rust owner tests. Certification runs the unfiltered regression/conformance corpus once. Rust tests remain because their narrow validation, rollback, storage, protocol, and error diagnostics are not supplied by catalog cases.               |
-| The same semantic outcome in Rust, regression, and browser tests               | Retain the Rust test for authority semantics, a regression case for deterministic package/replay compatibility, and a browser case only when it proves transport/rendered workflow behavior. Remove browser assertions that merely restate every event/fingerprint permutation without a visible integration claim. |
-| Four `@live` browser cases in both ordinary E2E and `e2e:live`                 | Replace ambiguous title tagging with explicit gate, certification, and live-artifact groups. Deterministic journeys run once in the selected tier; only artifact/managed-server claims run in the live group.                                                                                                       |
-| `check:claims` exact prose/date/count checks plus executable manifest checks   | Keep executable capability progression, owner evidence, host composition, and production-stub checks blocking. Move prose, dates, exact counts, Den-document review, and limitation review to a certification receipt or generated report.                                                                          |
-| Nx cached E2E result presented like browser execution                          | Keep cache use for local speed, but command output/evidence must distinguish a cache receipt from an executed browser run. Milestone/live claims require an actual run.                                                                                                                                             |
+| Current duplication                                                            | Decision and retained detection path                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `protocol:check`, `catalog:check`, or `session:check` beside `generated:check` | Never compose both in one tier. Focused aliases remain owner conveniences; project and certification gates use only `generated:check`.                                                                                                                                                                                     |
+| Rust, TypeScript, and generated protocol identity/version                      | Keep `check:protocol-compatibility` beside generation equality. Generation proves emitted DTO equality; the compatibility check uniquely catches a one-sided hand-maintained live-client identity/version change before a host handshake.                                                                                  |
+| Every scenario and conformance case plus all Rust tests                        | The project gate runs three representative regression cases plus all Rust owner tests. Certification runs the unfiltered regression/conformance corpus once. Rust tests remain because their narrow validation, rollback, storage, protocol, and error diagnostics are not supplied by catalog cases.                      |
+| The same semantic outcome in Rust, regression, and browser tests               | Retain the Rust test for authority semantics, a regression case for deterministic package/replay compatibility, and a browser case only when it proves transport/rendered workflow behavior. Remove browser assertions that merely restate every event/fingerprint permutation without a visible integration claim.        |
+| Deterministic live-host journeys formerly selected by both E2E and `e2e:live`  | Removed the ambiguous `@live` tag from deterministic journeys. `e2e:certification` runs every non-artifact browser case once; `e2e:live-artifacts` selects only the managed screenshot/evidence scenario, and `e2e:live` is a compatibility alias.                                                                         |
+| `check:claims` exact prose/date/count checks plus executable manifest checks   | Executable capability progression, owner evidence, host composition, and production-stub checks remain blocking. Prose/date/count literals were removed; certification generates a receipt from the live generated inventory plus a provenance-labelled Den limitation snapshot whose age is policy, not a source literal. |
+| Nx cached E2E result presented like browser execution                          | Keep cache use for local speed, but command output/evidence must distinguish a cache receipt from an executed browser run. Milestone/live claims require an actual run.                                                                                                                                                    |
 
 ## Checked Artifact Decisions
 
-| Artifact                                                   |  Current size | Unique local value                                                                       | Decision                                                                                                                                                                                                                                                                                                         |
-| ---------------------------------------------------------- | ------------: | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `libs/protocol/src/generated/api-types.ts`                 |  74,030 bytes | The generated DTO contract compiled by every TypeScript consumer                         | Keep checked and blocking through `generated:check`.                                                                                                                                                                                                                                                             |
-| `libs/transport/src/generated/rust-capability-manifest.ts` |  14,527 bytes | Offline capability fixture, evidence inventory, and executable claims input              | Keep checked and blocking while offline consumers use it. Generate counts/descriptions from it rather than copying them into prose.                                                                                                                                                                              |
-| `libs/transport/src/generated/rust-scenario-catalog.ts`    |  67,096 bytes | Offline fixture/golden data for transport and viewer tests; never a live viewer fallback | Keep checked for now. Narrow only after the affected tests consume an equivalent generated-on-demand fixture with equal diagnostics.                                                                                                                                                                             |
-| `libs/transport/src/generated/rust-combat-session.ts`      | 454,890 bytes | Broad offline session/control/automatic-run/replay fixture used by transport tests       | Candidate for #5870 narrowing or generation on demand because it is 74% of checked generated bytes. Retain the current file until tests use a smaller representative checked fixture or deterministic temporary generation. Do not move it to ASHA Testing without a destination owner and visible failure path. |
+| Artifact                                                   |  Current size | Unique local value                                                                          | Decision                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------- | ------------: | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs/protocol/src/generated/api-types.ts`                 |  74,030 bytes | The generated DTO contract compiled by every TypeScript consumer                            | Keep checked and blocking through `generated:check`.                                                                                                                                                                                                                                                                               |
+| `libs/transport/src/generated/rust-capability-manifest.ts` |  14,527 bytes | Offline capability fixture, evidence inventory, and executable claims input                 | Keep checked and blocking while offline consumers use it. Generate counts/descriptions from it rather than copying them into prose.                                                                                                                                                                                                |
+| `libs/transport/src/generated/rust-scenario-catalog.ts`    |  67,096 bytes | Offline fixture/golden data for transport and viewer tests; never a live viewer fallback    | Keep checked for now. Narrow only after the affected tests consume an equivalent generated-on-demand fixture with equal diagnostics.                                                                                                                                                                                               |
+| `libs/transport/src/generated/rust-combat-session.ts`      | 101,321 bytes | Representative offline session/control/automatic-run/replay fixture used by transport tests | Narrowed from 454,890 bytes. The Rust emitter now selects one complete representative per offline category; generated equality and transport tests retain local drift detection, while all providers/scenarios and broad semantics remain in Rust owner tests, unfiltered regression/conformance, and live-host browser workflows. |
 
-No artifact is deleted by this design. #5870 must record before/after size,
-generation cost, consumer changes, and the retained test that detects drift
-before narrowing the combat-session artifact.
+No generated authority contract was deleted. The combat-session artifact
+dropped by 353,569 bytes (77.7%). Its generation path is unchanged, so
+`generated:check` still identifies the owning emitter and stale file. The
+TypeScript offline transport continues to receive a complete session,
+control-history, script, automatic-run, and automatic-run-replay representative.
+The Rust registry and certification corpus, rather than this offline projection,
+retain exhaustive provider and semantic coverage.
 
 ## Claims And Non-Claims
 
@@ -408,7 +434,7 @@ It must not hard-code:
 - exact capability/provider/scenario counts in manually synchronized prose;
 - an exact list of active limitations whose authority is Den.
 
-Certification should generate a review receipt containing current executable
+Certification generates a review receipt containing current executable
 counts, the source commit, reviewed Den document handles, active limitations,
 reviewer identity, and review time. That receipt can become stale by policy
 without making an unrelated source edit fail because a literal date changed.
@@ -435,31 +461,36 @@ review rule.
 
 ## Scope Accounting
 
-Acceptance criteria fully satisfied by this design task:
+The #5866 acceptance contract is fully routed with no acceptance item deferred:
 
-- every current `verify`, CI, documented focused, generated, regression,
-  browser, and live entrypoint is inventoried by defect class, overlap,
-  ownership, lifecycle, and cost;
-- cold and warm baseline timings identify command-level bottlenecks and cache
-  receipts;
-- focused, blocking, and certification commands have exact names,
-  compositions, cadence, and failure posture;
-- primary blocking browser workflows and exhaustive certification journeys are
-  separated;
-- duplicate semantic, generated, claims, and browser execution has a retained
-  detection decision;
-- checked artifact retention/narrowing decisions and cross-repository migration
-  prerequisites are explicit.
+- #5868 inventoried the old graph, defect classes, overlap, ownership, recorded
+  costs, and the focused/blocking/certification target contract.
+- #5869 implemented fail-closed `verify:change` profiles, representative
+  regression and four-workflow browser groups, revised blocking `verify`, and
+  selector failure-injection tests.
+- #5870 implemented one exhaustive `certify` command, a nightly/manual
+  Rulebench-owned workflow, and explicit live-required milestone mode.
+- Blocking and certification use shared primitives, never compose `verify`
+  inside `certify`, and execute representative versus exhaustive regression
+  and browser groups at their documented tiers.
+- Deterministic browser journeys no longer also carry the live-artifact tag.
+  Certification executes 22 deterministic journeys once; live mode adds only
+  the managed screenshot/evidence scenario.
+- Executable capability claims remain blocking. Certification derives current
+  inventory and writes a source/Den provenance receipt without hard-coded prose,
+  counts, or freshness dates in the source gate.
+- The generated combat-session projection retains one complete representative
+  for each offline consumer category and is 353,569 bytes (77.7%) smaller;
+  exhaustive provider and semantic coverage remains with Rust owners, the
+  unfiltered corpus, and live-host workflows.
+- Twenty-one validation-runner self-tests plus existing Rust boundary,
+  generated-equality, protocol-compatibility, and regression rejection probes
+  fail closed around the lighter routing.
+- The focused, blocking, and certification measurements above distinguish
+  actual execution from cached receipts.
+- `AGENTS.md`, README, the evidence template, and Den guidance record the exact
+  commands, ownership, cadence, receipt, artifact, and non-claim boundaries.
 
-Intentionally deferred implementation:
-
-- #5869 implements `verify:change`, profiles, `verify:static`,
-  `regression:gate`, `e2e:gate`, the revised blocking `verify`, CI wiring, and
-  failure-injection proof;
-- #5870 implements `certify`, scheduled/milestone routing, deterministic/live
-  browser grouping, executable-versus-governance claims separation, artifact
-  cleanup, final AGENTS/Den/task-template guidance, and before/after timing.
-
-Both follow-ups are required for parent #5866 acceptance. They are explicit
-milestone phases, not polish or optional backlog, and the parent is not
-closable after this design alone.
+No proof was moved to `asha-testing`: no destination project, runnable consumer,
+or retained Rulebench failure signal exists. The migration prerequisites above
+remain the gate for any future relocation, not deferred #5866 acceptance work.

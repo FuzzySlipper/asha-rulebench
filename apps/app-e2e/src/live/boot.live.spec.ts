@@ -28,7 +28,7 @@ async function openLiveSetup(page: Page) {
 }
 
 liveScenario(
-  "boot live evidence @live",
+  "boot live evidence @live-artifact",
   async ({ page, collector, liveBaseUrl }) => {
     const liveSessionId = `live-evidence-${Date.now()}`;
     const livePackId = `pack.live.${Date.now()}`;

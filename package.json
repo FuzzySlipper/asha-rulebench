@@ -12,6 +12,7 @@
     "typecheck": "nx run-many -t typecheck --all",
     "test": "vitest run --passWithNoTests",
     "verify": "pnpm run verify:static && pnpm run regression:gate && pnpm run e2e:gate",
+    "certify": "node tools/scripts/certify.mjs",
     "verify:change": "node tools/scripts/verify-change.mjs",
     "verify:static": "pnpm run test:validation-scripts && pnpm run check:pattern && pnpm run check:typescript-authority && pnpm run generated:check && pnpm run check:protocol-compatibility && pnpm run check:rust-boundaries && pnpm run check:rust-test-ownership && pnpm run rust:test && pnpm run check:claims:executable && pnpm run check:docs && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
     "check:pattern": "node tools/scripts/check-pattern.mjs",
@@ -21,6 +22,7 @@
     "check:rust-test-ownership": "node tools/scripts/check-rust-test-ownership.mjs",
     "check:claims": "node tools/scripts/check-verification-claims.mjs",
     "check:claims:executable": "node tools/scripts/check-verification-claims.mjs --executable",
+    "review:claims-and-limitations": "node tools/scripts/review-claims-and-limitations.mjs",
     "check:portable-consumer": "node tools/scripts/check-portable-consumer.mjs",
     "check:docs": "node tools/scripts/check-docs-commands.mjs",
     "rust:check": "cargo check --manifest-path rulebench-rs/Cargo.toml",
@@ -43,7 +45,9 @@
     "test:validation-scripts": "node --test tools/scripts/*.test.mjs",
     "e2e": "nx e2e app-e2e",
     "e2e:gate": "playwright test --config apps/app-e2e/playwright.config.mts --grep @gate",
-    "e2e:live": "playwright test --config apps/app-e2e/playwright.config.mts --grep @live"
+    "e2e:certification": "playwright test --config apps/app-e2e/playwright.config.mts --grep-invert @live-artifact",
+    "e2e:live": "pnpm run e2e:live-artifacts",
+    "e2e:live-artifacts": "playwright test --config apps/app-e2e/playwright.config.mts --grep @live-artifact"
   },
   "dependencies": {
     "@angular/common": "~21.2.0",
