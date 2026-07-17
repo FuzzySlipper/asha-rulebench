@@ -132,6 +132,15 @@ export class ContentWorkbenchStore {
   }
 
   setDraftIdentity(id: string, version: string): void {
+    const current = this._draftIdentity();
+    if (current.id === id && current.version === version) return;
+
+    this.draftGeneration += 1;
+    this.draftController?.abort();
+    this.draftController = null;
+    if (this._draft().kind === "loading") {
+      this._draft.set({ kind: "idle" });
+    }
     this._draftIdentity.set({ id, version });
     this.clock.now();
   }

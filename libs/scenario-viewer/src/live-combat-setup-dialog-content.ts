@@ -1,7 +1,10 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import type { OnInit } from "@angular/core";
 import { ContentWorkbenchStore, LiveCombatStore } from "@asha-rulebench/store";
-import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol";
+import type {
+  RulebenchAuthoredActionBindingRequestDto,
+  RulebenchContentPackReferenceDto,
+} from "@asha-rulebench/protocol";
 
 @Component({
   selector: "arb-live-combat-setup-dialog-content",
@@ -273,6 +276,9 @@ import type { RulebenchContentPackReferenceDto } from "@asha-rulebench/protocol"
                           }
                         </div>
                       }
+                      @if (authoredActionSelectionError(); as error) {
+                        <p role="alert">{{ error.code }} · {{ error.message }}</p>
+                      }
                     }
                   }
                   @if (contentWorkspace().kind === "error") {
@@ -475,13 +481,36 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
       []
     );
   });
+  protected readonly hasUnresolvedAuthoredActionSelection = computed(() => {
+    if (this.selectedAuthoredActionKey() === null) return false;
+    const selected = this.selectedAuthoredAction();
+    const actorId = this.selectedAuthoredActorId();
+    return (
+      selected === null ||
+      actorId === null ||
+      !this.bindingActors().some((actor) => actor.id === actorId)
+    );
+  });
+  protected readonly authoredActionSelectionError = computed(() => {
+    const catalog = this.bindingCatalog();
+    if (
+      catalog.kind !== "data" ||
+      !this.hasUnresolvedAuthoredActionSelection()
+    ) {
+      return null;
+    }
+    return {
+      code: "authoredActionBindingSelectionUnresolved",
+      message:
+        "The selected authored action or actor is no longer available. Choose a current binding or explicitly select No action binding.",
+    };
+  });
   protected readonly canCreateSession = computed(
     () =>
       this.connection().kind === "data" &&
       this.selectedScenarioId() !== null &&
       this.sessionIdInput().trim().length > 0 &&
-      (this.selectedAuthoredAction() === null ||
-        this.selectedAuthoredActorId() !== null),
+      !this.hasUnresolvedAuthoredActionSelection(),
   );
 
   ngOnInit(): void {
@@ -580,16 +609,25 @@ export class LiveCombatSetupDialogContentComponent implements OnInit {
   protected createSession(): void {
     const scenarioId = this.selectedScenarioId();
     if (scenarioId === null) return;
+    const authoredActionKey = this.selectedAuthoredActionKey();
     const authoredAction = this.selectedAuthoredAction();
     const authoredActorId = this.selectedAuthoredActorId();
-    const authoredActionBinding =
-      authoredAction === null || authoredActorId === null
-        ? null
-        : {
-            contentPack: authoredAction.contentPack,
-            actionId: authoredAction.actionId,
-            actorId: authoredActorId,
-          };
+    let authoredActionBinding: RulebenchAuthoredActionBindingRequestDto | null =
+      null;
+    if (authoredActionKey !== null) {
+      if (
+        authoredAction === null ||
+        authoredActorId === null ||
+        !this.bindingActors().some((actor) => actor.id === authoredActorId)
+      ) {
+        return;
+      }
+      authoredActionBinding = {
+        contentPack: authoredAction.contentPack,
+        actionId: authoredAction.actionId,
+        actorId: authoredActorId,
+      };
+    }
     void this.store.createSession(
       this.sessionIdInput().trim(),
       scenarioId,

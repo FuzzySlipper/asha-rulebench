@@ -180,6 +180,135 @@ describe("ContentWorkbenchStore", () => {
     expect(store.canImportDraft()).toBe(false);
   });
 
+  it("invalidates a pending Rust template when the requested identity changes", async () => {
+    let requestSignal: AbortSignal | null = null;
+    let resolveDraft:
+      | ((value: {
+          ok: true;
+          value: {
+            authoredPayload: string;
+            sourceKind: "rustTemplate";
+            sourceLabel: string;
+            identity: { id: string; version: string };
+            identityExpectation: string;
+          };
+        }) => void)
+      | null = null;
+    const pendingDraft = new Promise<{
+      ok: true;
+      value: {
+        authoredPayload: string;
+        sourceKind: "rustTemplate";
+        sourceLabel: string;
+        identity: { id: string; version: string };
+        identityExpectation: string;
+      };
+    }>((resolve) => {
+      resolveDraft = resolve;
+    });
+    const transport = createFakeRulebenchLiveTransport({
+      createContentTemplateDraft: async (identity, options) => {
+        requestSignal = options?.signal ?? null;
+        return pendingDraft;
+      },
+    });
+    const store = new ContentWorkbenchStore(transport, clock);
+
+    store.setDraftIdentity("pack.identity-a", "1.0.0");
+    const request = store.startTemplateDraft();
+    store.setDraftIdentity("pack.identity-b", "2.0.0");
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(store.draft()).toEqual({ kind: "idle" });
+    const completeDraft = resolveDraft;
+    if (completeDraft === null) throw new Error("template draft was not requested");
+    completeDraft({
+      ok: true,
+      value: {
+        authoredPayload: '{"pack":{"id":"pack.identity-a"}}',
+        sourceKind: "rustTemplate",
+        sourceLabel: "Rust template for identity A",
+        identity: { id: "pack.identity-a", version: "1.0.0" },
+        identityExpectation: "New content identity pack.identity-a@1.0.0.",
+      },
+    });
+    await request;
+
+    expect(store.draftIdentity()).toEqual({
+      id: "pack.identity-b",
+      version: "2.0.0",
+    });
+    expect(store.draft()).toEqual({ kind: "idle" });
+    expect(store.draftPayload()).toBeNull();
+  });
+
+  it("invalidates a pending Rust clone when the requested identity changes", async () => {
+    let requestSignal: AbortSignal | null = null;
+    let resolveDraft:
+      | ((value: {
+          ok: true;
+          value: {
+            authoredPayload: string;
+            sourceKind: "storedClone";
+            sourceLabel: string;
+            identity: { id: string; version: string };
+            identityExpectation: string;
+          };
+        }) => void)
+      | null = null;
+    const pendingDraft = new Promise<{
+      ok: true;
+      value: {
+        authoredPayload: string;
+        sourceKind: "storedClone";
+        sourceLabel: string;
+        identity: { id: string; version: string };
+        identityExpectation: string;
+      };
+    }>((resolve) => {
+      resolveDraft = resolve;
+    });
+    const transport = createFakeRulebenchLiveTransport({
+      listContentWorkspace: async () => ({
+        ok: true,
+        value: workspace(firstReference, true),
+      }),
+      cloneContentDraft: async (_reference, _identity, options) => {
+        requestSignal = options?.signal ?? null;
+        return pendingDraft;
+      },
+    });
+    const store = new ContentWorkbenchStore(transport, clock);
+    await store.loadWorkspace();
+
+    store.setDraftIdentity("pack.clone-a", "1.0.0");
+    const request = store.cloneSelectedDraft();
+    store.setDraftIdentity("pack.clone-b", "2.0.0");
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(store.draft()).toEqual({ kind: "idle" });
+    const completeDraft = resolveDraft;
+    if (completeDraft === null) throw new Error("clone draft was not requested");
+    completeDraft({
+      ok: true,
+      value: {
+        authoredPayload: '{"pack":{"id":"pack.clone-a"}}',
+        sourceKind: "storedClone",
+        sourceLabel: "Clone for identity A",
+        identity: { id: "pack.clone-a", version: "1.0.0" },
+        identityExpectation: "New content identity pack.clone-a@1.0.0.",
+      },
+    });
+    await request;
+
+    expect(store.draftIdentity()).toEqual({
+      id: "pack.clone-b",
+      version: "2.0.0",
+    });
+    expect(store.draft()).toEqual({ kind: "idle" });
+    expect(store.draftPayload()).toBeNull();
+  });
+
   it("ignores an older review response after a newer pack selection", async () => {
     let resolveFirst: ((value: { ok: true; value: RulebenchContentPackReviewDto }) => void) | null = null;
     const firstReview = new Promise<{ ok: true; value: RulebenchContentPackReviewDto }>((resolve) => {
