@@ -138,6 +138,7 @@ export class ContentWorkbenchStore {
     this.draftGeneration += 1;
     this.draftController?.abort();
     this.draftController = null;
+    this.invalidateValidationRequest();
     if (this._draft().kind === "loading") {
       this._draft.set({ kind: "idle" });
     }
@@ -269,7 +270,7 @@ export class ContentWorkbenchStore {
   ): Promise<void> {
     const generation = ++this.draftGeneration;
     this.draftController?.abort();
-    this.validationController?.abort();
+    this.invalidateValidationRequest();
     const controller = new AbortController();
     this.draftController = controller;
     this._draft.set({ kind: "loading" });
@@ -293,7 +294,7 @@ export class ContentWorkbenchStore {
     if (advanceGeneration) this.draftGeneration += 1;
     this.requestGeneration += 1;
     this.draftController?.abort();
-    this.validationController?.abort();
+    this.invalidateValidationRequest();
     this._draftPayload.set(payload);
     this._draftSyntax.set(inspectJsonSyntax(payload));
     this._validatedPayload.set(null);
@@ -301,6 +302,14 @@ export class ContentWorkbenchStore {
     this._importAttempt.set({ kind: "idle" });
     this._diff.set({ kind: "idle" });
     this.clock.now();
+  }
+
+  private invalidateValidationRequest(): void {
+    this.validationController?.abort();
+    this.validationController = null;
+    if (this._validation().kind === "loading") {
+      this._validation.set({ kind: "idle" });
+    }
   }
 
   private async mutateSelected(

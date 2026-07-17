@@ -180,6 +180,61 @@ describe("ContentWorkbenchStore", () => {
     expect(store.canImportDraft()).toBe(false);
   });
 
+  it("cancels semantic validation on identity change and remains retryable", async () => {
+    let requestSignal: AbortSignal | null = null;
+    let resolveValidation:
+      | ((value: { ok: true; value: ReturnType<typeof acceptedValidation> }) => void)
+      | null = null;
+    const pendingValidation = new Promise<{
+      ok: true;
+      value: ReturnType<typeof acceptedValidation>;
+    }>((resolve) => {
+      resolveValidation = resolve;
+    });
+    let validationRequestCount = 0;
+    const transport = createFakeRulebenchLiveTransport({
+      validateContent: async (_payload, options) => {
+        validationRequestCount += 1;
+        if (validationRequestCount === 1) {
+          requestSignal = options?.signal ?? null;
+          return pendingValidation;
+        }
+        return {
+          ok: true,
+          value: acceptedValidation("pack.identity-b", "2.0.0"),
+        };
+      },
+    });
+    const store = new ContentWorkbenchStore(transport, clock);
+    store.stagePayload("{}");
+
+    const request = store.validateDraft();
+    store.setDraftIdentity("pack.identity-b", "2.0.0");
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(store.validation()).toEqual({ kind: "idle" });
+    expect(store.canImportDraft()).toBe(false);
+    const completeValidation = resolveValidation;
+    if (completeValidation === null) throw new Error("validation was not requested");
+    completeValidation({
+      ok: true,
+      value: acceptedValidation("pack.identity-a", "1.0.0"),
+    });
+    await request;
+
+    expect(store.validation()).toEqual({ kind: "idle" });
+    expect(store.canImportDraft()).toBe(false);
+
+    await store.validateDraft();
+
+    expect(validationRequestCount).toBe(2);
+    expect(store.validation()).toMatchObject({
+      kind: "data",
+      value: { accepted: true, packLabel: "pack.identity-b@2.0.0" },
+    });
+    expect(store.canImportDraft()).toBe(true);
+  });
+
   it("invalidates a pending Rust template when the requested identity changes", async () => {
     let requestSignal: AbortSignal | null = null;
     let resolveDraft:
