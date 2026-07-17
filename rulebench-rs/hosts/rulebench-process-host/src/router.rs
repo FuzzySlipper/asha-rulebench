@@ -7,11 +7,11 @@ use rulebench_bridge::replay_storage::{
     ContentPackStorage, ReplayArchiveEntry, ReplayArchiveStorage,
 };
 use rulebench_bridge::{BridgeError, BridgeErrorKind, BridgeScenario, RulebenchBridge};
-use rulebench_fixtures::{
+use rulebench_product_content::{
     aggregated_combat_session_transcripts, aggregated_scenario_catalog_cases,
     replay_review_packages, resolve_catalog_scenario,
 };
-use rulebench_fixtures::{
+use rulebench_product_content::{
     capability_registry_input, compiled_ruleset_provider_catalog, scenario_package_registry,
 };
 use rulebench_protocol::{

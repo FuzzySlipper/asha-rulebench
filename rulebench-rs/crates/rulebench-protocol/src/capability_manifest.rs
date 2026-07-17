@@ -359,7 +359,7 @@ fn host_capabilities(
         regression,
     );
     viewer_readback.evidence = vec![
-        "rulebench-fixtures.scenario-package-registry".to_string(),
+        "rulebench-product-content.scenario-package-registry".to_string(),
         "rulebench-bridge.viewer-readback-index".to_string(),
         "rulebench-process-host.viewer-readback-routes".to_string(),
     ];

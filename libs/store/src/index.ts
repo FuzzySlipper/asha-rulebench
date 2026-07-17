@@ -6,12 +6,8 @@ export * from "./content-workspace-store";
 import { InjectionToken, Injectable, signal } from '@angular/core';
 import type { Provider, Signal } from '@angular/core';
 import {
-  projectContentImportReadout,
-  projectContentValidationReadout,
   projectRulebenchViewerSessionStep,
   projectRulebenchViewerScenario,
-  type RulebenchContentImportView,
-  type RulebenchContentValidationView,
   type RulebenchCombatSessionStepView,
   type RulebenchScenarioView,
 } from '@asha-rulebench/domain';
@@ -21,18 +17,10 @@ import type {
   RulebenchViewerScenarioSummaryDto,
   RulebenchViewerSessionSummaryDto,
 } from '@asha-rulebench/protocol';
-import {
-  createFakeRulebenchTransport,
-  type RulebenchLiveTransport,
-  type RulebenchOfflineFixtureTransport,
-} from '@asha-rulebench/transport';
+import type { RulebenchLiveTransport } from '@asha-rulebench/transport';
 import type { AsyncState } from "./async-state";
 import { provideLiveCombatStoreKernel, RULEBENCH_LIVE_TRANSPORT } from './live-combat-store';
 import { provideContentWorkbenchStoreKernel } from './content-workspace-store';
-
-export const RULEBENCH_OFFLINE_FIXTURE_TRANSPORT = new InjectionToken<RulebenchOfflineFixtureTransport>('RULEBENCH_OFFLINE_FIXTURE_TRANSPORT', {
-  factory: () => createFakeRulebenchTransport(),
-});
 
 export const RULEBENCH_CLOCK = new InjectionToken<ClockPort>('RULEBENCH_CLOCK', {
   factory: () => browserClock,
@@ -266,75 +254,15 @@ function viewerSelectionError(code: string, message: string): RulebenchLiveTrans
   return { kind: 'selection', code, message, retryable: false };
 }
 
-@Injectable()
-export class ContentStore {
-  private readonly _imports = signal<AsyncState<readonly RulebenchContentImportView[]>>({ kind: 'idle' });
-  readonly imports: Signal<AsyncState<readonly RulebenchContentImportView[]>> = this._imports.asReadonly();
-
-  private readonly _selectedImportId = signal<string | null>(null);
-  readonly selectedImportId: Signal<string | null> = this._selectedImportId.asReadonly();
-
-  private readonly _validation = signal<AsyncState<RulebenchContentValidationView>>({ kind: 'idle' });
-  readonly validation: Signal<AsyncState<RulebenchContentValidationView>> = this._validation.asReadonly();
-
-  constructor(
-    private readonly transport: RulebenchOfflineFixtureTransport,
-    private readonly clock: ClockPort,
-  ) {}
-
-  async loadImportExamples(): Promise<void> {
-    this._imports.set({ kind: 'loading' });
-    const result = await this.transport.loadContentImportExamples();
-    this._imports.set(
-      result.ok
-        ? { kind: 'data', value: result.value.map(projectContentImportReadout) }
-        : { kind: 'error', error: result.error },
-    );
-    if (result.ok && this._selectedImportId() === null) {
-      this._selectedImportId.set(result.value[0]?.exampleId ?? null);
-    }
-    this.clock.now();
-  }
-
-  selectImport(exampleId: string): void {
-    this._selectedImportId.set(exampleId);
-    this.clock.now();
-  }
-
-  async loadValidation(scenarioId?: string): Promise<void> {
-    this._validation.set({ kind: 'loading' });
-    const result = await this.transport.loadContentValidationReport(scenarioId);
-    this._validation.set(
-      result.ok
-        ? { kind: 'data', value: projectContentValidationReadout(result.value) }
-        : { kind: 'error', error: result.error },
-    );
-    this.clock.now();
-  }
-
-  clear(): void {
-    this._imports.set({ kind: 'idle' });
-    this._validation.set({ kind: 'idle' });
-    this._selectedImportId.set(null);
-    this.clock.now();
-  }
-}
-
 export function provideRulebenchStoreKernel(): Provider[] {
   return [
     ...provideLiveCombatStoreKernel(),
     ...provideContentWorkbenchStoreKernel(),
-    { provide: RULEBENCH_OFFLINE_FIXTURE_TRANSPORT, useFactory: () => createFakeRulebenchTransport() },
     { provide: RULEBENCH_CLOCK, useValue: browserClock },
     {
       provide: SessionStore,
       deps: [RULEBENCH_LIVE_TRANSPORT, RULEBENCH_CLOCK],
       useFactory: (transport: RulebenchLiveTransport, clock: ClockPort) => new SessionStore(transport, clock),
-    },
-    {
-      provide: ContentStore,
-      deps: [RULEBENCH_OFFLINE_FIXTURE_TRANSPORT, RULEBENCH_CLOCK],
-      useFactory: (transport: RulebenchOfflineFixtureTransport, clock: ClockPort) => new ContentStore(transport, clock),
     },
   ];
 }

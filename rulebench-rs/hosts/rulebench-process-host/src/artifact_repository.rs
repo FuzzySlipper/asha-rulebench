@@ -1717,7 +1717,7 @@ mod tests {
     use std::collections::BTreeSet;
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use rulebench_fixtures::{aggregated_scenario_catalog_cases, replay_review_packages};
+    use rulebench_product_content::{aggregated_scenario_catalog_cases, replay_review_packages};
 
     use super::*;
 

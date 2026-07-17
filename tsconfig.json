@@ -12,7 +12,6 @@
     { "path": "libs/scenario-viewer/tsconfig.lib.json" },
     { "path": "libs/shell/tsconfig.lib.json" },
     { "path": "libs/store/tsconfig.lib.json" },
-    { "path": "libs/testing-fixtures/tsconfig.lib.json" },
     { "path": "libs/theme/tsconfig.lib.json" },
     { "path": "libs/transport/tsconfig.lib.json" }
   ]

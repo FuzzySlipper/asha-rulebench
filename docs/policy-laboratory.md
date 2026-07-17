@@ -24,16 +24,16 @@ One owner path is required:
 
 1. Add the selector and one registration in
    `rulebench-combat/src/runtime/automation/policy.rs`.
-2. Add its exhaustive deterministic score and evidence reason in
+2. Add its deterministic score and evidence reason in
    `rulebench-combat/src/runtime/automation.rs`. Tie-breaking remains candidate
    index after policy score.
 3. Declare the capability only on compatible providers in
-   `rulebench-fixtures/src/providers.rs`.
+   `rulebench-product-content/src/providers.rs`.
 4. Add focused selection, tie, incompatibility, no-candidate, end, and reaction
-   tests as applicable. Add a package-owned automatic run plus verified replay
-   so the conformance gate covers `policy.<id>`.
-5. Regenerate checked protocol, session, and capability artifacts. The shared
-   UI reads catalog metadata and does not gain policy-specific decision code.
+   tests as applicable, plus a primary product workflow.
+5. Regenerate the protocol contract when required. Add exhaustive public
+   contract proof to `asha-rulebench-testing`; the shared UI reads catalog
+   metadata and does not gain policy-specific decision code.
 
 Do not add dynamic dispatch supplied by a host, mutable callbacks, fixture
 field access from policy code, or a TypeScript implementation of the ranking.

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("operates the application menubar entirely by keyboard", async ({
+test("operates the application menubar entirely by keyboard @gate", async ({
   page,
 }) => {
   await page.goto("/");
@@ -78,7 +78,7 @@ test("operates the application menubar entirely by keyboard", async ({
   await expect(file).toBeFocused();
 });
 
-test("keeps application menus accessible at mobile width", async ({ page }) => {
+test("keeps application menus accessible at mobile width @gate", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(
@@ -113,7 +113,7 @@ test("keeps application menus accessible at mobile width", async ({ page }) => {
   expect(dimensions.body).toBe(dimensions.viewport);
 });
 
-test("preserves panel and dialog navigation under accessibility media", async ({
+test("preserves panel and dialog navigation under accessibility media @gate", async ({
   page,
 }) => {
   await page.emulateMedia({

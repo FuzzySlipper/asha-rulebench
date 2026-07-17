@@ -54,7 +54,6 @@ See `README.md` and Den doc `asha-rulebench/basic-design` for current repo orien
     /platform            # browser/host ports and fakes
     /shell               # routes and app composition only
     /theme               # approved tokens and theme entrypoints
-    /testing-fixtures    # typed fixtures for tests and scenario examples
   /tools                 # workspace scripts and generators
 ```
 
@@ -72,13 +71,10 @@ its generated-DTO-only API and fake/live implementation parity.
 # Canonical blocking project gate (the GitHub required check)
 pnpm run verify
 
-# Complete deterministic certification (nightly/manual workflow surface)
-pnpm run certify
-
 # Explicit focused checks; repeat --profile to take the safe union
 pnpm run verify:change -- --profile frontend
 pnpm run verify:change -- --profile rust-owner --crate rulebench-combat
-pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
+pnpm run verify:change -- --profile product-content
 
 # LAN-first development server
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
@@ -87,38 +83,27 @@ den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 
-# Milestone/release certification with inspected live artifacts
-BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run certify -- --require-live
 ```
 
 `verify:change` has a closed profile vocabulary and never infers safety from a
 Git diff. Use `frontend` for production TypeScript, `browser` for routes and
 visible workflows, `rust-owner --crate <workspace-owner>` for a changed Rust
 owner, `protocol-generated` for protocol/emitter/generated-consumer changes,
-`fixtures-conformance` for fixture/registry/capability work, `host-transport`
+`product-content` for named Rulebench content, `host-transport`
 for bridge/process-host/transport/store work, and `docs` for command or support
-documentation. Combine profiles when a change crosses owners. Exact
-fixture filters are `--package`, `--package-version`, `--ruleset`,
-`--ruleset-version`, `--scenario`, and `--capability`; omitting a safe filter
-runs the full regression/conformance corpus. Use `--dry-run` to inspect the
-selected commands. Missing/unknown profiles, crates, filters, and arguments
-fail closed. If classification is uncertain, run `pnpm run verify`.
+documentation. Combine profiles when a change crosses owners. Use `--dry-run`
+to inspect the selected commands. Missing or unknown profiles, crates, and
+arguments fail closed. If classification is uncertain, run `pnpm run verify`.
 
-`pnpm run certify` is the Rulebench-owned exhaustive deterministic suite. It
-composes static authority/product contracts, the unfiltered semantic corpus,
-the independent portable consumer, the complete deterministic browser set,
-and a generated claims/limitations receipt exactly once. GitHub runs it
-nightly and on manual dispatch through `.github/workflows/certification.yml`.
-It is not a required check for every edit. Use `--require-live` for milestone
-or release UI claims; that mode fails closed unless both `BASE_URL` and
-`LIVE_RUN=1` are present and collects the managed live-artifact scenario after
-deterministic certification. Inspect its screenshots and evidence packet;
-process exit alone is not visual proof.
+Exhaustive semantic, compatibility, replay, and browser certification is owned
+downstream by public repository `FuzzySlipper/asha-rulebench-testing`. This
+product repository must not import it or wait for it as an ordinary per-change
+gate.
 
 Use [docs/validation-evidence-template.md](docs/validation-evidence-template.md)
 for Den task handoffs. Record which tier was selected, why narrower tiers were
 safe, whether browser work actually executed or came from cache, and the
-explicit non-claims. Do not present a focused or blocking receipt as exhaustive
+explicit non-claims. Do not present a focused or blocking result as downstream
 certification.
 
 ## Frontend Boundary Rules
@@ -154,7 +139,7 @@ When a task seems to require breaking a boundary, stop and request planner revie
 | components | `libs/components`                       | Know gameplay/domain logic                                     |
 | platform   | `libs/platform`                         | Reach into application state or transport                      |
 | shell      | `libs/shell`, `apps/app`                | Contain feature/domain logic                                   |
-| testing    | `libs/testing-fixtures`, `apps/app-e2e` | Become the only proof for a user-facing UI task                |
+| testing    | owner-local specs, `apps/app-e2e`       | Become the only proof for a user-facing UI task                |
 
 ## TypeScript House Style
 

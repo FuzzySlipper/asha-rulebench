@@ -15,7 +15,7 @@ Each `RulesetProviderDescriptor` declares:
 - the versioned check, targeting, effect, and policy capabilities packages may
   use.
 
-The concrete catalog is compiled in `rulebench-fixtures/src/providers.rs` and
+The concrete catalog is compiled in `rulebench-product-content/src/providers.rs` and
 validated before the built-in package registry exists. The process host and
 generated capability manifest consume that same catalog. Shared resolution,
 bridge, store, and UI code never switch on provider, package, or scenario ids.
@@ -27,14 +27,14 @@ bridge, store, and UI code never switch on provider, package, or scenario ids.
    reviewed compatibility change.
 2. Register the provider with an exact capability set and compatible vocabulary
    versions. Colliding provider or ruleset identities fail startup tests.
-3. Add independently owned content and a multi-participant package with
-   deterministic positive/rejection cases, manual and automatic evidence,
-   goldens, and a replay package.
+3. Add independently owned named product content and a multi-participant
+   package with focused positive/rejection cases and a primary visible journey.
 4. Prove exact package/ruleset filters, cross-ruleset rejection, missing
    capability rejection, and replay/content failure under a removed, upgraded,
    or wrong provider.
-5. Regenerate protocol/catalog/manifest artifacts and inspect both live setup
-   selection and the Runtime capabilities dialog.
+5. Regenerate the protocol contract when required and inspect both live setup
+   selection and the Runtime capabilities dialog. Extend exhaustive public
+   contract proof in `asha-rulebench-testing`.
 
 Provider versions and ruleset versions are exact for stored content and replay
 interpretation. Upgrades do not silently retarget old artifacts. Migration must

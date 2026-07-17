@@ -932,18 +932,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rulebench-authority"
-version = "0.1.0"
-dependencies = [
- "rpg-core",
- "rpg-ir",
- "rulebench-codegen",
- "rulebench-combat",
- "rulebench-fixtures",
- "rulebench-replay",
-]
-
-[[package]]
 name = "rulebench-bridge"
 version = "0.1.0"
 dependencies = [
@@ -959,13 +947,7 @@ dependencies = [
 name = "rulebench-codegen"
 version = "0.1.0"
 dependencies = [
- "rpg-core",
- "rpg-ir",
- "rulebench-combat",
- "rulebench-content",
- "rulebench-fixtures",
  "rulebench-protocol",
- "rulebench-replay",
 ]
 
 [[package]]
@@ -990,7 +972,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "rulebench-fixtures"
+name = "rulebench-process-host"
+version = "0.1.0"
+dependencies = [
+ "rulebench-bridge",
+ "rulebench-product-content",
+ "rulebench-protocol",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rulebench-product-content"
 version = "0.1.0"
 dependencies = [
  "rpg-core",
@@ -999,17 +992,6 @@ dependencies = [
  "rulebench-content",
  "rulebench-protocol",
  "rulebench-replay",
-]
-
-[[package]]
-name = "rulebench-process-host"
-version = "0.1.0"
-dependencies = [
- "rulebench-bridge",
- "rulebench-fixtures",
- "rulebench-protocol",
- "serde",
- "serde_json",
 ]
 
 [[package]]

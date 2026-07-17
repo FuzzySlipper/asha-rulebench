@@ -38,7 +38,7 @@ const allowedDependencies = new Map([
     ]),
   ],
   [
-    "rulebench-fixtures",
+    "rulebench-product-content",
     new Set([
       "rpg-core",
       "rpg-ir",
@@ -50,30 +50,11 @@ const allowedDependencies = new Map([
   ],
   [
     "rulebench-codegen",
-    new Set([
-      "rpg-core",
-      "rpg-ir",
-      "rulebench-combat",
-      "rulebench-content",
-      "rulebench-fixtures",
-      "rulebench-protocol",
-      "rulebench-replay",
-    ]),
-  ],
-  [
-    "rulebench-authority",
-    new Set([
-      "rpg-core",
-      "rpg-ir",
-      "rulebench-codegen",
-      "rulebench-combat",
-      "rulebench-fixtures",
-      "rulebench-replay",
-    ]),
+    new Set(["rulebench-protocol"]),
   ],
   [
     "rulebench-process-host",
-    new Set(["rulebench-bridge", "rulebench-fixtures", "rulebench-protocol"]),
+    new Set(["rulebench-bridge", "rulebench-product-content", "rulebench-protocol"]),
   ],
 ]);
 
@@ -300,7 +281,7 @@ function runFocusedFailureTests() {
   assertRejected(
     validateDependency(
       "rulebench-content",
-      "rulebench-authority",
+      "rulebench-product-content",
       "self-test:reverse-dependency",
     ),
     "a product authority reverse dependency was accepted",

@@ -2,12 +2,11 @@
 resolver = "2"
 
 members = [
-    "crates/rulebench-authority",
     "crates/rulebench-bridge",
     "crates/rulebench-codegen",
     "crates/rulebench-combat",
     "crates/rulebench-content",
-    "crates/rulebench-fixtures",
+    "crates/rulebench-product-content",
     "crates/rulebench-protocol",
     "crates/rulebench-replay",
     "hosts/rulebench-process-host",

@@ -10,7 +10,7 @@ workspace = true
 
 [dependencies]
 rulebench-bridge = { path = "../../crates/rulebench-bridge" }
-rulebench-fixtures = { path = "../../crates/rulebench-fixtures" }
+rulebench-product-content = { path = "../../crates/rulebench-product-content" }
 rulebench-protocol = { path = "../../crates/rulebench-protocol" }
 serde.workspace = true
 serde_json.workspace = true

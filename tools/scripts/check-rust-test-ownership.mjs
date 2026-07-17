@@ -9,7 +9,7 @@ const owningCrates = [
   "rulebench-replay",
   "rulebench-protocol",
   "rulebench-bridge",
-  "rulebench-fixtures",
+  "rulebench-product-content",
   "rulebench-codegen",
 ];
 const failures = [];
@@ -26,22 +26,6 @@ for (const crate of owningCrates) {
   }
 }
 
-const authorityHarness = join(
-  rustRoot,
-  "crates",
-  "rulebench-authority",
-  "src",
-  "tests",
-);
-const authorityTestCount = collectRustFiles(authorityHarness)
-  .map((file) => countTests(readFileSync(file, "utf8")))
-  .reduce((sum, count) => sum + count, 0);
-if (authorityTestCount === 0) {
-  failures.push(
-    "rulebench-authority must retain cross-crate product harness tests under src/tests.",
-  );
-}
-
 runFocusedFailureTests();
 
 if (failures.length > 0) {
@@ -50,7 +34,7 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `check:rust-test-ownership ok (${owningCrates.length} owners, ${authorityTestCount} authority harness tests)`,
+  `check:rust-test-ownership ok (${owningCrates.length} focused product owners; exhaustive harness is downstream)`,
 );
 
 function collectRustFiles(directory) {

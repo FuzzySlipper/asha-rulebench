@@ -8,9 +8,6 @@ import {
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { renderApiTypes } from "../../libs/protocol/scripts/generate-api-types.mjs";
-import { renderScenarioCatalog } from "../../libs/transport/scripts/generate-rust-scenario-catalog.mjs";
-import { renderCombatSessionCatalog } from "../../libs/transport/scripts/generate-rust-combat-session.mjs";
-import { renderCapabilityManifest } from "../../libs/transport/scripts/generate-rust-capability-manifest.mjs";
 import {
   renderRpgContentArtifact,
   RPG_CONTENT_ARTIFACT_SCHEMA,
@@ -26,24 +23,9 @@ const artifacts = [
     render: renderRpgContentArtifact,
   },
   {
-    emitter: "rulebench-process-host/emit_capability_manifest",
-    path: "libs/transport/src/generated/rust-capability-manifest.ts",
-    render: renderCapabilityManifest,
-  },
-  {
     emitter: "rulebench-codegen/emit_protocol_types",
     path: "libs/protocol/src/generated/api-types.ts",
     render: renderApiTypes,
-  },
-  {
-    emitter: "rulebench-authority/emit_scenario_catalog",
-    path: "libs/transport/src/generated/rust-scenario-catalog.ts",
-    render: renderScenarioCatalog,
-  },
-  {
-    emitter: "rulebench-authority/emit_combat_session",
-    path: "libs/transport/src/generated/rust-combat-session.ts",
-    render: renderCombatSessionCatalog,
   },
 ];
 

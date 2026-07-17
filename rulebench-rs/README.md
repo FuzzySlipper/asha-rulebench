@@ -1,7 +1,7 @@
 # Rulebench Rust Workspace
 
-This workspace owns Rulebench product behavior, adapters, storage, fixtures,
-protocol, generation, and its concrete process host. Portable RPG substrate is
+This workspace owns Rulebench product behavior, adapters, storage, named content,
+protocol generation, and its concrete process host. Portable RPG substrate is
 owned by the public `asha-rpg` repository and enters this workspace only
 through exact Git dependencies.
 
@@ -23,13 +23,12 @@ Boundary and adapter layers:
 
 - `rulebench-protocol`: Rust-owned command/readback DTO contracts.
 - `rulebench-bridge`: protocol-to-authority runtime invocation, independent of the eventual host technology.
-- `rulebench-codegen`: Rulebench-local TypeScript and checked-artifact generation.
+- `rulebench-codegen`: Rust protocol DTO generation for the product client.
 - `hosts/rulebench-process-host`: concrete loopback HTTP/JSON adapter over `rulebench-bridge`; this host is Rulebench-local and not portable authority.
 
 Rulebench-local layers:
 
-- `rulebench-fixtures`: authored scenarios, fixtures, goldens, and regression packs.
-- `rulebench-authority`: stable catalog/session emitter commands and the Rulebench integration test harness; it has no library compatibility API.
+- `rulebench-product-content`: named scenarios and primary workflow samples used by the product host.
 
 The reusable public facade is `asha-rpg` in its own repository. This workspace
 does not provide a game-consumer facade or a combined product compatibility
@@ -48,7 +47,7 @@ public asha-rpg: rpg-core + rpg-ir + rpg-compiler + rpg-runtime
                                              |
                                       process host
 
-fixtures import focused owners directly and feed codegen plus the authority harness.
+named product content imports focused owners directly and feeds the bridge and host.
 ```
 
 `pnpm run check:rust-boundaries` enforces this workspace graph and is part of
@@ -58,31 +57,14 @@ revisions, and unbounded version requirements. The independent public consumer
 proof lives with `asha-rpg`, not inside this product repository.
 
 `pnpm run check:rust-test-ownership` keeps focused tests beside every active
-authority, adapter, protocol, fixture, and codegen owner while retaining the
-`rulebench-authority/src/tests` suite as cross-crate product evidence. Cargo
-dev-dependencies remain subject to the same one-way boundary policy.
+authority, adapter, protocol, content, and codegen owner. Cargo dev-dependencies
+remain subject to the same one-way boundary policy.
 
-`pnpm run generated:check` is the canonical generated-artifact gate. It emits
-the protocol, scenario catalog, combat session, and executable capability
-manifest projections to a temporary directory and compares all four with
-their committed outputs. Failures name the Rust emitter and artifact;
-`pnpm run generated:write` is the only supported update path. Every generated
-header records its emitter and protocol schema.
-
-The scenario and combat-session TypeScript catalogs are offline fixture and
-golden evidence. The product viewer reads the process host's versioned viewer
-routes through `RulebenchLiveTransport`; it never falls back to these checked
-artifacts. `docs/viewer-evidence-boundaries.md` inventories every consumer.
-
-`pnpm run regression:check` executes every package-owned catalog case twice
-through Rust authority, then executes the capability conformance registry. A
-capability is marked regression-covered only after its registered case proves
-operation-specific events and state, deterministic rolls/trace/fingerprint,
-classified rejection behavior, replay reproduction, and replay mismatch
-diagnostics. Exact package, package-version, ruleset, ruleset-version,
-scenario, and capability filters are accepted by the underlying binary;
-`pnpm run regression:list` prints both scenario and capability identities
-before an intentional package expectation or generated-artifact update.
+`pnpm run generated:check` is the product generated-artifact gate. It emits the
+Rust protocol DTO contract to a temporary directory and compares it with the
+committed TypeScript output. Scenario, session, capability, and certification
+proof artifacts and their emitters are downstream-owned by
+`FuzzySlipper/asha-rulebench-testing`.
 
 Operation pipeline v2 adds bounded explicit multi-target and Manhattan-area
 actions without changing the legacy single-target path. Rust owns target-set
@@ -91,22 +73,17 @@ and resource-ledger fingerprints; generated TypeScript only submits and renders
 those facts. See `../docs/operation-pipeline-v2.md` for the compatibility and
 migration contract.
 
-The executable manifest is assembled from the ruleset operation registry,
-combat execution and automation-policy registries, registered regression
-packages, the compiled provider catalog, and the concrete host's selected
-storage/recovery adapters. The current durable-host artifact reports 2 compiled
-providers, 2 ruleset identities, 4 packages, 11 scenarios, 1 policy, and the
-exact governed ASHA revision. Provider entries carry exact capability and
-operation/effect-vocabulary compatibility. The process host
-serves the same typed DTO at `GET /api/rulebench/v1/capabilities`; a memory-mode
-host therefore cannot inherit durable support merely because the checked
-artifact was emitted from a filesystem-mode host. See
+The executable manifest is assembled at runtime from operation and policy
+registries, named product packages, the compiled provider catalog, and the
+concrete host's selected storage/recovery adapters. The process host serves the
+typed DTO at `GET /api/rulebench/v1/capabilities`; a memory-mode host therefore
+cannot inherit durable support from a filesystem composition. Exhaustive
+coverage is a downstream result, not a product runtime fact. See
 `../docs/capability-manifest.md`.
 
 `pnpm run rust:test` is part of `pnpm run verify`, so clean CI executes the
-focused owner suites, cross-crate authority harness, host-neutral bridge
-contracts, composed-owner reaction rollback checks, and real process-host
-lifecycle/TCP tests rather than relying on TypeScript or generated fixtures.
+focused owner suites, host-neutral bridge contracts, composed-owner reaction
+rollback checks, and real process-host lifecycle/TCP tests.
 
 `pnpm run e2e` exercises the real local process host through the Angular
 same-origin proxy, including classified failure recovery and the full
@@ -121,10 +98,10 @@ and tests. Do not add a path dependency simply to preserve an old import path.
 
 ## Migration Posture
 
-- Every current workspace crate is an active owner, adapter, fixture, generator, harness, or host surface with focused tests; new empty reservation crates are forbidden as implementation claims.
+- Every current workspace crate is an active owner, adapter, product-content, generator, or host surface with focused tests; new empty reservation crates are forbidden as implementation claims.
 - Import focused owners directly; do not add a combined compatibility facade.
 - Do not create circular dependencies to preserve an old import path.
-- Keep scenario-specific assumptions in `rulebench-fixtures` or the Rulebench harness.
+- Keep scenario-specific assumptions in `rulebench-product-content` or the Rulebench harness.
 - Keep host choice out of `rulebench-bridge`; the selected first concrete adapter lives under `hosts/rulebench-process-host`.
 
 ## Commands

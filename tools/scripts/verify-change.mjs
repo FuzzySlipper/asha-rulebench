@@ -8,7 +8,7 @@ export const profileOrder = [
   "browser",
   "rust-owner",
   "protocol-generated",
-  "fixtures-conformance",
+  "product-content",
   "host-transport",
   "docs",
 ];
@@ -19,25 +19,14 @@ export const governedCrates = new Set([
   "rulebench-replay",
   "rulebench-protocol",
   "rulebench-bridge",
-  "rulebench-fixtures",
+  "rulebench-product-content",
   "rulebench-codegen",
-  "rulebench-authority",
   "rulebench-process-host",
-]);
-
-const filterFlags = new Map([
-  ["--package", "package"],
-  ["--package-version", "packageVersion"],
-  ["--ruleset", "ruleset"],
-  ["--ruleset-version", "rulesetVersion"],
-  ["--scenario", "scenario"],
-  ["--capability", "capability"],
 ]);
 
 export function parseVerifyChangeArguments(argumentsList) {
   const profiles = [];
   const crates = [];
-  const filters = {};
   let dryRun = false;
 
   for (let index = 0; index < argumentsList.length; index += 1) {
@@ -53,14 +42,6 @@ export function parseVerifyChangeArguments(argumentsList) {
     }
     if (argument === "--crate") {
       crates.push(requireValue(argumentsList, ++index, argument));
-      continue;
-    }
-    const filterName = filterFlags.get(argument);
-    if (filterName !== undefined) {
-      if (filters[filterName] !== undefined) {
-        throw new Error(`${argument} may be supplied only once.`);
-      }
-      filters[filterName] = requireValue(argumentsList, ++index, argument);
       continue;
     }
     throw new Error(`Unknown verify:change argument: ${argument}`);
@@ -97,19 +78,11 @@ export function parseVerifyChangeArguments(argumentsList) {
     throw new Error("--crate is valid only with the rust-owner profile.");
   }
 
-  const hasFilters = Object.keys(filters).length > 0;
-  if (hasFilters && !uniqueProfiles.includes("fixtures-conformance")) {
-    throw new Error(
-      "Regression identity filters are valid only with fixtures-conformance.",
-    );
-  }
-
   return {
     profiles: profileOrder.filter((profile) =>
       uniqueProfiles.includes(profile),
     ),
     crates: uniqueCrates,
-    filters,
     dryRun,
   };
 }
@@ -152,13 +125,11 @@ export function buildVerifyChangePlan(selection) {
         addScript("check:rust-boundaries");
         addScript("generated:check");
         addScript("check:protocol-compatibility");
-        addScript("check:claims:executable");
         addScript("typecheck");
         addScript("test");
         break;
-      case "fixtures-conformance":
-        addCargoTest("rulebench-fixtures");
-        addCommand(commands, regressionCommand(selection.filters));
+      case "product-content":
+        addCargoTest("rulebench-product-content");
         break;
       case "host-transport":
         addCargoTest("rulebench-bridge");
@@ -178,7 +149,6 @@ export function buildVerifyChangePlan(selection) {
         break;
       case "docs":
         addScript("check:docs");
-        addScript("check:claims:executable");
         break;
     }
   }
@@ -192,29 +162,6 @@ export function formatCommand(entry) {
       /^[A-Za-z0-9_./:@=-]+$/.test(part) ? part : JSON.stringify(part),
     )
     .join(" ");
-}
-
-function regressionCommand(filters) {
-  const argumentsList = [
-    "run",
-    "--quiet",
-    "--manifest-path",
-    workspaceManifest,
-    "-p",
-    "rulebench-fixtures",
-    "--bin",
-    "check_regressions",
-    "--",
-  ];
-  for (const [flag, filterName] of filterFlags) {
-    const value = filters[filterName];
-    if (value !== undefined) argumentsList.push(flag, value);
-  }
-  return {
-    id: `regression:${argumentsList.slice(9).join(":") || "all"}`,
-    command: "cargo",
-    arguments: argumentsList,
-  };
 }
 
 function addCommand(commands, command) {
@@ -243,13 +190,6 @@ function run() {
   console.log(`verify:change profiles: ${selection.profiles.join(", ")}`);
   if (selection.crates.length > 0) {
     console.log(`verify:change crates: ${selection.crates.join(", ")}`);
-  }
-  if (Object.keys(selection.filters).length > 0) {
-    console.log(
-      `verify:change filters: ${Object.entries(selection.filters)
-        .map(([name, value]) => `${name}=${value}`)
-        .join(", ")}`,
-    );
   }
   console.log("verify:change selected commands:");
   for (const command of plan) console.log(`- ${formatCommand(command)}`);

@@ -15,7 +15,7 @@ The first useful version should let a user load a simple two-combatant scenario,
 - accepted DomainEvents;
 - rule trace;
 - final state diff;
-- fixture or golden result.
+- classified product result.
 
 The UI can stay modest. The product value is explainability. If the bench says a target took damage, gained a modifier, failed a target legality check, or triggered a reaction window, the user should be able to inspect why.
 
@@ -30,7 +30,7 @@ live in the independent `FuzzySlipper/asha-rpg` repository. Rulebench consumes
 sibling path or direct ASHA dependency is allowed.
 
 See `rulebench-rs/README.md` and `docs/rust-authority-reconciliation.md` for the
-current dependency direction. Protocol, bridge, fixtures, and generators
+current dependency direction. Protocol, bridge, product content, and generators
 import focused product and public RPG owners directly; no combined Rust
 compatibility facade remains. Planner-approved `serde` protocol DTOs and the
 `serde_json` process host provide the live local bridge.
@@ -127,7 +127,7 @@ TypeScript should be used for:
 
 - typed catalog authoring;
 - ergonomic builders over generated protocol shapes;
-- scenario fixtures and goldens;
+- named product scenarios and authoring inputs;
 - policy code that reads generated views and proposes typed intents;
 - UI view models and display mapping;
 - tests that prove authored content produces expected protocol inputs and rendered outputs.
@@ -204,7 +204,6 @@ Layer intent:
 - `platform`: browser/host ports and fakes.
 - `shell`: routing and application composition only.
 - `theme`: approved tokens and theme entrypoints.
-- `testing-fixtures`: typed fixtures for tests and scenario examples.
 
 Use workspace generators for new components, libraries, features, stores, platform ports, and tests.
 
@@ -263,41 +262,22 @@ profiles instead of guessing from a Git diff:
 pnpm run verify:change -- --profile frontend
 pnpm run verify:change -- --profile rust-owner --crate rulebench-combat
 pnpm run verify:change -- --profile protocol-generated --profile host-transport
-pnpm run verify:change -- --profile fixtures-conformance --scenario hexing-bolt-reaction
+pnpm run verify:change -- --profile product-content
 ```
 
 Profiles may be repeated and their commands are deduplicated. The runner prints
 the complete selection before execution, rejects missing/unknown ownership,
 and supports `--dry-run`. Run the blocking gate when classification is
 uncertain. The pre-tiering measurements, exact profile contract, blocking
-membership, and retained certification paths are documented in
+membership, and downstream certification ownership are documented in
 [docs/validation-tiers.md](docs/validation-tiers.md).
 
-Complete deterministic certification is one Rulebench-owned command:
-
-```bash
-pnpm run certify
-```
-
-It runs static authority/product contracts, the unfiltered
-regression/conformance corpus, the independent portable consumer, every
-deterministic browser journey (including mobile and accessibility coverage),
-and a claims/limitations receipt. It runs nightly and by manual GitHub workflow
-dispatch, not as the required check for every edit. The receipt derives current
-inventory counts from generated Rust evidence and records the last reviewed Den
-limitation snapshot without letting a literal date or copied prose block fail
-unrelated source changes.
-
-For a milestone or release with user-visible UI claims, run the live-required
-mode against a managed server and inspect the emitted artifacts:
-
-```bash
-den-serve up asha-rulebench -repo /home/dev/asha-rulebench
-BASE_URL=<local-url> LIVE_RUN=1 pnpm run certify -- --require-live
-```
-
-Without `--require-live`, certification explicitly does not claim managed/LAN
-visual evidence. See
+Exhaustive semantic, compatibility, replay, and browser certification moved to
+the public downstream consumer
+[`FuzzySlipper/asha-rulebench-testing`](https://github.com/FuzzySlipper/asha-rulebench-testing).
+It consumes exact public revisions and runs nightly, manually, or for named
+milestones. Rulebench neither imports that repository nor waits for it as an
+ordinary per-change gate. See
 [docs/validation-evidence-template.md](docs/validation-evidence-template.md)
 for task handoff evidence.
 
@@ -319,8 +299,7 @@ sessions, automatic runs, and replay packages; panels retain the board,
 initiative, encounter status, available actions, participants, and evidence.
 The focused tools configure or select authority behavior, while panel view models
 display Rust-owned outcomes. Scenario and transcript evidence is read from the
-running process host; checked TypeScript catalogs are offline fixture and golden
-evidence only and are never a live fallback. See
+running process host; no checked scenario/session catalog is a live fallback. See
 `docs/viewer-evidence-boundaries.md` for the complete consumer inventory.
 
 The current surface proves two compiled ruleset providers: Hexing Bolt's
@@ -340,10 +319,8 @@ vocabulary and capabilities of the selected compiled provider.
 
 The executable capability manifest reports the current compiled providers,
 rulesets, packages, scenarios, automation policies, and operation-pipeline
-identity. Its checked TypeScript projection records provider
-capability/vocabulary compatibility, the exact governed ASHA revision, and the
-configured durable-host support matrix; the live workbench always reads the
-current process-host manifest instead. The certification receipt derives its
-inventory from that generated evidence instead of synchronizing prose counts.
+identity. The live workbench reads the current process-host manifest. Downstream
+certification records exact product revisions and separately evaluates exhaustive
+capability coverage.
 See `docs/capability-manifest.md` and `docs/ruleset-providers.md` for the
 authority and evolution contracts.

@@ -60,40 +60,13 @@ test("rust-owner requires an exact governed crate", () => {
   );
 });
 
-test("fixtures profile preserves exact filters and defaults to the full corpus", () => {
-  const filtered = parseVerifyChangeArguments([
+test("product-content selects only the focused product owner", () => {
+  const selection = parseVerifyChangeArguments([
     "--profile",
-    "fixtures-conformance",
-    "--scenario",
-    "hexing-bolt-reaction",
+    "product-content",
   ]);
-  const filteredRegression = buildVerifyChangePlan(filtered).find((entry) =>
-    entry.id.startsWith("regression:"),
-  );
-  assert.deepEqual(filteredRegression.arguments.slice(-2), [
-    "--scenario",
-    "hexing-bolt-reaction",
-  ]);
-
-  const unfiltered = parseVerifyChangeArguments([
-    "--profile",
-    "fixtures-conformance",
-  ]);
-  const unfilteredRegression = buildVerifyChangePlan(unfiltered).find((entry) =>
-    entry.id.startsWith("regression:"),
-  );
-  assert.equal(unfilteredRegression.arguments.at(-1), "--");
-});
-
-test("identity filters fail closed outside fixtures-conformance", () => {
-  assert.throws(
-    () =>
-      parseVerifyChangeArguments([
-        "--profile",
-        "frontend",
-        "--capability",
-        "operation.damage",
-      ]),
-    /valid only with fixtures-conformance/,
+  assert.deepEqual(
+    buildVerifyChangePlan(selection).map((entry) => entry.id),
+    ["cargo:test:rulebench-product-content"],
   );
 });

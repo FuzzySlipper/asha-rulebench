@@ -9,7 +9,9 @@ use std::time::Duration;
 use rulebench_bridge::content_storage::{CanonicalContentPack, ImportedContentPack};
 use rulebench_bridge::import_authored_content;
 use rulebench_bridge::replay_storage::{bind_authored_action, AuthoredActionBindingRequest};
-use rulebench_fixtures::{aggregated_scenario_catalog_cases, compiled_ruleset_provider_catalog};
+use rulebench_product_content::{
+    aggregated_scenario_catalog_cases, compiled_ruleset_provider_catalog,
+};
 use rulebench_protocol::{
     AuthoredActionBindingRequestDto, AuthoredContentPackDocumentDto, AutomaticRunRequestDto,
     AutomationPolicyCatalogEntryDto, CombatAutomationNoCandidateBehaviorDto,
@@ -120,21 +122,14 @@ fn capability_route_reports_registry_and_actual_host_composition() {
         "policy.firstAcceptedCandidate",
         "policy.lowestVitalityTarget",
         "policy.objectiveSidePressure",
+        "targeting.multipleCombatants",
+        "operation.heal",
+        "operation.grantTemporaryVitality",
     ] {
-        assert!(manifest.capabilities.iter().any(|capability| {
-            capability.id == capability_id && capability.support.regression_covered
-        }));
-    }
-    assert!(manifest.capabilities.iter().any(|capability| {
-        capability.id == "targeting.multipleCombatants"
-            && capability.support.runtime_executable
-            && capability.support.regression_covered
-    }));
-    for capability_id in ["operation.heal", "operation.grantTemporaryVitality"] {
         assert!(manifest.capabilities.iter().any(|capability| {
             capability.id == capability_id
                 && capability.support.runtime_executable
-                && capability.support.regression_covered
+                && !capability.support.regression_covered
         }));
     }
     assert!(manifest.capabilities.iter().any(|capability| {
@@ -1182,126 +1177,6 @@ fn shatterline_v4_scenarios_materialize_run_and_recover_from_exact_authored_cont
     let verification: ReplayVerificationReadoutDto =
         serde_json::from_slice(&verification.body).expect("v4 replay verification is JSON");
     assert!(verification.accepted);
-    fs::remove_dir_all(directory).expect("test repository cleans up");
-}
-
-#[test]
-fn shipped_authored_content_versions_import_through_the_same_rust_workspace() {
-    let sequence = TEST_DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let directory = std::env::temp_dir().join(format!(
-        "asha-rulebench-authored-version-fixtures-{}-{sequence}",
-        std::process::id()
-    ));
-    let mut router = build_durable_rulebench_router(&directory).expect("durable router opens");
-    let fixtures = [
-        include_str!("fixtures/authored-content-v1.json"),
-        include_str!("fixtures/authored-content-v2.json"),
-        include_str!("fixtures/authored-content-v3.json"),
-        include_str!("fixtures/shatterline-foundation-v4.json"),
-    ];
-
-    for payload in fixtures {
-        let imported = router.handle(&json_request(
-            HttpMethod::Post,
-            "/api/rulebench/v1/content/import",
-            &serde_json::json!({
-                "authoredPayload": payload,
-                "replacementPolicy": "reject"
-            }),
-        ));
-        assert_eq!(
-            imported.status,
-            200,
-            "{}",
-            String::from_utf8_lossy(&imported.body)
-        );
-        let imported: ContentImportAttemptDto =
-            serde_json::from_slice(&imported.body).expect("fixture import is JSON");
-        assert!(imported.accepted, "{imported:?}");
-    }
-
-    let workspace = router.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
-    let workspace: ContentWorkspaceDto =
-        serde_json::from_slice(&workspace.body).expect("workspace is JSON");
-    assert_eq!(workspace.packs.len(), 4);
-    let v1 = workspace
-        .packs
-        .iter()
-        .find(|pack| pack.reference.id == "pack.fixture.authored.v1")
-        .expect("v1 receipt exists");
-    assert!(v1
-        .definitions
-        .iter()
-        .any(|definition| definition.kind == "entity"));
-    assert_eq!(v1.reference.fingerprint.value, "673a6a29efafa979");
-    let v2 = workspace
-        .packs
-        .iter()
-        .find(|pack| pack.reference.id == "pack.fixture.authored.v2")
-        .expect("v2 receipt exists");
-    assert!(v2.definitions.iter().any(|definition| {
-        definition.kind == "ability" && definition.id == "ability.binding-glyph"
-    }));
-    assert_eq!(v2.reference.fingerprint.value, "938acf1dca484c9c");
-    let v3 = workspace
-        .packs
-        .iter()
-        .find(|pack| pack.reference.id == "pack.fixture.authored.v3")
-        .expect("v3 receipt exists");
-    assert_eq!(
-        v3.reference.fingerprint.algorithm,
-        "fnv1a64.rulebench-content-pack.v1"
-    );
-    assert_eq!(v3.reference.fingerprint.value, "86bbc06adfd914a2");
-    assert!(v3.definitions.iter().any(|definition| {
-        definition.kind == "modifier" && definition.id == "modifier.binding-glyph.anchored"
-    }));
-    assert!(v3.definitions.iter().any(|definition| {
-        definition.kind == "action" && definition.id == "action.binding-glyph"
-    }));
-    let v4 = workspace
-        .packs
-        .iter()
-        .find(|pack| pack.reference.id == "pack.shatterline.foundation")
-        .expect("v4 Shatterline receipt exists");
-    assert_eq!(
-        v4.reference.fingerprint.algorithm,
-        "fnv1a64.rulebench-content-pack.v2"
-    );
-    assert_eq!(
-        v4.definitions
-            .iter()
-            .filter(|definition| definition.kind == "class")
-            .count(),
-        5
-    );
-    assert_eq!(
-        v4.definitions
-            .iter()
-            .filter(|definition| definition.kind == "scenario")
-            .count(),
-        2
-    );
-    let references = workspace
-        .packs
-        .iter()
-        .map(|pack| pack.reference.clone())
-        .collect::<Vec<_>>();
-    drop(router);
-
-    let mut restarted =
-        build_durable_rulebench_router(&directory).expect("all shipped versions reload");
-    let workspace = restarted.handle(&request(HttpMethod::Get, "/api/rulebench/v1/content"));
-    let workspace: ContentWorkspaceDto =
-        serde_json::from_slice(&workspace.body).expect("restarted workspace is JSON");
-    assert_eq!(
-        workspace
-            .packs
-            .iter()
-            .map(|pack| pack.reference.clone())
-            .collect::<Vec<_>>(),
-        references
-    );
     fs::remove_dir_all(directory).expect("test repository cleans up");
 }
 

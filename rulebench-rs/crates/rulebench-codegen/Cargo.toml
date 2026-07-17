@@ -3,16 +3,10 @@ name = "rulebench-codegen"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Rulebench-local protocol and artifact generation support."
+description = "Rulebench product protocol generation support."
 
 [lints]
 workspace = true
 
 [dependencies]
-rulebench-fixtures = { path = "../rulebench-fixtures" }
 rulebench-protocol = { path = "../rulebench-protocol" }
-rulebench-combat = { path = "../rulebench-combat" }
-rulebench-content = { path = "../rulebench-content" }
-rulebench-replay = { path = "../rulebench-replay" }
-rpg-core.workspace = true
-rpg-ir.workspace = true

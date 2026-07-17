@@ -7,7 +7,6 @@
 #![forbid(unsafe_code)]
 
 mod artifact_repository;
-mod capability_artifact;
 mod content_workspace;
 mod http;
 mod router;
@@ -17,7 +16,6 @@ pub use artifact_repository::{
     ArtifactRepositoryIssue, FileReplayArchiveStorage, FileSessionRecoveryStorage,
     ReplayStorageOpenReport, SessionRecoveryOpenReport,
 };
-pub use capability_artifact::render_capability_manifest_artifact;
 pub use http::{HttpMethod, HttpRequest, HttpResponse};
 pub use router::{
     build_durable_rulebench_router, build_rulebench_bridge, ArtifactRepositoryConfig,

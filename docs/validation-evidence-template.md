@@ -1,53 +1,34 @@
 # Validation Evidence Template
 
-Use this structure in Den implementation, validation, and review handoffs. The
-goal is to make the selected risk tier and its non-claims inspectable without
-copying generated inventory counts into task prose.
+## Target
 
-```text
-Validation tier:
-- focused | blocking | certification | certification with live artifacts
+- Repository and exact commit:
+- Den task:
+- Change owners:
 
-Risk classification:
-- Changed owners/surfaces:
-- Focused profiles selected:
-- Why no broader profile was required:
+## Selected product tier
 
-Commands and results:
-- Focused:
-- Blocking `pnpm run verify`:
-- Certification `pnpm run certify`:
-- Exact-SHA GitHub checks:
+- focused | blocking | managed live evidence
+- Commands:
+- Why this tier is sufficient:
+- Result:
 
-Browser evidence:
-- Deterministic workflows executed:
-- Cache receipt versus actual browser execution:
-- Managed `BASE_URL`:
-- Live artifact command:
-- Screenshots/evidence packet inspected:
-- Rendered behavior observed:
+## Browser evidence
 
-Governance evidence:
-- Claims/limitations receipt:
-- Den document handles reviewed:
-- Limitation snapshot provenance:
+- Browser executed: yes | no
+- Managed URL and scenario:
+- Artifacts inspected: yes | no
+- Observed rendered behavior:
 
-Proof routing:
-- Retained duplicate and its distinct defect class:
-- Deleted/narrowed/generated proof:
-- Retained detection path:
+## Downstream state
 
-Non-claims and residual risk:
-- What this run did not establish:
+- `asha-rulebench-testing` run or receipt, if separately requested:
+- Exact pinned product revisions:
+- Executed | failed | skipped | unavailable | stale:
 
-Scope accounting:
-- Acceptance criteria satisfied:
-- Intentionally deferred work:
-- Follow-up tasks and classification:
-- Is any follow-up required for parent acceptance? no | yes | uncertain
-```
+## Non-claims
 
-When classification is uncertain, run the blocking gate. Use certification for
-milestones, releases, governed ASHA changes, compatibility/migration changes,
-or proof removal. User-visible milestone/release claims additionally require
-the managed live-artifact mode and human inspection of the rendered evidence.
+- A focused or blocking product result is not exhaustive certification.
+- A browser exit code without artifact inspection is not visual proof.
+- A downstream failure is routed by the first broken public contract; the
+  testing repository is not semantic authority.
