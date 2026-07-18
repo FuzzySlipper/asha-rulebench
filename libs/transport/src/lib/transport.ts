@@ -24,6 +24,8 @@ export interface RulesetTransport {
   readonly react: (
     reaction: GameplayReactionRequestDto,
   ) => Promise<RulesetWorkspaceResponseDto>;
+  readonly restoreCheckpoint: () => Promise<RulesetWorkspaceResponseDto>;
+  readonly replay: () => Promise<RulesetWorkspaceResponseDto>;
 }
 
 export function createRulesetTransport(http: JsonHttpClient): RulesetTransport {
@@ -45,5 +47,7 @@ export function createRulesetTransport(http: JsonHttpClient): RulesetTransport {
     activate: () => request('POST', '/api/ruleset/activate'),
     command: (command) => request('POST', '/api/ruleset/command', command),
     react: (reaction) => request('POST', '/api/ruleset/reaction', reaction),
+    restoreCheckpoint: () => request('POST', '/api/ruleset/checkpoint/restore'),
+    replay: () => request('POST', '/api/ruleset/replay'),
   };
 }

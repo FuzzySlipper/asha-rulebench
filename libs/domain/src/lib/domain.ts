@@ -150,7 +150,7 @@ export interface GameplayEntityView {
 export interface GameplayWorkspaceView {
   readonly actorId: string;
   readonly stateRevision: number;
-  readonly acceptedRandomValues: number;
+  readonly acceptedRandomValues: string;
   readonly actions: readonly GameplayActionView[];
   readonly entities: readonly GameplayEntityView[];
   readonly pendingReaction: {
@@ -167,11 +167,41 @@ export interface GameplayWorkspaceView {
     readonly status: string;
     readonly code: string | null;
     readonly message: string;
-    readonly randomConsumed: number;
+    readonly randomConsumed: string;
     readonly randomRequest: string | null;
     readonly events: readonly string[];
     readonly trace: readonly string[];
   } | null;
+  readonly archive: {
+    readonly checkpointSchema: string;
+    readonly replaySchemaVersion: number;
+    readonly eventSchemaVersion: number;
+    readonly artifactId: string;
+    readonly artifactSchema: string;
+    readonly composition: string;
+    readonly language: string;
+    readonly operationSchemas: readonly string[];
+    readonly capabilitySchemas: readonly string[];
+    readonly sourcePackages: readonly string[];
+    readonly dependencyLock: readonly string[];
+    readonly fingerprints: readonly string[];
+    readonly definitionFingerprints: readonly string[];
+    readonly stateRevision: string;
+    readonly acceptedRandomPosition: string;
+    readonly phase: string;
+    readonly stateHash: string;
+    readonly checkpointBytes: number;
+    readonly verificationStatus: string;
+    readonly verificationMessage: string;
+    readonly replayEntries: readonly {
+      readonly sequence: number;
+      readonly operation: string;
+      readonly outcome: string;
+      readonly transition: string;
+      readonly randomEvidence: readonly string[];
+      readonly events: readonly string[];
+    }[];
+  };
 }
 
 export function rulesetWorkspaceView(
@@ -307,6 +337,40 @@ function gameplayView(
               (trace) => `${trace.code} · ${trace.path} · ${trace.detail}`,
             ),
           },
+    archive: {
+      checkpointSchema: gameplay.archive.checkpointSchema,
+      replaySchemaVersion: gameplay.archive.replaySchemaVersion,
+      eventSchemaVersion: gameplay.archive.eventSchemaVersion,
+      artifactId: gameplay.archive.artifactId,
+      artifactSchema: gameplay.archive.artifactSchema,
+      composition: gameplay.archive.composition,
+      language: gameplay.archive.language,
+      operationSchemas: gameplay.archive.operationSchemas,
+      capabilitySchemas: gameplay.archive.capabilitySchemas,
+      sourcePackages: gameplay.archive.sourcePackages,
+      dependencyLock: gameplay.archive.dependencyLock,
+      fingerprints: [
+        `source ${gameplay.archive.fingerprints.source}`,
+        `semantic ${gameplay.archive.fingerprints.semantic}`,
+        `presentation ${gameplay.archive.fingerprints.presentation}`,
+      ],
+      definitionFingerprints: gameplay.archive.definitionFingerprints,
+      stateRevision: gameplay.archive.stateRevision,
+      acceptedRandomPosition: gameplay.archive.acceptedRandomPosition,
+      phase: gameplay.archive.phase,
+      stateHash: gameplay.archive.stateHash,
+      checkpointBytes: gameplay.archive.checkpointBytes,
+      verificationStatus: gameplay.archive.verificationStatus,
+      verificationMessage: gameplay.archive.verificationMessage,
+      replayEntries: gameplay.archive.replayEntries.map((entry) => ({
+        sequence: entry.sequence,
+        operation: entry.operation,
+        outcome: entry.outcome,
+        transition: `${entry.before.phase} r${entry.before.revision} ${entry.before.stateHash} → ${entry.after.phase} r${entry.after.revision} ${entry.after.stateHash}`,
+        randomEvidence: entry.randomEvidence,
+        events: entry.events,
+      })),
+    },
   };
 }
 

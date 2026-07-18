@@ -78,3 +78,16 @@ With 1.0 still active, the host compares accepted artifact structures and the
 UI identifies both the directly changed action and Arc Lash: Stormfront as a
 changed derived descendant, including the exact semantic field transition.
 The report remains pre-activation and does not define migration policy.
+
+## #5956 transition
+
+The artifact-bound Asha RPG session now emits one versioned portable checkpoint
+and typed replay entries for every submitted intent and reaction. Rulebench
+stores those public records in the active slot and exposes their exact package,
+lock, artifact, definition-fingerprint, schema, phase, random-evidence, event,
+revision, and state-hash identity for inspection. Checkpoint restore and replay
+are invoked through Asha RPG and replace the session only after complete Rust
+validation. Rulebench does not execute TypeScript, float package versions,
+reapply events, or own a parallel state path. Process-restart storage,
+activation migration, and exhaustive compatibility evidence remain downstream
+or future work.

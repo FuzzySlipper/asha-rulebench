@@ -44,6 +44,10 @@ describe('ruleset workspace view mapping', () => {
     expect(view.gameplay?.actions[0]?.randomPlan).toEqual([
       'if no-roll branch: formulaDice 5d4',
     ]);
+    expect(view.gameplay?.archive.verificationStatus).toBe('verified');
+    expect(view.gameplay?.archive.replayEntries[0]?.transition).toContain(
+      'awaitingReaction ward r2',
+    );
   });
 
   it('maps candidate upgrade impact without implying activation', () => {
@@ -116,7 +120,7 @@ function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
   return {
     actorId: 'hero',
     stateRevision: 2,
-    acceptedRandomValues: 3,
+    acceptedRandomValues: '3',
     actions: [
       {
         id: 'rulebench.wardbreaker-volley',
@@ -152,6 +156,55 @@ function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
     entities: [],
     pendingReaction: null,
     lastResult: null,
+    archive: {
+      checkpointSchema: 'asha.rpg.session.checkpoint@1',
+      replaySchemaVersion: 1,
+      eventSchemaVersion: 1,
+      artifactId: 'rulebench.fresh-start@1.0.0:fnv1a64:4444444444444444',
+      artifactSchema: 'asha.rpg.ruleset.compiled@1',
+      composition: 'rulebench.fresh-start@1.0.0',
+      language: 'asha-rpg@1.0.0',
+      operationSchemas: ['operation.damage@1'],
+      capabilitySchemas: ['capability.vitality@1'],
+      sourcePackages: ['rulebench.field-manual@1.0.0 · fnv1a64:source'],
+      dependencyLock: [],
+      fingerprints: {
+        source: 'fnv1a64:1111111111111111',
+        semantic: 'fnv1a64:2222222222222222',
+        presentation: 'fnv1a64:3333333333333333',
+      },
+      definitionFingerprints: [
+        'rulebench.signal-flare · fnv1a64:6666666666666666',
+      ],
+      stateRevision: '2',
+      acceptedRandomPosition: '3',
+      phase: 'awaitingReaction ward',
+      stateHash: 'fnv1a64.rpg-session.v1:state',
+      checkpointBytes: 4096,
+      replayEntries: [
+        {
+          sequence: 1,
+          operation: 'submit rulebench.signal-flare',
+          outcome: 'awaitingReaction',
+          before: {
+            revision: '2',
+            acceptedRandomPosition: '3',
+            phase: 'ready',
+            stateHash: 'hash-before',
+          },
+          after: {
+            revision: '2',
+            acceptedRandomPosition: '3',
+            phase: 'awaitingReaction ward',
+            stateHash: 'hash-after',
+          },
+          randomEvidence: ['formulaDice 1d6 at $.damage = 4'],
+          events: [],
+        },
+      ],
+      verificationStatus: 'verified',
+      verificationMessage: 'Rust replay verified 1 record',
+    },
   };
 }
 

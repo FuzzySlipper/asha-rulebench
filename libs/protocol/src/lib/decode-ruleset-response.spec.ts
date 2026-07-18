@@ -94,4 +94,83 @@ describe('ruleset protocol decoder', () => {
 
     expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
   });
+
+  it('strictly decodes the portable checkpoint and replay archive', () => {
+    const response = {
+      ...emptyResponse,
+      status: 'active',
+      gameplayAvailable: true,
+      gameplay: {
+        actorId: 'hero',
+        stateRevision: 0,
+        acceptedRandomValues: '0',
+        actions: [],
+        preflights: [],
+        entities: [],
+        pendingReaction: null,
+        lastResult: null,
+        archive: {
+          checkpointSchema: 'asha.rpg.session.checkpoint@1',
+          replaySchemaVersion: 1,
+          eventSchemaVersion: 1,
+          artifactId: 'artifact-1',
+          artifactSchema: 'asha.rpg.ruleset.compiled@1',
+          composition: 'rules@1.0.0',
+          language: 'asha-rpg@1.0.0',
+          operationSchemas: ['operation.damage@1'],
+          capabilitySchemas: ['capability.vitality@1'],
+          sourcePackages: ['rules@1.0.0 · source'],
+          dependencyLock: [],
+          fingerprints: {
+            source: 'source',
+            semantic: 'semantic',
+            presentation: 'presentation',
+          },
+          definitionFingerprints: ['action.one · definition'],
+          stateRevision: '0',
+          acceptedRandomPosition: '0',
+          phase: 'ready',
+          stateHash: 'fnv1a64.rpg-session.v1:state',
+          checkpointBytes: 2048,
+          replayEntries: [
+            {
+              sequence: 1,
+              operation: 'submit action.one',
+              outcome: 'accepted',
+              before: {
+                revision: '0',
+                acceptedRandomPosition: '0',
+                phase: 'ready',
+                stateHash: 'before',
+              },
+              after: {
+                revision: '1',
+                acceptedRandomPosition: '1',
+                phase: 'ready',
+                stateHash: 'after',
+              },
+              randomEvidence: ['formulaDice 1d6 at $.damage = 4'],
+              events: ['4 force damage to raider'],
+            },
+          ],
+          verificationStatus: 'verified',
+          verificationMessage: 'Rust replay verified 1 record',
+        },
+      },
+    };
+
+    expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
+    expect(() =>
+      decodeRulesetWorkspaceResponse({
+        ...response,
+        gameplay: { ...response.gameplay, acceptedRandomValues: 0 },
+      }),
+    ).toThrow('$.gameplay.acceptedRandomValues');
+    expect(() =>
+      decodeRulesetWorkspaceResponse({
+        ...response,
+        gameplay: { ...response.gameplay, acceptedRandomValues: '00' },
+      }),
+    ).toThrow('$.gameplay.acceptedRandomValues');
+  });
 });

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createRulesetTransport, type JsonHttpClient } from './transport.js';
 
 describe('ruleset transport', () => {
-  it('sends freshly prepared source through the generated compile request shape', async () => {
+  it('uses generated compile and portable archive routes', async () => {
     const requests: {
       readonly method: 'GET' | 'POST';
       readonly path: string;
@@ -19,6 +19,8 @@ describe('ruleset transport', () => {
 
     const transport = createRulesetTransport(http);
     await transport.compile('fresh');
+    await transport.restoreCheckpoint();
+    await transport.replay();
 
     expect(requests).toEqual([
       {
@@ -27,6 +29,16 @@ describe('ruleset transport', () => {
         body: {
           sourceId: 'fresh',
         },
+      },
+      {
+        method: 'POST',
+        path: '/api/ruleset/checkpoint/restore',
+        body: undefined,
+      },
+      {
+        method: 'POST',
+        path: '/api/ruleset/replay',
+        body: undefined,
       },
     ]);
   });

@@ -1,5 +1,6 @@
 import type {
   GameplayActionDto,
+  GameplayArchiveDto,
   GameplayCostDto,
   GameplayEntityDto,
   GameplayEventDto,
@@ -13,6 +14,8 @@ import type {
   GameplayReactionDto,
   GameplayReactionOptionDto,
   GameplayResultDto,
+  GameplayReplayBoundaryDto,
+  GameplayReplayEntryDto,
   GameplaySessionDto,
   GameplayTraceDto,
   RulesetArtifactSummaryDto,
@@ -109,6 +112,7 @@ function nullableGameplay(
       'entities',
       'pendingReaction',
       'lastResult',
+      'archive',
     ],
     path,
   );
@@ -118,7 +122,7 @@ function nullableGameplay(
       record['stateRevision'],
       `${path}.stateRevision`,
     ),
-    acceptedRandomValues: nonNegativeInteger(
+    acceptedRandomValues: nonNegativeIntegerString(
       record['acceptedRandomValues'],
       `${path}.acceptedRandomValues`,
     ),
@@ -137,6 +141,161 @@ function nullableGameplay(
       `${path}.pendingReaction`,
     ),
     lastResult: nullableResult(record['lastResult'], `${path}.lastResult`),
+    archive: gameplayArchive(record['archive'], `${path}.archive`),
+  };
+}
+
+function gameplayArchive(value: unknown, path: string): GameplayArchiveDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'checkpointSchema',
+      'replaySchemaVersion',
+      'eventSchemaVersion',
+      'artifactId',
+      'artifactSchema',
+      'composition',
+      'language',
+      'operationSchemas',
+      'capabilitySchemas',
+      'sourcePackages',
+      'dependencyLock',
+      'fingerprints',
+      'definitionFingerprints',
+      'stateRevision',
+      'acceptedRandomPosition',
+      'phase',
+      'stateHash',
+      'checkpointBytes',
+      'replayEntries',
+      'verificationStatus',
+      'verificationMessage',
+    ],
+    path,
+  );
+  return {
+    checkpointSchema: requiredString(
+      record['checkpointSchema'],
+      `${path}.checkpointSchema`,
+    ),
+    replaySchemaVersion: nonNegativeInteger(
+      record['replaySchemaVersion'],
+      `${path}.replaySchemaVersion`,
+    ),
+    eventSchemaVersion: nonNegativeInteger(
+      record['eventSchemaVersion'],
+      `${path}.eventSchemaVersion`,
+    ),
+    artifactId: requiredString(record['artifactId'], `${path}.artifactId`),
+    artifactSchema: requiredString(
+      record['artifactSchema'],
+      `${path}.artifactSchema`,
+    ),
+    composition: requiredString(record['composition'], `${path}.composition`),
+    language: requiredString(record['language'], `${path}.language`),
+    operationSchemas: stringArray(
+      record['operationSchemas'],
+      `${path}.operationSchemas`,
+    ),
+    capabilitySchemas: stringArray(
+      record['capabilitySchemas'],
+      `${path}.capabilitySchemas`,
+    ),
+    sourcePackages: stringArray(
+      record['sourcePackages'],
+      `${path}.sourcePackages`,
+    ),
+    dependencyLock: stringArray(
+      record['dependencyLock'],
+      `${path}.dependencyLock`,
+    ),
+    fingerprints: fingerprints(record['fingerprints'], `${path}.fingerprints`),
+    definitionFingerprints: stringArray(
+      record['definitionFingerprints'],
+      `${path}.definitionFingerprints`,
+    ),
+    stateRevision: nonNegativeIntegerString(
+      record['stateRevision'],
+      `${path}.stateRevision`,
+    ),
+    acceptedRandomPosition: nonNegativeIntegerString(
+      record['acceptedRandomPosition'],
+      `${path}.acceptedRandomPosition`,
+    ),
+    phase: requiredString(record['phase'], `${path}.phase`),
+    stateHash: requiredString(record['stateHash'], `${path}.stateHash`),
+    checkpointBytes: nonNegativeInteger(
+      record['checkpointBytes'],
+      `${path}.checkpointBytes`,
+    ),
+    replayEntries: requiredArray(
+      record['replayEntries'],
+      `${path}.replayEntries`,
+    ).map((entry, index) =>
+      gameplayReplayEntry(entry, `${path}.replayEntries[${index}]`),
+    ),
+    verificationStatus: requiredString(
+      record['verificationStatus'],
+      `${path}.verificationStatus`,
+    ),
+    verificationMessage: requiredString(
+      record['verificationMessage'],
+      `${path}.verificationMessage`,
+    ),
+  };
+}
+
+function gameplayReplayEntry(
+  value: unknown,
+  path: string,
+): GameplayReplayEntryDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'sequence',
+      'operation',
+      'outcome',
+      'before',
+      'after',
+      'randomEvidence',
+      'events',
+    ],
+    path,
+  );
+  return {
+    sequence: nonNegativeInteger(record['sequence'], `${path}.sequence`),
+    operation: requiredString(record['operation'], `${path}.operation`),
+    outcome: requiredString(record['outcome'], `${path}.outcome`),
+    before: gameplayReplayBoundary(record['before'], `${path}.before`),
+    after: gameplayReplayBoundary(record['after'], `${path}.after`),
+    randomEvidence: stringArray(
+      record['randomEvidence'],
+      `${path}.randomEvidence`,
+    ),
+    events: stringArray(record['events'], `${path}.events`),
+  };
+}
+
+function gameplayReplayBoundary(
+  value: unknown,
+  path: string,
+): GameplayReplayBoundaryDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['revision', 'acceptedRandomPosition', 'phase', 'stateHash'],
+    path,
+  );
+  return {
+    revision: nonNegativeIntegerString(record['revision'], `${path}.revision`),
+    acceptedRandomPosition: nonNegativeIntegerString(
+      record['acceptedRandomPosition'],
+      `${path}.acceptedRandomPosition`,
+    ),
+    phase: requiredString(record['phase'], `${path}.phase`),
+    stateHash: requiredString(record['stateHash'], `${path}.stateHash`),
   };
 }
 
@@ -412,7 +571,7 @@ function nullableResult(
     trace: requiredArray(record['trace'], `${path}.trace`).map((entry, index) =>
       gameplayTrace(entry, `${path}.trace[${index}]`),
     ),
-    randomConsumed: nonNegativeInteger(
+    randomConsumed: nonNegativeIntegerString(
       record['randomConsumed'],
       `${path}.randomConsumed`,
     ),
@@ -972,6 +1131,17 @@ function requiredString(value: unknown, path: string): string {
     throw new RulesetProtocolDecodeError(path, 'expected a string');
   }
   return value;
+}
+
+function nonNegativeIntegerString(value: unknown, path: string): string {
+  const source = requiredString(value, path);
+  if (!/^(?:0|[1-9][0-9]*)$/.test(source)) {
+    throw new RulesetProtocolDecodeError(
+      path,
+      'expected a canonical non-negative integer string',
+    );
+  }
+  return source;
 }
 
 function nullableString(value: unknown, path: string): string | null {

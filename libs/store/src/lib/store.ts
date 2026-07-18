@@ -53,6 +53,14 @@ export class RulesetWorkspaceStore {
     await this.run(() => this.transport.react(reaction));
   }
 
+  public async restoreCheckpoint(): Promise<void> {
+    await this.run(() => this.transport.restoreCheckpoint());
+  }
+
+  public async replay(): Promise<void> {
+    await this.run(() => this.transport.replay());
+  }
+
   private async run(
     request: () => ReturnType<RulesetTransport['status']>,
   ): Promise<void> {

@@ -73,6 +73,14 @@ fn route(
                 Err(diagnostic) => invalid_request(host, diagnostic),
             }
         }
+        (&Method::Post, "/api/ruleset/checkpoint/restore") => {
+            let response = host.restore_latest_checkpoint();
+            (if response.ok { 200 } else { 409 }, response)
+        }
+        (&Method::Post, "/api/ruleset/replay") => {
+            let response = host.replay_archive();
+            (if response.ok { 200 } else { 409 }, response)
+        }
         _ => {
             let mut response = host.status();
             response.ok = false;

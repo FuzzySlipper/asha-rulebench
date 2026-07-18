@@ -45,6 +45,8 @@ describe('ruleset workspace store', () => {
       activate: async () => emptyResponse(),
       command: async () => emptyResponse(),
       react: async () => emptyResponse(),
+      restoreCheckpoint: async () => emptyResponse(),
+      replay: async () => emptyResponse(),
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
@@ -95,6 +97,8 @@ describe('ruleset workspace store', () => {
       activate: async () => active,
       command: async () => active,
       react: async () => active,
+      restoreCheckpoint: async () => active,
+      replay: async () => active,
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
@@ -119,6 +123,8 @@ function transportReturning(
     activate: async () => response,
     command: async () => response,
     react: async () => response,
+    restoreCheckpoint: async () => response,
+    replay: async () => response,
   };
 }
 

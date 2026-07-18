@@ -1,7 +1,7 @@
 # ASHA Rulebench
 
 ASHA Rulebench is the authoring and inspection product for compiled Asha RPG
-rulesets. Den tasks #5953, #5955, and #5957 now build on the deliberate empty
+rulesets. Den tasks #5953, #5955, #5957, and #5956 now build on the deliberate empty
 boundary from #5952:
 
 - no prototype content is bundled;
@@ -36,6 +36,14 @@ bounded resource, resolves d6 and five-d4 requests, and suspends/resumes a
 reaction against the same state revision. Rust owns all interpretation and
 mutation.
 
+The active slot also stores Asha RPG's versioned portable checkpoint and typed
+replay entries. Rulebench displays their exact artifact/package/lock bindings,
+fingerprint planes, definition fingerprints, pending phase, state revision,
+random position, structured evidence, accepted events, and canonical state
+hash. Restore and replay buttons delegate to the public Asha RPG APIs; the
+product does not rematerialize TypeScript, resolve package ranges, reapply
+events, or maintain a second gameplay state path.
+
 ## Retained product surfaces
 
 - `apps/app`: Angular bootstrap.
@@ -51,7 +59,8 @@ mutation.
 - `libs/platform`: browser ports, including the JSON HTTP boundary used by the
   same-origin compiler transport.
 - `libs/scenario-viewer`: compiler, exact lock, closure, diagnostics,
-  fingerprint, activation, commands, reactions, and state inspection.
+  fingerprint, activation, commands, reactions, checkpoint, replay, and state
+  inspection.
 - `libs/shell`: routes only.
 - `libs/theme`: product tokens.
 
@@ -86,9 +95,9 @@ Rust host and generated protocol. Exhaustive
 cross-repository certification remains downstream, but the old prototype
 expectations have been retired rather than preserved there.
 
-Non-claims: session persistence across process restarts or artifact activation,
-replay/checkpoints, migration, nested reaction windows, upgrade migration
-policy, and exhaustive cross-product certification are not implemented here.
+Non-claims: archive persistence across process restarts or artifact activation,
+storage migration, nested reaction windows, upgrade migration policy, and
+exhaustive cross-product certification are not implemented here.
 
 The fresh composition now demonstrates one primary base, two ordered typed
 mixins, a local relational patch, an authorized semantic overlay, and a

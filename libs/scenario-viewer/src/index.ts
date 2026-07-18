@@ -508,6 +508,168 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 </div>
               </arb-workbench-panel>
             }
+
+            <arb-workbench-panel
+              data-testid="replay-archive-panel"
+              [panelNumber]="6"
+              panelTitle="Portable checkpoint and replay archive"
+            >
+              <div class="panel-body">
+                <p class="section-label">
+                  {{ gameplay.archive.checkpointSchema }} · replay schema
+                  {{ gameplay.archive.replaySchemaVersion }} · event schema
+                  {{ gameplay.archive.eventSchemaVersion }}
+                </p>
+                <p class="summary">
+                  Rulebench stores and inspects this record. Exact artifact
+                  restore, pending-phase reconstruction, and replay remain Rust
+                  authority operations.
+                </p>
+                <dl class="facts">
+                  <div>
+                    <dt>Pinned artifact</dt>
+                    <dd>{{ gameplay.archive.artifactId }}</dd>
+                  </div>
+                  <div>
+                    <dt>Artifact schema</dt>
+                    <dd>{{ gameplay.archive.artifactSchema }}</dd>
+                  </div>
+                  <div>
+                    <dt>Composition</dt>
+                    <dd>{{ gameplay.archive.composition }}</dd>
+                  </div>
+                  <div>
+                    <dt>Language</dt>
+                    <dd>{{ gameplay.archive.language }}</dd>
+                  </div>
+                  <div>
+                    <dt>Checkpoint phase</dt>
+                    <dd>{{ gameplay.archive.phase }}</dd>
+                  </div>
+                  <div>
+                    <dt>State revision</dt>
+                    <dd>{{ gameplay.archive.stateRevision }}</dd>
+                  </div>
+                  <div>
+                    <dt>Accepted random position</dt>
+                    <dd>{{ gameplay.archive.acceptedRandomPosition }}</dd>
+                  </div>
+                  <div>
+                    <dt>Encoded checkpoint</dt>
+                    <dd>{{ gameplay.archive.checkpointBytes }} bytes</dd>
+                  </div>
+                </dl>
+                <p class="section-label">Canonical session state hash</p>
+                <code>{{ gameplay.archive.stateHash }}</code>
+                <p class="section-label">Exact source package bindings</p>
+                <ul class="row-list">
+                  @for (
+                    source of gameplay.archive.sourcePackages;
+                    track source
+                  ) {
+                    <li>
+                      <code>{{ source }}</code>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Exact dependency lock</p>
+                <ul class="row-list">
+                  @for (edge of gameplay.archive.dependencyLock; track edge) {
+                    <li>
+                      <code>{{ edge }}</code>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Artifact fingerprint planes</p>
+                <ul class="row-list">
+                  @for (
+                    fingerprint of gameplay.archive.fingerprints;
+                    track fingerprint
+                  ) {
+                    <li>
+                      <code>{{ fingerprint }}</code>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Authority schema bindings</p>
+                <ul class="row-list">
+                  @for (
+                    operation of gameplay.archive.operationSchemas;
+                    track operation
+                  ) {
+                    <li>
+                      <code>{{ operation }}</code>
+                    </li>
+                  }
+                  @for (
+                    capability of gameplay.archive.capabilitySchemas;
+                    track capability
+                  ) {
+                    <li>
+                      <code>{{ capability }}</code>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Definition fingerprints</p>
+                <ul class="row-list">
+                  @for (
+                    definition of gameplay.archive.definitionFingerprints;
+                    track definition
+                  ) {
+                    <li>
+                      <code>{{ definition }}</code>
+                    </li>
+                  }
+                </ul>
+                <div class="actions" aria-label="Portable archive actions">
+                  <button
+                    data-testid="restore-checkpoint"
+                    class="secondary"
+                    type="button"
+                    [disabled]="store.busy()"
+                    (click)="restoreCheckpoint()"
+                  >
+                    Restore stored checkpoint
+                  </button>
+                  <button
+                    data-testid="replay-records"
+                    type="button"
+                    [disabled]="store.busy()"
+                    (click)="replayArchive()"
+                  >
+                    Replay stored records in Rust
+                  </button>
+                </div>
+                <p role="status" class="accepted">
+                  <strong>{{ gameplay.archive.verificationStatus }}</strong> ·
+                  {{ gameplay.archive.verificationMessage }}
+                </p>
+                <p class="section-label">
+                  {{ gameplay.archive.replayEntries.length }} stored replay
+                  record(s)
+                </p>
+                <ul class="row-list" data-testid="replay-records-list">
+                  @for (
+                    entry of gameplay.archive.replayEntries;
+                    track entry.sequence
+                  ) {
+                    <li>
+                      <strong
+                        >{{ entry.sequence }}. {{ entry.operation }} ·
+                        {{ entry.outcome }}</strong
+                      >
+                      <code>{{ entry.transition }}</code>
+                      @for (evidence of entry.randomEvidence; track evidence) {
+                        <span>Random: {{ evidence }}</span>
+                      }
+                      @for (event of entry.events; track event) {
+                        <span>Event: {{ event }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
           }
 
           @if (view.artifact; as artifact) {
@@ -934,6 +1096,14 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected activateRuleset(): void {
     void this.store.activate();
+  }
+
+  protected restoreCheckpoint(): void {
+    void this.store.restoreCheckpoint();
+  }
+
+  protected replayArchive(): void {
+    void this.store.replay();
   }
 
   protected selectedAction(): GameplayActionView | null {

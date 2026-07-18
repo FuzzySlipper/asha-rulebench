@@ -109,12 +109,26 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   );
   await expect(workspace).toContainText('remains staged at revision 2');
   await expect(workspace).toContainText('focus 1/2');
+  const archive = page.getByTestId('replay-archive-panel');
+  await expect(archive).toContainText('3 stored replay record(s)');
+  await expect(archive).toContainText('awaitingReaction reaction.raise-ward');
+  await archive.getByTestId('restore-checkpoint').click();
+  await expect(archive).toContainText('checkpointRestored');
+  await expect(workspace).toContainText(
+    'Reaction pending: reaction.raise-ward',
+  );
   await workspace.getByLabel('Random evidence').fill('1, 2, 3, 4, 1');
   await workspace.getByRole('button', { name: /Raise ward/ }).click();
   await expect(workspace).toContainText('Revision 3 · actor hero');
   await expect(workspace).toContainText('focus 0/2');
   await expect(workspace).toContainText('Random consumed: 5');
   await expect(workspace).toContainText('reactionResolved:');
+  await expect(archive).toContainText('4 stored replay record(s)');
+  await expect(archive).toContainText('asha.rpg.session.checkpoint@1');
+  await archive.getByTestId('replay-records').click();
+  await expect(archive).toContainText('Rust replay verified 4 record(s)');
+  await expect(workspace).toContainText('Revision 3 · actor hero');
+  await expect(workspace).toContainText('focus 0/2');
   const activeArtifact = workspace
     .getByText('Active artifact', { exact: true })
     .locator('..')

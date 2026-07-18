@@ -64,9 +64,15 @@ export type GameplayReactionOptionDto = { id: string, label: string, damageReduc
 
 export type GameplayReactionDto = { reactionId: string, actorId: string, targetId: string, actionId: string, options: Array<GameplayReactionOptionDto>, path: string, };
 
-export type GameplayResultDto = { status: string, code: string | null, message: string, events: Array<GameplayEventDto>, trace: Array<GameplayTraceDto>, randomConsumed: number, stateRevision: number, randomRequest: GameplayRandomRequestDto | null, };
+export type GameplayResultDto = { status: string, code: string | null, message: string, events: Array<GameplayEventDto>, trace: Array<GameplayTraceDto>, randomConsumed: string, stateRevision: number, randomRequest: GameplayRandomRequestDto | null, };
 
-export type GameplaySessionDto = { actorId: string, stateRevision: number, acceptedRandomValues: number, actions: Array<GameplayActionDto>, preflights: Array<GameplayPreflightDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, lastResult: GameplayResultDto | null, };
+export type GameplayReplayBoundaryDto = { revision: string, acceptedRandomPosition: string, phase: string, stateHash: string, };
+
+export type GameplayReplayEntryDto = { sequence: number, operation: string, outcome: string, before: GameplayReplayBoundaryDto, after: GameplayReplayBoundaryDto, randomEvidence: Array<string>, events: Array<string>, };
+
+export type GameplayArchiveDto = { checkpointSchema: string, replaySchemaVersion: number, eventSchemaVersion: number, artifactId: string, artifactSchema: string, composition: string, language: string, operationSchemas: Array<string>, capabilitySchemas: Array<string>, sourcePackages: Array<string>, dependencyLock: Array<string>, fingerprints: RulesetFingerprintDto, definitionFingerprints: Array<string>, stateRevision: string, acceptedRandomPosition: string, phase: string, stateHash: string, checkpointBytes: number, replayEntries: Array<GameplayReplayEntryDto>, verificationStatus: string, verificationMessage: string, };
+
+export type GameplaySessionDto = { actorId: string, stateRevision: number, acceptedRandomValues: string, actions: Array<GameplayActionDto>, preflights: Array<GameplayPreflightDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
 
 export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
 

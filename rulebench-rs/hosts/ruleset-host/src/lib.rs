@@ -12,8 +12,8 @@ use rpg_compiler::{
 };
 use rpg_core::{
     ActiveRpgModifier, GridPosition, RpgCapabilityState, RpgDomainEvent, RpgEntityState, RpgIntent,
-    RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt,
-    RpgResolutionRejection, RpgTraceStep, Team,
+    RpgRandomEvidence, RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest,
+    RpgResolutionReceipt, RpgResolutionRejection, RpgTraceStep, Team,
 };
 use rpg_ir::{
     CompiledRulesetArtifact, MaterializedRulesetDefinitionKind, MaterializedRulesetVisibility,
@@ -21,7 +21,9 @@ use rpg_ir::{
     RulesetImpactPlane, RulesetRelationshipKind,
 };
 use rpg_runtime::{
-    RpgAuthorityCommand, RpgAuthoritySession, RpgCommandOutcome, RpgReactionCommand,
+    RpgAuthorityCommand, RpgAuthoritySession, RpgCheckpointPhase, RpgCommandOutcome,
+    RpgReactionCommand, RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation,
+    RpgReplayPhase, RpgSessionCheckpoint,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -396,9 +398,59 @@ pub struct GameplayResultDto {
     pub message: String,
     pub events: Vec<GameplayEventDto>,
     pub trace: Vec<GameplayTraceDto>,
-    pub random_consumed: usize,
+    pub random_consumed: String,
     pub state_revision: u32,
     pub random_request: Option<GameplayRandomRequestDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayReplayBoundaryDto {
+    pub revision: String,
+    pub accepted_random_position: String,
+    pub phase: String,
+    pub state_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayReplayEntryDto {
+    pub sequence: usize,
+    pub operation: String,
+    pub outcome: String,
+    pub before: GameplayReplayBoundaryDto,
+    pub after: GameplayReplayBoundaryDto,
+    pub random_evidence: Vec<String>,
+    pub events: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayArchiveDto {
+    pub checkpoint_schema: String,
+    pub replay_schema_version: u32,
+    pub event_schema_version: u32,
+    pub artifact_id: String,
+    pub artifact_schema: String,
+    pub composition: String,
+    pub language: String,
+    pub operation_schemas: Vec<String>,
+    pub capability_schemas: Vec<String>,
+    pub source_packages: Vec<String>,
+    pub dependency_lock: Vec<String>,
+    pub fingerprints: RulesetFingerprintDto,
+    pub definition_fingerprints: Vec<String>,
+    pub state_revision: String,
+    pub accepted_random_position: String,
+    pub phase: String,
+    pub state_hash: String,
+    pub checkpoint_bytes: usize,
+    pub replay_entries: Vec<GameplayReplayEntryDto>,
+    pub verification_status: String,
+    pub verification_message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -407,12 +459,13 @@ pub struct GameplayResultDto {
 pub struct GameplaySessionDto {
     pub actor_id: String,
     pub state_revision: u32,
-    pub accepted_random_values: usize,
+    pub accepted_random_values: String,
     pub actions: Vec<GameplayActionDto>,
     pub preflights: Vec<GameplayPreflightDto>,
     pub entities: Vec<GameplayEntityDto>,
     pub pending_reaction: Option<GameplayReactionDto>,
     pub last_result: Option<GameplayResultDto>,
+    pub archive: GameplayArchiveDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -470,6 +523,12 @@ struct ActiveRuleset {
     bundle: CompiledRulesetBundle,
     session: RpgAuthoritySession,
     last_result: Option<GameplayResultDto>,
+    initial_checkpoint: RpgSessionCheckpoint,
+    latest_checkpoint: RpgSessionCheckpoint,
+    latest_checkpoint_bytes: Vec<u8>,
+    replay_entries: Vec<RpgReplayEntry>,
+    verification_status: String,
+    verification_message: String,
 }
 
 #[derive(Debug, Default)]
@@ -488,19 +547,39 @@ impl ActivationSlots {
         self.candidate = None;
     }
 
-    fn activate(&mut self) -> bool {
+    fn activate(&mut self) -> Result<bool, RpgReplayFailure> {
         let Some(candidate) = self.candidate.take() else {
-            return false;
+            return Ok(false);
         };
         let session =
-            RpgAuthoritySession::new(candidate.ruleset().clone(), initial_gameplay_state());
+            RpgAuthoritySession::from_compiled_ruleset(candidate.clone(), initial_gameplay_state());
+        let checkpoint = match session.checkpoint() {
+            Ok(checkpoint) => checkpoint,
+            Err(failure) => {
+                self.candidate = Some(candidate);
+                return Err(failure);
+            }
+        };
+        let checkpoint_bytes = match session.checkpoint_json() {
+            Ok(checkpoint_bytes) => checkpoint_bytes,
+            Err(failure) => {
+                self.candidate = Some(candidate);
+                return Err(failure);
+            }
+        };
         self.active = Some(ActiveRuleset {
             bundle: candidate,
             session,
             last_result: None,
+            initial_checkpoint: checkpoint.clone(),
+            latest_checkpoint: checkpoint,
+            latest_checkpoint_bytes: checkpoint_bytes,
+            replay_entries: Vec::new(),
+            verification_status: "notRun".to_owned(),
+            verification_message: "No replay verification has run yet".to_owned(),
         });
         self.activation_revision += 1;
-        true
+        Ok(true)
     }
 
     fn status(&self) -> RulesetLifecycleStatus {
@@ -511,6 +590,19 @@ impl ActivationSlots {
         } else {
             RulesetLifecycleStatus::NoActiveRuleset
         }
+    }
+}
+
+impl ActiveRuleset {
+    fn store_entry(&mut self, entry: RpgReplayEntry) -> Result<(), RpgReplayFailure> {
+        let checkpoint = self.session.checkpoint()?;
+        let checkpoint_bytes = self.session.checkpoint_json()?;
+        self.replay_entries.push(entry);
+        self.latest_checkpoint = checkpoint;
+        self.latest_checkpoint_bytes = checkpoint_bytes;
+        self.verification_status = "notRun".to_owned();
+        self.verification_message = "Stored replay changed; verification is required".to_owned();
+        Ok(())
     }
 }
 
@@ -561,10 +653,9 @@ impl RulesetHost {
 
     pub fn activate_candidate(&self) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-        if slots.activate() {
-            response_from_slots(true, &slots, Vec::new())
-        } else {
-            response_from_slots(
+        match slots.activate() {
+            Ok(true) => response_from_slots(true, &slots, Vec::new()),
+            Ok(false) => response_from_slots(
                 false,
                 &slots,
                 vec![RulesetDiagnosticDto {
@@ -580,7 +671,10 @@ impl RulesetHost {
                     expected: None,
                     actual: None,
                 }],
-            )
+            ),
+            Err(failure) => {
+                response_from_slots(false, &slots, diagnostics_from_replay_failure(failure))
+            }
         }
     }
 
@@ -600,7 +694,7 @@ impl RulesetHost {
                 )],
             );
         };
-        let outcome = active.session.submit(RpgAuthorityCommand {
+        let recorded = active.session.submit_recorded(RpgAuthorityCommand {
             expected_revision: u64::from(request.expected_revision),
             intent: RpgIntent {
                 action_id: request.action_id,
@@ -609,6 +703,19 @@ impl RulesetHost {
             },
             random_values: request.random_values,
         });
+        let (outcome, entry) = match recorded {
+            Ok(recorded) => recorded,
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_replay_failure(failure),
+                );
+            }
+        };
+        if let Err(failure) = active.store_entry(entry) {
+            return response_from_slots(false, &slots, diagnostics_from_replay_failure(failure));
+        }
         active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
         response_from_slots(
             !matches!(outcome, RpgCommandOutcome::Rejected(_)),
@@ -633,18 +740,112 @@ impl RulesetHost {
                 )],
             );
         };
-        let outcome = active.session.react(RpgReactionCommand {
+        let recorded = active.session.react_recorded(RpgReactionCommand {
             expected_revision: u64::from(request.expected_revision),
             reaction_id: request.reaction_id,
             option_id: request.option_id,
             additional_random_values: request.additional_random_values,
         });
+        let (outcome, entry) = match recorded {
+            Ok(recorded) => recorded,
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_replay_failure(failure),
+                );
+            }
+        };
+        if let Err(failure) = active.store_entry(entry) {
+            return response_from_slots(false, &slots, diagnostics_from_replay_failure(failure));
+        }
         active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
         response_from_slots(
             !matches!(outcome, RpgCommandOutcome::Rejected(_)),
             &slots,
             Vec::new(),
         )
+    }
+
+    pub fn restore_latest_checkpoint(&self) -> RulesetWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = &mut slots.active else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic(
+                    "RPG_CHECKPOINT_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.activeArtifact",
+                    "activate a compiled artifact before restoring a checkpoint",
+                )],
+            );
+        };
+        match RpgAuthoritySession::restore_checkpoint_json(&active.latest_checkpoint_bytes) {
+            Ok(restored) => {
+                active.session = restored;
+                active.verification_status = "checkpointRestored".to_owned();
+                active.verification_message = format!(
+                    "Restored checkpoint {} at revision {}",
+                    active.latest_checkpoint.state_hash.value,
+                    active.latest_checkpoint.state.revision
+                );
+                response_from_slots(true, &slots, Vec::new())
+            }
+            Err(failure) => {
+                response_from_slots(false, &slots, diagnostics_from_replay_failure(failure))
+            }
+        }
+    }
+
+    pub fn replay_archive(&self) -> RulesetWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = &mut slots.active else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic(
+                    "RPG_REPLAY_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.activeArtifact",
+                    "activate a compiled artifact before replaying stored records",
+                )],
+            );
+        };
+        match active
+            .session
+            .replay_into(active.initial_checkpoint.clone(), &active.replay_entries)
+        {
+            Ok(()) => match active.session.checkpoint() {
+                Ok(checkpoint) => {
+                    let checkpoint_bytes = match active.session.checkpoint_json() {
+                        Ok(checkpoint_bytes) => checkpoint_bytes,
+                        Err(failure) => {
+                            return response_from_slots(
+                                false,
+                                &slots,
+                                diagnostics_from_replay_failure(failure),
+                            );
+                        }
+                    };
+                    active.latest_checkpoint = checkpoint;
+                    active.latest_checkpoint_bytes = checkpoint_bytes;
+                    active.verification_status = "verified".to_owned();
+                    active.verification_message = format!(
+                        "Rust replay verified {} record(s) at state hash {}",
+                        active.replay_entries.len(),
+                        active.latest_checkpoint.state_hash.value
+                    );
+                    response_from_slots(true, &slots, Vec::new())
+                }
+                Err(failure) => {
+                    response_from_slots(false, &slots, diagnostics_from_replay_failure(failure))
+                }
+            },
+            Err(failure) => {
+                active.verification_status = "failed".to_owned();
+                active.verification_message = failure.to_string();
+                response_from_slots(false, &slots, diagnostics_from_replay_failure(failure))
+            }
+        }
     }
 }
 
@@ -1003,7 +1204,7 @@ fn gameplay_session(active: &ActiveRuleset) -> GameplaySessionDto {
     GameplaySessionDto {
         actor_id: actor_id.to_owned(),
         state_revision: dto_revision(state.revision()),
-        accepted_random_values: active.session.accepted_random_values(),
+        accepted_random_values: active.session.accepted_random_values().to_string(),
         actions,
         preflights,
         entities: state.entities().map(gameplay_entity).collect(),
@@ -1012,7 +1213,200 @@ fn gameplay_session(active: &ActiveRuleset) -> GameplaySessionDto {
             .pending_reaction()
             .map(|pending| gameplay_reaction(&pending.request)),
         last_result: active.last_result.clone(),
+        archive: gameplay_archive(active),
     }
+}
+
+fn gameplay_archive(active: &ActiveRuleset) -> GameplayArchiveDto {
+    let checkpoint = &active.latest_checkpoint;
+    let binding = &checkpoint.artifact_binding;
+    GameplayArchiveDto {
+        checkpoint_schema: format!("{}@{}", checkpoint.schema.id, checkpoint.schema.version),
+        replay_schema_version: checkpoint.schemas.replay_entry,
+        event_schema_version: checkpoint.schemas.event,
+        artifact_id: binding.artifact_id.clone(),
+        artifact_schema: format!(
+            "{}@{}",
+            binding.artifact_schema.identity, binding.artifact_schema.major
+        ),
+        composition: format!("{}@{}", binding.composition.id, binding.composition.version),
+        language: format!("{}@{}", binding.language.id, binding.language.version),
+        operation_schemas: checkpoint
+            .schemas
+            .operations
+            .iter()
+            .map(|requirement| format!("{}@{}", requirement.id, requirement.version))
+            .collect(),
+        capability_schemas: checkpoint
+            .schemas
+            .capabilities
+            .iter()
+            .map(|requirement| format!("{}@{}", requirement.id, requirement.version))
+            .collect(),
+        source_packages: binding
+            .source_packages
+            .iter()
+            .map(|package| {
+                format!(
+                    "{}@{} · {}",
+                    package.id, package.version, package.source_fingerprint
+                )
+            })
+            .collect(),
+        dependency_lock: binding
+            .dependency_lock
+            .iter()
+            .map(|entry| {
+                format!(
+                    "{} --{} {} → {}--> {} as {} · {}",
+                    entry.requester,
+                    dependency_relationship(entry.relationship),
+                    entry.requested_version,
+                    entry.resolved_version,
+                    entry.package_id,
+                    entry.import_as,
+                    entry.source_fingerprint
+                )
+            })
+            .collect(),
+        fingerprints: RulesetFingerprintDto {
+            source: binding.fingerprints.source.clone(),
+            semantic: binding.fingerprints.semantic.clone(),
+            presentation: binding.fingerprints.presentation.clone(),
+        },
+        definition_fingerprints: binding
+            .definitions
+            .iter()
+            .map(|definition| format!("{} · {}", definition.id, definition.fingerprint))
+            .collect(),
+        state_revision: checkpoint.state.revision.to_string(),
+        accepted_random_position: checkpoint.accepted_random_position.to_string(),
+        phase: checkpoint_phase_label(&checkpoint.phase),
+        state_hash: format!(
+            "{}:{}",
+            checkpoint.state_hash.algorithm, checkpoint.state_hash.value
+        ),
+        checkpoint_bytes: active.latest_checkpoint_bytes.len(),
+        replay_entries: active
+            .replay_entries
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| gameplay_replay_entry(index, entry))
+            .collect(),
+        verification_status: active.verification_status.clone(),
+        verification_message: active.verification_message.clone(),
+    }
+}
+
+fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplayEntryDto {
+    let (random_evidence, events) = match &entry.outcome {
+        RpgCommandOutcome::Accepted(receipt) => (
+            receipt
+                .random_evidence
+                .iter()
+                .map(gameplay_random_evidence)
+                .collect(),
+            receipt
+                .events
+                .iter()
+                .map(|event| gameplay_event(event).summary)
+                .collect(),
+        ),
+        RpgCommandOutcome::AwaitingReaction(pending) => (
+            pending
+                .random_evidence
+                .iter()
+                .map(gameplay_random_evidence)
+                .collect(),
+            Vec::new(),
+        ),
+        RpgCommandOutcome::Rejected(rejection) => (
+            rejection
+                .random_evidence
+                .iter()
+                .map(gameplay_random_evidence)
+                .collect(),
+            Vec::new(),
+        ),
+    };
+    GameplayReplayEntryDto {
+        sequence: index + 1,
+        operation: match &entry.operation {
+            RpgReplayOperation::Submit { command } => {
+                format!(
+                    "submit {} by {} → {} at revision {}",
+                    command.intent.action_id,
+                    command.intent.actor_id,
+                    command.intent.target_ids.join(", "),
+                    command.expected_revision
+                )
+            }
+            RpgReplayOperation::React { command } => {
+                format!(
+                    "react {} with {} at revision {}",
+                    command.reaction_id,
+                    command.option_id.as_deref().unwrap_or("decline"),
+                    command.expected_revision
+                )
+            }
+        },
+        outcome: match &entry.outcome {
+            RpgCommandOutcome::Accepted(_) => "accepted",
+            RpgCommandOutcome::AwaitingReaction(_) => "awaitingReaction",
+            RpgCommandOutcome::Rejected(_) => "rejected",
+        }
+        .to_owned(),
+        before: gameplay_replay_boundary(&entry.before),
+        after: gameplay_replay_boundary(&entry.after),
+        random_evidence,
+        events,
+    }
+}
+
+fn gameplay_replay_boundary(boundary: &RpgReplayBoundary) -> GameplayReplayBoundaryDto {
+    GameplayReplayBoundaryDto {
+        revision: boundary.revision.to_string(),
+        accepted_random_position: boundary.accepted_random_position.to_string(),
+        phase: replay_phase_label(&boundary.phase),
+        state_hash: format!(
+            "{}:{}",
+            boundary.state_hash.algorithm, boundary.state_hash.value
+        ),
+    }
+}
+
+fn checkpoint_phase_label(phase: &RpgCheckpointPhase) -> String {
+    match phase {
+        RpgCheckpointPhase::Ready => "ready".to_owned(),
+        RpgCheckpointPhase::AwaitingReaction { pending, .. } => {
+            format!("awaitingReaction {}", pending.request.reaction_id)
+        }
+    }
+}
+
+fn replay_phase_label(phase: &RpgReplayPhase) -> String {
+    match phase {
+        RpgReplayPhase::Ready => "ready".to_owned(),
+        RpgReplayPhase::AwaitingReaction { reaction_id } => {
+            format!("awaitingReaction {reaction_id}")
+        }
+    }
+}
+
+fn gameplay_random_evidence(evidence: &RpgRandomEvidence) -> String {
+    format!(
+        "{} {}d{} at {} = {}",
+        gameplay_random_request(&evidence.request).kind,
+        evidence.request.count,
+        evidence.request.sides,
+        evidence.request.path,
+        evidence
+            .values
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 fn gameplay_action(
@@ -1132,7 +1526,7 @@ fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> Gamepl
             message: format!("Awaiting reaction {}", pending.request.reaction_id),
             events: Vec::new(),
             trace: pending.trace.iter().map(gameplay_trace).collect(),
-            random_consumed: pending.random_attempted,
+            random_consumed: pending.random_attempted.to_string(),
             state_revision: dto_revision(current_revision),
             random_request: None,
         },
@@ -1150,7 +1544,7 @@ fn accepted_result(receipt: &RpgResolutionReceipt) -> GameplayResultDto {
         ),
         events: receipt.events.iter().map(gameplay_event).collect(),
         trace: receipt.trace.iter().map(gameplay_trace).collect(),
-        random_consumed: receipt.random_consumed,
+        random_consumed: receipt.random_consumed.to_string(),
         state_revision: dto_revision(receipt.state_revision),
         random_request: None,
     }
@@ -1163,7 +1557,7 @@ fn rejected_result(rejection: &RpgResolutionRejection, current_revision: u64) ->
         message: rejection.message.clone(),
         events: Vec::new(),
         trace: rejection.trace.iter().map(gameplay_trace).collect(),
-        random_consumed: rejection.random_attempted,
+        random_consumed: rejection.random_attempted.to_string(),
         state_revision: dto_revision(current_revision),
         random_request: rejection
             .random_request
@@ -1374,6 +1768,26 @@ fn host_diagnostic(code: &str, path: &str, message: &str) -> RulesetDiagnosticDt
         expected: None,
         actual: None,
     }
+}
+
+fn diagnostics_from_replay_failure(failure: RpgReplayFailure) -> Vec<RulesetDiagnosticDto> {
+    failure
+        .diagnostics
+        .into_iter()
+        .map(|diagnostic| RulesetDiagnosticDto {
+            stage: "replay".to_owned(),
+            severity: "error".to_owned(),
+            code: diagnostic.code,
+            path: diagnostic.path,
+            message: diagnostic.message,
+            package_id: None,
+            definition_id: None,
+            source: None,
+            graph_path: None,
+            expected: diagnostic.expected,
+            actual: diagnostic.actual,
+        })
+        .collect()
 }
 
 fn diagnostics_from_failure(failure: RpgCompileFailure) -> Vec<RulesetDiagnosticDto> {
@@ -1682,6 +2096,9 @@ pub fn generated_protocol() -> String {
         GameplayReactionOptionDto::decl(),
         GameplayReactionDto::decl(),
         GameplayResultDto::decl(),
+        GameplayReplayBoundaryDto::decl(),
+        GameplayReplayEntryDto::decl(),
+        GameplayArchiveDto::decl(),
         GameplaySessionDto::decl(),
         RulesetWorkspaceResponseDto::decl(),
         RulesetCompileRequestDto::decl(),
