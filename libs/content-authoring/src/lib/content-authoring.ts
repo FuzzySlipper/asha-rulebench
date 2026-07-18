@@ -444,10 +444,7 @@ function fieldManualPackage(
       module: 'packages/rulebench-field-manual.ts',
       declaration: 'arcLashStormfront',
     },
-    references: actionReferences(
-      'rulebench.arc-lash-stormfront',
-      stormDamageDefinitionId,
-    ),
+    references: [],
     presentation: { label: 'Arc Lash Stormfront' },
   });
   return defineRulesetPackage({
@@ -533,8 +530,7 @@ function actionReferences(
   const references =
     actionIdentity === 'rulebench.tactical-advance'
       ? ['catalog.modifier.exposed', 'catalog.stat.power']
-      : actionIdentity === 'rulebench.arc-lash' ||
-          actionIdentity === 'rulebench.arc-lash-stormfront'
+      : actionIdentity === 'rulebench.arc-lash'
         ? [
             stormDamageDefinitionId,
             'catalog.stat.power',
@@ -560,9 +556,7 @@ function composeFreshRuleset(
       id: 'rulebench.field-manual',
       version: fieldManualVersion,
     }),
-    add: [
-      rulesetPackageRequest({ id: 'rulebench.primitives', version: '1.0.0' }),
-    ],
+    add: [],
     overlays: overlays.map((id) =>
       rulesetPackageRequest({ id, version: fieldManualVersion }),
     ),

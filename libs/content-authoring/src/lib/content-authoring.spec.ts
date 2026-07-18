@@ -18,20 +18,33 @@ describe('fresh Rulebench ruleset package graph', () => {
 
     expect(canonicalJson(first.prepared)).toBe(canonicalJson(second.prepared));
     expect(first.prepared.exportedRoots).toEqual([
-      'catalog.damage.storm',
-      'catalog.defense.guard',
-      'catalog.modifier.exposed',
-      'catalog.resource.focus',
-      'catalog.stat.power',
       'rulebench.arc-lash',
       'rulebench.arc-lash-stormfront',
       'rulebench.tactical-advance',
       'rulebench.wardbreaker-volley',
     ]);
-    expect(first.prepared.dependencyLock).toHaveLength(7);
+    expect(first.prepared.dependencyLock).toHaveLength(6);
     expect(
       first.prepared.materializedDefinitions.map((definition) => definition.id),
-    ).toEqual(first.prepared.exportedRoots);
+    ).toEqual([
+      'catalog.damage.storm',
+      'catalog.defense.guard',
+      'catalog.modifier.exposed',
+      'catalog.resource.focus',
+      'catalog.stat.power',
+      ...first.prepared.exportedRoots,
+    ]);
+    expect(
+      first.prepared.materializedDefinitions
+        .filter((definition) => definition.visibility === 'support')
+        .map((definition) => definition.id),
+    ).toEqual([
+      'catalog.damage.storm',
+      'catalog.defense.guard',
+      'catalog.modifier.exposed',
+      'catalog.resource.focus',
+      'catalog.stat.power',
+    ]);
     expect(first.prepared.requiredOperations).toContainEqual({
       id: 'operation.openReaction',
       version: 1,
@@ -88,10 +101,10 @@ describe('fresh Rulebench ruleset package graph', () => {
       );
       expect(diagnostic?.code).toBe('RULESET_DEFINITION_REFERENCE_MISSING');
       expect(diagnostic?.packageId).toBe('rulebench.field-manual');
-      expect(diagnostic?.definitionId).toBe('rulebench.arc-lash-stormfront');
+      expect(diagnostic?.definitionId).toBe('rulebench.arc-lash');
       expect(diagnostic?.source).toEqual({
         module: 'packages/rulebench-field-manual.ts',
-        declaration: 'arcLashStormfront',
+        declaration: 'rulebench.arc-lash',
       });
     }
   });

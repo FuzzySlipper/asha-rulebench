@@ -24,11 +24,11 @@ importers:
         specifier: ~21.2.0
         version: 21.2.17(@angular/common@21.2.17(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(@angular/platform-browser@21.2.17(@angular/common@21.2.17(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2)))(rxjs@7.8.2)
       '@asha-rpg/authoring':
-        specifier: github:FuzzySlipper/asha-rpg#4f7e1124b1db3507a2b64b3ff951ec10883c63c7&path:/packages/authoring
-        version: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/authoring(@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/ir)
+        specifier: github:FuzzySlipper/asha-rpg#cf5713e532b91048b903360f14b04a20f5f3aa75&path:/packages/authoring
+        version: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/authoring(@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/ir)
       '@asha-rpg/ir':
-        specifier: github:FuzzySlipper/asha-rpg#4f7e1124b1db3507a2b64b3ff951ec10883c63c7&path:/packages/ir
-        version: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/ir
+        specifier: github:FuzzySlipper/asha-rpg#cf5713e532b91048b903360f14b04a20f5f3aa75&path:/packages/ir
+        version: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/ir
       rxjs:
         specifier: ~7.8.0
         version: 7.8.2
@@ -352,14 +352,14 @@ packages:
       '@angular/platform-browser': 21.2.17
       rxjs: ^6.5.3 || ^7.4.0
 
-  '@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/authoring':
-    resolution: {gitHosted: true, integrity: sha512-iX/69p/aZxuXSE7ztophAwi+5UJTUrK4yeQ98naJeuJYCaZLWoqcV/wZwrf8c4duNhh3wEQVCtQ8AuKCSJrWHg==, path: /packages/authoring, tarball: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7}
+  '@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/authoring':
+    resolution: {gitHosted: true, integrity: sha512-Z8/JWdgpUDGeUFKvfuGyDnmW+3YaWC2eKjLkIQ0JWHS6Di9s/PlP85qjFcl0TgHOhqin61iMOO8JqT9i36M+bg==, path: /packages/authoring, tarball: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75}
     version: 0.1.0
     peerDependencies:
       '@asha-rpg/ir': 0.1.0
 
-  '@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/ir':
-    resolution: {gitHosted: true, integrity: sha512-iX/69p/aZxuXSE7ztophAwi+5UJTUrK4yeQ98naJeuJYCaZLWoqcV/wZwrf8c4duNhh3wEQVCtQ8AuKCSJrWHg==, path: /packages/ir, tarball: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7}
+  '@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/ir':
+    resolution: {gitHosted: true, integrity: sha512-Z8/JWdgpUDGeUFKvfuGyDnmW+3YaWC2eKjLkIQ0JWHS6Di9s/PlP85qjFcl0TgHOhqin61iMOO8JqT9i36M+bg==, path: /packages/ir, tarball: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75}
     version: 0.1.0
 
   '@babel/code-frame@7.29.7':
@@ -6025,11 +6025,11 @@ snapshots:
       rxjs: 7.8.2
       tslib: 2.8.1
 
-  '@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/authoring(@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/ir)':
+  '@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/authoring(@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/ir)':
     dependencies:
-      '@asha-rpg/ir': https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/ir
+      '@asha-rpg/ir': https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/ir
 
-  '@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/4f7e1124b1db3507a2b64b3ff951ec10883c63c7#path:/packages/ir': {}
+  '@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/cf5713e532b91048b903360f14b04a20f5f3aa75#path:/packages/ir': {}
 
   '@babel/code-frame@7.29.7':
     dependencies:

@@ -37,7 +37,7 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   await expect(workspace).toContainText('Arc Lash: Stormfront');
   await expect(workspace).toContainText('Wardbreaker Volley');
   await expect(workspace).toContainText('catalog.damage.storm');
-  await expect(workspace).toContainText('7 lock edges');
+  await expect(workspace).toContainText('6 lock edges');
   await expect(workspace).toContainText('operation.damage@1');
   await expect(workspace).toContainText('capability.vitality@1');
   await expect(workspace).toContainText('operation.openReaction@1');
@@ -185,10 +185,10 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   await expect(workspace).toContainText('RULESET_DEFINITION_REFERENCE_MISSING');
   await expect(workspace).toContainText('Package: rulebench.field-manual');
   await expect(workspace).toContainText(
-    'Definition: rulebench.arc-lash-stormfront',
+    'Definition: rulebench.arc-lash',
   );
   await expect(workspace).toContainText(
-    'Source: packages/rulebench-field-manual.ts#arcLashStormfront',
+    'Source: packages/rulebench-field-manual.ts#rulebench.arc-lash',
   );
   await expect(
     workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
