@@ -17,25 +17,32 @@ Rulesets are explicit, dependency-closed artifacts compiled from one TypeScript
 manifest. Files organize authoring, manifests define packages, exported roots
 define closure, and compiled artifacts define runtime truth.
 
-Rulebench is currently intentionally empty under #5952. Do not restore named
+Rulebench starts intentionally inactive under #5952 and #5953. Do not restore named
 prototype content, implicit rulesets, ambient registration, runtime discovery,
 scenario-defined partial rulesets, hidden defaults, product-owned semantic
 state, replay compatibility, or legacy authority adapters.
 
-Fresh compiler and activation work belongs to #5953. Fresh runtime and visible
-gameplay work belongs to #5955. Until then, the honest product state is
-`No compiled ruleset active`.
+The fresh compiler and atomic activation boundary is owned by #5953. Fresh
+runtime and visible gameplay work belongs to #5955. Startup remains
+`No compiled ruleset active`; a user must explicitly compile and activate the
+closed artifact.
 
 ## Current Repository Structure
 
 ```text
 /apps/app              Angular bootstrap
-/apps/app-e2e          focused empty-state and managed-live evidence
+/apps/app-e2e          focused compiler lifecycle and managed-live evidence
 /libs/components       reusable presentation primitives
 /libs/platform         browser/host ports
-/libs/scenario-viewer  empty workspace; future compiled-artifact consumer
+/libs/content-authoring fresh immutable package/composition declarations
+/libs/protocol         Rust-generated lifecycle DTOs and strict decoder
+/libs/transport        generated-DTO-only compiler host client
+/libs/domain           pure artifact-to-inspection mapping
+/libs/store            explicit async compile/activate orchestration
+/libs/scenario-viewer  compiler and artifact inspection feature
 /libs/shell            routes and composition
 /libs/theme            approved tokens
+/rulebench-rs/hosts/ruleset-host narrow loopback compiler/activation host
 ```
 
 Every retained surface must have a concrete #5953 or #5955 consumer. Do not add
@@ -46,6 +53,10 @@ new dependencies or authority layers without the owning Den task.
 ```bash
 pnpm run verify
 pnpm run verify:change -- --profile frontend
+pnpm run verify:change -- --profile content-authoring
+pnpm run verify:change -- --profile rust-owner
+pnpm run verify:change -- --profile protocol-generated
+pnpm run verify:change -- --profile host-transport
 pnpm run verify:change -- --profile browser
 pnpm run verify:change -- --profile docs
 
@@ -54,8 +65,8 @@ BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 `verify:change` accepts only the closed current vocabulary `frontend`,
-`browser`, and `docs`. Run `pnpm run verify` when classification is
-uncertain.
+`content-authoring`, `rust-owner`, `protocol-generated`, `host-transport`,
+`browser`, and `docs`. Run `pnpm run verify` when classification is uncertain.
 
 ## Frontend Boundaries
 
@@ -73,5 +84,7 @@ gameplay semantics or mutates authoritative state.
 
 ## Non-Claims
 
-The empty boundary does not claim compilation, activation, gameplay execution,
-persistence, migration, replay compatibility, or exhaustive certification.
+The current boundary claims explicit package resolution, Rust compilation,
+closed artifact loading, inspection, and atomic activation. It does not claim
+gameplay execution, persistence, migration, replay compatibility, derivation
+or overlay execution, or exhaustive certification.

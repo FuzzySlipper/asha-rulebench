@@ -27,7 +27,14 @@
       "@asha-rulebench/platform": ["libs/platform/src/index.ts"],
       "@asha-rulebench/scenario-viewer": ["libs/scenario-viewer/src/index.ts"],
       "@asha-rulebench/shell": ["libs/shell/src/index.ts"],
-      "@asha-rulebench/theme": ["libs/theme/src/index.ts"]
+      "@asha-rulebench/theme": ["libs/theme/src/index.ts"],
+      "@asha-rulebench/protocol": ["libs/protocol/src/index.ts"],
+      "@asha-rulebench/content-authoring": [
+        "libs/content-authoring/src/index.ts"
+      ],
+      "@asha-rulebench/transport": ["libs/transport/src/index.ts"],
+      "@asha-rulebench/domain": ["libs/domain/src/index.ts"],
+      "@asha-rulebench/store": ["libs/store/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp", "dist", "coverage"]

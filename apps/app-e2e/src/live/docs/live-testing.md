@@ -8,9 +8,10 @@ BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 `e2e:live` is a compatibility alias for the artifact-only
-`e2e:live-artifacts` group. The current scenario inspects only the honest
-no-active-ruleset state. It does not claim compilation, activation, gameplay,
-persistence, replay, or downstream certification.
+`e2e:live-artifacts` group. The current scenario inspects the initially empty
+state, explicit Rust compilation, the closed artifact readout, and atomic
+activation. It does not claim gameplay execution, persistence, replay, or
+downstream certification.
 
 Use the printed `local:` URL for Playwright probes. Report the printed `lan:`
 URL for human inspection from another machine.

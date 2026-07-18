@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, type OnInit } from '@angular/core';
 import {
   ApplicationMenubarComponent,
   type ApplicationMenuGroup,
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
+import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 @Component({
   selector: 'arb-rulebench-workspace-feature',
@@ -30,18 +31,24 @@ import {
           var(--arb-surface);
         border: 1px solid var(--arb-border);
         display: grid;
-        gap: 0.45rem;
-        min-height: 13rem;
+        gap: 0.6rem;
+        min-height: 15rem;
         padding: clamp(1.5rem, 5vw, 4rem);
       }
 
       .eyebrow,
       h1,
-      p {
+      h2,
+      p,
+      dl,
+      dd,
+      dt,
+      ul {
         margin: 0;
       }
 
-      .eyebrow {
+      .eyebrow,
+      .section-label {
         color: var(--arb-accent-strong);
         font-size: 0.72rem;
         font-weight: 700;
@@ -50,33 +57,56 @@ import {
       }
 
       h1 {
-        font-size: clamp(2rem, 5vw, 4.5rem);
+        font-size: clamp(2.2rem, 5vw, 4.6rem);
         letter-spacing: -0.04em;
         line-height: 0.95;
-        max-width: 12ch;
+        max-width: 13ch;
       }
 
       .summary {
         color: var(--arb-muted);
-        max-width: 66ch;
+        max-width: 70ch;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 0.6rem;
+      }
+
+      button {
+        background: var(--arb-accent);
+        border: 1px solid var(--arb-accent-strong);
+        color: var(--arb-on-accent, #071b1a);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        min-height: 2.8rem;
+        padding: 0.65rem 1rem;
+      }
+
+      button.secondary {
+        background: transparent;
+        color: var(--arb-foreground);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
       }
 
       .panels {
         display: grid;
         gap: 1px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        min-height: 21rem;
       }
 
-      .state {
-        align-content: start;
+      .panel-body {
         display: grid;
         gap: 1rem;
-        padding: clamp(1.25rem, 3vw, 2.25rem);
-      }
-
-      .state strong {
-        font-size: 1.15rem;
+        overflow-wrap: anywhere;
+        padding: clamp(1rem, 2.5vw, 1.8rem);
       }
 
       .status {
@@ -93,13 +123,54 @@ import {
         width: 0.65rem;
       }
 
-      .next-boundary {
+      .status.active::before {
+        background: var(--arb-accent-strong);
+      }
+
+      .facts {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .facts > div,
+      .row-list li {
+        border-top: 1px solid var(--arb-border);
+        display: grid;
+        gap: 0.25rem;
+        padding-top: 0.7rem;
+      }
+
+      dt,
+      .muted {
+        color: var(--arb-muted);
+        font-size: 0.78rem;
+      }
+
+      dd,
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+      }
+
+      .row-list {
+        display: grid;
+        gap: 0.75rem;
+        list-style: none;
+        padding: 0;
+      }
+
+      .diagnostic {
+        border-left: 3px solid var(--arb-warning);
+        padding-left: 0.8rem;
+      }
+
+      .non-claim {
         border-left: 3px solid var(--arb-accent);
         color: var(--arb-muted);
         padding-left: 0.9rem;
       }
 
-      @media (max-width: 44rem) {
+      @media (max-width: 50rem) {
         .panels {
           grid-template-columns: 1fr;
         }
@@ -107,7 +178,7 @@ import {
     `,
   ],
   template: `
-    <main class="workspace" aria-label="Rulebench empty workspace">
+    <main class="workspace" aria-label="Rulebench ruleset workspace">
       <arb-workbench-panel
         [panelNumber]="1"
         panelTitle="Application menu"
@@ -117,56 +188,287 @@ import {
         <arb-application-menubar
           panelTools
           [groups]="menuGroups"
-          statusMessage="No compiled ruleset active"
+          [statusMessage]="
+            store.view()?.headline ?? 'Connecting to Rust compiler'
+          "
         />
       </arb-workbench-panel>
 
-      <header class="masthead">
-        <p class="eyebrow">ASHA Rulebench</p>
-        <h1>No compiled ruleset active</h1>
-        <p class="summary">
-          The legacy prototype corpus and its implicit authority paths have been
-          removed. Rulebench has no actions, scenarios, sessions, or replay
-          content to execute.
-        </p>
-      </header>
-
-      <section class="panels" aria-label="Empty ruleset state">
-        <arb-workbench-panel [panelNumber]="2" panelTitle="Ruleset status">
-          <div class="state">
-            <p class="status" role="status">
-              <strong>No compiled ruleset active</strong>
-            </p>
-            <p>
-              Execution controls remain unavailable until an explicit compiled
-              artifact is selected.
-            </p>
+      @if (store.view(); as view) {
+        <header class="masthead">
+          <p class="eyebrow">ASHA Rulebench · explicit artifact lifecycle</p>
+          <h1>{{ view.headline }}</h1>
+          <p class="summary">{{ view.summary }}</p>
+          <div class="actions" aria-label="Ruleset lifecycle controls">
+            <button
+              type="button"
+              [disabled]="store.busy()"
+              (click)="compileRuleset()"
+            >
+              Compile explicit manifest
+            </button>
+            <button
+              class="secondary"
+              type="button"
+              [disabled]="store.busy() || view.phase !== 'candidate'"
+              (click)="activateRuleset()"
+            >
+              Activate accepted artifact
+            </button>
           </div>
-        </arb-workbench-panel>
+        </header>
 
-        <arb-workbench-panel [panelNumber]="3" panelTitle="Next authority boundary">
-          <div class="state">
-            <strong>Explicit manifests only</strong>
-            <p class="next-boundary">
-              Future content enters through the package manifest and compiler
-              boundary introduced by Den task #5953. Files, imports, scenarios,
-              and startup behavior do not define an active ruleset.
-            </p>
-          </div>
-        </arb-workbench-panel>
-      </section>
+        <section class="panels" aria-label="Ruleset compiler inspection">
+          <arb-workbench-panel [panelNumber]="2" panelTitle="Lifecycle">
+            <div class="panel-body">
+              <p
+                class="status"
+                [class.active]="view.phase === 'active'"
+                role="status"
+              >
+                <strong>{{ view.statusLabel }}</strong>
+              </p>
+              <dl class="facts">
+                <div>
+                  <dt>Activation revision</dt>
+                  <dd>{{ view.activationRevision }}</dd>
+                </div>
+                <div>
+                  <dt>Active artifact</dt>
+                  <dd>{{ view.activeArtifactId ?? 'none' }}</dd>
+                </div>
+              </dl>
+              <p class="non-claim">
+                Gameplay execution unavailable. Task #5955 owns runtime sessions
+                and visible action execution.
+              </p>
+            </div>
+          </arb-workbench-panel>
+
+          @if (view.artifact; as artifact) {
+            <arb-workbench-panel
+              [panelNumber]="3"
+              panelTitle="Artifact identity"
+            >
+              <div class="panel-body">
+                <p class="section-label">Closed portable artifact</p>
+                <dl class="facts">
+                  <div>
+                    <dt>Artifact</dt>
+                    <dd>{{ artifact.artifactId }}</dd>
+                  </div>
+                  <div>
+                    <dt>Schema</dt>
+                    <dd>{{ artifact.schema }}</dd>
+                  </div>
+                  <div>
+                    <dt>Composition</dt>
+                    <dd>{{ artifact.composition }}</dd>
+                  </div>
+                  <div>
+                    <dt>Language</dt>
+                    <dd>{{ artifact.language }}</dd>
+                  </div>
+                  <div>
+                    <dt>Reserved slots</dt>
+                    <dd>{{ artifact.reservedSlots }}</dd>
+                  </div>
+                </dl>
+              </div>
+            </arb-workbench-panel>
+
+            <arb-workbench-panel
+              [panelNumber]="4"
+              panelTitle="Fingerprint planes"
+            >
+              <div class="panel-body">
+                <ul class="row-list">
+                  @for (
+                    fingerprint of artifact.fingerprints;
+                    track fingerprint.plane
+                  ) {
+                    <li>
+                      <strong>{{ fingerprint.plane }}</strong>
+                      <code>{{ fingerprint.value }}</code>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
+
+            <arb-workbench-panel
+              [panelNumber]="5"
+              panelTitle="Exact source and dependency lock"
+            >
+              <div class="panel-body">
+                <p class="section-label">
+                  {{ artifact.sources.length }} exact sources
+                </p>
+                <ul class="row-list">
+                  @for (source of artifact.sources; track source.identity) {
+                    <li>
+                      <strong>{{ source.identity }}</strong
+                      ><code>{{ source.fingerprint }}</code>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">
+                  {{ artifact.lock.length }} lock edges
+                </p>
+                <ul class="row-list">
+                  @for (
+                    entry of artifact.lock;
+                    track entry.requester + entry.importAs
+                  ) {
+                    <li>
+                      <strong>{{ entry.resolution }}</strong>
+                      <span
+                        >{{ entry.relationship }} from {{ entry.requester }} as
+                        {{ entry.importAs }}</span
+                      >
+                      <code>{{ entry.fingerprint }}</code>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
+
+            <arb-workbench-panel
+              [panelNumber]="6"
+              panelTitle="Exported-root closure"
+            >
+              <div class="panel-body">
+                <p class="section-label">Exported roots</p>
+                <ul class="row-list">
+                  @for (root of artifact.exportedRoots; track root) {
+                    <li>
+                      <strong>{{ root }}</strong>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Materialized definitions</p>
+                <ul class="row-list">
+                  @for (
+                    definition of artifact.definitions;
+                    track definition.id
+                  ) {
+                    <li>
+                      <strong>{{ definition.label }}</strong>
+                      <code>{{ definition.id }}</code>
+                      <span>{{ definition.contract }}</span>
+                      <span class="muted"
+                        >{{ definition.owner }} · {{ definition.source }}</span
+                      >
+                      <span class="muted">
+                        References:
+                        {{
+                          definition.references.length === 0
+                            ? 'none'
+                            : definition.references.join(', ')
+                        }}
+                      </span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
+
+            <arb-workbench-panel
+              [panelNumber]="7"
+              panelTitle="Requirements and relationships"
+            >
+              <div class="panel-body">
+                <p class="section-label">Rust-owned semantic requirements</p>
+                <ul class="row-list">
+                  @for (operation of artifact.operations; track operation) {
+                    <li>
+                      <strong>{{ operation }}</strong>
+                    </li>
+                  }
+                  @for (capability of artifact.capabilities; track capability) {
+                    <li>
+                      <strong>{{ capability }}</strong>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Provenance edges</p>
+                <ul class="row-list">
+                  @for (
+                    relationship of artifact.relationships;
+                    track relationship.kind + relationship.edge
+                  ) {
+                    <li>
+                      <strong>{{ relationship.kind }}</strong>
+                      <span>{{ relationship.edge }}</span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
+          } @else {
+            <arb-workbench-panel
+              [panelNumber]="3"
+              panelTitle="Compiler boundary"
+            >
+              <div class="panel-body">
+                <strong>No candidate artifact</strong>
+                <p>
+                  The host starts without runtime truth. The compile action
+                  submits the one explicit prepared composition to Rust; no
+                  directory or global registry is scanned.
+                </p>
+              </div>
+            </arb-workbench-panel>
+          }
+
+          @if (view.diagnostics.length > 0) {
+            <arb-workbench-panel [panelNumber]="8" panelTitle="Diagnostics">
+              <div class="panel-body">
+                @for (
+                  diagnostic of view.diagnostics;
+                  track diagnostic.code + diagnostic.path
+                ) {
+                  <div class="diagnostic">
+                    <strong>{{ diagnostic.code }}</strong>
+                    <p>{{ diagnostic.path }} · {{ diagnostic.message }}</p>
+                  </div>
+                }
+              </div>
+            </arb-workbench-panel>
+          }
+        </section>
+      } @else {
+        <header class="masthead">
+          <p class="eyebrow">ASHA Rulebench</p>
+          <h1>Connecting to Rust compiler</h1>
+          <p class="summary">
+            Loading the explicit ruleset lifecycle without activating content.
+          </p>
+        </header>
+      }
+
+      @if (store.state(); as state) {
+        @if (state.kind === 'error') {
+          <section class="panel-body" role="alert">
+            <strong>Compiler transport unavailable</strong>
+            <p>{{ state.message }}</p>
+          </section>
+        }
+      }
     </main>
   `,
 })
-export class RulebenchWorkspaceFeatureComponent {
+export class RulebenchWorkspaceFeatureComponent implements OnInit {
+  protected readonly store = createBrowserRulesetWorkspaceStore();
+
   protected readonly menuGroups: readonly ApplicationMenuGroup[] = [
     {
       id: 'ruleset',
       label: 'Ruleset',
       items: [
         {
-          id: 'no-active-ruleset',
-          label: 'No compiled ruleset active',
+          id: 'explicit-compiler',
+          label: 'Explicit compiler workspace',
           disabled: true,
         },
       ],
@@ -176,11 +478,23 @@ export class RulebenchWorkspaceFeatureComponent {
       label: 'Run',
       items: [
         {
-          id: 'execution-unavailable',
-          label: 'Execution unavailable',
+          id: 'gameplay-unavailable',
+          label: 'Gameplay unavailable (#5955)',
           disabled: true,
         },
       ],
     },
   ];
+
+  public ngOnInit(): void {
+    void this.store.refresh();
+  }
+
+  protected compileRuleset(): void {
+    void this.store.compile();
+  }
+
+  protected activateRuleset(): void {
+    void this.store.activate();
+  }
 }

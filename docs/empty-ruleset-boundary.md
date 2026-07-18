@@ -22,15 +22,15 @@ No compatibility shim or placeholder corpus replaces them.
 
 ## Retained surfaces and concrete consumers
 
-| Surface | Current use | Required future consumer |
-| --- | --- | --- |
-| Angular app and shell | boot the empty product | #5953 compiler/activation composition |
-| scenario-viewer feature | render no-active-ruleset state | #5953 artifact inspection; #5955 runtime workflow |
-| components | render panels and disabled honest controls | #5953 diagnostics/activation; #5955 candidates/readouts |
-| platform ports | generic browser boundary | #5953 manifest input, diagnostics copy, local selection state |
-| theme | render current product | #5953 and #5955 product presentation |
-| focused Playwright harness | verify/inspect empty state | #5953 compilation journey; #5955 gameplay journey |
-| structural and TypeScript authority guards | protect current boundaries | #5953 immutable authoring boundary |
+| Surface                                    | Current use                                | Required future consumer                                      |
+| ------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------- |
+| Angular app and shell                      | boot the empty product                     | #5953 compiler/activation composition                         |
+| scenario-viewer feature                    | render no-active-ruleset state             | #5953 artifact inspection; #5955 runtime workflow             |
+| components                                 | render panels and disabled honest controls | #5953 diagnostics/activation; #5955 candidates/readouts       |
+| platform ports                             | generic browser boundary                   | #5953 manifest input, diagnostics copy, local selection state |
+| theme                                      | render current product                     | #5953 and #5955 product presentation                          |
+| focused Playwright harness                 | verify/inspect empty state                 | #5953 compilation journey; #5955 gameplay journey             |
+| structural and TypeScript authority guards | protect current boundaries                 | #5953 immutable authoring boundary                            |
 
 ## Next authority boundary
 
@@ -39,3 +39,12 @@ exported-root closure into a closed Rust-validated artifact. It must introduce
 fresh protocol, transport, store, and host surfaces from that contract. It may
 not revive deleted catalogs, startup defaults, scenario-defined rulesets, or
 raw-IR product evaluation.
+
+## #5953 transition
+
+The retained boundary now has its first fresh consumer. `rulebench.fresh-start`
+names one base package and one contributed support package, resolves three
+exact lock edges, and closes the exported roots `rulebench.signal-flare` and
+`catalog.damage.radiant`. Rust emits and reloads the closed artifact before it
+can become a candidate. The product still starts inactive, and activation does
+not create a gameplay session or restore any deleted prototype surface.

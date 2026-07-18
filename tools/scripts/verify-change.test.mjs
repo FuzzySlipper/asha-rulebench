@@ -11,7 +11,7 @@ test('requires an explicit closed profile', () => {
     /At least one --profile is required/,
   );
   assert.throws(
-    () => parseVerifyChangeArguments(['--profile', 'rust-owner']),
+    () => parseVerifyChangeArguments(['--profile', 'retired-session-owner']),
     /Unknown verify:change profile/,
   );
 });
@@ -50,5 +50,31 @@ test('rejects arguments from retired authority profiles', () => {
         'removed-owner',
       ]),
     /Unknown verify:change argument/,
+  );
+});
+
+test('selects fresh compiler owners without restoring retired crate filters', () => {
+  const selection = parseVerifyChangeArguments([
+    '--profile',
+    'protocol-generated',
+    '--profile',
+    'host-transport',
+    '--profile',
+    'rust-owner',
+  ]);
+  assert.deepEqual(selection.profiles, [
+    'rust-owner',
+    'protocol-generated',
+    'host-transport',
+  ]);
+  assert.deepEqual(
+    buildVerifyChangePlan(selection).map((entry) => entry.id),
+    [
+      'pnpm:test:rust',
+      'pnpm:check:generated',
+      'pnpm:typecheck',
+      'pnpm:test',
+      'pnpm:ruleset:prepare',
+    ],
   );
 });

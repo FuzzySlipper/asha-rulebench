@@ -1,17 +1,17 @@
 import { expect, test } from '@playwright/test';
 
-test('boots in an honest no-active-ruleset state @gate', async ({ page }) => {
+test('compiles, inspects, and atomically activates the explicit ruleset @gate', async ({
+  page,
+}) => {
   await page.goto('/');
 
-  const workspace = page.getByLabel('Rulebench empty workspace');
+  const workspace = page.getByLabel('Rulebench ruleset workspace');
   await expect(workspace).toBeVisible();
   await expect(
     workspace.getByRole('heading', { name: 'No compiled ruleset active' }),
   ).toBeVisible();
-  await expect(workspace.getByText('No compiled ruleset active')).toHaveCount(3);
-  await expect(workspace).toContainText(
-    'Future content enters through the package manifest and compiler boundary',
-  );
+  await expect(workspace.getByText('none', { exact: true })).toBeVisible();
+  await expect(workspace).toContainText('Gameplay execution unavailable');
 
   const menubar = workspace.getByRole('menubar', {
     name: 'Rulebench application menu',
@@ -20,8 +20,37 @@ test('boots in an honest no-active-ruleset state @gate', async ({ page }) => {
   await expect(
     page
       .getByRole('menu', { name: 'Ruleset' })
-      .getByRole('menuitem', { name: 'No compiled ruleset active' }),
+      .getByRole('menuitem', { name: 'Explicit compiler workspace' }),
   ).toHaveAttribute('aria-disabled', 'true');
+
+  await workspace
+    .getByRole('button', { name: 'Compile explicit manifest' })
+    .click();
+  await expect(
+    workspace.getByRole('heading', { name: 'Compiled candidate ready' }),
+  ).toBeVisible();
+  await expect(workspace).toContainText('Rust validation accepted');
+  await expect(workspace).toContainText('rulebench.fresh-start@1.0.0:fnv1a64:');
+  await expect(workspace).toContainText('Signal Flare');
+  await expect(workspace).toContainText('rulebench.signal-flare');
+  await expect(workspace).toContainText('catalog.damage.radiant');
+  await expect(workspace).toContainText('3 lock edges');
+  await expect(workspace).toContainText('operation.damage@1');
+  await expect(workspace).toContainText('capability.vitality@1');
+  await expect(workspace).toContainText('Source');
+  await expect(workspace).toContainText('Semantic');
+  await expect(workspace).toContainText('Presentation');
+
+  await workspace
+    .getByRole('button', { name: 'Activate accepted artifact' })
+    .click();
+  await expect(
+    workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
+  ).toBeVisible();
+  await expect(workspace).toContainText('Activation revision 1');
+  await expect(
+    workspace.getByRole('button', { name: /execute|roll|resolve/i }),
+  ).toHaveCount(0);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(workspace).toBeVisible();

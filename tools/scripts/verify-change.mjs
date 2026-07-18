@@ -1,7 +1,15 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-export const profileOrder = ['frontend', 'browser', 'docs'];
+export const profileOrder = [
+  'frontend',
+  'content-authoring',
+  'rust-owner',
+  'protocol-generated',
+  'host-transport',
+  'browser',
+  'docs',
+];
 
 export function parseVerifyChangeArguments(argumentsList) {
   const profiles = [];
@@ -61,6 +69,26 @@ export function buildVerifyChangePlan(selection) {
         addScript('typecheck');
         addScript('test');
         addScript('build');
+        break;
+      case 'content-authoring':
+        addScript('check:typescript-authority');
+        addScript('ruleset:prepare');
+        addScript('typecheck');
+        addScript('test');
+        break;
+      case 'rust-owner':
+        addScript('test:rust');
+        break;
+      case 'protocol-generated':
+        addScript('check:generated');
+        addScript('typecheck');
+        addScript('test');
+        break;
+      case 'host-transport':
+        addScript('ruleset:prepare');
+        addScript('test:rust');
+        addScript('typecheck');
+        addScript('test');
         break;
       case 'browser':
         addScript('typecheck');

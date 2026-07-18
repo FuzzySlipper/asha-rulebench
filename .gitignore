@@ -7,4 +7,5 @@ tmp/
 .nx/
 playwright-report/
 test-results/
+target/
 *.tsbuildinfo

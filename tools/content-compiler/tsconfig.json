@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../tmp/content-compiler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": [
+    "../scripts/emit-prepared-ruleset.ts",
+    "../../libs/content-authoring/src/**/*.ts"
+  ],
+  "exclude": ["../../libs/content-authoring/src/**/*.spec.ts"]
+}

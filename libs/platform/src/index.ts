@@ -26,13 +26,19 @@ export interface TextFileInputPort {
   }>;
 }
 
+export interface JsonHttpPort {
+  readonly request: (method: 'GET' | 'POST', path: string) => Promise<unknown>;
+}
+
 export const browserClock: ClockPort = {
   now: () => new Date(),
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
   clearTimeout: (handle) => window.clearTimeout(handle),
 };
 
-export const memoryStorage = (initial: Readonly<Record<string, string>> = {}): KeyValueStoragePort => {
+export const memoryStorage = (
+  initial: Readonly<Record<string, string>> = {},
+): KeyValueStoragePort => {
   const values = new Map(Object.entries(initial));
   return {
     getItem: (key) => values.get(key) ?? null,
@@ -55,9 +61,20 @@ export const browserDocumentEffects = (): DocumentEffectsPort => ({
   setTitle: (title) => {
     document.title = title;
   },
-  setRootClass: (className, enabled) => document.documentElement.classList.toggle(className, enabled),
+  setRootClass: (className, enabled) =>
+    document.documentElement.classList.toggle(className, enabled),
 });
 
 export const browserTextFileInput = (): TextFileInputPort => ({
   readText: async (file) => ({ name: file.name, text: await file.text() }),
+});
+
+export const browserJsonHttp = (): JsonHttpPort => ({
+  request: async (method, path) => {
+    const response = await fetch(path, {
+      method,
+      headers: { accept: 'application/json' },
+    });
+    return response.json();
+  },
 });

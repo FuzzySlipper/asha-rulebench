@@ -5,10 +5,14 @@ const host = '0.0.0.0';
 const probeHost = '127.0.0.1';
 const port = await freePort();
 const publicUrl = `http://${probeHost}:${port}`;
-const child = spawn('pnpm', ['nx', 'serve', 'app', '--host', host, '--port', String(port)], {
-  stdio: 'inherit',
-  shell: false,
-});
+const child = spawn(
+  'pnpm',
+  ['dev', '--', '--host', host, '--port', String(port)],
+  {
+    stdio: 'inherit',
+    shell: false,
+  },
+);
 
 console.log(`BASE_URL=${publicUrl}`);
 
