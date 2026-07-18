@@ -43,6 +43,14 @@ liveScenario(
       workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
     ).toBeVisible();
     await expect(workspace).toContainText('Activation revision 1');
+    const arcLashPlan = actionCard(workspace, 'Arc Lash');
+    await expect(arcLashPlan).toContainText('always: attackCheck 1d20');
+    await expect(arcLashPlan).toContainText(
+      'if check hit and predicate true: formulaDice 2d6',
+    );
+    await expect(arcLashPlan).toContainText(
+      'if check hit and predicate false: formulaDice 1d6',
+    );
     await collector.milestone('accepted artifact atomically active', {
       screenshot: true,
       layerSnapshot: { visibleState: await workspace.innerText() },
@@ -135,5 +143,5 @@ liveScenario(
 );
 
 function actionCard(workspace: Locator, name: string) {
-  return workspace.getByText(name, { exact: true }).locator('..');
+  return workspace.locator('li.action-card').filter({ hasText: name });
 }

@@ -53,6 +53,17 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   await expect(workspace).toContainText('Activation revision 1');
   await expect(workspace).toContainText('Revision 0 · actor hero');
   await expect(workspace).toContainText('Candidates: none at this revision');
+  const arcLashPlan = actionCard(workspace, 'Arc Lash');
+  await expect(arcLashPlan).toContainText('always: attackCheck 1d20');
+  await expect(arcLashPlan).toContainText(
+    'if check hit and predicate true: formulaDice 2d6',
+  );
+  await expect(arcLashPlan).toContainText(
+    'if check hit and predicate false: formulaDice 1d6',
+  );
+  await expect(arcLashPlan).not.toContainText(
+    'attackCheck 1d20, formulaDice 2d6, formulaDice 1d6',
+  );
 
   await actionCard(workspace, 'Tactical Advance')
     .getByRole('button', { name: 'Select action' })
@@ -126,5 +137,5 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
 });
 
 function actionCard(workspace: Locator, name: string) {
-  return workspace.getByText(name, { exact: true }).locator('..');
+  return workspace.locator('li.action-card').filter({ hasText: name });
 }

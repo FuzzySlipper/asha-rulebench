@@ -6,6 +6,9 @@ import type {
   GameplayModifierDto,
   GameplayNamedValueDto,
   GameplayPreflightDto,
+  GameplayRandomPlanConditionDto,
+  GameplayRandomPlanConditionKindDto,
+  GameplayRandomPlanEntryDto,
   GameplayRandomRequestDto,
   GameplayReactionDto,
   GameplayReactionOptionDto,
@@ -137,7 +140,7 @@ function gameplayAction(value: unknown, path: string): GameplayActionDto {
       'maximumRange',
       'maximumTargets',
       'costs',
-      'randomRequests',
+      'randomPlan',
       'candidateIds',
     ],
     path,
@@ -158,11 +161,11 @@ function gameplayAction(value: unknown, path: string): GameplayActionDto {
     costs: requiredArray(record['costs'], `${path}.costs`).map((entry, index) =>
       gameplayCost(entry, `${path}.costs[${index}]`),
     ),
-    randomRequests: requiredArray(
-      record['randomRequests'],
-      `${path}.randomRequests`,
+    randomPlan: requiredArray(
+      record['randomPlan'],
+      `${path}.randomPlan`,
     ).map((entry, index) =>
-      gameplayRandomRequest(entry, `${path}.randomRequests[${index}]`),
+      gameplayRandomPlanEntry(entry, `${path}.randomPlan[${index}]`),
     ),
     candidateIds: stringArray(record['candidateIds'], `${path}.candidateIds`),
   };
@@ -189,6 +192,57 @@ function gameplayRandomRequest(
     sides: nonNegativeInteger(record['sides'], `${path}.sides`),
     path: requiredString(record['path'], `${path}.path`),
   };
+}
+
+function gameplayRandomPlanEntry(
+  value: unknown,
+  path: string,
+): GameplayRandomPlanEntryDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['request', 'conditions'], path);
+  return {
+    request: gameplayRandomRequest(record['request'], `${path}.request`),
+    conditions: requiredArray(record['conditions'], `${path}.conditions`).map(
+      (condition, index) =>
+        gameplayRandomPlanCondition(
+          condition,
+          `${path}.conditions[${index}]`,
+        ),
+    ),
+  };
+}
+
+function gameplayRandomPlanCondition(
+  value: unknown,
+  path: string,
+): GameplayRandomPlanConditionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['kind', 'path'], path);
+  return {
+    kind: randomPlanConditionKind(record['kind'], `${path}.kind`),
+    path: requiredString(record['path'], `${path}.path`),
+  };
+}
+
+function randomPlanConditionKind(
+  value: unknown,
+  path: string,
+): GameplayRandomPlanConditionKindDto {
+  const kind = requiredString(value, path);
+  switch (kind) {
+    case 'whenThen':
+    case 'whenOtherwise':
+    case 'checkHit':
+    case 'checkMiss':
+    case 'checkSaved':
+    case 'checkFailed':
+    case 'checkNoRoll':
+    case 'allPreviousTrue':
+    case 'anyPreviousFalse':
+      return kind;
+    default:
+      throw new RulesetProtocolDecodeError(path, `unknown random branch ${kind}`);
+  }
 }
 
 function gameplayPreflight(value: unknown, path: string): GameplayPreflightDto {

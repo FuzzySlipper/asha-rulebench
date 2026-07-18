@@ -338,14 +338,14 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                             : action.costs.join(', ')
                         }}
                       </span>
-                      <span>
-                        Random plan:
-                        {{
-                          action.randomPlan.length === 0
-                            ? 'none'
-                            : action.randomPlan.join(', ')
-                        }}
-                      </span>
+                      <span>Random requirements by authority branch:</span>
+                      @if (action.randomPlan.length === 0) {
+                        <span class="muted">none</span>
+                      } @else {
+                        @for (randomPath of action.randomPlan; track randomPath) {
+                          <span class="muted">{{ randomPath }}</span>
+                        }
+                      }
                       @for (
                         preflight of action.preflight;
                         track preflight.targetId

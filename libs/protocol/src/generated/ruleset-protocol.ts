@@ -26,7 +26,13 @@ export type GameplayCostDto = { resourceId: string, amount: number, };
 
 export type GameplayRandomRequestDto = { kind: string, count: number, sides: number, path: string, };
 
-export type GameplayActionDto = { id: string, name: string, sourcePath: string, team: string, maximumRange: number, maximumTargets: number, costs: Array<GameplayCostDto>, randomRequests: Array<GameplayRandomRequestDto>, candidateIds: Array<string>, };
+export type GameplayRandomPlanConditionKindDto = "whenThen" | "whenOtherwise" | "checkHit" | "checkMiss" | "checkSaved" | "checkFailed" | "checkNoRoll" | "allPreviousTrue" | "anyPreviousFalse";
+
+export type GameplayRandomPlanConditionDto = { kind: GameplayRandomPlanConditionKindDto, path: string, };
+
+export type GameplayRandomPlanEntryDto = { request: GameplayRandomRequestDto, conditions: Array<GameplayRandomPlanConditionDto>, };
+
+export type GameplayActionDto = { id: string, name: string, sourcePath: string, team: string, maximumRange: number, maximumTargets: number, costs: Array<GameplayCostDto>, randomPlan: Array<GameplayRandomPlanEntryDto>, candidateIds: Array<string>, };
 
 export type GameplayPreflightDto = { actionId: string, targetId: string, available: boolean, code: string | null, message: string, };
 

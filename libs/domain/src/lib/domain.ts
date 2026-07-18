@@ -1,4 +1,6 @@
 import type {
+  GameplayRandomPlanConditionDto,
+  GameplayRandomPlanEntryDto,
   RulesetArtifactSummaryDto,
   RulesetDiagnosticDto,
   RulesetWorkspaceResponseDto,
@@ -176,9 +178,7 @@ function gameplayView(
       source: action.sourcePath,
       candidateIds: action.candidateIds,
       costs: action.costs.map((cost) => `${cost.amount} ${cost.resourceId}`),
-      randomPlan: action.randomRequests.map(
-        (request) => `${request.kind}: ${request.count}d${request.sides}`,
-      ),
+      randomPlan: action.randomPlan.map(randomPlanLabel),
       preflight: gameplay.preflights
         .filter((preflight) => preflight.actionId === action.id)
         .map((preflight) => ({
@@ -232,6 +232,42 @@ function gameplayView(
             ),
           },
   };
+}
+
+function randomPlanLabel(entry: GameplayRandomPlanEntryDto): string {
+  const request = `${entry.request.kind} ${entry.request.count}d${entry.request.sides}`;
+  if (entry.conditions.length === 0) {
+    return `always: ${request}`;
+  }
+  const conditions = entry.conditions.map(randomConditionLabel).join(' and ');
+  return `if ${conditions}: ${request}`;
+}
+
+function randomConditionLabel(
+  condition: GameplayRandomPlanConditionDto,
+): string {
+  switch (condition.kind) {
+    case 'whenThen':
+      return 'predicate true';
+    case 'whenOtherwise':
+      return 'predicate false';
+    case 'checkHit':
+      return 'check hit';
+    case 'checkMiss':
+      return 'check miss';
+    case 'checkSaved':
+      return 'check saved';
+    case 'checkFailed':
+      return 'check failed';
+    case 'checkNoRoll':
+      return 'no-roll branch';
+    case 'allPreviousTrue':
+      return 'all prior predicates true';
+    case 'anyPreviousFalse':
+      return 'all prior predicates false';
+    default:
+      return condition.kind;
+  }
 }
 
 function artifactInspection(

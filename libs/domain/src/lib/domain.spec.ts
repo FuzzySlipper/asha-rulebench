@@ -33,7 +33,9 @@ describe('ruleset workspace view mapping', () => {
     expect(view.activeArtifactId).toBe(active.artifactId);
     expect(view.gameplayAvailable).toBe(true);
     expect(view.gameplay?.stateRevision).toBe(2);
-    expect(view.gameplay?.actions[0]?.randomPlan).toEqual(['formulaDice: 5d4']);
+    expect(view.gameplay?.actions[0]?.randomPlan).toEqual([
+      'if no-roll branch: formulaDice 5d4',
+    ]);
   });
 });
 
@@ -68,8 +70,16 @@ function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
         maximumRange: 3,
         maximumTargets: 1,
         costs: [{ resourceId: 'focus', amount: 1 }],
-        randomRequests: [
-          { kind: 'formulaDice', count: 5, sides: 4, path: '$.damage' },
+        randomPlan: [
+          {
+            request: {
+              kind: 'formulaDice',
+              count: 5,
+              sides: 4,
+              path: '$.damage',
+            },
+            conditions: [{ kind: 'checkNoRoll', path: '$.program' }],
+          },
         ],
         candidateIds: ['raider'],
       },

@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use rpg_compiler::{
     compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRpgAction,
     CompiledRulesetBundle, RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity,
-    RpgDiagnosticStage,
+    RpgDiagnosticStage, RpgRandomPlanCondition, RpgRandomPlanConditionKind, RpgRandomPlanEntry,
 };
 use rpg_core::{
     ActiveRpgModifier, GridPosition, RpgCapabilityState, RpgDomainEvent, RpgEntityState, RpgIntent,
@@ -171,6 +171,37 @@ pub struct GameplayRandomRequestDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub enum GameplayRandomPlanConditionKindDto {
+    WhenThen,
+    WhenOtherwise,
+    CheckHit,
+    CheckMiss,
+    CheckSaved,
+    CheckFailed,
+    CheckNoRoll,
+    AllPreviousTrue,
+    AnyPreviousFalse,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayRandomPlanConditionDto {
+    pub kind: GameplayRandomPlanConditionKindDto,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayRandomPlanEntryDto {
+    pub request: GameplayRandomRequestDto,
+    pub conditions: Vec<GameplayRandomPlanConditionDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct GameplayActionDto {
     pub id: String,
     pub name: String,
@@ -179,7 +210,7 @@ pub struct GameplayActionDto {
     pub maximum_range: u32,
     pub maximum_targets: u32,
     pub costs: Vec<GameplayCostDto>,
-    pub random_requests: Vec<GameplayRandomRequestDto>,
+    pub random_plan: Vec<GameplayRandomPlanEntryDto>,
     pub candidate_ids: Vec<String>,
 }
 
@@ -667,10 +698,10 @@ fn gameplay_action(
                 amount: cost.amount,
             })
             .collect(),
-        random_requests: action
-            .random_requests
+        random_plan: action
+            .random_plan
             .iter()
-            .map(gameplay_random_request)
+            .map(gameplay_random_plan_entry)
             .collect(),
         candidate_ids,
     }
@@ -810,6 +841,48 @@ fn gameplay_random_request(request: &RpgRandomRequest) -> GameplayRandomRequestD
         count: request.count,
         sides: request.sides,
         path: request.path.clone(),
+    }
+}
+
+fn gameplay_random_plan_entry(entry: &RpgRandomPlanEntry) -> GameplayRandomPlanEntryDto {
+    GameplayRandomPlanEntryDto {
+        request: gameplay_random_request(&entry.request),
+        conditions: entry
+            .conditions
+            .iter()
+            .map(gameplay_random_plan_condition)
+            .collect(),
+    }
+}
+
+fn gameplay_random_plan_condition(
+    condition: &RpgRandomPlanCondition,
+) -> GameplayRandomPlanConditionDto {
+    GameplayRandomPlanConditionDto {
+        kind: match condition.kind {
+            RpgRandomPlanConditionKind::WhenThen => GameplayRandomPlanConditionKindDto::WhenThen,
+            RpgRandomPlanConditionKind::WhenOtherwise => {
+                GameplayRandomPlanConditionKindDto::WhenOtherwise
+            }
+            RpgRandomPlanConditionKind::CheckHit => GameplayRandomPlanConditionKindDto::CheckHit,
+            RpgRandomPlanConditionKind::CheckMiss => GameplayRandomPlanConditionKindDto::CheckMiss,
+            RpgRandomPlanConditionKind::CheckSaved => {
+                GameplayRandomPlanConditionKindDto::CheckSaved
+            }
+            RpgRandomPlanConditionKind::CheckFailed => {
+                GameplayRandomPlanConditionKindDto::CheckFailed
+            }
+            RpgRandomPlanConditionKind::CheckNoRoll => {
+                GameplayRandomPlanConditionKindDto::CheckNoRoll
+            }
+            RpgRandomPlanConditionKind::AllPreviousTrue => {
+                GameplayRandomPlanConditionKindDto::AllPreviousTrue
+            }
+            RpgRandomPlanConditionKind::AnyPreviousFalse => {
+                GameplayRandomPlanConditionKindDto::AnyPreviousFalse
+            }
+        },
+        path: condition.path.clone(),
     }
 }
 
@@ -1154,6 +1227,9 @@ pub fn generated_protocol() -> String {
         RulesetArtifactSummaryDto::decl(),
         GameplayCostDto::decl(),
         GameplayRandomRequestDto::decl(),
+        GameplayRandomPlanConditionKindDto::decl(),
+        GameplayRandomPlanConditionDto::decl(),
+        GameplayRandomPlanEntryDto::decl(),
         GameplayActionDto::decl(),
         GameplayPreflightDto::decl(),
         GameplayNamedValueDto::decl(),
