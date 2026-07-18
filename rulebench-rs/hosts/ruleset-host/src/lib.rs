@@ -31,6 +31,20 @@ pub struct RulesetDiagnosticDto {
     pub code: String,
     pub path: String,
     pub message: String,
+    pub package_id: Option<String>,
+    pub definition_id: Option<String>,
+    pub source: Option<RulesetDiagnosticSourceDto>,
+    pub graph_path: Option<Vec<String>>,
+    pub expected: Option<String>,
+    pub actual: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetDiagnosticSourceDto {
+    pub module: String,
+    pub declaration: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -144,6 +158,21 @@ pub struct RulesetWorkspaceResponseDto {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
 pub struct RulesetCompileRequestDto {
+    pub source_id: RulesetSourceIdDto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum RulesetSourceIdDto {
+    Fresh,
+    MissingSupport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct PreparedRulesetCompileRequestDto {
     pub prepared_source: String,
 }
 
@@ -193,6 +222,12 @@ pub struct RulesetHost {
     slots: Mutex<ActivationSlots<CompiledRulesetBundle>>,
 }
 
+impl Default for RulesetHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RulesetHost {
     pub fn new() -> Self {
         Self {
@@ -240,6 +275,12 @@ impl RulesetHost {
                     code: "RULESET_ACTIVATION_CANDIDATE_REQUIRED".to_owned(),
                     path: "$.candidateArtifact".to_owned(),
                     message: "compile an accepted artifact before activation".to_owned(),
+                    package_id: None,
+                    definition_id: None,
+                    source: None,
+                    graph_path: None,
+                    expected: None,
+                    actual: None,
                 }],
             )
         }
@@ -256,6 +297,12 @@ fn close_portable_artifact(
             code: "RULESET_ARTIFACT_ENCODING_FAILED".to_owned(),
             path: "$".to_owned(),
             message: error.to_string(),
+            package_id: None,
+            definition_id: None,
+            source: None,
+            graph_path: None,
+            expected: None,
+            actual: None,
         }]
     })?;
     load_compiled_ruleset_artifact_json(&encoded).map_err(diagnostics_from_failure)
@@ -298,6 +345,12 @@ fn diagnostic_dto(diagnostic: RpgDiagnostic) -> RulesetDiagnosticDto {
         code: diagnostic.code,
         path: diagnostic.path,
         message: diagnostic.message,
+        package_id: None,
+        definition_id: None,
+        source: None,
+        graph_path: None,
+        expected: None,
+        actual: None,
     }
 }
 
@@ -463,6 +516,7 @@ pub fn generated_protocol() -> String {
     let declarations = [
         RulesetLifecycleStatus::decl(),
         RulesetDiagnosticDto::decl(),
+        RulesetDiagnosticSourceDto::decl(),
         RulesetIdentityDto::decl(),
         RulesetSourcePackageDto::decl(),
         RulesetLockEntryDto::decl(),
@@ -472,7 +526,9 @@ pub fn generated_protocol() -> String {
         RulesetFingerprintDto::decl(),
         RulesetArtifactSummaryDto::decl(),
         RulesetWorkspaceResponseDto::decl(),
+        RulesetSourceIdDto::decl(),
         RulesetCompileRequestDto::decl(),
+        PreparedRulesetCompileRequestDto::decl(),
     ];
     let exports = declarations
         .into_iter()

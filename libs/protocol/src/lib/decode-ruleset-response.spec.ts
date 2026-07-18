@@ -36,4 +36,31 @@ describe('ruleset protocol decoder', () => {
       }),
     ).toThrow('$.activationRevision');
   });
+
+  it('retains typed source context on compiler diagnostics', () => {
+    const response = {
+      ...emptyResponse,
+      ok: false,
+      diagnostics: [
+        {
+          stage: 'graph',
+          severity: 'error',
+          code: 'RULESET_DEFINITION_REFERENCE_MISSING',
+          path: '$.definitions[0].references[0]',
+          message: 'missing support',
+          packageId: 'rulebench.field-manual',
+          definitionId: 'rulebench.signal-flare',
+          source: {
+            module: 'packages/rulebench-field-manual.ts',
+            declaration: 'signalFlare',
+          },
+          graphPath: ['rulebench.field-manual', 'catalog.damage.missing'],
+          expected: 'exported support definition',
+          actual: 'missing',
+        },
+      ],
+    };
+
+    expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
+  });
 });

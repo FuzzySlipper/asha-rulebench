@@ -12,15 +12,16 @@ rulesets. Den task #5953 now builds on the deliberate empty boundary from #5952:
   atomically activated without introducing gameplay authority.
 
 Content enters only through the explicit manifest/compiler boundary. Each
-compile click prepares the currently selected TypeScript package graph in the
-browser and sends that prepared source through a generated request DTO. The
-current fresh composition resolves an exact package lock and exported-root
-closure; Rust derives its private normalized execution input from that one
-closed definition graph, compiles it, round-trips the portable artifact through
-the authoritative loader, and only then creates an activation candidate.
-Source directories, server startup, and import side effects never determine
-runtime meaning. A selectable invalid graph proves source diagnostics remain
-user-reachable without replacing the active artifact.
+compile click sends the explicit source selection through a generated request
+DTO. A loopback trusted-authoring gateway prepares that TypeScript package graph
+for the request and passes only its closed prepared source to Rust. The current
+fresh composition resolves an exact package lock and exported-root closure;
+Rust derives its private normalized execution input from that one closed
+definition graph, compiles it, round-trips the portable artifact through the
+authoritative loader, and only then creates an activation candidate. Source
+directories, server startup, browser execution, and import side effects never
+determine runtime meaning. A selectable invalid graph proves source diagnostics
+remain user-reachable without replacing the active artifact.
 
 ## Retained product surfaces
 

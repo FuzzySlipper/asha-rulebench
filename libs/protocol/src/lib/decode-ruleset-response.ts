@@ -2,6 +2,7 @@ import type {
   RulesetArtifactSummaryDto,
   RulesetDefinitionDto,
   RulesetDiagnosticDto,
+  RulesetDiagnosticSourceDto,
   RulesetFingerprintDto,
   RulesetIdentityDto,
   RulesetLifecycleStatus,
@@ -152,13 +153,51 @@ function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
 
 function diagnostic(value: unknown, path: string): RulesetDiagnosticDto {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['stage', 'severity', 'code', 'path', 'message'], path);
+  exactKeys(
+    record,
+    [
+      'stage',
+      'severity',
+      'code',
+      'path',
+      'message',
+      'packageId',
+      'definitionId',
+      'source',
+      'graphPath',
+      'expected',
+      'actual',
+    ],
+    path,
+  );
   return {
     stage: requiredString(record['stage'], `${path}.stage`),
     severity: requiredString(record['severity'], `${path}.severity`),
     code: requiredString(record['code'], `${path}.code`),
     path: requiredString(record['path'], `${path}.path`),
     message: requiredString(record['message'], `${path}.message`),
+    packageId: nullableString(record['packageId'], `${path}.packageId`),
+    definitionId: nullableString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    source: nullableDiagnosticSource(record['source'], `${path}.source`),
+    graphPath: nullableStringArray(record['graphPath'], `${path}.graphPath`),
+    expected: nullableString(record['expected'], `${path}.expected`),
+    actual: nullableString(record['actual'], `${path}.actual`),
+  };
+}
+
+function nullableDiagnosticSource(
+  value: unknown,
+  path: string,
+): RulesetDiagnosticSourceDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['module', 'declaration'], path);
+  return {
+    module: requiredString(record['module'], `${path}.module`),
+    declaration: requiredString(record['declaration'], `${path}.declaration`),
   };
 }
 
@@ -337,6 +376,10 @@ function stringArray(value: unknown, path: string): string[] {
   return requiredArray(value, path).map((entry, index) =>
     requiredString(entry, `${path}[${index}]`),
   );
+}
+
+function nullableStringArray(value: unknown, path: string): string[] | null {
+  return value === null ? null : stringArray(value, path);
 }
 
 function requiredString(value: unknown, path: string): string {

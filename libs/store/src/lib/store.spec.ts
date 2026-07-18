@@ -16,12 +16,18 @@ describe('ruleset workspace store', () => {
           code: 'RULESET_EXPORTED_ROOT_MISSING',
           path: '$.exportedRoots[0]',
           message: 'missing root',
+          packageId: null,
+          definitionId: null,
+          source: null,
+          graphPath: null,
+          expected: null,
+          actual: null,
         },
       ],
     };
     const store = new RulesetWorkspaceStore(transportReturning(rejected));
 
-    await store.compile(validPreparation());
+    await store.compile('fresh');
 
     expect(store.state().kind).toBe('ready');
     expect(store.view()?.phase).toBe('empty');
@@ -40,7 +46,7 @@ describe('ruleset workspace store', () => {
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
-    await store.compile(validPreparation());
+    await store.compile('fresh');
 
     const state = store.state();
     expect(state.kind).toBe('error');
@@ -61,26 +67,36 @@ describe('ruleset workspace store', () => {
       status: async () => active,
       compile: async () => {
         compileRequests += 1;
-        return emptyResponse();
+        return {
+          ...active,
+          ok: false,
+          diagnostics: [
+            {
+              stage: 'graph',
+              severity: 'error',
+              code: 'RULESET_DEFINITION_REFERENCE_MISSING',
+              path: '$.packages[rulebench.field-manual@1.0.0].definitions[0]',
+              message: 'missing support definition',
+              packageId: 'rulebench.field-manual',
+              definitionId: 'rulebench.signal-flare',
+              source: {
+                module: 'packages/rulebench-field-manual.ts',
+                declaration: 'signalFlare',
+              },
+              graphPath: null,
+              expected: null,
+              actual: null,
+            },
+          ],
+        };
       },
       activate: async () => active,
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
-    await store.compile({
-      ok: false,
-      diagnostics: [
-        {
-          stage: 'graph',
-          severity: 'error',
-          code: 'RULESET_DEFINITION_REFERENCE_MISSING',
-          path: '$.packages[rulebench.field-manual@1.0.0].definitions[0]',
-          message: 'missing support definition',
-        },
-      ],
-    });
+    await store.compile('missingSupport');
 
-    expect(compileRequests).toBe(0);
+    expect(compileRequests).toBe(1);
     expect(store.view()?.phase).toBe('active');
     expect(store.view()?.activationRevision).toBe(3);
     expect(store.view()?.activeArtifactId).toBe('artifact-active');
@@ -110,10 +126,6 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     gameplayAvailable: false,
     diagnostics: [],
   };
-}
-
-function validPreparation() {
-  return { ok: true as const, preparedSource: '{}', diagnostics: [] as const };
 }
 
 function artifactSummary(artifactId: string) {

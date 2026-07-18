@@ -20,6 +20,7 @@ import {
 } from '@asha-rpg/authoring';
 import type {
   PrepareRulesetResult,
+  RulesetCompilerDiagnostic,
   RulesetCompositionManifest,
   RulesetPackageSource,
 } from '@asha-rpg/authoring';
@@ -96,7 +97,7 @@ export function prepareFreshRulebenchRuleset(): PrepareRulesetResult {
   });
 }
 
-export type RulebenchRulesetSourceId = 'fresh' | 'missing-support';
+export type RulebenchRulesetSourceId = 'fresh' | 'missingSupport';
 
 export interface RulebenchRulesetSourceOption {
   readonly id: RulebenchRulesetSourceId;
@@ -112,7 +113,7 @@ export const RULEBENCH_RULESET_SOURCE_OPTIONS: readonly RulebenchRulesetSourceOp
       description: 'Signal Flare and its radiant support definition.',
     },
     {
-      id: 'missing-support',
+      id: 'missingSupport',
       label: 'Invalid missing support',
       description:
         'Signal Flare references a definition absent from the package graph.',
@@ -127,13 +128,7 @@ export type PreparedRulebenchRulesetSource =
     }
   | {
       readonly ok: false;
-      readonly diagnostics: readonly {
-        readonly stage: string;
-        readonly severity: 'error';
-        readonly code: string;
-        readonly path: string;
-        readonly message: string;
-      }[];
+      readonly diagnostics: readonly RulesetCompilerDiagnostic[];
     };
 
 export function prepareRulebenchRulesetSource(
@@ -155,13 +150,7 @@ export function prepareRulebenchRulesetSource(
   }
   return {
     ok: false,
-    diagnostics: result.diagnostics.map((diagnostic) => ({
-      stage: diagnostic.stage,
-      severity: diagnostic.severity,
-      code: diagnostic.code,
-      path: diagnostic.path,
-      message: diagnostic.message,
-    })),
+    diagnostics: result.diagnostics,
   };
 }
 

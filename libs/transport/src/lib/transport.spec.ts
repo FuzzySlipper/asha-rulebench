@@ -18,14 +18,14 @@ describe('ruleset transport', () => {
     };
 
     const transport = createRulesetTransport(http);
-    await transport.compile('{"compositionIdentity":{"id":"fresh"}}');
+    await transport.compile('fresh');
 
     expect(requests).toEqual([
       {
         method: 'POST',
         path: '/api/ruleset/compile',
         body: {
-          preparedSource: '{"compositionIdentity":{"id":"fresh"}}',
+          sourceId: 'fresh',
         },
       },
     ]);

@@ -9,11 +9,7 @@ import {
   type ApplicationMenuGroup,
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
-import {
-  prepareRulebenchRulesetSource,
-  RULEBENCH_RULESET_SOURCE_OPTIONS,
-  type RulebenchRulesetSourceId,
-} from '@asha-rulebench/content-authoring';
+import type { RulesetSourceIdDto } from '@asha-rulebench/protocol';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 @Component({
@@ -224,8 +220,8 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
           </div>
           <p class="summary">
             Selected source: <strong>{{ selectedSourceLabel() }}</strong
-            >. The compile click prepares this TypeScript package graph again in
-            the browser before contacting Rust.
+            >. The compile click asks the trusted authoring host to prepare this
+            TypeScript package graph again before contacting Rust.
           </p>
           <div class="actions" aria-label="Ruleset lifecycle controls">
             <button
@@ -441,10 +437,11 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
               <div class="panel-body">
                 <strong>No candidate artifact</strong>
                 <p>
-                  The host starts without runtime truth. The compile action
-                  freshly prepares the selected TypeScript package graph and
-                  submits that explicit composition to Rust; no directory or
-                  global registry is scanned.
+                  The host starts without runtime truth. The compile action asks
+                  the trusted authoring host to freshly prepare the selected
+                  TypeScript package graph, then submits that explicit
+                  composition to Rust; no directory or global registry is
+                  scanned.
                 </p>
               </div>
             </arb-workbench-panel>
@@ -460,6 +457,32 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                   <div class="diagnostic">
                     <strong>{{ diagnostic.code }}</strong>
                     <p>{{ diagnostic.path }} · {{ diagnostic.message }}</p>
+                    @if (diagnostic.packageId) {
+                      <p class="muted">Package: {{ diagnostic.packageId }}</p>
+                    }
+                    @if (diagnostic.definitionId) {
+                      <p class="muted">
+                        Definition: {{ diagnostic.definitionId }}
+                      </p>
+                    }
+                    @if (diagnostic.source) {
+                      <p class="muted">
+                        Source: {{ diagnostic.source.module }}#{{
+                          diagnostic.source.declaration
+                        }}
+                      </p>
+                    }
+                    @if (diagnostic.graphPath) {
+                      <p class="muted">
+                        Graph: {{ diagnostic.graphPath.join(' → ') }}
+                      </p>
+                    }
+                    @if (diagnostic.expected || diagnostic.actual) {
+                      <p class="muted">
+                        Expected {{ diagnostic.expected ?? 'not supplied' }} ·
+                        actual {{ diagnostic.actual ?? 'not supplied' }}
+                      </p>
+                    }
                   </div>
                 }
               </div>
@@ -489,9 +512,14 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 })
 export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly store = createBrowserRulesetWorkspaceStore();
-  protected readonly sourceOptions = RULEBENCH_RULESET_SOURCE_OPTIONS;
-  protected readonly selectedSourceId =
-    signal<RulebenchRulesetSourceId>('fresh');
+  protected readonly sourceOptions: readonly {
+    readonly id: RulesetSourceIdDto;
+    readonly label: string;
+  }[] = [
+    { id: 'fresh', label: 'Valid field manual' },
+    { id: 'missingSupport', label: 'Invalid missing support' },
+  ];
+  protected readonly selectedSourceId = signal<RulesetSourceIdDto>('fresh');
   protected readonly selectedSourceLabel = () =>
     this.sourceOptions.find((source) => source.id === this.selectedSourceId())
       ?.label ?? 'Unknown source';
@@ -526,11 +554,10 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected compileRuleset(): void {
-    const preparation = prepareRulebenchRulesetSource(this.selectedSourceId());
-    void this.store.compile(preparation);
+    void this.store.compile(this.selectedSourceId());
   }
 
-  protected selectSource(sourceId: RulebenchRulesetSourceId): void {
+  protected selectSource(sourceId: RulesetSourceIdDto): void {
     this.selectedSourceId.set(sourceId);
   }
 

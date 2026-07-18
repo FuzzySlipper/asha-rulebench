@@ -43,7 +43,7 @@ describe('fresh Rulebench ruleset package graph', () => {
 
   it('prepares the selected source on demand and exposes invalid graph diagnostics', () => {
     const accepted = prepareRulebenchRulesetSource('fresh');
-    const rejected = prepareRulebenchRulesetSource('missing-support');
+    const rejected = prepareRulebenchRulesetSource('missingSupport');
 
     expect(accepted.ok).toBe(true);
     if (accepted.ok) {
@@ -51,9 +51,16 @@ describe('fresh Rulebench ruleset package graph', () => {
     }
     expect(rejected.ok).toBe(false);
     if (!rejected.ok) {
-      expect(rejected.diagnostics[0]?.code).toBe(
+      const diagnostic = rejected.diagnostics[0];
+      expect(diagnostic?.code).toBe(
         'RULESET_DEFINITION_REFERENCE_MISSING',
       );
+      expect(diagnostic?.packageId).toBe('rulebench.field-manual');
+      expect(diagnostic?.definitionId).toBe('rulebench.signal-flare');
+      expect(diagnostic?.source).toEqual({
+        module: 'packages/rulebench-field-manual.ts',
+        declaration: 'signalFlare',
+      });
     }
   });
 });

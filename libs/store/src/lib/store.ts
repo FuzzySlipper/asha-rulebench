@@ -4,7 +4,7 @@ import {
   type RulesetWorkspaceView,
 } from '@asha-rulebench/domain';
 import { browserJsonHttp } from '@asha-rulebench/platform';
-import type { RulesetDiagnosticDto } from '@asha-rulebench/protocol';
+import type { RulesetSourceIdDto } from '@asha-rulebench/protocol';
 import {
   createRulesetTransport,
   type RulesetTransport,
@@ -18,17 +18,6 @@ export type AsyncState<Value> =
       readonly kind: 'error';
       readonly message: string;
       readonly previous: Value | null;
-    };
-
-export type RulesetSourcePreparation =
-  | {
-      readonly ok: true;
-      readonly preparedSource: string;
-      readonly diagnostics: readonly [];
-    }
-  | {
-      readonly ok: false;
-      readonly diagnostics: readonly RulesetDiagnosticDto[];
     };
 
 export class RulesetWorkspaceStore {
@@ -45,16 +34,8 @@ export class RulesetWorkspaceStore {
     await this.run(() => this.transport.status());
   }
 
-  public async compile(preparation: RulesetSourcePreparation): Promise<void> {
-    if (!preparation.ok) {
-      const previous = currentView(this.mutableState()) ?? emptyWorkspaceView();
-      this.mutableState.set({
-        kind: 'ready',
-        value: { ...previous, diagnostics: preparation.diagnostics },
-      });
-      return;
-    }
-    await this.run(() => this.transport.compile(preparation.preparedSource));
+  public async compile(sourceId: RulesetSourceIdDto): Promise<void> {
+    await this.run(() => this.transport.compile(sourceId));
   }
 
   public async activate(): Promise<void> {
@@ -95,16 +76,4 @@ function currentView(
   if (state.kind === 'ready') return state.value;
   if (state.kind === 'loading' || state.kind === 'error') return state.previous;
   return null;
-}
-
-function emptyWorkspaceView(): RulesetWorkspaceView {
-  return rulesetWorkspaceView({
-    ok: true,
-    status: 'noActiveRuleset',
-    activeArtifact: null,
-    candidateArtifact: null,
-    activationRevision: 0,
-    gameplayAvailable: false,
-    diagnostics: [],
-  });
 }

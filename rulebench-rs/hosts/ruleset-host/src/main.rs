@@ -1,7 +1,8 @@
 use std::env;
 
 use rulebench_ruleset_host::{
-    RulesetCompileRequestDto, RulesetDiagnosticDto, RulesetHost, RulesetWorkspaceResponseDto,
+    PreparedRulesetCompileRequestDto, RulesetDiagnosticDto, RulesetHost,
+    RulesetWorkspaceResponseDto,
 };
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
@@ -45,7 +46,7 @@ fn route(
             Err(diagnostic) => {
                 let mut response = host.status();
                 response.ok = false;
-                response.diagnostics = vec![diagnostic];
+                response.diagnostics = vec![*diagnostic];
                 (400, response)
             }
         },
@@ -62,6 +63,12 @@ fn route(
                 code: "RULESET_ROUTE_NOT_FOUND".to_owned(),
                 path: url.to_owned(),
                 message: format!("unsupported request {method} {url}"),
+                package_id: None,
+                definition_id: None,
+                source: None,
+                graph_path: None,
+                expected: None,
+                actual: None,
             }];
             (404, response)
         }
@@ -70,13 +77,13 @@ fn route(
 
 fn decode_compile_request(
     request: &mut Request,
-) -> Result<RulesetCompileRequestDto, RulesetDiagnosticDto> {
+) -> Result<PreparedRulesetCompileRequestDto, Box<RulesetDiagnosticDto>> {
     let mut body = String::new();
     request
         .as_reader()
         .read_to_string(&mut body)
-        .map_err(|error| request_diagnostic(error.to_string()))?;
-    serde_json::from_str(&body).map_err(|error| request_diagnostic(error.to_string()))
+        .map_err(|error| Box::new(request_diagnostic(error.to_string())))?;
+    serde_json::from_str(&body).map_err(|error| Box::new(request_diagnostic(error.to_string())))
 }
 
 fn request_diagnostic(message: String) -> RulesetDiagnosticDto {
@@ -86,6 +93,12 @@ fn request_diagnostic(message: String) -> RulesetDiagnosticDto {
         code: "RULESET_COMPILE_REQUEST_INVALID".to_owned(),
         path: "$".to_owned(),
         message,
+        package_id: None,
+        definition_id: None,
+        source: None,
+        graph_path: None,
+        expected: None,
+        actual: None,
     }
 }
 

@@ -2,7 +2,9 @@
 
 export type RulesetLifecycleStatus = "noActiveRuleset" | "compiledCandidate" | "active";
 
-export type RulesetDiagnosticDto = { stage: string, severity: string, code: string, path: string, message: string, };
+export type RulesetDiagnosticDto = { stage: string, severity: string, code: string, path: string, message: string, packageId: string | null, definitionId: string | null, source: RulesetDiagnosticSourceDto | null, graphPath: Array<string> | null, expected: string | null, actual: string | null, };
+
+export type RulesetDiagnosticSourceDto = { module: string, declaration: string, };
 
 export type RulesetIdentityDto = { id: string, version: string, };
 
@@ -22,4 +24,8 @@ export type RulesetArtifactSummaryDto = { schema: RulesetIdentityDto, artifactId
 
 export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, activationRevision: number, gameplayAvailable: boolean, diagnostics: Array<RulesetDiagnosticDto>, };
 
-export type RulesetCompileRequestDto = { preparedSource: string, };
+export type RulesetSourceIdDto = "fresh" | "missingSupport";
+
+export type RulesetCompileRequestDto = { sourceId: RulesetSourceIdDto, };
+
+export type PreparedRulesetCompileRequestDto = { preparedSource: string, };

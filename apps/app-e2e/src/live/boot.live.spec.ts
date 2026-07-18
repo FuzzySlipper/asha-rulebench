@@ -60,6 +60,11 @@ liveScenario(
     await expect(workspace).toContainText(
       'RULESET_DEFINITION_REFERENCE_MISSING',
     );
+    await expect(workspace).toContainText('Package: rulebench.field-manual');
+    await expect(workspace).toContainText('Definition: rulebench.signal-flare');
+    await expect(workspace).toContainText(
+      'Source: packages/rulebench-field-manual.ts#signalFlare',
+    );
     await expect(
       workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
     ).toBeVisible();
