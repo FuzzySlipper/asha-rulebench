@@ -9,6 +9,7 @@ import {
   type ApplicationMenuGroup,
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
+import type { GameplayActionView } from '@asha-rulebench/domain';
 import type { RulesetSourceIdDto } from '@asha-rulebench/protocol';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
@@ -176,6 +177,31 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
         padding-left: 0.9rem;
       }
 
+      .action-card {
+        border: 1px solid var(--arb-border);
+        display: grid;
+        gap: 0.65rem;
+        padding: 0.9rem;
+      }
+
+      .action-card.selected {
+        border-color: var(--arb-accent-strong);
+      }
+
+      .evidence-input {
+        background: var(--arb-bg);
+        border: 1px solid var(--arb-border);
+        color: var(--arb-foreground);
+        min-height: 2.8rem;
+        padding: 0.65rem;
+        width: 100%;
+      }
+
+      .accepted {
+        border-left: 3px solid var(--arb-accent-strong);
+        padding-left: 0.8rem;
+      }
+
       @media (max-width: 50rem) {
         .panels {
           grid-template-columns: 1fr;
@@ -262,12 +288,225 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                   <dd>{{ view.activeArtifactId ?? 'none' }}</dd>
                 </div>
               </dl>
-              <p class="non-claim">
-                Gameplay execution unavailable. Task #5955 owns runtime sessions
-                and visible action execution.
+              <p class="summary">
+                Gameplay session:
+                <strong>{{
+                  view.gameplayAvailable ? 'available' : 'inactive'
+                }}</strong>
               </p>
             </div>
           </arb-workbench-panel>
+
+          @if (view.gameplay; as gameplay) {
+            <arb-workbench-panel
+              [panelNumber]="3"
+              panelTitle="Persistent Rust authority session"
+            >
+              <div class="panel-body">
+                <p class="section-label">
+                  Revision {{ gameplay.stateRevision }} · actor
+                  {{ gameplay.actorId }} ·
+                  {{ gameplay.acceptedRandomValues }} accepted random values
+                </p>
+                <p class="summary">
+                  Select an action and a Rust-provided candidate. Random
+                  evidence is explicit comma-separated die results; Rulebench
+                  does not roll or interpret the action program.
+                </p>
+                <ul class="row-list">
+                  @for (action of gameplay.actions; track action.id) {
+                    <li
+                      class="action-card"
+                      [class.selected]="selectedActionId() === action.id"
+                    >
+                      <strong>{{ action.name }}</strong>
+                      <code>{{ action.id }}</code>
+                      <span class="muted">Source: {{ action.source }}</span>
+                      <span>
+                        Candidates:
+                        {{
+                          action.candidateIds.length === 0
+                            ? 'none at this revision'
+                            : action.candidateIds.join(', ')
+                        }}
+                      </span>
+                      <span>
+                        Costs:
+                        {{
+                          action.costs.length === 0
+                            ? 'none'
+                            : action.costs.join(', ')
+                        }}
+                      </span>
+                      <span>
+                        Random plan:
+                        {{
+                          action.randomPlan.length === 0
+                            ? 'none'
+                            : action.randomPlan.join(', ')
+                        }}
+                      </span>
+                      @for (
+                        preflight of action.preflight;
+                        track preflight.targetId
+                      ) {
+                        <span class="muted">
+                          {{ preflight.targetId }} ·
+                          {{
+                            preflight.available ? 'available' : 'unavailable'
+                          }}
+                          ·
+                          {{ preflight.message }}
+                        </span>
+                      }
+                      <button
+                        class="secondary"
+                        type="button"
+                        [disabled]="store.busy()"
+                        (click)="selectAction(action.id, action.candidateIds)"
+                      >
+                        Select action
+                      </button>
+                    </li>
+                  }
+                </ul>
+
+                @if (selectedAction(); as action) {
+                  <p class="section-label">Command {{ action.name }}</p>
+                  <div class="actions" aria-label="Rust candidate selection">
+                    @for (candidate of action.candidateIds; track candidate) {
+                      <button
+                        class="secondary"
+                        type="button"
+                        [attr.aria-pressed]="selectedTargetId() === candidate"
+                        [disabled]="store.busy()"
+                        (click)="selectedTargetId.set(candidate)"
+                      >
+                        Target {{ candidate }}
+                      </button>
+                    }
+                  </div>
+                  <label for="random-evidence">Random evidence</label>
+                  <input
+                    #randomEvidenceInput
+                    id="random-evidence"
+                    class="evidence-input"
+                    [value]="randomEvidence()"
+                    placeholder="Example: 12, 3, 4"
+                    (input)="setRandomEvidence(randomEvidenceInput.value)"
+                  />
+                  @if (evidenceError(); as error) {
+                    <p class="diagnostic">{{ error }}</p>
+                  }
+                  <button
+                    type="button"
+                    [disabled]="
+                      store.busy() ||
+                      selectedTargetId() === null ||
+                      gameplay.pendingReaction !== null
+                    "
+                    (click)="executeAction()"
+                  >
+                    Submit typed intent
+                  </button>
+                }
+
+                @if (gameplay.pendingReaction; as reaction) {
+                  <div class="action-card selected" role="status">
+                    <strong>Reaction pending: {{ reaction.reactionId }}</strong>
+                    <span>
+                      {{ reaction.actionId }} against
+                      {{ reaction.targetId }} remains staged at revision
+                      {{ gameplay.stateRevision }}.
+                    </span>
+                    <div class="actions">
+                      @for (option of reaction.options; track option.id) {
+                        <button
+                          type="button"
+                          [disabled]="store.busy()"
+                          (click)="
+                            resolveReaction(reaction.reactionId, option.id)
+                          "
+                        >
+                          {{ option.label }} (reduce
+                          {{ option.damageReduction }})
+                        </button>
+                      }
+                      <button
+                        class="secondary"
+                        type="button"
+                        [disabled]="store.busy()"
+                        (click)="resolveReaction(reaction.reactionId, null)"
+                      >
+                        Decline reaction
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </arb-workbench-panel>
+
+            <arb-workbench-panel [panelNumber]="4" panelTitle="Authority state">
+              <div class="panel-body">
+                <ul class="row-list">
+                  @for (entity of gameplay.entities; track entity.id) {
+                    <li>
+                      <strong>{{ entity.id }} · {{ entity.team }}</strong>
+                      <span
+                        >Position {{ entity.position }} · vitality
+                        {{ entity.vitality }}</span
+                      >
+                      <span>Stats: {{ entity.stats.join(', ') }}</span>
+                      <span>Defenses: {{ entity.defenses.join(', ') }}</span>
+                      <span>Resources: {{ entity.resources.join(', ') }}</span>
+                      <span>
+                        Modifiers:
+                        {{
+                          entity.modifiers.length === 0
+                            ? 'none'
+                            : entity.modifiers.join(', ')
+                        }}
+                      </span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
+
+            @if (gameplay.result; as result) {
+              <arb-workbench-panel
+                [panelNumber]="5"
+                panelTitle="Last authority outcome"
+              >
+                <div class="panel-body">
+                  <p class="accepted">
+                    <strong>{{ result.status }}</strong> · {{ result.message }}
+                  </p>
+                  @if (result.code) {
+                    <code>{{ result.code }}</code>
+                  }
+                  <span>Random consumed: {{ result.randomConsumed }}</span>
+                  @if (result.randomRequest) {
+                    <span>Random requested: {{ result.randomRequest }}</span>
+                  }
+                  <p class="section-label">Accepted events</p>
+                  <ul class="row-list">
+                    @for (event of result.events; track event) {
+                      <li>{{ event }}</li>
+                    }
+                  </ul>
+                  <p class="section-label">Trace</p>
+                  <ul class="row-list">
+                    @for (trace of result.trace; track trace) {
+                      <li>
+                        <code>{{ trace }}</code>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </arb-workbench-panel>
+            }
+          }
 
           @if (view.artifact; as artifact) {
             <arb-workbench-panel
@@ -520,6 +759,10 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     { id: 'missingSupport', label: 'Invalid missing support' },
   ];
   protected readonly selectedSourceId = signal<RulesetSourceIdDto>('fresh');
+  protected readonly selectedActionId = signal<string | null>(null);
+  protected readonly selectedTargetId = signal<string | null>(null);
+  protected readonly randomEvidence = signal('');
+  protected readonly evidenceError = signal<string | null>(null);
   protected readonly selectedSourceLabel = () =>
     this.sourceOptions.find((source) => source.id === this.selectedSourceId())
       ?.label ?? 'Unknown source';
@@ -541,8 +784,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       label: 'Run',
       items: [
         {
-          id: 'gameplay-unavailable',
-          label: 'Gameplay unavailable (#5955)',
+          id: 'persistent-authority',
+          label: 'Persistent authority session',
           disabled: true,
         },
       ],
@@ -563,5 +806,79 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected activateRuleset(): void {
     void this.store.activate();
+  }
+
+  protected selectedAction(): GameplayActionView | null {
+    const selected = this.selectedActionId();
+    if (selected === null) return null;
+    return (
+      this.store
+        .view()
+        ?.gameplay?.actions.find((action) => action.id === selected) ?? null
+    );
+  }
+
+  protected selectAction(
+    actionId: string,
+    candidateIds: readonly string[],
+  ): void {
+    this.selectedActionId.set(actionId);
+    this.selectedTargetId.set(candidateIds[0] ?? null);
+    this.evidenceError.set(null);
+  }
+
+  protected setRandomEvidence(value: string): void {
+    this.randomEvidence.set(value);
+    this.evidenceError.set(null);
+  }
+
+  protected executeAction(): void {
+    const gameplay = this.store.view()?.gameplay;
+    const actionId = this.selectedActionId();
+    const targetId = this.selectedTargetId();
+    const randomValues = this.parseRandomEvidence();
+    if (
+      gameplay === null ||
+      gameplay === undefined ||
+      actionId === null ||
+      targetId === null ||
+      randomValues === null
+    ) {
+      return;
+    }
+    void this.store.command({
+      expectedRevision: gameplay.stateRevision,
+      actionId,
+      actorId: gameplay.actorId,
+      targetIds: [targetId],
+      randomValues,
+    });
+  }
+
+  protected resolveReaction(reactionId: string, optionId: string | null): void {
+    const gameplay = this.store.view()?.gameplay;
+    const randomValues = this.parseRandomEvidence();
+    if (gameplay === null || gameplay === undefined || randomValues === null) {
+      return;
+    }
+    void this.store.react({
+      expectedRevision: gameplay.stateRevision,
+      reactionId,
+      optionId,
+      additionalRandomValues: randomValues,
+    });
+  }
+
+  private parseRandomEvidence(): number[] | null {
+    const source = this.randomEvidence().trim();
+    if (source.length === 0) return [];
+    const values = source.split(',').map((entry) => Number(entry.trim()));
+    if (values.some((value) => !Number.isSafeInteger(value) || value <= 0)) {
+      this.evidenceError.set(
+        'Random evidence must be comma-separated positive integers.',
+      );
+      return null;
+    }
+    return values;
   }
 }

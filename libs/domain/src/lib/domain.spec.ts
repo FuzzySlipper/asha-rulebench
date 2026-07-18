@@ -22,13 +22,18 @@ describe('ruleset workspace view mapping', () => {
     expect(view.artifact?.exportedRoots).toEqual(['rulebench.signal-flare']);
   });
 
-  it('reports active artifact identity without claiming gameplay availability', () => {
+  it('reports active artifact identity with the persistent authority view', () => {
     const active = artifact();
-    const view = rulesetWorkspaceView(response('active', active, null));
+    const activeResponse = response('active', active, null);
+    activeResponse.gameplayAvailable = true;
+    activeResponse.gameplay = gameplay();
+    const view = rulesetWorkspaceView(activeResponse);
 
     expect(view.phase).toBe('active');
     expect(view.activeArtifactId).toBe(active.artifactId);
-    expect(view.gameplayAvailable).toBe(false);
+    expect(view.gameplayAvailable).toBe(true);
+    expect(view.gameplay?.stateRevision).toBe(2);
+    expect(view.gameplay?.actions[0]?.randomPlan).toEqual(['formulaDice: 5d4']);
   });
 });
 
@@ -44,7 +49,43 @@ function response(
     candidateArtifact,
     activationRevision: status === 'active' ? 1 : 0,
     gameplayAvailable: false,
+    gameplay: null,
     diagnostics: [],
+  };
+}
+
+function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
+  return {
+    actorId: 'hero',
+    stateRevision: 2,
+    acceptedRandomValues: 3,
+    actions: [
+      {
+        id: 'rulebench.wardbreaker-volley',
+        name: 'Wardbreaker Volley',
+        sourcePath: 'packages/rulebench-field-manual.ts',
+        team: 'hostile',
+        maximumRange: 3,
+        maximumTargets: 1,
+        costs: [{ resourceId: 'focus', amount: 1 }],
+        randomRequests: [
+          { kind: 'formulaDice', count: 5, sides: 4, path: '$.damage' },
+        ],
+        candidateIds: ['raider'],
+      },
+    ],
+    preflights: [
+      {
+        actionId: 'rulebench.wardbreaker-volley',
+        targetId: 'raider',
+        available: true,
+        code: null,
+        message: 'accepted',
+      },
+    ],
+    entities: [],
+    pendingReaction: null,
+    lastResult: null,
   };
 }
 

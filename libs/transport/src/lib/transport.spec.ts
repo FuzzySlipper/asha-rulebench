@@ -40,6 +40,7 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     candidateArtifact: null,
     activationRevision: 0,
     gameplayAvailable: false,
+    gameplay: null,
     diagnostics: [],
   };
 }

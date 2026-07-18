@@ -22,10 +22,40 @@ export type RulesetFingerprintDto = { source: string, semantic: string, presenta
 
 export type RulesetArtifactSummaryDto = { schema: RulesetIdentityDto, artifactId: string, composition: RulesetIdentityDto, language: RulesetIdentityDto, sourcePackages: Array<RulesetSourcePackageDto>, dependencyLock: Array<RulesetLockEntryDto>, requiredOperations: Array<RulesetRequirementDto>, requiredCapabilities: Array<RulesetRequirementDto>, exportedRoots: Array<string>, definitions: Array<RulesetDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<RulesetRelationshipDto>, derivationSlots: number, overlaySlots: number, fingerprints: RulesetFingerprintDto, };
 
-export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, activationRevision: number, gameplayAvailable: boolean, diagnostics: Array<RulesetDiagnosticDto>, };
+export type GameplayCostDto = { resourceId: string, amount: number, };
+
+export type GameplayRandomRequestDto = { kind: string, count: number, sides: number, path: string, };
+
+export type GameplayActionDto = { id: string, name: string, sourcePath: string, team: string, maximumRange: number, maximumTargets: number, costs: Array<GameplayCostDto>, randomRequests: Array<GameplayRandomRequestDto>, candidateIds: Array<string>, };
+
+export type GameplayPreflightDto = { actionId: string, targetId: string, available: boolean, code: string | null, message: string, };
+
+export type GameplayNamedValueDto = { id: string, current: number, maximum: number | null, };
+
+export type GameplayModifierDto = { stackingGroup: string, id: string, value: number, remainingTurns: number, };
+
+export type GameplayEntityDto = { id: string, team: string, x: number, y: number, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
+
+export type GameplayEventDto = { kind: string, summary: string, };
+
+export type GameplayTraceDto = { path: string, code: string, detail: string, };
+
+export type GameplayReactionOptionDto = { id: string, label: string, damageReduction: number, };
+
+export type GameplayReactionDto = { reactionId: string, actorId: string, targetId: string, actionId: string, options: Array<GameplayReactionOptionDto>, path: string, };
+
+export type GameplayResultDto = { status: string, code: string | null, message: string, events: Array<GameplayEventDto>, trace: Array<GameplayTraceDto>, randomConsumed: number, stateRevision: number, randomRequest: GameplayRandomRequestDto | null, };
+
+export type GameplaySessionDto = { actorId: string, stateRevision: number, acceptedRandomValues: number, actions: Array<GameplayActionDto>, preflights: Array<GameplayPreflightDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, lastResult: GameplayResultDto | null, };
+
+export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, activationRevision: number, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
 
 export type RulesetSourceIdDto = "fresh" | "missingSupport";
 
 export type RulesetCompileRequestDto = { sourceId: RulesetSourceIdDto, };
 
 export type PreparedRulesetCompileRequestDto = { preparedSource: string, };
+
+export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, randomValues: Array<number>, };
+
+export type GameplayReactionRequestDto = { expectedRevision: number, reactionId: string, optionId: string | null, additionalRandomValues: Array<number>, };

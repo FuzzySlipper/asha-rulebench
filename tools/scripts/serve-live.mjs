@@ -148,7 +148,7 @@ function startAuthoringGateway(port, rustHostUrl, prepareSource) {
         const preparation = prepareSource(body.sourceId);
         if (!preparation.ok) {
           const workspace = await rustWorkspace(rustHostUrl);
-          sendJson(response, 422, {
+          sendJson(response, 200, {
             ...workspace,
             ok: false,
             diagnostics: preparation.diagnostics.map(authoringDiagnosticDto),
@@ -163,10 +163,15 @@ function startAuthoringGateway(port, rustHostUrl, prepareSource) {
         );
         return;
       }
+      const forwardedBody =
+        request.method === 'POST'
+          ? await readOptionalJsonBody(request)
+          : undefined;
       await forwardJson(
         response,
         `${rustHostUrl}${request.url ?? '/api/ruleset'}`,
         request.method === 'POST' ? 'POST' : 'GET',
+        forwardedBody,
       );
     } catch (error) {
       await respondWithGatewayDiagnostic(
@@ -263,6 +268,17 @@ function sendJson(response, status, payload) {
 }
 
 async function readJsonBody(request) {
+  const source = await readBody(request);
+  if (source.length === 0) throw new Error('request body is required');
+  return JSON.parse(source);
+}
+
+async function readOptionalJsonBody(request) {
+  const source = await readBody(request);
+  return source.length === 0 ? undefined : JSON.parse(source);
+}
+
+async function readBody(request) {
   const chunks = [];
   let length = 0;
   for await (const chunk of request) {
@@ -270,7 +286,7 @@ async function readJsonBody(request) {
     if (length > 1_048_576) throw new Error('request body exceeds 1 MiB');
     chunks.push(chunk);
   }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 async function waitForHost(url, child) {

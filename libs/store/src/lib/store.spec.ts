@@ -43,6 +43,8 @@ describe('ruleset workspace store', () => {
         throw new Error('host offline');
       },
       activate: async () => emptyResponse(),
+      command: async () => emptyResponse(),
+      react: async () => emptyResponse(),
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
@@ -91,6 +93,8 @@ describe('ruleset workspace store', () => {
         };
       },
       activate: async () => active,
+      command: async () => active,
+      react: async () => active,
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
@@ -113,6 +117,8 @@ function transportReturning(
     status: async () => response,
     compile: async () => response,
     activate: async () => response,
+    command: async () => response,
+    react: async () => response,
   };
 }
 
@@ -124,6 +130,7 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     candidateArtifact: null,
     activationRevision: 0,
     gameplayAvailable: false,
+    gameplay: null,
     diagnostics: [],
   };
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 
 test('compiles, inspects, and atomically activates the explicit ruleset @gate', async ({
   page,
@@ -11,7 +12,7 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     workspace.getByRole('heading', { name: 'No compiled ruleset active' }),
   ).toBeVisible();
   await expect(workspace.getByText('none', { exact: true })).toBeVisible();
-  await expect(workspace).toContainText('Gameplay execution unavailable');
+  await expect(workspace).toContainText('Gameplay session: inactive');
 
   const menubar = workspace.getByRole('menubar', {
     name: 'Rulebench application menu',
@@ -31,12 +32,14 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   ).toBeVisible();
   await expect(workspace).toContainText('Rust validation accepted');
   await expect(workspace).toContainText('rulebench.fresh-start@1.0.0:fnv1a64:');
-  await expect(workspace).toContainText('Signal Flare');
-  await expect(workspace).toContainText('rulebench.signal-flare');
-  await expect(workspace).toContainText('catalog.damage.radiant');
+  await expect(workspace).toContainText('Tactical Advance');
+  await expect(workspace).toContainText('Arc Lash');
+  await expect(workspace).toContainText('Wardbreaker Volley');
+  await expect(workspace).toContainText('catalog.damage.storm');
   await expect(workspace).toContainText('3 lock edges');
   await expect(workspace).toContainText('operation.damage@1');
   await expect(workspace).toContainText('capability.vitality@1');
+  await expect(workspace).toContainText('operation.openReaction@1');
   await expect(workspace).toContainText('Source');
   await expect(workspace).toContainText('Semantic');
   await expect(workspace).toContainText('Presentation');
@@ -48,6 +51,44 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
   ).toBeVisible();
   await expect(workspace).toContainText('Activation revision 1');
+  await expect(workspace).toContainText('Revision 0 · actor hero');
+  await expect(workspace).toContainText('Candidates: none at this revision');
+
+  await actionCard(workspace, 'Tactical Advance')
+    .getByRole('button', { name: 'Select action' })
+    .click();
+  await workspace.getByRole('button', { name: 'Submit typed intent' }).click();
+  await expect(workspace).toContainText('Revision 1 · actor hero');
+  await expect(workspace).toContainText('hero · ally');
+  await expect(workspace).toContainText('Position (2, 0)');
+  await expect(workspace).toContainText('exposed -2 (2 turns, guard-penalty)');
+
+  await actionCard(workspace, 'Arc Lash')
+    .getByRole('button', { name: 'Select action' })
+    .click();
+  await workspace.getByLabel('Random evidence').fill('10, 3, 4');
+  await workspace.getByRole('button', { name: 'Submit typed intent' }).click();
+  await expect(workspace).toContainText('Revision 2 · actor hero');
+  await expect(workspace).toContainText('focus 1/2');
+  await expect(workspace).toContainText('Random consumed: 3');
+  await expect(workspace).toContainText('damageApplied:');
+
+  await actionCard(workspace, 'Wardbreaker Volley')
+    .getByRole('button', { name: 'Select action' })
+    .click();
+  await workspace.getByLabel('Random evidence').fill('');
+  await workspace.getByRole('button', { name: 'Submit typed intent' }).click();
+  await expect(workspace).toContainText(
+    'Reaction pending: reaction.raise-ward',
+  );
+  await expect(workspace).toContainText('remains staged at revision 2');
+  await expect(workspace).toContainText('focus 1/2');
+  await workspace.getByLabel('Random evidence').fill('1, 2, 3, 4, 1');
+  await workspace.getByRole('button', { name: /Raise ward/ }).click();
+  await expect(workspace).toContainText('Revision 3 · actor hero');
+  await expect(workspace).toContainText('focus 0/2');
+  await expect(workspace).toContainText('Random consumed: 5');
+  await expect(workspace).toContainText('reactionResolved:');
   const activeArtifact = workspace
     .getByText('Active artifact', { exact: true })
     .locator('..')
@@ -65,19 +106,16 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     .click();
   await expect(workspace).toContainText('RULESET_DEFINITION_REFERENCE_MISSING');
   await expect(workspace).toContainText('Package: rulebench.field-manual');
-  await expect(workspace).toContainText('Definition: rulebench.signal-flare');
+  await expect(workspace).toContainText('Definition: rulebench.arc-lash');
   await expect(workspace).toContainText(
-    'Source: packages/rulebench-field-manual.ts#signalFlare',
+    'Source: packages/rulebench-field-manual.ts#rulebench.arc-lash',
   );
   await expect(
     workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
   ).toBeVisible();
   await expect(workspace).toContainText('Activation revision 1');
+  await expect(workspace).toContainText('Revision 3 · actor hero');
   await expect(activeArtifact).toHaveText(activeArtifactId);
-  await expect(
-    workspace.getByRole('button', { name: /execute|roll|resolve/i }),
-  ).toHaveCount(0);
-
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(workspace).toBeVisible();
   const dimensions = await page.evaluate(() => ({
@@ -86,3 +124,7 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   }));
   expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
 });
+
+function actionCard(workspace: Locator, name: string) {
+  return workspace.getByText(name, { exact: true }).locator('..');
+}

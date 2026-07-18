@@ -1,4 +1,17 @@
 import type {
+  GameplayActionDto,
+  GameplayCostDto,
+  GameplayEntityDto,
+  GameplayEventDto,
+  GameplayModifierDto,
+  GameplayNamedValueDto,
+  GameplayPreflightDto,
+  GameplayRandomRequestDto,
+  GameplayReactionDto,
+  GameplayReactionOptionDto,
+  GameplayResultDto,
+  GameplaySessionDto,
+  GameplayTraceDto,
   RulesetArtifactSummaryDto,
   RulesetDefinitionDto,
   RulesetDiagnosticDto,
@@ -33,6 +46,7 @@ export function decodeRulesetWorkspaceResponse(
       'candidateArtifact',
       'activationRevision',
       'gameplayAvailable',
+      'gameplay',
       'diagnostics',
     ],
     '$',
@@ -56,9 +70,318 @@ export function decodeRulesetWorkspaceResponse(
       record['gameplayAvailable'],
       '$.gameplayAvailable',
     ),
+    gameplay: nullableGameplay(record['gameplay'], '$.gameplay'),
     diagnostics: requiredArray(record['diagnostics'], '$.diagnostics').map(
       (entry, index) => diagnostic(entry, `$.diagnostics[${index}]`),
     ),
+  };
+}
+
+function nullableGameplay(
+  value: unknown,
+  path: string,
+): GameplaySessionDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'actorId',
+      'stateRevision',
+      'acceptedRandomValues',
+      'actions',
+      'preflights',
+      'entities',
+      'pendingReaction',
+      'lastResult',
+    ],
+    path,
+  );
+  return {
+    actorId: requiredString(record['actorId'], `${path}.actorId`),
+    stateRevision: nonNegativeInteger(
+      record['stateRevision'],
+      `${path}.stateRevision`,
+    ),
+    acceptedRandomValues: nonNegativeInteger(
+      record['acceptedRandomValues'],
+      `${path}.acceptedRandomValues`,
+    ),
+    actions: requiredArray(record['actions'], `${path}.actions`).map(
+      (entry, index) => gameplayAction(entry, `${path}.actions[${index}]`),
+    ),
+    preflights: requiredArray(record['preflights'], `${path}.preflights`).map(
+      (entry, index) =>
+        gameplayPreflight(entry, `${path}.preflights[${index}]`),
+    ),
+    entities: requiredArray(record['entities'], `${path}.entities`).map(
+      (entry, index) => gameplayEntity(entry, `${path}.entities[${index}]`),
+    ),
+    pendingReaction: nullableReaction(
+      record['pendingReaction'],
+      `${path}.pendingReaction`,
+    ),
+    lastResult: nullableResult(record['lastResult'], `${path}.lastResult`),
+  };
+}
+
+function gameplayAction(value: unknown, path: string): GameplayActionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'id',
+      'name',
+      'sourcePath',
+      'team',
+      'maximumRange',
+      'maximumTargets',
+      'costs',
+      'randomRequests',
+      'candidateIds',
+    ],
+    path,
+  );
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    name: requiredString(record['name'], `${path}.name`),
+    sourcePath: requiredString(record['sourcePath'], `${path}.sourcePath`),
+    team: requiredString(record['team'], `${path}.team`),
+    maximumRange: nonNegativeInteger(
+      record['maximumRange'],
+      `${path}.maximumRange`,
+    ),
+    maximumTargets: nonNegativeInteger(
+      record['maximumTargets'],
+      `${path}.maximumTargets`,
+    ),
+    costs: requiredArray(record['costs'], `${path}.costs`).map((entry, index) =>
+      gameplayCost(entry, `${path}.costs[${index}]`),
+    ),
+    randomRequests: requiredArray(
+      record['randomRequests'],
+      `${path}.randomRequests`,
+    ).map((entry, index) =>
+      gameplayRandomRequest(entry, `${path}.randomRequests[${index}]`),
+    ),
+    candidateIds: stringArray(record['candidateIds'], `${path}.candidateIds`),
+  };
+}
+
+function gameplayCost(value: unknown, path: string): GameplayCostDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['resourceId', 'amount'], path);
+  return {
+    resourceId: requiredString(record['resourceId'], `${path}.resourceId`),
+    amount: requiredInteger(record['amount'], `${path}.amount`),
+  };
+}
+
+function gameplayRandomRequest(
+  value: unknown,
+  path: string,
+): GameplayRandomRequestDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['kind', 'count', 'sides', 'path'], path);
+  return {
+    kind: requiredString(record['kind'], `${path}.kind`),
+    count: nonNegativeInteger(record['count'], `${path}.count`),
+    sides: nonNegativeInteger(record['sides'], `${path}.sides`),
+    path: requiredString(record['path'], `${path}.path`),
+  };
+}
+
+function gameplayPreflight(value: unknown, path: string): GameplayPreflightDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['actionId', 'targetId', 'available', 'code', 'message'],
+    path,
+  );
+  return {
+    actionId: requiredString(record['actionId'], `${path}.actionId`),
+    targetId: requiredString(record['targetId'], `${path}.targetId`),
+    available: requiredBoolean(record['available'], `${path}.available`),
+    code: nullableString(record['code'], `${path}.code`),
+    message: requiredString(record['message'], `${path}.message`),
+  };
+}
+
+function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'id',
+      'team',
+      'x',
+      'y',
+      'vitality',
+      'stats',
+      'defenses',
+      'resources',
+      'modifiers',
+    ],
+    path,
+  );
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    team: requiredString(record['team'], `${path}.team`),
+    x: nonNegativeInteger(record['x'], `${path}.x`),
+    y: nonNegativeInteger(record['y'], `${path}.y`),
+    vitality: gameplayNamedValue(record['vitality'], `${path}.vitality`),
+    stats: gameplayNamedValues(record['stats'], `${path}.stats`),
+    defenses: gameplayNamedValues(record['defenses'], `${path}.defenses`),
+    resources: gameplayNamedValues(record['resources'], `${path}.resources`),
+    modifiers: requiredArray(record['modifiers'], `${path}.modifiers`).map(
+      (entry, index) => gameplayModifier(entry, `${path}.modifiers[${index}]`),
+    ),
+  };
+}
+
+function gameplayNamedValues(
+  value: unknown,
+  path: string,
+): GameplayNamedValueDto[] {
+  return requiredArray(value, path).map((entry, index) =>
+    gameplayNamedValue(entry, `${path}[${index}]`),
+  );
+}
+
+function gameplayNamedValue(
+  value: unknown,
+  path: string,
+): GameplayNamedValueDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['id', 'current', 'maximum'], path);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    current: requiredInteger(record['current'], `${path}.current`),
+    maximum: nullableInteger(record['maximum'], `${path}.maximum`),
+  };
+}
+
+function gameplayModifier(value: unknown, path: string): GameplayModifierDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['stackingGroup', 'id', 'value', 'remainingTurns'], path);
+  return {
+    stackingGroup: requiredString(
+      record['stackingGroup'],
+      `${path}.stackingGroup`,
+    ),
+    id: requiredString(record['id'], `${path}.id`),
+    value: requiredInteger(record['value'], `${path}.value`),
+    remainingTurns: nonNegativeInteger(
+      record['remainingTurns'],
+      `${path}.remainingTurns`,
+    ),
+  };
+}
+
+function nullableReaction(
+  value: unknown,
+  path: string,
+): GameplayReactionDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['reactionId', 'actorId', 'targetId', 'actionId', 'options', 'path'],
+    path,
+  );
+  return {
+    reactionId: requiredString(record['reactionId'], `${path}.reactionId`),
+    actorId: requiredString(record['actorId'], `${path}.actorId`),
+    targetId: requiredString(record['targetId'], `${path}.targetId`),
+    actionId: requiredString(record['actionId'], `${path}.actionId`),
+    options: requiredArray(record['options'], `${path}.options`).map(
+      (entry, index) =>
+        gameplayReactionOption(entry, `${path}.options[${index}]`),
+    ),
+    path: requiredString(record['path'], `${path}.path`),
+  };
+}
+
+function gameplayReactionOption(
+  value: unknown,
+  path: string,
+): GameplayReactionOptionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['id', 'label', 'damageReduction'], path);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    label: requiredString(record['label'], `${path}.label`),
+    damageReduction: nonNegativeInteger(
+      record['damageReduction'],
+      `${path}.damageReduction`,
+    ),
+  };
+}
+
+function nullableResult(
+  value: unknown,
+  path: string,
+): GameplayResultDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'status',
+      'code',
+      'message',
+      'events',
+      'trace',
+      'randomConsumed',
+      'stateRevision',
+      'randomRequest',
+    ],
+    path,
+  );
+  return {
+    status: requiredString(record['status'], `${path}.status`),
+    code: nullableString(record['code'], `${path}.code`),
+    message: requiredString(record['message'], `${path}.message`),
+    events: requiredArray(record['events'], `${path}.events`).map(
+      (entry, index) => gameplayEvent(entry, `${path}.events[${index}]`),
+    ),
+    trace: requiredArray(record['trace'], `${path}.trace`).map((entry, index) =>
+      gameplayTrace(entry, `${path}.trace[${index}]`),
+    ),
+    randomConsumed: nonNegativeInteger(
+      record['randomConsumed'],
+      `${path}.randomConsumed`,
+    ),
+    stateRevision: nonNegativeInteger(
+      record['stateRevision'],
+      `${path}.stateRevision`,
+    ),
+    randomRequest:
+      record['randomRequest'] === null
+        ? null
+        : gameplayRandomRequest(
+            record['randomRequest'],
+            `${path}.randomRequest`,
+          ),
+  };
+}
+
+function gameplayEvent(value: unknown, path: string): GameplayEventDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['kind', 'summary'], path);
+  return {
+    kind: requiredString(record['kind'], `${path}.kind`),
+    summary: requiredString(record['summary'], `${path}.summary`),
+  };
+}
+
+function gameplayTrace(value: unknown, path: string): GameplayTraceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['path', 'code', 'detail'], path);
+  return {
+    path: requiredString(record['path'], `${path}.path`),
+    code: requiredString(record['code'], `${path}.code`),
+    detail: requiredString(record['detail'], `${path}.detail`),
   };
 }
 
@@ -408,6 +731,17 @@ function nonNegativeInteger(value: unknown, path: string): number {
     );
   }
   return value;
+}
+
+function requiredInteger(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+    throw new RulesetProtocolDecodeError(path, 'expected an integer');
+  }
+  return value;
+}
+
+function nullableInteger(value: unknown, path: string): number | null {
+  return value === null ? null : requiredInteger(value, path);
 }
 
 function exactKeys(

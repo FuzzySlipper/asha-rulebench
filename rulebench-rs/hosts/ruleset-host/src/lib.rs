@@ -3,12 +3,21 @@
 use std::sync::Mutex;
 
 use rpg_compiler::{
-    compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRulesetBundle,
-    RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity, RpgDiagnosticStage,
+    compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRpgAction,
+    CompiledRulesetBundle, RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity,
+    RpgDiagnosticStage,
+};
+use rpg_core::{
+    ActiveRpgModifier, GridPosition, RpgCapabilityState, RpgDomainEvent, RpgEntityState, RpgIntent,
+    RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt,
+    RpgResolutionRejection, RpgTraceStep, Team,
 };
 use rpg_ir::{
     CompiledRulesetArtifact, MaterializedRulesetDefinitionKind, MaterializedRulesetVisibility,
     RulesetDependencyRelationship, RulesetExtensionPolicy, RulesetRelationshipKind,
+};
+use rpg_runtime::{
+    RpgAuthorityCommand, RpgAuthoritySession, RpgCommandOutcome, RpgReactionCommand,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -144,6 +153,150 @@ pub struct RulesetArtifactSummaryDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct GameplayCostDto {
+    pub resource_id: String,
+    pub amount: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayRandomRequestDto {
+    pub kind: String,
+    pub count: u32,
+    pub sides: u32,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayActionDto {
+    pub id: String,
+    pub name: String,
+    pub source_path: String,
+    pub team: String,
+    pub maximum_range: u32,
+    pub maximum_targets: u32,
+    pub costs: Vec<GameplayCostDto>,
+    pub random_requests: Vec<GameplayRandomRequestDto>,
+    pub candidate_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayPreflightDto {
+    pub action_id: String,
+    pub target_id: String,
+    pub available: bool,
+    pub code: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayNamedValueDto {
+    pub id: String,
+    pub current: i32,
+    pub maximum: Option<i32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayModifierDto {
+    pub stacking_group: String,
+    pub id: String,
+    pub value: i32,
+    pub remaining_turns: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayEntityDto {
+    pub id: String,
+    pub team: String,
+    pub x: u32,
+    pub y: u32,
+    pub vitality: GameplayNamedValueDto,
+    pub stats: Vec<GameplayNamedValueDto>,
+    pub defenses: Vec<GameplayNamedValueDto>,
+    pub resources: Vec<GameplayNamedValueDto>,
+    pub modifiers: Vec<GameplayModifierDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayEventDto {
+    pub kind: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayTraceDto {
+    pub path: String,
+    pub code: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayReactionOptionDto {
+    pub id: String,
+    pub label: String,
+    pub damage_reduction: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayReactionDto {
+    pub reaction_id: String,
+    pub actor_id: String,
+    pub target_id: String,
+    pub action_id: String,
+    pub options: Vec<GameplayReactionOptionDto>,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayResultDto {
+    pub status: String,
+    pub code: Option<String>,
+    pub message: String,
+    pub events: Vec<GameplayEventDto>,
+    pub trace: Vec<GameplayTraceDto>,
+    pub random_consumed: usize,
+    pub state_revision: u32,
+    pub random_request: Option<GameplayRandomRequestDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplaySessionDto {
+    pub actor_id: String,
+    pub state_revision: u32,
+    pub accepted_random_values: usize,
+    pub actions: Vec<GameplayActionDto>,
+    pub preflights: Vec<GameplayPreflightDto>,
+    pub entities: Vec<GameplayEntityDto>,
+    pub pending_reaction: Option<GameplayReactionDto>,
+    pub last_result: Option<GameplayResultDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct RulesetWorkspaceResponseDto {
     pub ok: bool,
     pub status: RulesetLifecycleStatus,
@@ -151,6 +304,7 @@ pub struct RulesetWorkspaceResponseDto {
     pub candidate_artifact: Option<RulesetArtifactSummaryDto>,
     pub activation_revision: u32,
     pub gameplay_available: bool,
+    pub gameplay: Option<GameplaySessionDto>,
     pub diagnostics: Vec<RulesetDiagnosticDto>,
 }
 
@@ -176,25 +330,43 @@ pub struct PreparedRulesetCompileRequestDto {
     pub prepared_source: String,
 }
 
-#[derive(Debug, Clone)]
-struct ActivationSlots<Bundle> {
-    candidate: Option<Bundle>,
-    active: Option<Bundle>,
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayCommandRequestDto {
+    pub expected_revision: u32,
+    pub action_id: String,
+    pub actor_id: String,
+    pub target_ids: Vec<String>,
+    pub random_values: Vec<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayReactionRequestDto {
+    pub expected_revision: u32,
+    pub reaction_id: String,
+    pub option_id: Option<String>,
+    pub additional_random_values: Vec<u32>,
+}
+
+#[derive(Debug)]
+struct ActiveRuleset {
+    bundle: CompiledRulesetBundle,
+    session: RpgAuthoritySession,
+    last_result: Option<GameplayResultDto>,
+}
+
+#[derive(Debug, Default)]
+struct ActivationSlots {
+    candidate: Option<CompiledRulesetBundle>,
+    active: Option<ActiveRuleset>,
     activation_revision: u32,
 }
 
-impl<Bundle> Default for ActivationSlots<Bundle> {
-    fn default() -> Self {
-        Self {
-            candidate: None,
-            active: None,
-            activation_revision: 0,
-        }
-    }
-}
-
-impl<Bundle> ActivationSlots<Bundle> {
-    fn stage(&mut self, candidate: Bundle) {
+impl ActivationSlots {
+    fn stage(&mut self, candidate: CompiledRulesetBundle) {
         self.candidate = Some(candidate);
     }
 
@@ -202,7 +374,13 @@ impl<Bundle> ActivationSlots<Bundle> {
         let Some(candidate) = self.candidate.take() else {
             return false;
         };
-        self.active = Some(candidate);
+        let session =
+            RpgAuthoritySession::new(candidate.ruleset().clone(), initial_gameplay_state());
+        self.active = Some(ActiveRuleset {
+            bundle: candidate,
+            session,
+            last_result: None,
+        });
         self.activation_revision += 1;
         true
     }
@@ -219,7 +397,7 @@ impl<Bundle> ActivationSlots<Bundle> {
 }
 
 pub struct RulesetHost {
-    slots: Mutex<ActivationSlots<CompiledRulesetBundle>>,
+    slots: Mutex<ActivationSlots>,
 }
 
 impl Default for RulesetHost {
@@ -285,6 +463,69 @@ impl RulesetHost {
             )
         }
     }
+
+    pub fn execute_command(
+        &self,
+        request: GameplayCommandRequestDto,
+    ) -> RulesetWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = &mut slots.active else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic(
+                    "RPG_SESSION_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.activeArtifact",
+                    "activate a compiled artifact before submitting gameplay",
+                )],
+            );
+        };
+        let outcome = active.session.submit(RpgAuthorityCommand {
+            expected_revision: u64::from(request.expected_revision),
+            intent: RpgIntent {
+                action_id: request.action_id,
+                actor_id: request.actor_id,
+                target_ids: request.target_ids,
+            },
+            random_values: request.random_values,
+        });
+        active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
+        response_from_slots(
+            !matches!(outcome, RpgCommandOutcome::Rejected(_)),
+            &slots,
+            Vec::new(),
+        )
+    }
+
+    pub fn resolve_reaction(
+        &self,
+        request: GameplayReactionRequestDto,
+    ) -> RulesetWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = &mut slots.active else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic(
+                    "RPG_SESSION_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.activeArtifact",
+                    "activate a compiled artifact before resolving a reaction",
+                )],
+            );
+        };
+        let outcome = active.session.react(RpgReactionCommand {
+            expected_revision: u64::from(request.expected_revision),
+            reaction_id: request.reaction_id,
+            option_id: request.option_id,
+            additional_random_values: request.additional_random_values,
+        });
+        active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
+        response_from_slots(
+            !matches!(outcome, RpgCommandOutcome::Rejected(_)),
+            &slots,
+            Vec::new(),
+        )
+    }
 }
 
 fn close_portable_artifact(
@@ -310,7 +551,7 @@ fn close_portable_artifact(
 
 fn response_from_slots(
     ok: bool,
-    slots: &ActivationSlots<CompiledRulesetBundle>,
+    slots: &ActivationSlots,
     diagnostics: Vec<RulesetDiagnosticDto>,
 ) -> RulesetWorkspaceResponseDto {
     RulesetWorkspaceResponseDto {
@@ -319,14 +560,400 @@ fn response_from_slots(
         active_artifact: slots
             .active
             .as_ref()
-            .map(|bundle| artifact_summary(bundle.artifact())),
+            .map(|active| artifact_summary(active.bundle.artifact())),
         candidate_artifact: slots
             .candidate
             .as_ref()
             .map(|bundle| artifact_summary(bundle.artifact())),
         activation_revision: slots.activation_revision,
-        gameplay_available: false,
+        gameplay_available: slots.active.is_some(),
+        gameplay: slots.active.as_ref().map(gameplay_session),
         diagnostics,
+    }
+}
+
+fn initial_gameplay_state() -> RpgCapabilityState {
+    let hero = RpgEntityState::new("hero", Team::Ally, GridPosition { x: 0, y: 0 }, 28)
+        .with_stat("power", 3)
+        .with_defense("guard", 13)
+        .with_resource("focus", 2, 2);
+    let raider = RpgEntityState::new("raider", Team::Enemy, GridPosition { x: 4, y: 0 }, 36)
+        .with_stat("power", 2)
+        .with_defense("guard", 12)
+        .with_resource("focus", 2, 2);
+    let mut state = RpgCapabilityState::default();
+    state.insert_entity(hero);
+    state.insert_entity(raider);
+    state
+}
+
+fn gameplay_session(active: &ActiveRuleset) -> GameplaySessionDto {
+    let actor_id = "hero";
+    let state = active.session.state();
+    let actions = active
+        .session
+        .ruleset()
+        .actions()
+        .map(|action| gameplay_action(&active.session, actor_id, action))
+        .collect();
+    let mut preflights = Vec::new();
+    for action in active.session.ruleset().actions() {
+        for target in state.entities().filter(|entity| entity.id() != actor_id) {
+            let intent = RpgIntent {
+                action_id: action.id.clone(),
+                actor_id: actor_id.to_owned(),
+                target_ids: vec![target.id().to_owned()],
+            };
+            let result = active.session.ruleset().preflight(state, &intent);
+            preflights.push(match result {
+                Ok(()) => GameplayPreflightDto {
+                    action_id: action.id.clone(),
+                    target_id: target.id().to_owned(),
+                    available: true,
+                    code: None,
+                    message: "Rust authority accepts this intent at the active revision".to_owned(),
+                },
+                Err(rejection) => GameplayPreflightDto {
+                    action_id: action.id.clone(),
+                    target_id: target.id().to_owned(),
+                    available: false,
+                    code: Some(rejection.code),
+                    message: rejection.message,
+                },
+            });
+        }
+    }
+    GameplaySessionDto {
+        actor_id: actor_id.to_owned(),
+        state_revision: dto_revision(state.revision()),
+        accepted_random_values: active.session.accepted_random_values(),
+        actions,
+        preflights,
+        entities: state.entities().map(gameplay_entity).collect(),
+        pending_reaction: active
+            .session
+            .pending_reaction()
+            .map(|pending| gameplay_reaction(&pending.request)),
+        last_result: active.last_result.clone(),
+    }
+}
+
+fn gameplay_action(
+    session: &RpgAuthoritySession,
+    actor_id: &str,
+    action: CompiledRpgAction,
+) -> GameplayActionDto {
+    let candidate_ids = session
+        .ruleset()
+        .candidate_ids(session.state(), actor_id, &action.id)
+        .unwrap_or_default();
+    GameplayActionDto {
+        id: action.id,
+        name: action.name,
+        source_path: action.source_path,
+        team: match action.targets.team {
+            rpg_ir::RpgIrTeamConstraint::Hostile => "hostile",
+            rpg_ir::RpgIrTeamConstraint::Ally => "ally",
+            rpg_ir::RpgIrTeamConstraint::Any => "any",
+        }
+        .to_owned(),
+        maximum_range: action.targets.maximum_range,
+        maximum_targets: action.targets.maximum_targets,
+        costs: action
+            .costs
+            .into_iter()
+            .map(|cost| GameplayCostDto {
+                resource_id: cost.resource_id,
+                amount: cost.amount,
+            })
+            .collect(),
+        random_requests: action
+            .random_requests
+            .iter()
+            .map(gameplay_random_request)
+            .collect(),
+        candidate_ids,
+    }
+}
+
+fn gameplay_entity(entity: &RpgEntityState) -> GameplayEntityDto {
+    GameplayEntityDto {
+        id: entity.id().to_owned(),
+        team: match entity.team() {
+            Team::Ally => "ally",
+            Team::Enemy => "enemy",
+        }
+        .to_owned(),
+        x: entity.position().x,
+        y: entity.position().y,
+        vitality: GameplayNamedValueDto {
+            id: "vitality".to_owned(),
+            current: entity.vitality().current,
+            maximum: Some(entity.vitality().max),
+        },
+        stats: entity
+            .stats()
+            .map(|(id, value)| named_value(id, value, None))
+            .collect(),
+        defenses: entity
+            .defenses()
+            .map(|(id, value)| named_value(id, value, None))
+            .collect(),
+        resources: entity
+            .resources()
+            .map(|(id, value)| named_value(id, value.current, Some(value.max)))
+            .collect(),
+        modifiers: entity
+            .modifiers()
+            .map(|(group, modifier)| gameplay_modifier(group, modifier))
+            .collect(),
+    }
+}
+
+fn named_value(id: &str, current: i32, maximum: Option<i32>) -> GameplayNamedValueDto {
+    GameplayNamedValueDto {
+        id: id.to_owned(),
+        current,
+        maximum,
+    }
+}
+
+fn gameplay_modifier(group: &str, modifier: &ActiveRpgModifier) -> GameplayModifierDto {
+    GameplayModifierDto {
+        stacking_group: group.to_owned(),
+        id: modifier.id().to_owned(),
+        value: modifier.value(),
+        remaining_turns: modifier.remaining_turns(),
+    }
+}
+
+fn gameplay_reaction(request: &RpgReactionRequest) -> GameplayReactionDto {
+    GameplayReactionDto {
+        reaction_id: request.reaction_id.clone(),
+        actor_id: request.actor_id.clone(),
+        target_id: request.target_id.clone(),
+        action_id: request.action_id.clone(),
+        options: request
+            .options
+            .iter()
+            .map(|option| GameplayReactionOptionDto {
+                id: option.id.clone(),
+                label: option.label.clone(),
+                damage_reduction: option.damage_reduction,
+            })
+            .collect(),
+        path: request.path.clone(),
+    }
+}
+
+fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> GameplayResultDto {
+    match outcome {
+        RpgCommandOutcome::Accepted(receipt) => accepted_result(receipt),
+        RpgCommandOutcome::AwaitingReaction(pending) => GameplayResultDto {
+            status: "awaitingReaction".to_owned(),
+            code: None,
+            message: format!("Awaiting reaction {}", pending.request.reaction_id),
+            events: Vec::new(),
+            trace: pending.trace.iter().map(gameplay_trace).collect(),
+            random_consumed: pending.random_attempted,
+            state_revision: dto_revision(current_revision),
+            random_request: None,
+        },
+        RpgCommandOutcome::Rejected(rejection) => rejected_result(rejection, current_revision),
+    }
+}
+
+fn accepted_result(receipt: &RpgResolutionReceipt) -> GameplayResultDto {
+    GameplayResultDto {
+        status: "accepted".to_owned(),
+        code: None,
+        message: format!(
+            "Accepted {} at state revision {}",
+            receipt.action_id, receipt.state_revision
+        ),
+        events: receipt.events.iter().map(gameplay_event).collect(),
+        trace: receipt.trace.iter().map(gameplay_trace).collect(),
+        random_consumed: receipt.random_consumed,
+        state_revision: dto_revision(receipt.state_revision),
+        random_request: None,
+    }
+}
+
+fn rejected_result(rejection: &RpgResolutionRejection, current_revision: u64) -> GameplayResultDto {
+    GameplayResultDto {
+        status: "rejected".to_owned(),
+        code: Some(rejection.code.clone()),
+        message: rejection.message.clone(),
+        events: Vec::new(),
+        trace: rejection.trace.iter().map(gameplay_trace).collect(),
+        random_consumed: rejection.random_attempted,
+        state_revision: dto_revision(current_revision),
+        random_request: rejection
+            .random_request
+            .as_deref()
+            .map(gameplay_random_request),
+    }
+}
+
+fn dto_revision(revision: u64) -> u32 {
+    u32::try_from(revision).unwrap_or(u32::MAX)
+}
+
+fn gameplay_random_request(request: &RpgRandomRequest) -> GameplayRandomRequestDto {
+    GameplayRandomRequestDto {
+        kind: match request.kind {
+            RpgRandomRequestKind::AttackCheck => "attackCheck",
+            RpgRandomRequestKind::SavingThrowCheck => "savingThrowCheck",
+            RpgRandomRequestKind::FormulaDice => "formulaDice",
+        }
+        .to_owned(),
+        count: request.count,
+        sides: request.sides,
+        path: request.path.clone(),
+    }
+}
+
+fn gameplay_trace(trace: &RpgTraceStep) -> GameplayTraceDto {
+    GameplayTraceDto {
+        path: trace.path.clone(),
+        code: trace.code.clone(),
+        detail: trace.detail.clone(),
+    }
+}
+
+fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
+    let (kind, summary) = match event {
+        RpgDomainEvent::ResourceSpent {
+            entity_id,
+            resource_id,
+            amount,
+            remaining,
+        } => (
+            "resourceSpent",
+            format!("{entity_id} spent {amount} {resource_id}; {remaining} remains"),
+        ),
+        RpgDomainEvent::AttackResolved {
+            actor_id,
+            target_id,
+            roll,
+            total,
+            defense_id,
+            defense,
+            hit,
+        } => (
+            "attackResolved",
+            format!(
+                "{actor_id} rolled {roll} for {total} against {target_id} {defense_id} {defense}; hit={hit}"
+            ),
+        ),
+        RpgDomainEvent::SavingThrowResolved {
+            target_id,
+            roll,
+            total,
+            difficulty,
+            saved,
+        } => (
+            "savingThrowResolved",
+            format!(
+                "{target_id} rolled {roll} for {total} against {difficulty}; saved={saved}"
+            ),
+        ),
+        RpgDomainEvent::DamageApplied {
+            source_id,
+            target_id,
+            amount,
+            damage_type,
+            remaining_vitality,
+        } => (
+            "damageApplied",
+            format!(
+                "{source_id} dealt {amount} {damage_type} to {target_id}; vitality {remaining_vitality}"
+            ),
+        ),
+        RpgDomainEvent::HealingApplied {
+            source_id,
+            target_id,
+            amount,
+            current_vitality,
+        } => (
+            "healingApplied",
+            format!(
+                "{source_id} healed {target_id} for {amount}; vitality {current_vitality}"
+            ),
+        ),
+        RpgDomainEvent::ResourceChanged {
+            entity_id,
+            resource_id,
+            delta,
+            current,
+        } => (
+            "resourceChanged",
+            format!("{entity_id} changed {resource_id} by {delta}; current {current}"),
+        ),
+        RpgDomainEvent::ModifierApplied {
+            target_id,
+            modifier_id,
+            value,
+            remaining_turns,
+            ..
+        } => (
+            "modifierApplied",
+            format!(
+                "{target_id} gained {modifier_id} {value} for {remaining_turns} turn(s)"
+            ),
+        ),
+        RpgDomainEvent::PositionChanged {
+            entity_id,
+            previous,
+            current,
+            provokes,
+            ..
+        } => (
+            "positionChanged",
+            format!(
+                "{entity_id} moved ({},{}) to ({},{}); provokes={provokes}",
+                previous.x, previous.y, current.x, current.y
+            ),
+        ),
+        RpgDomainEvent::ReactionOpened {
+            reaction_id,
+            target_id,
+            ..
+        } => (
+            "reactionOpened",
+            format!("opened {reaction_id} for {target_id}"),
+        ),
+        RpgDomainEvent::ReactionResolved {
+            reaction_id,
+            option_id,
+            damage_reduction,
+        } => (
+            "reactionResolved",
+            format!(
+                "resolved {reaction_id} with {}; damage reduction {damage_reduction}",
+                option_id.as_deref().unwrap_or("decline")
+            ),
+        ),
+    };
+    GameplayEventDto {
+        kind: kind.to_owned(),
+        summary,
+    }
+}
+
+fn host_diagnostic(code: &str, path: &str, message: &str) -> RulesetDiagnosticDto {
+    RulesetDiagnosticDto {
+        stage: "gameplay".to_owned(),
+        severity: "error".to_owned(),
+        code: code.to_owned(),
+        path: path.to_owned(),
+        message: message.to_owned(),
+        package_id: None,
+        definition_id: None,
+        source: None,
+        graph_path: None,
+        expected: None,
+        actual: None,
     }
 }
 
@@ -525,10 +1152,25 @@ pub fn generated_protocol() -> String {
         RulesetRelationshipDto::decl(),
         RulesetFingerprintDto::decl(),
         RulesetArtifactSummaryDto::decl(),
+        GameplayCostDto::decl(),
+        GameplayRandomRequestDto::decl(),
+        GameplayActionDto::decl(),
+        GameplayPreflightDto::decl(),
+        GameplayNamedValueDto::decl(),
+        GameplayModifierDto::decl(),
+        GameplayEntityDto::decl(),
+        GameplayEventDto::decl(),
+        GameplayTraceDto::decl(),
+        GameplayReactionOptionDto::decl(),
+        GameplayReactionDto::decl(),
+        GameplayResultDto::decl(),
+        GameplaySessionDto::decl(),
         RulesetWorkspaceResponseDto::decl(),
         RulesetSourceIdDto::decl(),
         RulesetCompileRequestDto::decl(),
         PreparedRulesetCompileRequestDto::decl(),
+        GameplayCommandRequestDto::decl(),
+        GameplayReactionRequestDto::decl(),
     ];
     let exports = declarations
         .into_iter()
@@ -542,28 +1184,23 @@ pub fn generated_protocol() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{ActivationSlots, RulesetHost, RulesetLifecycleStatus};
+    use super::{initial_gameplay_state, RulesetHost, RulesetLifecycleStatus};
 
     #[test]
-    fn activation_replaces_the_whole_candidate_and_never_partial_state() {
-        let mut slots = ActivationSlots::default();
-        assert_eq!(slots.status(), RulesetLifecycleStatus::NoActiveRuleset);
-        assert!(!slots.activate());
-        assert_eq!(slots.activation_revision, 0);
-
-        slots.stage("artifact-one".to_owned());
-        assert_eq!(slots.status(), RulesetLifecycleStatus::CompiledCandidate);
-        assert!(slots.activate());
-        assert_eq!(slots.active.as_deref(), Some("artifact-one"));
-        assert_eq!(slots.candidate, None);
-        assert_eq!(slots.activation_revision, 1);
-
-        slots.stage("artifact-two".to_owned());
-        assert_eq!(slots.active.as_deref(), Some("artifact-one"));
-        assert_eq!(slots.activation_revision, 1);
-        assert!(slots.activate());
-        assert_eq!(slots.active.as_deref(), Some("artifact-two"));
-        assert_eq!(slots.activation_revision, 2);
+    fn initial_gameplay_state_is_explicit_and_inactive_until_artifact_activation() {
+        let state = initial_gameplay_state();
+        assert_eq!(state.revision(), 0);
+        assert_eq!(state.entity("hero").unwrap().position().x, 0);
+        assert_eq!(state.entity("raider").unwrap().position().x, 4);
+        assert_eq!(
+            state
+                .entity("hero")
+                .unwrap()
+                .resource("focus")
+                .unwrap()
+                .current,
+            2
+        );
     }
 
     #[test]

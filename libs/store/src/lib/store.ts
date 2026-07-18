@@ -4,7 +4,11 @@ import {
   type RulesetWorkspaceView,
 } from '@asha-rulebench/domain';
 import { browserJsonHttp } from '@asha-rulebench/platform';
-import type { RulesetSourceIdDto } from '@asha-rulebench/protocol';
+import type {
+  GameplayCommandRequestDto,
+  GameplayReactionRequestDto,
+  RulesetSourceIdDto,
+} from '@asha-rulebench/protocol';
 import {
   createRulesetTransport,
   type RulesetTransport,
@@ -40,6 +44,14 @@ export class RulesetWorkspaceStore {
 
   public async activate(): Promise<void> {
     await this.run(() => this.transport.activate());
+  }
+
+  public async command(command: GameplayCommandRequestDto): Promise<void> {
+    await this.run(() => this.transport.command(command));
+  }
+
+  public async react(reaction: GameplayReactionRequestDto): Promise<void> {
+    await this.run(() => this.transport.react(reaction));
   }
 
   private async run(

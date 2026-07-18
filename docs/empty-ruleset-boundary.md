@@ -44,11 +44,20 @@ raw-IR product evaluation.
 
 The retained boundary now has its first fresh consumer. `rulebench.fresh-start`
 names one base package and one contributed support package, resolves three
-exact lock edges, and closes the exported roots `rulebench.signal-flare` and
-`catalog.damage.radiant`. A loopback trusted-authoring gateway prepares the
+exact lock edges, and closes three action roots plus typed stat, defense,
+resource, modifier, and damage support. A loopback trusted-authoring gateway prepares the
 selected package graph for each compile request, and Rust derives execution
 semantics only from that closed definition graph before emitting and reloading
 the artifact. The selectable missing-support graph exposes source diagnostics
-while preserving any active artifact. The product still starts inactive, and
-activation does not create a gameplay session or restore any deleted prototype
-surface.
+while preserving any active artifact. The product still starts inactive.
+
+## #5955 transition
+
+Activation now creates one fresh persistent Asha RPG authority session. Its
+three TypeScript-authored actions form a visible sequential workflow over one
+Rust-owned state revision: movement makes later candidates legal, costs reduce
+a resource later preflight reads, a modifier remains visible in state, d6 and
+five-d4 evidence is consumed without a four-draw cap, and a typed reaction
+suspends and resumes the same staged command. Rulebench sends intents and
+decisions and renders generated DTOs; it does not interpret IR, evaluate costs
+or legality, reapply events, or keep a mirrored combat state.

@@ -20,6 +20,7 @@ const localWebServer = process.env['BASE_URL']
 
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
+  preserveOutput: 'always',
   use: {
     baseURL,
     trace: 'on-first-retry',

@@ -1,9 +1,10 @@
 use std::env;
 
 use rulebench_ruleset_host::{
-    PreparedRulesetCompileRequestDto, RulesetDiagnosticDto, RulesetHost,
-    RulesetWorkspaceResponseDto,
+    GameplayCommandRequestDto, GameplayReactionRequestDto, PreparedRulesetCompileRequestDto,
+    RulesetDiagnosticDto, RulesetHost, RulesetWorkspaceResponseDto,
 };
+use serde::de::DeserializeOwned;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -54,6 +55,24 @@ fn route(
             let response = host.activate_candidate();
             (if response.ok { 200 } else { 409 }, response)
         }
+        (&Method::Post, "/api/ruleset/command") => {
+            match decode_request::<GameplayCommandRequestDto>(request) {
+                Ok(command) => {
+                    let response = host.execute_command(command);
+                    (200, response)
+                }
+                Err(diagnostic) => invalid_request(host, diagnostic),
+            }
+        }
+        (&Method::Post, "/api/ruleset/reaction") => {
+            match decode_request::<GameplayReactionRequestDto>(request) {
+                Ok(reaction) => {
+                    let response = host.resolve_reaction(reaction);
+                    (200, response)
+                }
+                Err(diagnostic) => invalid_request(host, diagnostic),
+            }
+        }
         _ => {
             let mut response = host.status();
             response.ok = false;
@@ -78,12 +97,28 @@ fn route(
 fn decode_compile_request(
     request: &mut Request,
 ) -> Result<PreparedRulesetCompileRequestDto, Box<RulesetDiagnosticDto>> {
+    decode_request(request)
+}
+
+fn decode_request<Value: DeserializeOwned>(
+    request: &mut Request,
+) -> Result<Value, Box<RulesetDiagnosticDto>> {
     let mut body = String::new();
     request
         .as_reader()
         .read_to_string(&mut body)
         .map_err(|error| Box::new(request_diagnostic(error.to_string())))?;
     serde_json::from_str(&body).map_err(|error| Box::new(request_diagnostic(error.to_string())))
+}
+
+fn invalid_request(
+    host: &RulesetHost,
+    diagnostic: Box<RulesetDiagnosticDto>,
+) -> (u16, RulesetWorkspaceResponseDto) {
+    let mut response = host.status();
+    response.ok = false;
+    response.diagnostics = vec![*diagnostic];
+    (400, response)
 }
 
 fn request_diagnostic(message: String) -> RulesetDiagnosticDto {

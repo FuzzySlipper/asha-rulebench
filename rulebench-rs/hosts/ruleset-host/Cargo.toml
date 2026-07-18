@@ -6,7 +6,9 @@ license.workspace = true
 
 [dependencies]
 rpg-compiler.workspace = true
+rpg-core.workspace = true
 rpg-ir.workspace = true
+rpg-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tiny_http.workspace = true

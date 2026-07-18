@@ -1,15 +1,17 @@
 # ASHA Rulebench
 
 ASHA Rulebench is the authoring and inspection product for compiled Asha RPG
-rulesets. Den task #5953 now builds on the deliberate empty boundary from #5952:
+rulesets. Den tasks #5953 and #5955 now build on the deliberate empty boundary
+from #5952:
 
 - no prototype content is bundled;
 - no ruleset is selected by default;
 - no scenario, import, filename, or startup behavior can construct a ruleset;
 - no Rulebench-owned combat, replay, or semantic authority remains;
 - the UI starts and clearly reports **No compiled ruleset active**;
-- one explicit fresh TypeScript composition can be compiled, inspected, and
-  atomically activated without introducing gameplay authority.
+- one explicit fresh TypeScript composition can be compiled, inspected,
+  atomically activated, and exercised through Asha RPG authority without
+  introducing TypeScript gameplay authority.
 
 Content enters only through the explicit manifest/compiler boundary. Each
 compile click sends the explicit source selection through a generated request
@@ -21,7 +23,17 @@ definition graph, compiles it, round-trips the portable artifact through the
 authoritative loader, and only then creates an activation candidate. Source
 directories, server startup, browser execution, and import side effects never
 determine runtime meaning. A selectable invalid graph proves source diagnostics
-remain user-reachable without replacing the active artifact.
+remain user-reachable without replacing the active artifact or its persistent
+session.
+
+Activation creates one fresh Asha RPG authority session. The browser displays
+Rust-provided action catalogs, source identity, candidates, preflight, random
+requests, accepted events, trace, and state. It sends only typed intents,
+explicit random evidence, and typed reaction decisions. The current field
+manual has three ordinary TypeScript-authored actions whose sequential workflow
+moves an actor, applies a modifier, spends a bounded resource, resolves d6 and
+five-d4 requests, and suspends/resumes a reaction against the same state
+revision. Rust owns all interpretation and mutation.
 
 ## Retained product surfaces
 
@@ -33,20 +45,20 @@ remain user-reachable without replacing the active artifact.
 - `libs/protocol`: generated Rust host DTOs plus a strict decoder.
 - `libs/transport`, `libs/domain`, `libs/store`: generated-DTO transport,
   pure inspection mapping, and explicit lifecycle state.
-- `libs/components`: generic workbench panels and menus used for
-  compilation/activation inspection; #5955 may add runtime controls.
+- `libs/components`: generic workbench panels and menus used for artifact and
+  authority-session inspection.
 - `libs/platform`: browser ports, including the JSON HTTP boundary used by the
   same-origin compiler transport.
 - `libs/scenario-viewer`: compiler, exact lock, closure, diagnostics,
-  fingerprint, and activation inspection. #5955 consumes the active artifact
-  in a visible workflow.
+  fingerprint, activation, commands, reactions, and state inspection.
 - `libs/shell`: routes only.
 - `libs/theme`: product tokens.
 
 `rulebench-rs/hosts/ruleset-host` is a fresh narrow loopback host pinned to the
-public Asha RPG revision. It owns only compile/load/inspect/activate lifecycle
-state. It does not own gameplay sessions, state mutation, persistence, or
-replay.
+public Asha RPG revision. It owns compile/load/inspect/activate lifecycle state
+and the product lifecycle of one Asha RPG session. Asha RPG owns the session's
+rules, legality, state mutation, randomness, events, trace, and reaction
+transaction. Rulebench does not reapply events or mirror semantic state.
 
 ## Commands
 
@@ -72,6 +84,10 @@ Rulebench's blocking gate is focused product validation, including the fresh
 Rust host and generated protocol. Exhaustive
 cross-repository certification remains downstream, but the old prototype
 expectations have been retired rather than preserved there.
+
+Non-claims: session persistence across process restarts or artifact activation,
+replay/checkpoints, derivation/mixins/overlays, migration, nested reaction
+windows, and exhaustive cross-product certification are not implemented here.
 
 See [docs/empty-ruleset-boundary.md](docs/empty-ruleset-boundary.md) for the
 deletion and retention inventory.

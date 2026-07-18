@@ -1,5 +1,7 @@
 import {
   decodeRulesetWorkspaceResponse,
+  type GameplayCommandRequestDto,
+  type GameplayReactionRequestDto,
   type RulesetCompileRequestDto,
   type RulesetSourceIdDto,
   type RulesetWorkspaceResponseDto,
@@ -19,6 +21,12 @@ export interface RulesetTransport {
     sourceId: RulesetSourceIdDto,
   ) => Promise<RulesetWorkspaceResponseDto>;
   readonly activate: () => Promise<RulesetWorkspaceResponseDto>;
+  readonly command: (
+    command: GameplayCommandRequestDto,
+  ) => Promise<RulesetWorkspaceResponseDto>;
+  readonly react: (
+    reaction: GameplayReactionRequestDto,
+  ) => Promise<RulesetWorkspaceResponseDto>;
 }
 
 export function createRulesetTransport(http: JsonHttpClient): RulesetTransport {
@@ -38,5 +46,7 @@ export function createRulesetTransport(http: JsonHttpClient): RulesetTransport {
       return request('POST', '/api/ruleset/compile', compileRequest);
     },
     activate: () => request('POST', '/api/ruleset/activate'),
+    command: (command) => request('POST', '/api/ruleset/command', command),
+    react: (reaction) => request('POST', '/api/ruleset/reaction', reaction),
   };
 }

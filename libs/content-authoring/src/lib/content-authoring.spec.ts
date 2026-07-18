@@ -8,7 +8,7 @@ import {
 } from './content-authoring.js';
 
 describe('fresh Rulebench ruleset package graph', () => {
-  it('closes one TypeScript-only action through an exact dependency lock', () => {
+  it('closes three TypeScript-only actions through an exact dependency lock', () => {
     const first = prepareFreshRulebenchRuleset();
     const second = prepareFreshRulebenchRuleset();
 
@@ -18,13 +18,23 @@ describe('fresh Rulebench ruleset package graph', () => {
 
     expect(canonicalJson(first.prepared)).toBe(canonicalJson(second.prepared));
     expect(first.prepared.exportedRoots).toEqual([
-      'catalog.damage.radiant',
-      'rulebench.signal-flare',
+      'catalog.damage.storm',
+      'catalog.defense.guard',
+      'catalog.modifier.exposed',
+      'catalog.resource.focus',
+      'catalog.stat.power',
+      'rulebench.arc-lash',
+      'rulebench.tactical-advance',
+      'rulebench.wardbreaker-volley',
     ]);
     expect(first.prepared.dependencyLock).toHaveLength(3);
     expect(
       first.prepared.materializedDefinitions.map((definition) => definition.id),
-    ).toEqual(['catalog.damage.radiant', 'rulebench.signal-flare']);
+    ).toEqual(first.prepared.exportedRoots);
+    expect(first.prepared.requiredOperations).toContainEqual({
+      id: 'operation.openReaction',
+      version: 1,
+    });
     expect(first.prepared.derivationProvenance).toEqual([]);
     expect(first.prepared.overlayProvenance).toEqual([]);
   });
@@ -47,19 +57,20 @@ describe('fresh Rulebench ruleset package graph', () => {
 
     expect(accepted.ok).toBe(true);
     if (accepted.ok) {
-      expect(accepted.preparedSource).toContain('rulebench.signal-flare');
+      expect(accepted.preparedSource).toContain('rulebench.wardbreaker-volley');
+      expect(accepted.preparedSource).toContain('"count":5');
+      expect(accepted.preparedSource).toContain('"sides":4');
+      expect(accepted.preparedSource).toContain('"sides":6');
     }
     expect(rejected.ok).toBe(false);
     if (!rejected.ok) {
       const diagnostic = rejected.diagnostics[0];
-      expect(diagnostic?.code).toBe(
-        'RULESET_DEFINITION_REFERENCE_MISSING',
-      );
+      expect(diagnostic?.code).toBe('RULESET_DEFINITION_REFERENCE_MISSING');
       expect(diagnostic?.packageId).toBe('rulebench.field-manual');
-      expect(diagnostic?.definitionId).toBe('rulebench.signal-flare');
+      expect(diagnostic?.definitionId).toBe('rulebench.arc-lash');
       expect(diagnostic?.source).toEqual({
         module: 'packages/rulebench-field-manual.ts',
-        declaration: 'signalFlare',
+        declaration: 'rulebench.arc-lash',
       });
     }
   });
