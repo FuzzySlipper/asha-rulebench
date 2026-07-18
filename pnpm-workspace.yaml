@@ -1,13 +1,9 @@
 autoInstallPeers: true
 blockExoticSubdeps: false
 allowBuilds:
-  "@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/authoring": true
-  "@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/ir": true
   "@parcel/watcher": true
   esbuild: true
   less: true
   lmdb: true
   msgpackr-extract: true
   nx: true
-overrides:
-  "@asha-rpg/ir@0.1.0": "github:FuzzySlipper/asha-rpg#ea3e3803d4736268f2a10996a34bc5b8dfefcffc&path:packages/ir"

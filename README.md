@@ -1,326 +1,59 @@
 # ASHA Rulebench
 
-ASHA Rulebench is an Angular/Nx workbench for experimenting with RPG-shaped gameplay rules on top of ASHA/ECRP architecture.
+ASHA Rulebench is the authoring and inspection product for compiled Asha RPG
+rulesets. It is currently at the deliberate empty boundary established by Den
+task #5952:
 
-It is not trying to become a full game. It is a place to author, run, inspect, and test rules and scenarios while the underlying authority model stays clean enough to be useful in downstream games.
+- no prototype content is bundled;
+- no ruleset is selected by default;
+- no scenario, import, filename, or startup behavior can construct a ruleset;
+- no Rulebench-owned combat, replay, or semantic authority remains;
+- the UI starts and clearly reports **No compiled ruleset active**.
 
-The name is intentional: this is a bench for rules, not an RPG product shell.
+Future content enters only through the explicit manifest/compiler boundary
+owned by #5953. That path will compile one explicit TypeScript package or
+composition manifest into a dependency-closed, Rust-validated artifact before
+Rulebench can activate it. Source directories and import side effects never
+determine runtime meaning.
 
-## Design Intent
+## Retained product surfaces
 
-The first useful version should let a user load a simple two-combatant scenario, execute or replay a deterministic rule resolution, and inspect:
+- `apps/app`: Angular bootstrap.
+- `apps/app-e2e`: focused empty-state browser and managed live evidence.
+- `libs/components`: generic workbench panels, menus, and dialogs. #5953 uses
+  these for compilation/activation inspection and #5955 for runtime controls.
+- `libs/platform`: browser ports. #5953 uses file input, storage, clipboard,
+  timing, and document effects without bypassing product layers.
+- `libs/scenario-viewer`: the current empty workspace feature. #5953 replaces
+  the empty artifact state with compiler/activation readouts; #5955 consumes
+  the active artifact in a visible workflow.
+- `libs/shell`: routes only.
+- `libs/theme`: product tokens.
 
-- board state;
-- chosen actor, action, and target;
-- accepted DomainEvents;
-- rule trace;
-- final state diff;
-- classified product result.
+The deleted Rust workspace, generated protocol, transport/store/domain layers,
+content authoring corpus, replay persistence, and proof artifacts were coupled
+to the retired prototype. #5953 must introduce fresh owner boundaries from the
+compiled-artifact contract rather than restoring those paths.
 
-The UI can stay modest. The product value is explainability. If the bench says a target took damage, gained a modifier, failed a target legality check, or triggered a reaction window, the user should be able to inspect why.
-
-This repo is also a proving ground. Local Rust crates may incubate RPG-domain or game-rules behavior while ideas are still forming. Pieces that become clearly game-generic can later move upstream into ASHA.
-
-## Rust Authority Workspace
-
-Local Rust product authority lives under `rulebench-rs/`. Portable primitives,
-normalized rule declarations, and the public-ASHA RuntimeSession fabric now
-live in the independent `FuzzySlipper/asha-rpg` repository. Rulebench consumes
-`rpg-core`, `rpg-ir`, and `rpg-runtime` from one exact public Git revision; no
-sibling path or direct ASHA dependency is allowed.
-
-See `rulebench-rs/README.md` and `docs/rust-authority-reconciliation.md` for the
-current dependency direction. Protocol, bridge, product content, and generators
-import focused product and public RPG owners directly; no combined Rust
-compatibility facade remains. Planner-approved `serde` protocol DTOs and the
-`serde_json` process host provide the live local bridge.
-
-The current gameplay-fabric slice and its explicit local/upstream ownership
-boundary are documented in
-[docs/gameplay-fabric-integration.md](docs/gameplay-fabric-integration.md).
-
-Run the focused Rust gates with:
-
-```bash
-pnpm run rust:check
-pnpm run rust:test
-pnpm run check:rust-boundaries
-```
-
-`pnpm dev` starts both the loopback Rust process host and the Angular server.
-Angular remains the only `0.0.0.0` LAN-facing process and proxies the versioned
-`/api/rulebench/v1` path to Rust on the same origin. The typed client in
-`libs/transport/src/live.ts` owns protocol handshakes, generated DTO requests,
-classified host errors, and request cancellation. Stores and components must
-consume that public transport boundary rather than call the host directly.
-`LiveCombatStore` owns live connection/session selection, command inputs,
-preflight, submission, snapshot refresh, stale-response suppression, and
-cleanup; domain projections turn Rust evidence into display labels only.
-The same live boundary reads `/api/rulebench/v1/capabilities`, whose manifest
-is assembled from Rust owner registries plus the selected host composition.
-The workbench presents that evidence under **View → Runtime capabilities**;
-neither the generated artifact nor the UI grants runtime permission.
-`ContentWorkbenchStore` owns the live authored-pack lifecycle through the same
-transport: file text crosses a platform port, Rust decodes and semantically
-validates the versioned document, and TypeScript displays generic diagnostics,
-canonical definitions, diffs, activation state, and audit evidence.
-The canonical `pnpm run e2e` gate starts this combined stack and completes a
-real Rust-owned combat session through the transport, including cleanup and
-classified failure/version-mismatch checks.
-
-For restart-stable authored content, finalized replays, and active sessions,
-start the Rust host
-with `--artifact-root PATH` (or set `RULEBENCH_ARTIFACT_ROOT`). The concrete
-host owns that versioned, single-writer filesystem repository; portable Rust
-crates remain serialization-free and the bridge remains host-neutral. At each
-accepted command boundary the host atomically stores the canonical scenario,
-exact ruleset provenance, typed command history, generation, and verified
-authority frame. Startup reconstructs valid sessions by replaying those typed
-commands through fresh Rust authority; incompatible or corrupt records are
-quarantined instead of becoming live state. The setup tool distinguishes new,
-restored, and explicitly forked sessions and provides explicit fork and discard
-actions. See `docs/session-recovery.md` for the recovery, migration, and
-non-claim boundaries.
-The deterministic policy laboratory executes bounded scenario × policy × seed
-matrices one trial at a time, archives every trial through the same replay
-repository, and exposes cancellation and first-divergence comparison. See
-`docs/policy-laboratory.md` for its registration path and non-claims.
-Stored authored packs are re-decoded and re-imported on every host start before
-their exact activation can be used. A new session may select a compatible
-activated pack set; its exact references and set fingerprint are then retained
-in the finalized replay. Authored-content v3 added the legacy strict modifier
-and action declarations. V4 adds dependency-closed archetypes/build inputs,
-participant state, loadouts, multiple action grants, configured scenarios, and
-manual or exact automatic control while preserving the permanent strict v1-v3
-readers.
-Through the migrated RPG-language boundary, Rust binds an exact runtime action
-to its TypeScript-authored source identity, compiles canonical normalized IR,
-executes the public semantic kernel, and retains product provenance through
-replay-verified restart recovery. See
-`docs/rpg-rules-language-integration.md` and
-`docs/authored-content-format.md` for the semantic and wire boundaries.
-Through `content.authored-scenario@1`, Rust materializes an active v4 scenario,
-retains its exact pack/scenario/archetype/loadout/action/control receipt, and
-reconstructs that composition for recovery and finalized replay verification.
-Finalized replay files use the portable, versioned canonical identity described
-in `docs/replay-archive-identity.md`; the process host atomically migrates only
-recognized legacy identities and quarantines unknown or mismatched records.
-
-## Source Material
-
-This repo starts from four planning references:
-
-- `ruleweaver/rpg-rules-engine-successor-concept`: RuleWeaver successor as an ECRP-aligned RPG rules substrate.
-- `ruleweaver/asha-upstream-game-rules-substrate`: game-generic Rust substrate candidates for ASHA main.
-- `ruleweaver/asha-rpg-combat-sim-plan`: first workbench/product shape.
-- `asha/ecrp-pattern-guide`: reusable ECRP pattern and authority rules.
-
-The old RuleWeaver project is evidence, not structure to preserve. Borrow its useful lessons: tactical expressiveness, action slots, target legality, conditions, modifiers, reaction windows, deterministic traces, and content fixtures. Do not inherit event-handler extensibility, mutable TypeScript contexts, UI/runtime coupling, or 4e ceremony just because those shapes existed before.
-
-## TypeScript And Rust Split
-
-The central rule is:
-
-> TypeScript references and configures Rust behavior. Rust defines and executes rule logic.
-
-TypeScript should be used for:
-
-- typed catalog authoring;
-- ergonomic builders over generated protocol shapes;
-- named product scenarios and authoring inputs;
-- policy code that reads generated views and proposes typed intents;
-- UI view models and display mapping;
-- tests that prove authored content produces expected protocol inputs and rendered outputs.
-
-Rust should own:
-
-- content validation;
-- rule semantics;
-- capability storage and mutation;
-- target legality;
-- deterministic dice and random streams;
-- effect interpretation;
-- modifier, condition, and duration lifecycle;
-- reaction windows;
-- accepted DomainEvents;
-- trace, replay, and state hashes.
-
-Good TypeScript describes which Rust operations to run:
-
-```ts
-action({
-  id: "hexing_bolt",
-  target: target.singleEnemy({ range: 10, lineOfSight: true }),
-  attack: attack.vs("Nerve").using("Mind"),
-  onHit: [
-    effects.damage({ dice: "1d8", stat: "Mind", type: "psychic" }),
-    effects.modifier({
-      id: "rattled",
-      duration: duration.untilEndOfNextTurn(),
-    }),
-  ],
-});
-```
-
-Bad TypeScript implements authority:
-
-```ts
-onHit(ctx) {
-  ctx.target.hp -= rollSomeDice();
-  ctx.bus.emit('damage-applied');
-}
-```
-
-If a ruleset needs behavior that is not expressible in the current operation vocabulary, add or incubate a Rust operation instead of smuggling authority into TypeScript.
-
-## ECRP Fit
-
-ASHA Rulebench follows the ECRP framing:
-
-> Entities carry Capabilities; Rules validate; Policies propose; Events record.
-
-In this repo that means:
-
-- stored TS catalogs and scenario files are inputs, not authority;
-- runtime authority lives in Rust services, local harnesses, or upstream ASHA runtime surfaces;
-- UI projections display truth, they do not own it;
-- traces explain resolution decisions, they are not committed facts;
-- DomainEvents are the accepted replay/audit spine.
-
-Likely upstream candidates include bounded values, modifiers, periodic effects, hit/hurt facts, reaction windows, traces, replay, and content validation rails. RPG action economy, powers, classes, encounter vocabulary, and mutant ruleset details should stay local until they prove otherwise.
-
-## Frontend Architecture
-
-This frontend is built as layered infrastructure. Keep the existing Angular/Nx boundaries intact unless a task explicitly asks for architecture work.
-
-Layer intent:
-
-- `protocol`: generated protocol exports and shared result/error types.
-- `transport`: backend, native, WASM, or fake runtime communication through protocol types.
-- `domain`: pure view/domain mapping over protocol data, with no Angular or browser APIs.
-- `store`: application state mutation, async state, and transport orchestration.
-- `renderer`: feature rendering composition over domain views and presentational components.
-- `components`: reusable presentational Angular components.
-- `platform`: browser/host ports and fakes.
-- `shell`: routing and application composition only.
-- `theme`: approved tokens and theme entrypoints.
-
-Use workspace generators for new components, libraries, features, stores, platform ports, and tests.
-
-## First Slice
-
-The first slice should prove the repository shape before it tries to prove a full rules engine:
-
-1. Replace template identity with ASHA Rulebench naming.
-2. Define a canned scenario readout through generated or generated-shaped protocol exports.
-3. Add testing fixtures for a two-combatant tactical scenario.
-4. Map protocol readouts into domain view models.
-5. Add store and fake transport state for loading the scenario result as `AsyncState<T>`.
-6. Render a static board, timeline, trace, and final-state summary.
-7. Cover the flow with unit tests, deterministic E2E, and a live browser inspection pass.
-
-After that, the next slice can route one typed intent through a Rust-backed local harness or upstream ASHA runtime surface.
-
-## Non-Claims
-
-ASHA Rulebench is not:
-
-- a full RPG or adventure game;
-- a straight RuleWeaver port;
-- a D&D 4e compatibility target;
-- an ASHA fork;
-- a generic rules engine;
-- a place for mutable TypeScript authority callbacks;
-- a renderer-first game prototype;
-- a replacement for upstream ASHA runtime, replay, or validation infrastructure.
-
-## Development
-
-Install dependencies:
-
-```bash
-pnpm install
-```
-
-Run the app on the LAN:
-
-```bash
-pnpm run dev
-```
-
-Verify the workspace:
+## Commands
 
 ```bash
 pnpm run verify
-```
-
-`pnpm run verify` is the canonical blocking project gate and the GitHub
-required check. For explicit owner-matched feedback, use the closed focused
-profiles instead of guessing from a Git diff:
-
-```bash
 pnpm run verify:change -- --profile frontend
-pnpm run verify:change -- --profile rust-owner --crate rulebench-combat
-pnpm run verify:change -- --profile protocol-generated --profile host-transport
-pnpm run verify:change -- --profile product-content
+pnpm run verify:change -- --profile browser
+pnpm run verify:change -- --profile docs
 ```
 
-Profiles may be repeated and their commands are deduplicated. The runner prints
-the complete selection before execution, rejects missing/unknown ownership,
-and supports `--dry-run`. Run the blocking gate when classification is
-uncertain. The pre-tiering measurements, exact profile contract, blocking
-membership, and downstream certification ownership are documented in
-[docs/validation-tiers.md](docs/validation-tiers.md).
-
-Exhaustive semantic, compatibility, replay, and browser certification moved to
-the public downstream consumer
-[`FuzzySlipper/asha-rulebench-testing`](https://github.com/FuzzySlipper/asha-rulebench-testing).
-It consumes exact public revisions and runs nightly, manually, or for named
-milestones. Rulebench neither imports that repository nor waits for it as an
-ordinary per-change gate. See
-[docs/validation-evidence-template.md](docs/validation-evidence-template.md)
-for task handoff evidence.
-
-For opt-in live evidence:
+For managed visual evidence:
 
 ```bash
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
-Use the `local:` URL printed by `den-serve` for Playwright `BASE_URL`. Report
-the printed `lan:` URL for human inspection from another machine.
+Rulebench's blocking gate is focused product validation. Exhaustive
+cross-repository certification remains downstream, but the old prototype
+expectations have been retired rather than preserved there.
 
-## Current State
-
-The human testing surface is a seven-panel Angular workbench. Application menus
-open focused setup tools for content packs, live authority evidence, live Rust
-sessions, automatic runs, and replay packages; panels retain the board,
-initiative, encounter status, available actions, participants, and evidence.
-The focused tools configure or select authority behavior, while panel view models
-display Rust-owned outcomes. Scenario and transcript evidence is read from the
-running process host; no checked scenario/session catalog is a live fallback. See
-`docs/viewer-evidence-boundaries.md` for the complete consumer inventory.
-
-The current surface proves two compiled ruleset providers: Hexing Bolt's
-attack-versus-defense package family and Objective Turn Control's
-three-participant saving-throw package. Both use deterministic cases, live
-commands, bounded automatic control, and replay inspection. With an artifact
-root configured, the content tool imports,
-reviews, compares, activates, deactivates, and safely deletes authored packs;
-authored packs, finalized replays, and verified active-session checkpoints
-survive host restart. Live session snapshots expose authoritative board and
-participant positions to the workbench.
-
-The authored-content claim is deliberately narrow: no arbitrary scripts,
-plugins, callbacks, general character progression, inventory simulation, or
-TypeScript rule authority, and no guarantee beyond the exact closed v3/v4
-vocabulary and capabilities of the selected compiled provider.
-
-The executable capability manifest reports the current compiled providers,
-rulesets, packages, scenarios, automation policies, and operation-pipeline
-identity. The live workbench reads the current process-host manifest. Downstream
-certification records exact product revisions and separately evaluates exhaustive
-capability coverage.
-See `docs/capability-manifest.md` and `docs/ruleset-providers.md` for the
-authority and evolution contracts.
+See [docs/empty-ruleset-boundary.md](docs/empty-ruleset-boundary.md) for the
+deletion and retention inventory.

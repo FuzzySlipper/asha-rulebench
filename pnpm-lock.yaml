@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@asha-rpg/ir@0.1.0': github:FuzzySlipper/asha-rpg#ea3e3803d4736268f2a10996a34bc5b8dfefcffc&path:packages/ir
-
 importers:
 
   .:
@@ -51,12 +48,6 @@ importers:
       '@angular/language-service':
         specifier: ~21.2.0
         version: 21.2.17
-      '@asha-rpg/authoring':
-        specifier: github:FuzzySlipper/asha-rpg#ea3e3803d4736268f2a10996a34bc5b8dfefcffc&path:packages/authoring
-        version: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/authoring
-      '@asha-rpg/ir':
-        specifier: github:FuzzySlipper/asha-rpg#ea3e3803d4736268f2a10996a34bc5b8dfefcffc&path:packages/ir
-        version: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/ir
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.4
@@ -354,14 +345,6 @@ packages:
       '@angular/core': 21.2.17
       '@angular/platform-browser': 21.2.17
       rxjs: ^6.5.3 || ^7.4.0
-
-  '@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/authoring':
-    resolution: {gitHosted: true, integrity: sha512-ncjIJlaLaP/uATgfYuA4Ktne8rmTu9MLJ0mow/LGQ6zK0QdtPEcQ75NssR8aMPKh6gA0YFwP7k0ob0PDyJuzAA==, path: packages/authoring, tarball: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc}
-    version: 0.1.0
-
-  '@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/ir':
-    resolution: {gitHosted: true, integrity: sha512-ncjIJlaLaP/uATgfYuA4Ktne8rmTu9MLJ0mow/LGQ6zK0QdtPEcQ75NssR8aMPKh6gA0YFwP7k0ob0PDyJuzAA==, path: packages/ir, tarball: https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc}
-    version: 0.1.0
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -6022,12 +6005,6 @@ snapshots:
       '@angular/platform-browser': 21.2.17(@angular/common@21.2.17(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))
       rxjs: 7.8.2
       tslib: 2.8.1
-
-  '@asha-rpg/authoring@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/authoring':
-    dependencies:
-      '@asha-rpg/ir': https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/ir
-
-  '@asha-rpg/ir@https://codeload.github.com/FuzzySlipper/asha-rpg/tar.gz/ea3e3803d4736268f2a10996a34bc5b8dfefcffc#path:packages/ir': {}
 
   '@babel/code-frame@7.29.7':
     dependencies:

@@ -9,7 +9,6 @@ const boundaries = JSON.parse(
 const knownScopes = new Set(boundaries.scopes);
 const failures = [];
 const requiredFiles = [
-  "template-manifest.json",
   "boundaries.json",
   ".playwright-service.json",
   "AGENTS.md",
@@ -35,7 +34,6 @@ for (const lib of libs) {
   validateLib(lib);
 }
 
-validateManifest();
 validateSourceImports();
 validateLiveHarness();
 parseJson(".playwright-service.json");
@@ -68,24 +66,6 @@ function validateLib(lib) {
     failures.push(`libs/${lib} has unknown scope: ${scope}`);
   if (!exists(`libs/${lib}/src/index.ts`))
     failures.push(`libs/${lib} must expose libs/${lib}/src/index.ts`);
-}
-
-function validateManifest() {
-  const manifest = parseJson("template-manifest.json");
-  if (manifest === null) return;
-  for (const deviation of manifest.localDeviations ?? []) {
-    if (typeof deviation.adr !== "string") {
-      failures.push(
-        "template-manifest localDeviations entries must include adr",
-      );
-      continue;
-    }
-    if (!exists(deviation.adr)) {
-      failures.push(
-        `template-manifest deviation ADR does not exist: ${deviation.adr}`,
-      );
-    }
-  }
 }
 
 function validateSourceImports() {

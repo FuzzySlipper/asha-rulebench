@@ -8,10 +8,9 @@ BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 `e2e:live` is a compatibility alias for the artifact-only
-`e2e:live-artifacts` group. Primary deterministic integration journeys belong
-to the product `@gate` set. Exhaustive browser certification is owned by the
-downstream public `asha-rulebench-testing` repository against exact product
-revisions.
+`e2e:live-artifacts` group. The current scenario inspects only the honest
+no-active-ruleset state. It does not claim compilation, activation, gameplay,
+persistence, replay, or downstream certification.
 
 Use the printed `local:` URL for Playwright probes. Report the printed `lan:`
 URL for human inspection from another machine.
