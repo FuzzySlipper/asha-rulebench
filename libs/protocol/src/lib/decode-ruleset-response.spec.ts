@@ -10,6 +10,7 @@ const emptyResponse = {
   status: 'noActiveRuleset',
   activeArtifact: null,
   candidateArtifact: null,
+  upgradeImpact: null,
   activationRevision: 0,
   gameplayAvailable: false,
   gameplay: null,
@@ -60,6 +61,35 @@ describe('ruleset protocol decoder', () => {
           actual: 'missing',
         },
       ],
+    };
+
+    expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
+  });
+
+  it('decodes an exact pre-activation upgrade impact report', () => {
+    const response = {
+      ...emptyResponse,
+      upgradeImpact: {
+        fromArtifactId: 'artifact-1.0',
+        toArtifactId: 'artifact-1.1',
+        sourceChanges: ['field-manual 1.0.0 → 1.1.0'],
+        definitions: [
+          {
+            definitionId: 'rulebench.arc-lash-stormfront',
+            change: 'changed',
+            descendant: true,
+            causes: ['primary base identity or fingerprint changed'],
+            fields: [
+              {
+                plane: 'semantic',
+                path: '$.semantic.program.hit.amount.right.value',
+                before: '1',
+                after: '2',
+              },
+            ],
+          },
+        ],
+      },
     };
 
     expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);

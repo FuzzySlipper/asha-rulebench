@@ -10,7 +10,6 @@ import {
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
 import type { GameplayActionView } from '@asha-rulebench/domain';
-import type { RulesetSourceIdDto } from '@asha-rulebench/protocol';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 @Component({
@@ -342,7 +341,10 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                       @if (action.randomPlan.length === 0) {
                         <span class="muted">none</span>
                       } @else {
-                        @for (randomPath of action.randomPlan; track randomPath) {
+                        @for (
+                          randomPath of action.randomPlan;
+                          track randomPath
+                        ) {
                           <span class="muted">{{ randomPath }}</span>
                         }
                       }
@@ -533,7 +535,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                     <dd>{{ artifact.language }}</dd>
                   </div>
                   <div>
-                    <dt>Reserved slots</dt>
+                    <dt>Materialization records</dt>
                     <dd>{{ artifact.reservedSlots }}</dd>
                   </div>
                 </dl>
@@ -558,6 +560,56 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 </ul>
               </div>
             </arb-workbench-panel>
+
+            @if (view.upgradeImpact; as impact) {
+              <arb-workbench-panel
+                [panelNumber]="5"
+                panelTitle="Pre-activation upgrade impact"
+              >
+                <div class="panel-body">
+                  <p class="section-label">
+                    Candidate compared with active runtime truth
+                  </p>
+                  <code>{{ impact.transition }}</code>
+                  <p class="summary">
+                    This report compares fully materialized Rust-accepted
+                    artifacts. Activation has not occurred.
+                  </p>
+                  <p class="section-label">Changed package sources</p>
+                  <ul class="row-list">
+                    @for (source of impact.sourceChanges; track source) {
+                      <li>
+                        <code>{{ source }}</code>
+                      </li>
+                    }
+                  </ul>
+                  <p class="section-label">
+                    Changed definitions and effective fields
+                  </p>
+                  <ul class="row-list">
+                    @for (
+                      definition of impact.definitions;
+                      track definition.definitionId
+                    ) {
+                      <li>
+                        <strong>{{ definition.definitionId }}</strong>
+                        <span>{{ definition.status }}</span>
+                        @for (cause of definition.causes; track cause) {
+                          <span class="muted">{{ cause }}</span>
+                        }
+                        @for (
+                          field of definition.fields;
+                          track field.plane + field.path
+                        ) {
+                          <span>{{ field.plane }} · {{ field.path }}</span>
+                          <code>{{ field.transition }}</code>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </arb-workbench-panel>
+            }
 
             <arb-workbench-panel
               [panelNumber]="5"
@@ -618,6 +670,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                     <li>
                       <strong>{{ definition.label }}</strong>
                       <code>{{ definition.id }}</code>
+                      <code>{{ definition.fingerprint }}</code>
                       <span>{{ definition.contract }}</span>
                       <span class="muted"
                         >{{ definition.owner }} · {{ definition.source }}</span
@@ -668,6 +721,76 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 </ul>
               </div>
             </arb-workbench-panel>
+
+            <arb-workbench-panel
+              [panelNumber]="8"
+              panelTitle="Materialization provenance"
+            >
+              <div class="panel-body">
+                <p class="section-label">Base and ordered mixin chains</p>
+                <ul class="row-list">
+                  @for (
+                    derivation of artifact.derivations;
+                    track derivation.definitionId
+                  ) {
+                    <li>
+                      <strong>{{ derivation.definitionId }}</strong>
+                      <span
+                        >{{ derivation.owner }} derives from
+                        {{ derivation.base }}</span
+                      >
+                      <code>{{ derivation.baseFingerprint }}</code>
+                      @for (mixin of derivation.mixins; track mixin.order) {
+                        <span>
+                          {{ mixin.order + 1 }}. {{ mixin.identity }} ·
+                          {{ mixin.parameters }}
+                        </span>
+                        <code>{{ mixin.fingerprint }}</code>
+                      }
+                      <span>Local patch</span>
+                      <code>{{ derivation.localPatchFingerprint }}</code>
+                      @for (
+                        change of derivation.changes;
+                        track change.plane + change.path
+                      ) {
+                        <span>
+                          {{ change.plane }} · {{ change.path }} ·
+                          {{ change.effective ? 'effective' : 'ineffective' }}
+                        </span>
+                        <code>{{ change.transition }}</code>
+                      }
+                      <span>Materialized definition</span>
+                      <code>{{ derivation.materializedFingerprint }}</code>
+                    </li>
+                  }
+                </ul>
+                <p class="section-label">Composition-ordered overlays</p>
+                <ul class="row-list">
+                  @for (overlay of artifact.overlays; track overlay.order) {
+                    <li>
+                      <strong>{{ overlay.overlay }}</strong>
+                      <span>{{ overlay.target }} · {{ overlay.impact }}</span>
+                      <span>Expected and observed before</span>
+                      <code>{{ overlay.expectedFingerprint }}</code>
+                      <code>{{ overlay.beforeFingerprint }}</code>
+                      <span>Patch → materialized after</span>
+                      <code>{{ overlay.patchFingerprint }}</code>
+                      <code>{{ overlay.afterFingerprint }}</code>
+                      @for (
+                        change of overlay.changes;
+                        track change.plane + change.path
+                      ) {
+                        <span>
+                          {{ change.plane }} · {{ change.path }} ·
+                          {{ change.effective ? 'effective' : 'ineffective' }}
+                        </span>
+                        <code>{{ change.transition }}</code>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            </arb-workbench-panel>
           } @else {
             <arb-workbench-panel
               [panelNumber]="3"
@@ -687,7 +810,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
           }
 
           @if (view.diagnostics.length > 0) {
-            <arb-workbench-panel [panelNumber]="8" panelTitle="Diagnostics">
+            <arb-workbench-panel [panelNumber]="9" panelTitle="Diagnostics">
               <div class="panel-body">
                 @for (
                   diagnostic of view.diagnostics;
@@ -752,13 +875,16 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly store = createBrowserRulesetWorkspaceStore();
   protected readonly sourceOptions: readonly {
-    readonly id: RulesetSourceIdDto;
+    readonly id: 'fresh' | 'freshUpgrade' | 'missingSupport';
     readonly label: string;
   }[] = [
     { id: 'fresh', label: 'Valid field manual' },
+    { id: 'freshUpgrade', label: 'Field manual 1.1 candidate' },
     { id: 'missingSupport', label: 'Invalid missing support' },
   ];
-  protected readonly selectedSourceId = signal<RulesetSourceIdDto>('fresh');
+  protected readonly selectedSourceId = signal<
+    'fresh' | 'freshUpgrade' | 'missingSupport'
+  >('fresh');
   protected readonly selectedActionId = signal<string | null>(null);
   protected readonly selectedTargetId = signal<string | null>(null);
   protected readonly randomEvidence = signal('');
@@ -800,7 +926,9 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     void this.store.compile(this.selectedSourceId());
   }
 
-  protected selectSource(sourceId: RulesetSourceIdDto): void {
+  protected selectSource(
+    sourceId: 'fresh' | 'freshUpgrade' | 'missingSupport',
+  ): void {
     this.selectedSourceId.set(sourceId);
   }
 

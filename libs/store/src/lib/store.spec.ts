@@ -128,6 +128,7 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     status: 'noActiveRuleset',
     activeArtifact: null,
     candidateArtifact: null,
+    upgradeImpact: null,
     activationRevision: 0,
     gameplayAvailable: false,
     gameplay: null,
@@ -151,6 +152,8 @@ function artifactSummary(artifactId: string) {
     relationships: [],
     derivationSlots: 0,
     overlaySlots: 0,
+    derivations: [],
+    overlays: [],
     fingerprints: {
       source: 'fnv1a64:0000000000000000',
       semantic: 'fnv1a64:0000000000000000',

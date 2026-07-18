@@ -20,6 +20,14 @@ describe('ruleset workspace view mapping', () => {
       { plane: 'Presentation', value: 'fnv1a64:3333333333333333' },
     ]);
     expect(view.artifact?.exportedRoots).toEqual(['rulebench.signal-flare']);
+    expect(view.artifact?.derivations[0]?.mixins[0]).toEqual({
+      identity: 'rulebench.primitives@1.0.0#rulebench.double-range',
+      fingerprint: 'fnv1a64:7777777777777777',
+      parameters: 'factor=2',
+      order: 0,
+    });
+    expect(view.artifact?.overlays[0]?.impact).toBe('semantic · reject');
+    expect(view.artifact?.overlays[0]?.changes[0]?.transition).toBe('7 → 8');
   });
 
   it('reports active artifact identity with the persistent authority view', () => {
@@ -37,6 +45,53 @@ describe('ruleset workspace view mapping', () => {
       'if no-roll branch: formulaDice 5d4',
     ]);
   });
+
+  it('maps candidate upgrade impact without implying activation', () => {
+    const active = artifact();
+    const candidate = {
+      ...artifact(),
+      artifactId: 'rulebench.fresh-start@1.1.0:fnv1a64:aaaaaaaaaaaaaaaa',
+    };
+    const candidateResponse = response('compiledCandidate', active, candidate);
+    candidateResponse.upgradeImpact = {
+      fromArtifactId: active.artifactId,
+      toArtifactId: candidate.artifactId,
+      sourceChanges: ['rulebench.field-manual: 1.0.0 → 1.1.0'],
+      definitions: [
+        {
+          definitionId: 'rulebench.arc-lash-stormfront',
+          change: 'changed',
+          descendant: true,
+          causes: ['primary base identity or fingerprint changed'],
+          fields: [
+            {
+              plane: 'semantic',
+              path: '$.semantic.program.hit.amount.right.value',
+              before: '1',
+              after: '2',
+            },
+          ],
+        },
+      ],
+    };
+
+    const view = rulesetWorkspaceView(candidateResponse);
+
+    expect(view.phase).toBe('candidate');
+    expect(view.activationRevision).toBe(0);
+    expect(view.upgradeImpact?.definitions[0]).toEqual({
+      definitionId: 'rulebench.arc-lash-stormfront',
+      status: 'changed derived descendant',
+      causes: ['primary base identity or fingerprint changed'],
+      fields: [
+        {
+          plane: 'semantic',
+          path: '$.semantic.program.hit.amount.right.value',
+          transition: '1 → 2',
+        },
+      ],
+    });
+  });
 });
 
 function response(
@@ -49,6 +104,7 @@ function response(
     status,
     activeArtifact,
     candidateArtifact,
+    upgradeImpact: null,
     activationRevision: status === 'active' ? 1 : 0,
     gameplayAvailable: false,
     gameplay: null,
@@ -119,6 +175,7 @@ function artifact(): RulesetArtifactSummaryDto {
     definitions: [
       {
         id: 'rulebench.signal-flare',
+        fingerprint: 'fnv1a64:6666666666666666',
         label: 'Signal Flare',
         kind: 'action',
         visibility: 'exported',
@@ -132,8 +189,49 @@ function artifact(): RulesetArtifactSummaryDto {
     ],
     policyBindingIds: [],
     relationships: [],
-    derivationSlots: 0,
-    overlaySlots: 0,
+    derivationSlots: 1,
+    overlaySlots: 1,
+    derivations: [
+      {
+        definitionId: 'rulebench.signal-flare',
+        owner: 'rulebench.field-manual@1.0.0',
+        base: 'rulebench.field-manual@1.0.0#rulebench.signal-base',
+        baseFingerprint: 'fnv1a64:6666666666666666',
+        mixins: [
+          {
+            identity: 'rulebench.primitives@1.0.0#rulebench.double-range',
+            fingerprint: 'fnv1a64:7777777777777777',
+            parameters: ['factor=2'],
+            order: 0,
+          },
+        ],
+        localPatchFingerprint: 'fnv1a64:8888888888888888',
+        materializedFingerprint: 'fnv1a64:9999999999999999',
+        changes: [],
+      },
+    ],
+    overlays: [
+      {
+        overlay: 'rulebench.balance@1.0.0',
+        target: 'rulebench.field-manual@1.0.0#rulebench.signal-flare',
+        expectedFingerprint: 'fnv1a64:9999999999999999',
+        beforeFingerprint: 'fnv1a64:9999999999999999',
+        afterFingerprint: 'fnv1a64:aaaaaaaaaaaaaaaa',
+        plane: 'semantic',
+        conflictPolicy: 'reject',
+        patchFingerprint: 'fnv1a64:bbbbbbbbbbbbbbbb',
+        order: 0,
+        changes: [
+          {
+            plane: 'semantic',
+            path: 'targets.maximumRange',
+            before: '7',
+            after: '8',
+            effective: true,
+          },
+        ],
+      },
+    ],
     fingerprints: {
       source: 'fnv1a64:1111111111111111',
       semantic: 'fnv1a64:2222222222222222',

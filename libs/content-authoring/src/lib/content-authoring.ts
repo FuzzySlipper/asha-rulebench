@@ -12,7 +12,10 @@ import {
   damageType,
   defenseId,
   defineActionDefinition,
+  defineDerivedDefinition,
+  defineMixinDefinition,
   defineRulesetPackage,
+  defineRulesetRelationship,
   defineSupportDefinition,
   definitionReference,
   dice,
@@ -55,6 +58,57 @@ const supportDefinitions = Object.freeze([
   support('catalog.modifier.exposed', 'modifier', 'exposed', 'Exposed'),
 ]);
 
+const mixinDefinitions = Object.freeze([
+  defineMixinDefinition({
+    kind: 'mixin',
+    id: 'rulebench.double-range',
+    visibility: 'public',
+    extensionPolicy: 'sealed',
+    source: {
+      module: 'packages/rulebench-primitives.ts',
+      declaration: 'doubleRange',
+    },
+    references: [],
+    parameters: [{ id: 'factor', type: 'number' }],
+    patch: {
+      version: 1,
+      operations: [
+        {
+          kind: 'adjustNumber',
+          plane: 'semantic',
+          path: fieldPath('targets', 'maximumRange'),
+          multiply: { parameter: 'factor' },
+          add: 0,
+        },
+      ],
+    },
+  }),
+  defineMixinDefinition({
+    kind: 'mixin',
+    id: 'rulebench.extend-range',
+    visibility: 'public',
+    extensionPolicy: 'sealed',
+    source: {
+      module: 'packages/rulebench-primitives.ts',
+      declaration: 'extendRange',
+    },
+    references: [],
+    parameters: [{ id: 'amount', type: 'number', default: 1 }],
+    patch: {
+      version: 1,
+      operations: [
+        {
+          kind: 'adjustNumber',
+          plane: 'semantic',
+          path: fieldPath('targets', 'maximumRange'),
+          multiply: 1,
+          add: { parameter: 'amount' },
+        },
+      ],
+    },
+  }),
+]);
+
 const primitivesPackage = defineRulesetPackage({
   identity: { id: 'rulebench.primitives', version: '1.0.0' },
   entry: {
@@ -64,20 +118,31 @@ const primitivesPackage = defineRulesetPackage({
   language: { id: 'asha-rpg', version: '^1.0.0' },
   dependencies: [],
   requirements: { operations: [], capabilities: [] },
-  definitions: supportDefinitions,
-  exports: supportDefinitions.map((definition) => definition.id),
+  definitions: [...supportDefinitions, ...mixinDefinitions],
+  exports: [...supportDefinitions, ...mixinDefinitions].map(
+    (definition) => definition.id,
+  ),
   policyBindings: [],
   relationships: [],
 });
 
-const freshFieldManual = fieldManualPackage('catalog.damage.storm');
-const invalidFieldManual = fieldManualPackage('catalog.damage.missing');
+const freshVariant = buildFreshRulesetVariant({
+  version: '1.0.0',
+  arcLashDamageBonus: 1,
+});
+const upgradeVariant = buildFreshRulesetVariant({
+  version: '1.1.0',
+  arcLashDamageBonus: 2,
+});
+const invalidFieldManual = fieldManualPackage('catalog.damage.missing', {
+  version: '1.0.0',
+  arcLashDamageBonus: 1,
+});
 
 export const FRESH_RULESET_PACKAGE_SOURCES: readonly RulesetPackageSource[] =
-  Object.freeze([
-    rulesetPackageSource(freshFieldManual),
-    rulesetPackageSource(primitivesPackage),
-  ]);
+  freshVariant.packages;
+export const UPGRADE_RULESET_PACKAGE_SOURCES: readonly RulesetPackageSource[] =
+  upgradeVariant.packages;
 
 const INVALID_RULESET_PACKAGE_SOURCES: readonly RulesetPackageSource[] =
   Object.freeze([
@@ -86,19 +151,9 @@ const INVALID_RULESET_PACKAGE_SOURCES: readonly RulesetPackageSource[] =
   ]);
 
 export const FRESH_RULESET_COMPOSITION: RulesetCompositionManifest =
-  composeRuleset({
-    identity: { id: 'rulebench.fresh-start', version: '1.0.0' },
-    language: { id: 'asha-rpg', version: '^1.0.0' },
-    base: rulesetPackageRequest({
-      id: 'rulebench.field-manual',
-      version: '1.0.0',
-    }),
-    add: [
-      rulesetPackageRequest({ id: 'rulebench.primitives', version: '1.0.0' }),
-    ],
-    overlays: [],
-    configure: {},
-  });
+  freshVariant.composition;
+export const UPGRADE_RULESET_COMPOSITION: RulesetCompositionManifest =
+  upgradeVariant.composition;
 
 export function prepareFreshRulebenchRuleset(): PrepareRulesetResult {
   return prepareRulesetCompilation({
@@ -107,7 +162,10 @@ export function prepareFreshRulebenchRuleset(): PrepareRulesetResult {
   });
 }
 
-export type RulebenchRulesetSourceId = 'fresh' | 'missingSupport';
+export type RulebenchRulesetSourceId =
+  | 'fresh'
+  | 'freshUpgrade'
+  | 'missingSupport';
 
 export interface RulebenchRulesetSourceOption {
   readonly id: RulebenchRulesetSourceId;
@@ -121,7 +179,13 @@ export const RULEBENCH_RULESET_SOURCE_OPTIONS: readonly RulebenchRulesetSourceOp
       id: 'fresh',
       label: 'Valid field manual',
       description:
-        'Three TypeScript-authored actions and their support catalogs.',
+        'Four TypeScript-authored actions, including a derived and overlaid action, plus their support catalogs.',
+    },
+    {
+      id: 'freshUpgrade',
+      label: 'Field manual 1.1 candidate',
+      description:
+        'A candidate package upgrade that changes Arc Lash damage and its derived descendant without activation.',
     },
     {
       id: 'missingSupport',
@@ -145,12 +209,10 @@ export type PreparedRulebenchRulesetSource =
 export function prepareRulebenchRulesetSource(
   sourceId: RulebenchRulesetSourceId,
 ): PreparedRulebenchRulesetSource {
+  const selection = rulesetSourceSelection(sourceId);
   const result = prepareRulesetCompilation({
-    composition: FRESH_RULESET_COMPOSITION,
-    packages:
-      sourceId === 'fresh'
-        ? FRESH_RULESET_PACKAGE_SOURCES
-        : INVALID_RULESET_PACKAGE_SOURCES,
+    composition: selection.composition,
+    packages: selection.packages,
   });
   if (result.ok) {
     return {
@@ -165,8 +227,103 @@ export function prepareRulebenchRulesetSource(
   };
 }
 
+function rulesetSourceSelection(sourceId: RulebenchRulesetSourceId): {
+  readonly composition: RulesetCompositionManifest;
+  readonly packages: readonly RulesetPackageSource[];
+} {
+  switch (sourceId) {
+    case 'fresh':
+      return freshVariant;
+    case 'freshUpgrade':
+      return upgradeVariant;
+    case 'missingSupport':
+      return {
+        composition: composeFreshRuleset([], '1.0.0'),
+        packages: INVALID_RULESET_PACKAGE_SOURCES,
+      };
+  }
+}
+
+function buildFreshRulesetVariant(options: {
+  readonly version: string;
+  readonly arcLashDamageBonus: number;
+}): {
+  readonly composition: RulesetCompositionManifest;
+  readonly packages: readonly RulesetPackageSource[];
+} {
+  const fieldManual = fieldManualPackage('catalog.damage.storm', options);
+  const basePackages: readonly RulesetPackageSource[] = Object.freeze([
+    rulesetPackageSource(fieldManual),
+    rulesetPackageSource(primitivesPackage),
+  ]);
+  const basePrepared = prepareRulesetCompilation({
+    composition: composeFreshRuleset([], options.version),
+    packages: basePackages,
+  });
+  if (!basePrepared.ok) {
+    throw new Error(
+      `fresh derivation failed: ${canonicalJson(basePrepared.diagnostics)}`,
+    );
+  }
+  const arcDerivation = basePrepared.prepared.derivationProvenance.find(
+    (provenance) => provenance.definitionId === 'rulebench.arc-lash-stormfront',
+  );
+  if (arcDerivation === undefined) {
+    throw new Error(
+      'fresh derivation did not materialize rulebench.arc-lash-stormfront',
+    );
+  }
+  const semanticOverlay = overlayPackage({
+    id: 'rulebench.stormfront-balance',
+    version: options.version,
+    targetPackageVersion: options.version,
+    expectedFingerprint: arcDerivation.materializedFingerprint,
+    plane: 'semantic',
+    path: fieldPath('targets', 'maximumRange'),
+    value: 8,
+  });
+  const semanticPrepared = prepareRulesetCompilation({
+    composition: composeFreshRuleset(
+      ['rulebench.stormfront-balance'],
+      options.version,
+    ),
+    packages: [...basePackages, rulesetPackageSource(semanticOverlay)],
+  });
+  if (!semanticPrepared.ok) {
+    throw new Error(
+      `fresh semantic overlay failed: ${canonicalJson(semanticPrepared.diagnostics)}`,
+    );
+  }
+  const semanticOverlayProvenance =
+    semanticPrepared.prepared.overlayProvenance[0];
+  if (semanticOverlayProvenance === undefined) {
+    throw new Error('fresh semantic overlay did not emit provenance');
+  }
+  const presentationOverlay = overlayPackage({
+    id: 'rulebench.stormfront-presentation',
+    version: options.version,
+    targetPackageVersion: options.version,
+    expectedFingerprint: semanticOverlayProvenance.afterFingerprint,
+    plane: 'presentation',
+    path: fieldPath('label'),
+    value: 'Arc Lash: Stormfront',
+  });
+  return {
+    composition: composeFreshRuleset(
+      ['rulebench.stormfront-balance', 'rulebench.stormfront-presentation'],
+      options.version,
+    ),
+    packages: Object.freeze([
+      ...basePackages,
+      rulesetPackageSource(semanticOverlay),
+      rulesetPackageSource(presentationOverlay),
+    ]),
+  };
+}
+
 function authoredActions(
   stormDamageDefinitionId: string,
+  arcLashDamageBonus: number,
 ): readonly AuthoredAction[] {
   const power = statId('catalog.stat.power');
   const guard = defenseId('catalog.defense.guard');
@@ -210,7 +367,10 @@ function authoredActions(
         hit: when(
           compare(readStat('actor', power), 'greaterThan', constant(0)),
           damage({
-            amount: add(dice({ count: 2, sides: 6 }), constant(1)),
+            amount: add(
+              dice({ count: 2, sides: 6 }),
+              constant(arcLashDamageBonus),
+            ),
             type: storm,
           }),
           damage({ amount: dice({ count: 1, sides: 6 }), type: storm }),
@@ -243,14 +403,24 @@ function authoredActions(
   ]);
 }
 
-function fieldManualPackage(stormDamageDefinitionId: string) {
-  const actions = authoredActions(stormDamageDefinitionId);
+function fieldManualPackage(
+  stormDamageDefinitionId: string,
+  options: {
+    readonly version: string;
+    readonly arcLashDamageBonus: number;
+  },
+) {
+  const actions = authoredActions(
+    stormDamageDefinitionId,
+    options.arcLashDamageBonus,
+  );
   const definitions = actions.map((authored) =>
     defineActionDefinition({
       kind: 'action',
       id: authored.id,
       visibility: 'public',
-      extensionPolicy: 'patchable',
+      extensionPolicy:
+        authored.id === 'rulebench.arc-lash' ? 'derivable' : 'patchable',
       source: {
         module: 'packages/rulebench-field-manual.ts',
         declaration: authored.id,
@@ -264,8 +434,24 @@ function fieldManualPackage(stormDamageDefinitionId: string) {
       action: authored,
     }),
   );
+  const derivedArcLash = defineDerivedDefinition({
+    kind: 'derived',
+    id: 'rulebench.arc-lash-stormfront',
+    materializesAs: 'action',
+    visibility: 'public',
+    extensionPolicy: 'patchable',
+    source: {
+      module: 'packages/rulebench-field-manual.ts',
+      declaration: 'arcLashStormfront',
+    },
+    references: actionReferences(
+      'rulebench.arc-lash-stormfront',
+      stormDamageDefinitionId,
+    ),
+    presentation: { label: 'Arc Lash Stormfront' },
+  });
   return defineRulesetPackage({
-    identity: { id: 'rulebench.field-manual', version: '1.0.0' },
+    identity: { id: 'rulebench.field-manual', version: options.version },
     entry: {
       module: 'packages/rulebench-field-manual.ts',
       declaration: 'default',
@@ -296,10 +482,47 @@ function fieldManualPackage(stormDamageDefinitionId: string) {
         { id: 'capability.vitality', version: 1 },
       ],
     },
-    definitions,
-    exports: definitions.map((definition) => definition.id),
+    definitions: [...definitions, derivedArcLash],
+    exports: [...definitions, derivedArcLash].map(
+      (definition) => definition.id,
+    ),
     policyBindings: [],
-    relationships: [],
+    relationships: [
+      defineRulesetRelationship({
+        kind: 'derivesFrom',
+        definitionId: derivedArcLash.id,
+        target: definitionReference({ definitionId: 'rulebench.arc-lash' }),
+        mixins: [
+          {
+            target: definitionReference({
+              importAs: 'primitives',
+              definitionId: 'rulebench.double-range',
+            }),
+            parameters: { factor: 2 },
+          },
+          {
+            target: definitionReference({
+              importAs: 'primitives',
+              definitionId: 'rulebench.extend-range',
+            }),
+            parameters: { amount: 1 },
+          },
+        ],
+        localPatch: {
+          version: 1,
+          operations: [
+            {
+              kind: 'setScalar',
+              plane: 'presentation',
+              path: fieldPath('description'),
+              value:
+                'Derived from Arc Lash through two ordered mixins and a local patch.',
+            },
+          ],
+        },
+        version: 1,
+      }),
+    ],
   });
 }
 
@@ -310,7 +533,8 @@ function actionReferences(
   const references =
     actionIdentity === 'rulebench.tactical-advance'
       ? ['catalog.modifier.exposed', 'catalog.stat.power']
-      : actionIdentity === 'rulebench.arc-lash'
+      : actionIdentity === 'rulebench.arc-lash' ||
+          actionIdentity === 'rulebench.arc-lash-stormfront'
         ? [
             stormDamageDefinitionId,
             'catalog.stat.power',
@@ -323,6 +547,87 @@ function actionReferences(
       definitionReference({ importAs: 'primitives', definitionId }),
     ),
   );
+}
+
+function composeFreshRuleset(
+  overlays: readonly string[],
+  fieldManualVersion: string,
+): RulesetCompositionManifest {
+  return composeRuleset({
+    identity: { id: 'rulebench.fresh-start', version: fieldManualVersion },
+    language: { id: 'asha-rpg', version: '^1.0.0' },
+    base: rulesetPackageRequest({
+      id: 'rulebench.field-manual',
+      version: fieldManualVersion,
+    }),
+    add: [
+      rulesetPackageRequest({ id: 'rulebench.primitives', version: '1.0.0' }),
+    ],
+    overlays: overlays.map((id) =>
+      rulesetPackageRequest({ id, version: fieldManualVersion }),
+    ),
+    configure: {},
+  });
+}
+
+function overlayPackage(options: {
+  readonly id: string;
+  readonly version: string;
+  readonly targetPackageVersion: string;
+  readonly expectedFingerprint: string;
+  readonly plane: 'semantic' | 'presentation';
+  readonly path: ReturnType<typeof fieldPath>;
+  readonly value: string | number | boolean;
+}) {
+  return defineRulesetPackage({
+    identity: { id: options.id, version: options.version },
+    entry: { module: `packages/${options.id}.ts`, declaration: 'default' },
+    language: { id: 'asha-rpg', version: '^1.0.0' },
+    dependencies: [
+      rulesetDependency({
+        id: 'rulebench.field-manual',
+        version: options.targetPackageVersion,
+        importAs: 'fieldManual',
+      }),
+    ],
+    requirements: { operations: [], capabilities: [] },
+    definitions: [],
+    exports: [],
+    policyBindings: [],
+    relationships: [
+      defineRulesetRelationship({
+        kind: 'patches',
+        definitionId: `${options.id}.patch`,
+        target: definitionReference({
+          importAs: 'fieldManual',
+          definitionId: 'rulebench.arc-lash-stormfront',
+        }),
+        targetPackage: {
+          id: 'rulebench.field-manual',
+          version: options.targetPackageVersion,
+        },
+        expectedFingerprint: options.expectedFingerprint,
+        patch: {
+          version: 1,
+          operations: [
+            {
+              kind: 'setScalar',
+              plane: options.plane,
+              path: options.path,
+              value: options.value,
+            },
+          ],
+        },
+        plane: options.plane,
+        conflictPolicy: 'reject',
+        version: 1,
+      }),
+    ],
+  });
+}
+
+function fieldPath(...names: readonly string[]) {
+  return names.map((name) => ({ kind: 'field' as const, name }));
 }
 
 function support(

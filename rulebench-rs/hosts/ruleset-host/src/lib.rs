@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 
-use std::sync::Mutex;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Mutex,
+};
 
 use rpg_compiler::{
     compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRpgAction,
@@ -14,12 +17,14 @@ use rpg_core::{
 };
 use rpg_ir::{
     CompiledRulesetArtifact, MaterializedRulesetDefinitionKind, MaterializedRulesetVisibility,
-    RulesetDependencyRelationship, RulesetExtensionPolicy, RulesetRelationshipKind,
+    RulesetConflictPolicy, RulesetDependencyRelationship, RulesetExtensionPolicy,
+    RulesetImpactPlane, RulesetRelationshipKind,
 };
 use rpg_runtime::{
     RpgAuthorityCommand, RpgAuthoritySession, RpgCommandOutcome, RpgReactionCommand,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -99,6 +104,7 @@ pub struct RulesetRequirementDto {
 #[ts(rename_all = "camelCase")]
 pub struct RulesetDefinitionDto {
     pub id: String,
+    pub fingerprint: String,
     pub label: Option<String>,
     pub kind: String,
     pub visibility: String,
@@ -132,6 +138,57 @@ pub struct RulesetFingerprintDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct RulesetPatchChangeDto {
+    pub plane: String,
+    pub path: String,
+    pub before: String,
+    pub after: String,
+    pub effective: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetMixinProvenanceDto {
+    pub identity: String,
+    pub fingerprint: String,
+    pub parameters: Vec<String>,
+    pub order: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetDerivationProvenanceDto {
+    pub definition_id: String,
+    pub owner: String,
+    pub base: String,
+    pub base_fingerprint: String,
+    pub mixins: Vec<RulesetMixinProvenanceDto>,
+    pub local_patch_fingerprint: String,
+    pub materialized_fingerprint: String,
+    pub changes: Vec<RulesetPatchChangeDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetOverlayProvenanceDto {
+    pub overlay: String,
+    pub target: String,
+    pub expected_fingerprint: String,
+    pub before_fingerprint: String,
+    pub after_fingerprint: String,
+    pub plane: String,
+    pub conflict_policy: String,
+    pub patch_fingerprint: String,
+    pub order: usize,
+    pub changes: Vec<RulesetPatchChangeDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct RulesetArtifactSummaryDto {
     pub schema: RulesetIdentityDto,
     pub artifact_id: String,
@@ -147,7 +204,40 @@ pub struct RulesetArtifactSummaryDto {
     pub relationships: Vec<RulesetRelationshipDto>,
     pub derivation_slots: usize,
     pub overlay_slots: usize,
+    pub derivations: Vec<RulesetDerivationProvenanceDto>,
+    pub overlays: Vec<RulesetOverlayProvenanceDto>,
     pub fingerprints: RulesetFingerprintDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetUpgradeFieldDto {
+    pub plane: String,
+    pub path: String,
+    pub before: String,
+    pub after: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetUpgradeDefinitionDto {
+    pub definition_id: String,
+    pub change: String,
+    pub descendant: bool,
+    pub causes: Vec<String>,
+    pub fields: Vec<RulesetUpgradeFieldDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetUpgradeImpactDto {
+    pub from_artifact_id: String,
+    pub to_artifact_id: String,
+    pub source_changes: Vec<String>,
+    pub definitions: Vec<RulesetUpgradeDefinitionDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -333,6 +423,7 @@ pub struct RulesetWorkspaceResponseDto {
     pub status: RulesetLifecycleStatus,
     pub active_artifact: Option<RulesetArtifactSummaryDto>,
     pub candidate_artifact: Option<RulesetArtifactSummaryDto>,
+    pub upgrade_impact: Option<RulesetUpgradeImpactDto>,
     pub activation_revision: u32,
     pub gameplay_available: bool,
     pub gameplay: Option<GameplaySessionDto>,
@@ -343,15 +434,7 @@ pub struct RulesetWorkspaceResponseDto {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
 pub struct RulesetCompileRequestDto {
-    pub source_id: RulesetSourceIdDto,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub enum RulesetSourceIdDto {
-    Fresh,
-    MissingSupport,
+    pub source_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -399,6 +482,10 @@ struct ActivationSlots {
 impl ActivationSlots {
     fn stage(&mut self, candidate: CompiledRulesetBundle) {
         self.candidate = Some(candidate);
+    }
+
+    fn clear_candidate(&mut self) {
+        self.candidate = None;
     }
 
     fn activate(&mut self) -> bool {
@@ -459,12 +546,14 @@ impl RulesetHost {
                     response_from_slots(true, &slots, Vec::new())
                 }
                 Err(diagnostics) => {
-                    let slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+                    let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+                    slots.clear_candidate();
                     response_from_slots(false, &slots, diagnostics)
                 }
             },
             Err(failure) => {
-                let slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+                let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+                slots.clear_candidate();
                 response_from_slots(false, &slots, diagnostics_from_failure(failure))
             }
         }
@@ -585,6 +674,13 @@ fn response_from_slots(
     slots: &ActivationSlots,
     diagnostics: Vec<RulesetDiagnosticDto>,
 ) -> RulesetWorkspaceResponseDto {
+    let upgrade_impact = match (&slots.active, &slots.candidate) {
+        (Some(active), Some(candidate)) => Some(upgrade_impact(
+            active.bundle.artifact(),
+            candidate.artifact(),
+        )),
+        _ => None,
+    };
     RulesetWorkspaceResponseDto {
         ok,
         status: slots.status(),
@@ -596,10 +692,260 @@ fn response_from_slots(
             .candidate
             .as_ref()
             .map(|bundle| artifact_summary(bundle.artifact())),
+        upgrade_impact,
         activation_revision: slots.activation_revision,
         gameplay_available: slots.active.is_some(),
         gameplay: slots.active.as_ref().map(gameplay_session),
         diagnostics,
+    }
+}
+
+fn upgrade_impact(
+    active: &CompiledRulesetArtifact,
+    candidate: &CompiledRulesetArtifact,
+) -> RulesetUpgradeImpactDto {
+    let active_sources = active
+        .source_packages
+        .iter()
+        .map(|source| (source.id.as_str(), source))
+        .collect::<BTreeMap<_, _>>();
+    let candidate_sources = candidate
+        .source_packages
+        .iter()
+        .map(|source| (source.id.as_str(), source))
+        .collect::<BTreeMap<_, _>>();
+    let mut source_changes = Vec::new();
+    let source_ids = active_sources
+        .keys()
+        .chain(candidate_sources.keys())
+        .copied()
+        .collect::<BTreeSet<_>>();
+    for source_id in source_ids {
+        let before = active_sources.get(source_id);
+        let after = candidate_sources.get(source_id);
+        let change = match (before, after) {
+            (Some(before), Some(after))
+                if before.version != after.version
+                    || before.source_fingerprint != after.source_fingerprint =>
+            {
+                Some(format!(
+                    "{source_id}: {} ({}) → {} ({})",
+                    before.version,
+                    before.source_fingerprint,
+                    after.version,
+                    after.source_fingerprint
+                ))
+            }
+            (Some(before), None) => Some(format!(
+                "{source_id}: {} ({}) → removed",
+                before.version, before.source_fingerprint
+            )),
+            (None, Some(after)) => Some(format!(
+                "{source_id}: added {} ({})",
+                after.version, after.source_fingerprint
+            )),
+            _ => None,
+        };
+        if let Some(change) = change {
+            source_changes.push(change);
+        }
+    }
+
+    let active_definitions = active
+        .materialized_definitions
+        .iter()
+        .map(|definition| (definition.id.as_str(), definition))
+        .collect::<BTreeMap<_, _>>();
+    let candidate_definitions = candidate
+        .materialized_definitions
+        .iter()
+        .map(|definition| (definition.id.as_str(), definition))
+        .collect::<BTreeMap<_, _>>();
+    let mut definitions = Vec::new();
+    let definition_ids = active_definitions
+        .keys()
+        .chain(candidate_definitions.keys())
+        .copied()
+        .collect::<BTreeSet<_>>();
+    for definition_id in definition_ids {
+        let before = active_definitions.get(definition_id).copied();
+        let after = candidate_definitions.get(definition_id).copied();
+        if before.map(|definition| &definition.fingerprint)
+            == after.map(|definition| &definition.fingerprint)
+        {
+            continue;
+        }
+        let mut fields = Vec::new();
+        diff_json_values(
+            "semantic",
+            "$.semantic",
+            before.map(|definition| &definition.semantic),
+            after.map(|definition| &definition.semantic),
+            &mut fields,
+        );
+        diff_json_values(
+            "presentation",
+            "$.presentation",
+            before.map(|definition| &definition.presentation),
+            after.map(|definition| &definition.presentation),
+            &mut fields,
+        );
+        let change = match (before, after) {
+            (None, Some(_)) => "added",
+            (Some(_), None) => "removed",
+            (Some(_), Some(_)) => "changed",
+            (None, None) => continue,
+        };
+        definitions.push(RulesetUpgradeDefinitionDto {
+            definition_id: definition_id.to_owned(),
+            change: change.to_owned(),
+            descendant: is_derived_definition(active, definition_id)
+                || is_derived_definition(candidate, definition_id),
+            causes: upgrade_causes(active, candidate, definition_id, before, after),
+            fields,
+        });
+    }
+
+    RulesetUpgradeImpactDto {
+        from_artifact_id: active.artifact_id.clone(),
+        to_artifact_id: candidate.artifact_id.clone(),
+        source_changes,
+        definitions,
+    }
+}
+
+fn is_derived_definition(artifact: &CompiledRulesetArtifact, definition_id: &str) -> bool {
+    artifact
+        .derivation_provenance
+        .iter()
+        .any(|provenance| provenance.definition_id == definition_id)
+}
+
+fn upgrade_causes(
+    active: &CompiledRulesetArtifact,
+    candidate: &CompiledRulesetArtifact,
+    definition_id: &str,
+    before: Option<&rpg_ir::MaterializedRulesetDefinition>,
+    after: Option<&rpg_ir::MaterializedRulesetDefinition>,
+) -> Vec<String> {
+    let mut causes = Vec::new();
+    if before.map(|definition| {
+        (
+            definition.provenance.package_id.as_str(),
+            definition.provenance.package_version.as_str(),
+        )
+    }) != after.map(|definition| {
+        (
+            definition.provenance.package_id.as_str(),
+            definition.provenance.package_version.as_str(),
+        )
+    }) {
+        causes.push("definition owner version changed".to_owned());
+    }
+    let active_derivation = active
+        .derivation_provenance
+        .iter()
+        .find(|provenance| provenance.definition_id == definition_id);
+    let candidate_derivation = candidate
+        .derivation_provenance
+        .iter()
+        .find(|provenance| provenance.definition_id == definition_id);
+    match (active_derivation, candidate_derivation) {
+        (Some(before), Some(after)) => {
+            if before.base_package_id != after.base_package_id
+                || before.base_package_version != after.base_package_version
+                || before.base_definition_id != after.base_definition_id
+                || before.base_fingerprint != after.base_fingerprint
+            {
+                causes.push("primary base identity or fingerprint changed".to_owned());
+            }
+            if before.mixins != after.mixins {
+                causes.push(
+                    "ordered mixin identities, parameters, or fingerprints changed".to_owned(),
+                );
+            }
+            if before.local_patch_fingerprint != after.local_patch_fingerprint {
+                causes.push("local patch fingerprint changed".to_owned());
+            }
+        }
+        (None, Some(_)) => causes.push("definition became derived".to_owned()),
+        (Some(_), None) => causes.push("definition is no longer derived".to_owned()),
+        (None, None) => {}
+    }
+    let active_overlays = active
+        .overlay_provenance
+        .iter()
+        .filter(|provenance| provenance.target_definition_id == definition_id)
+        .collect::<Vec<_>>();
+    let candidate_overlays = candidate
+        .overlay_provenance
+        .iter()
+        .filter(|provenance| provenance.target_definition_id == definition_id)
+        .collect::<Vec<_>>();
+    if active_overlays != candidate_overlays {
+        causes.push("composition-ordered overlay provenance changed".to_owned());
+    }
+    if causes.is_empty() {
+        causes.push("materialized definition fields changed".to_owned());
+    }
+    causes
+}
+
+fn diff_json_values(
+    plane: &str,
+    path: &str,
+    before: Option<&Value>,
+    after: Option<&Value>,
+    fields: &mut Vec<RulesetUpgradeFieldDto>,
+) {
+    if before == after {
+        return;
+    }
+    match (before, after) {
+        (Some(Value::Object(before)), Some(Value::Object(after))) => {
+            for key in before.keys().chain(after.keys()) {
+                let child_path = json_field_path(path, key);
+                let before_value = before.get(key);
+                let after_value = after.get(key);
+                if fields.last().is_some_and(|field| field.path == child_path) {
+                    continue;
+                }
+                diff_json_values(plane, &child_path, before_value, after_value, fields);
+            }
+        }
+        (Some(Value::Array(before)), Some(Value::Array(after))) => {
+            let length = before.len().max(after.len());
+            for index in 0..length {
+                diff_json_values(
+                    plane,
+                    &format!("{path}[{index}]"),
+                    before.get(index),
+                    after.get(index),
+                    fields,
+                );
+            }
+        }
+        _ => fields.push(RulesetUpgradeFieldDto {
+            plane: plane.to_owned(),
+            path: path.to_owned(),
+            before: before
+                .map(json_value)
+                .unwrap_or_else(|| "<missing>".to_owned()),
+            after: after
+                .map(json_value)
+                .unwrap_or_else(|| "<missing>".to_owned()),
+        }),
+    }
+}
+
+fn json_field_path(parent: &str, field: &str) -> String {
+    if field
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        format!("{parent}.{field}")
+    } else {
+        format!("{parent}[{}]", json_value(&Value::String(field.to_owned())))
     }
 }
 
@@ -1130,6 +1476,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
             .iter()
             .map(|definition| RulesetDefinitionDto {
                 id: definition.id.clone(),
+                fingerprint: definition.fingerprint.clone(),
                 label: definition
                     .presentation
                     .get("label")
@@ -1162,11 +1509,99 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
             .collect(),
         derivation_slots: artifact.derivation_provenance.len(),
         overlay_slots: artifact.overlay_provenance.len(),
+        derivations: artifact
+            .derivation_provenance
+            .iter()
+            .map(|provenance| RulesetDerivationProvenanceDto {
+                definition_id: provenance.definition_id.clone(),
+                owner: format!("{}@{}", provenance.package_id, provenance.package_version),
+                base: format!(
+                    "{}@{}#{}",
+                    provenance.base_package_id,
+                    provenance.base_package_version,
+                    provenance.base_definition_id
+                ),
+                base_fingerprint: provenance.base_fingerprint.clone(),
+                mixins: provenance
+                    .mixins
+                    .iter()
+                    .map(|mixin| RulesetMixinProvenanceDto {
+                        identity: format!(
+                            "{}@{}#{}",
+                            mixin.package_id, mixin.package_version, mixin.definition_id
+                        ),
+                        fingerprint: mixin.fingerprint.clone(),
+                        parameters: mixin
+                            .parameters
+                            .iter()
+                            .map(|(id, value)| format!("{id}={}", json_value(value)))
+                            .collect(),
+                        order: mixin.order,
+                    })
+                    .collect(),
+                local_patch_fingerprint: provenance.local_patch_fingerprint.clone(),
+                materialized_fingerprint: provenance.materialized_fingerprint.clone(),
+                changes: provenance.changes.iter().map(patch_change).collect(),
+            })
+            .collect(),
+        overlays: artifact
+            .overlay_provenance
+            .iter()
+            .map(|provenance| RulesetOverlayProvenanceDto {
+                overlay: format!(
+                    "{}@{}",
+                    provenance.overlay_package_id, provenance.overlay_package_version
+                ),
+                target: format!(
+                    "{}@{}#{}",
+                    provenance.target_package_id,
+                    provenance.target_package_version,
+                    provenance.target_definition_id
+                ),
+                expected_fingerprint: provenance.expected_fingerprint.clone(),
+                before_fingerprint: provenance.before_fingerprint.clone(),
+                after_fingerprint: provenance.after_fingerprint.clone(),
+                plane: impact_plane(provenance.plane).to_owned(),
+                conflict_policy: conflict_policy(provenance.conflict_policy).to_owned(),
+                patch_fingerprint: provenance.patch_fingerprint.clone(),
+                order: provenance.order,
+                changes: provenance.changes.iter().map(patch_change).collect(),
+            })
+            .collect(),
         fingerprints: RulesetFingerprintDto {
             source: artifact.fingerprints.source.clone(),
             semantic: artifact.fingerprints.semantic.clone(),
             presentation: artifact.fingerprints.presentation.clone(),
         },
+    }
+}
+
+fn patch_change(change: &rpg_ir::RulesetPatchChangeProvenance) -> RulesetPatchChangeDto {
+    RulesetPatchChangeDto {
+        plane: impact_plane(change.plane).to_owned(),
+        path: change.path.clone(),
+        before: json_value(&change.before),
+        after: json_value(&change.after),
+        effective: change.effective,
+    }
+}
+
+fn json_value(value: &serde_json::Value) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "<unencodable>".to_owned())
+}
+
+fn impact_plane(plane: RulesetImpactPlane) -> &'static str {
+    match plane {
+        RulesetImpactPlane::Semantic => "semantic",
+        RulesetImpactPlane::Presentation => "presentation",
+        RulesetImpactPlane::Both => "both",
+    }
+}
+
+fn conflict_policy(policy: RulesetConflictPolicy) -> &'static str {
+    match policy {
+        RulesetConflictPolicy::Reject => "reject",
+        RulesetConflictPolicy::Replace => "replace",
     }
 }
 
@@ -1224,7 +1659,14 @@ pub fn generated_protocol() -> String {
         RulesetDefinitionDto::decl(),
         RulesetRelationshipDto::decl(),
         RulesetFingerprintDto::decl(),
+        RulesetPatchChangeDto::decl(),
+        RulesetMixinProvenanceDto::decl(),
+        RulesetDerivationProvenanceDto::decl(),
+        RulesetOverlayProvenanceDto::decl(),
         RulesetArtifactSummaryDto::decl(),
+        RulesetUpgradeFieldDto::decl(),
+        RulesetUpgradeDefinitionDto::decl(),
+        RulesetUpgradeImpactDto::decl(),
         GameplayCostDto::decl(),
         GameplayRandomRequestDto::decl(),
         GameplayRandomPlanConditionKindDto::decl(),
@@ -1242,7 +1684,6 @@ pub fn generated_protocol() -> String {
         GameplayResultDto::decl(),
         GameplaySessionDto::decl(),
         RulesetWorkspaceResponseDto::decl(),
-        RulesetSourceIdDto::decl(),
         RulesetCompileRequestDto::decl(),
         PreparedRulesetCompileRequestDto::decl(),
         GameplayCommandRequestDto::decl(),

@@ -3,7 +3,6 @@ import {
   type GameplayCommandRequestDto,
   type GameplayReactionRequestDto,
   type RulesetCompileRequestDto,
-  type RulesetSourceIdDto,
   type RulesetWorkspaceResponseDto,
 } from '@asha-rulebench/protocol';
 
@@ -17,9 +16,7 @@ export interface JsonHttpClient {
 
 export interface RulesetTransport {
   readonly status: () => Promise<RulesetWorkspaceResponseDto>;
-  readonly compile: (
-    sourceId: RulesetSourceIdDto,
-  ) => Promise<RulesetWorkspaceResponseDto>;
+  readonly compile: (sourceId: string) => Promise<RulesetWorkspaceResponseDto>;
   readonly activate: () => Promise<RulesetWorkspaceResponseDto>;
   readonly command: (
     command: GameplayCommandRequestDto,

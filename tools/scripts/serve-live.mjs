@@ -26,8 +26,10 @@ const authoringModuleUrl = pathToFileURL(
     'index.js',
   ),
 );
-const { prepareRulebenchRulesetSource } = await import(
-  `${authoringModuleUrl.href}?startup=${Date.now()}`
+const { prepareRulebenchRulesetSource, RULEBENCH_RULESET_SOURCE_OPTIONS } =
+  await import(`${authoringModuleUrl.href}?startup=${Date.now()}`);
+const knownSourceIds = new Set(
+  RULEBENCH_RULESET_SOURCE_OPTIONS.map((option) => option.id),
 );
 
 const rustHostPort = await freePort();
@@ -72,6 +74,7 @@ const authoringGateway = await startAuthoringGateway(
   gatewayPort,
   rustHostUrl,
   prepareRulebenchRulesetSource,
+  knownSourceIds,
 );
 
 const angular = spawn(
@@ -123,7 +126,7 @@ function freePort() {
   });
 }
 
-function startAuthoringGateway(port, rustHostUrl, prepareSource) {
+function startAuthoringGateway(port, rustHostUrl, prepareSource, sourceIds) {
   const server = createHttpServer(async (request, response) => {
     try {
       if (request.method === 'POST' && request.url === '/api/ruleset/compile') {
@@ -133,7 +136,8 @@ function startAuthoringGateway(port, rustHostUrl, prepareSource) {
           typeof body !== 'object' ||
           Array.isArray(body) ||
           !('sourceId' in body) ||
-          (body.sourceId !== 'fresh' && body.sourceId !== 'missingSupport')
+          typeof body.sourceId !== 'string' ||
+          !sourceIds.has(body.sourceId)
         ) {
           await respondWithGatewayDiagnostic(
             response,
@@ -141,7 +145,7 @@ function startAuthoringGateway(port, rustHostUrl, prepareSource) {
             400,
             'RULESET_SOURCE_SELECTION_INVALID',
             '$.sourceId',
-            'sourceId must be fresh or missingSupport',
+            `sourceId must be one of ${[...sourceIds].join(', ')}`,
           );
           return;
         }

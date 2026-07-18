@@ -17,15 +17,22 @@ import type {
   GameplayTraceDto,
   RulesetArtifactSummaryDto,
   RulesetDefinitionDto,
+  RulesetDerivationProvenanceDto,
   RulesetDiagnosticDto,
   RulesetDiagnosticSourceDto,
   RulesetFingerprintDto,
   RulesetIdentityDto,
   RulesetLifecycleStatus,
   RulesetLockEntryDto,
+  RulesetMixinProvenanceDto,
+  RulesetOverlayProvenanceDto,
+  RulesetPatchChangeDto,
   RulesetRelationshipDto,
   RulesetRequirementDto,
   RulesetSourcePackageDto,
+  RulesetUpgradeDefinitionDto,
+  RulesetUpgradeFieldDto,
+  RulesetUpgradeImpactDto,
   RulesetWorkspaceResponseDto,
 } from '../generated/ruleset-protocol.js';
 
@@ -47,6 +54,7 @@ export function decodeRulesetWorkspaceResponse(
       'status',
       'activeArtifact',
       'candidateArtifact',
+      'upgradeImpact',
       'activationRevision',
       'gameplayAvailable',
       'gameplay',
@@ -64,6 +72,10 @@ export function decodeRulesetWorkspaceResponse(
     candidateArtifact: nullableArtifact(
       record['candidateArtifact'],
       '$.candidateArtifact',
+    ),
+    upgradeImpact: nullableUpgradeImpact(
+      record['upgradeImpact'],
+      '$.upgradeImpact',
     ),
     activationRevision: nonNegativeInteger(
       record['activationRevision'],
@@ -161,11 +173,9 @@ function gameplayAction(value: unknown, path: string): GameplayActionDto {
     costs: requiredArray(record['costs'], `${path}.costs`).map((entry, index) =>
       gameplayCost(entry, `${path}.costs[${index}]`),
     ),
-    randomPlan: requiredArray(
-      record['randomPlan'],
-      `${path}.randomPlan`,
-    ).map((entry, index) =>
-      gameplayRandomPlanEntry(entry, `${path}.randomPlan[${index}]`),
+    randomPlan: requiredArray(record['randomPlan'], `${path}.randomPlan`).map(
+      (entry, index) =>
+        gameplayRandomPlanEntry(entry, `${path}.randomPlan[${index}]`),
     ),
     candidateIds: stringArray(record['candidateIds'], `${path}.candidateIds`),
   };
@@ -204,10 +214,7 @@ function gameplayRandomPlanEntry(
     request: gameplayRandomRequest(record['request'], `${path}.request`),
     conditions: requiredArray(record['conditions'], `${path}.conditions`).map(
       (condition, index) =>
-        gameplayRandomPlanCondition(
-          condition,
-          `${path}.conditions[${index}]`,
-        ),
+        gameplayRandomPlanCondition(condition, `${path}.conditions[${index}]`),
     ),
   };
 }
@@ -241,7 +248,10 @@ function randomPlanConditionKind(
     case 'anyPreviousFalse':
       return kind;
     default:
-      throw new RulesetProtocolDecodeError(path, `unknown random branch ${kind}`);
+      throw new RulesetProtocolDecodeError(
+        path,
+        `unknown random branch ${kind}`,
+      );
   }
 }
 
@@ -439,6 +449,74 @@ function gameplayTrace(value: unknown, path: string): GameplayTraceDto {
   };
 }
 
+function nullableUpgradeImpact(
+  value: unknown,
+  path: string,
+): RulesetUpgradeImpactDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['fromArtifactId', 'toArtifactId', 'sourceChanges', 'definitions'],
+    path,
+  );
+  return {
+    fromArtifactId: requiredString(
+      record['fromArtifactId'],
+      `${path}.fromArtifactId`,
+    ),
+    toArtifactId: requiredString(
+      record['toArtifactId'],
+      `${path}.toArtifactId`,
+    ),
+    sourceChanges: stringArray(
+      record['sourceChanges'],
+      `${path}.sourceChanges`,
+    ),
+    definitions: requiredArray(
+      record['definitions'],
+      `${path}.definitions`,
+    ).map((entry, index) =>
+      upgradeDefinition(entry, `${path}.definitions[${index}]`),
+    ),
+  };
+}
+
+function upgradeDefinition(
+  value: unknown,
+  path: string,
+): RulesetUpgradeDefinitionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['definitionId', 'change', 'descendant', 'causes', 'fields'],
+    path,
+  );
+  return {
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    change: requiredString(record['change'], `${path}.change`),
+    descendant: requiredBoolean(record['descendant'], `${path}.descendant`),
+    causes: stringArray(record['causes'], `${path}.causes`),
+    fields: requiredArray(record['fields'], `${path}.fields`).map(
+      (entry, index) => upgradeField(entry, `${path}.fields[${index}]`),
+    ),
+  };
+}
+
+function upgradeField(value: unknown, path: string): RulesetUpgradeFieldDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['plane', 'path', 'before', 'after'], path);
+  return {
+    plane: requiredString(record['plane'], `${path}.plane`),
+    path: requiredString(record['path'], `${path}.path`),
+    before: requiredString(record['before'], `${path}.before`),
+    after: requiredString(record['after'], `${path}.after`),
+  };
+}
+
 function nullableArtifact(
   value: unknown,
   path: string,
@@ -465,6 +543,8 @@ function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
       'relationships',
       'derivationSlots',
       'overlaySlots',
+      'derivations',
+      'overlays',
       'fingerprints',
     ],
     path,
@@ -524,7 +604,133 @@ function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
       record['overlaySlots'],
       `${path}.overlaySlots`,
     ),
+    derivations: requiredArray(
+      record['derivations'],
+      `${path}.derivations`,
+    ).map((entry, index) => derivation(entry, `${path}.derivations[${index}]`)),
+    overlays: requiredArray(record['overlays'], `${path}.overlays`).map(
+      (entry, index) => overlay(entry, `${path}.overlays[${index}]`),
+    ),
     fingerprints: fingerprints(record['fingerprints'], `${path}.fingerprints`),
+  };
+}
+
+function derivation(
+  value: unknown,
+  path: string,
+): RulesetDerivationProvenanceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'definitionId',
+      'owner',
+      'base',
+      'baseFingerprint',
+      'mixins',
+      'localPatchFingerprint',
+      'materializedFingerprint',
+      'changes',
+    ],
+    path,
+  );
+  return {
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    owner: requiredString(record['owner'], `${path}.owner`),
+    base: requiredString(record['base'], `${path}.base`),
+    baseFingerprint: requiredString(
+      record['baseFingerprint'],
+      `${path}.baseFingerprint`,
+    ),
+    mixins: requiredArray(record['mixins'], `${path}.mixins`).map(
+      (entry, index) => mixin(entry, `${path}.mixins[${index}]`),
+    ),
+    localPatchFingerprint: requiredString(
+      record['localPatchFingerprint'],
+      `${path}.localPatchFingerprint`,
+    ),
+    materializedFingerprint: requiredString(
+      record['materializedFingerprint'],
+      `${path}.materializedFingerprint`,
+    ),
+    changes: requiredArray(record['changes'], `${path}.changes`).map(
+      (entry, index) => patchChange(entry, `${path}.changes[${index}]`),
+    ),
+  };
+}
+
+function mixin(value: unknown, path: string): RulesetMixinProvenanceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['identity', 'fingerprint', 'parameters', 'order'], path);
+  return {
+    identity: requiredString(record['identity'], `${path}.identity`),
+    fingerprint: requiredString(record['fingerprint'], `${path}.fingerprint`),
+    parameters: stringArray(record['parameters'], `${path}.parameters`),
+    order: nonNegativeInteger(record['order'], `${path}.order`),
+  };
+}
+
+function overlay(value: unknown, path: string): RulesetOverlayProvenanceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'overlay',
+      'target',
+      'expectedFingerprint',
+      'beforeFingerprint',
+      'afterFingerprint',
+      'plane',
+      'conflictPolicy',
+      'patchFingerprint',
+      'order',
+      'changes',
+    ],
+    path,
+  );
+  return {
+    overlay: requiredString(record['overlay'], `${path}.overlay`),
+    target: requiredString(record['target'], `${path}.target`),
+    expectedFingerprint: requiredString(
+      record['expectedFingerprint'],
+      `${path}.expectedFingerprint`,
+    ),
+    beforeFingerprint: requiredString(
+      record['beforeFingerprint'],
+      `${path}.beforeFingerprint`,
+    ),
+    afterFingerprint: requiredString(
+      record['afterFingerprint'],
+      `${path}.afterFingerprint`,
+    ),
+    plane: requiredString(record['plane'], `${path}.plane`),
+    conflictPolicy: requiredString(
+      record['conflictPolicy'],
+      `${path}.conflictPolicy`,
+    ),
+    patchFingerprint: requiredString(
+      record['patchFingerprint'],
+      `${path}.patchFingerprint`,
+    ),
+    order: nonNegativeInteger(record['order'], `${path}.order`),
+    changes: requiredArray(record['changes'], `${path}.changes`).map(
+      (entry, index) => patchChange(entry, `${path}.changes[${index}]`),
+    ),
+  };
+}
+
+function patchChange(value: unknown, path: string): RulesetPatchChangeDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['plane', 'path', 'before', 'after', 'effective'], path);
+  return {
+    plane: requiredString(record['plane'], `${path}.plane`),
+    path: requiredString(record['path'], `${path}.path`),
+    before: requiredString(record['before'], `${path}.before`),
+    after: requiredString(record['after'], `${path}.after`),
+    effective: requiredBoolean(record['effective'], `${path}.effective`),
   };
 }
 
@@ -653,6 +859,7 @@ function definition(value: unknown, path: string): RulesetDefinitionDto {
     record,
     [
       'id',
+      'fingerprint',
       'label',
       'kind',
       'visibility',
@@ -667,6 +874,7 @@ function definition(value: unknown, path: string): RulesetDefinitionDto {
   );
   return {
     id: requiredString(record['id'], `${path}.id`),
+    fingerprint: requiredString(record['fingerprint'], `${path}.fingerprint`),
     label: nullableString(record['label'], `${path}.label`),
     kind: requiredString(record['kind'], `${path}.kind`),
     visibility: requiredString(record['visibility'], `${path}.visibility`),

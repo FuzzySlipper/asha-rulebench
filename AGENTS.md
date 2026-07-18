@@ -84,7 +84,8 @@ gameplay semantics or mutates authoritative state.
 
 ## Non-Claims
 
-The current boundary claims explicit package resolution, Rust compilation,
-closed artifact loading, inspection, and atomic activation. It does not claim
-gameplay execution, persistence, migration, replay compatibility, derivation
-or overlay execution, or exhaustive certification.
+The current boundary claims explicit package resolution, deterministic
+derivation/mixin/overlay materialization, Rust compilation, closed artifact
+loading, provenance inspection, gameplay execution, and atomic activation. It
+does not claim persistence, migration, replay compatibility, or exhaustive
+certification.

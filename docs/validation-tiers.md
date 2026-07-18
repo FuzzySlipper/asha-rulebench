@@ -30,8 +30,10 @@ user-selected request, reaches Rust compilation and a closed artifact loader,
 appears in the user-facing inspection view, and activates atomically. It also
 proves that a subsequent invalid source graph displays its TypeScript
 diagnostics while preserving the active artifact and activation revision. It
-does not prove gameplay execution, persistence, replay, migration,
-derivation/overlay execution, or an exhaustive content corpus.
+does not prove persistence, replay, migration policy, or an exhaustive content
+corpus. The focused gate does cover the fresh gameplay and
+derivation/mixin/overlay graph, including visible materialization provenance
+and a pre-activation 1.0-to-1.1 upgrade-impact report.
 
 ## Downstream posture
 
@@ -49,5 +51,8 @@ BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 
 Inspect all milestone screenshots and the evidence packet. The current live
 claim covers the inactive startup state, per-click source preparation, explicit
-compilation, artifact inspection, activation revision, and failed-recompilation
-preservation. Gameplay remains an explicit non-claim.
+compilation, artifact inspection, activation revision, persistent gameplay
+commands and reaction completion, a pre-activation upgrade-impact report, and
+failed-recompilation preservation. Persistence across activation/process
+restart, replay, migration policy, and exhaustive certification remain explicit
+non-claims.

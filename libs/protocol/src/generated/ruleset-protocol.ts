@@ -14,13 +14,27 @@ export type RulesetLockEntryDto = { requester: string, packageId: string, reques
 
 export type RulesetRequirementDto = { id: string, version: number, };
 
-export type RulesetDefinitionDto = { id: string, label: string | null, kind: string, visibility: string, extensionPolicy: string, references: Array<string>, packageId: string, packageVersion: string, sourceModule: string, sourceDeclaration: string, };
+export type RulesetDefinitionDto = { id: string, fingerprint: string, label: string | null, kind: string, visibility: string, extensionPolicy: string, references: Array<string>, packageId: string, packageVersion: string, sourceModule: string, sourceDeclaration: string, };
 
 export type RulesetRelationshipDto = { kind: string, source: string, target: string, order: number, };
 
 export type RulesetFingerprintDto = { source: string, semantic: string, presentation: string, };
 
-export type RulesetArtifactSummaryDto = { schema: RulesetIdentityDto, artifactId: string, composition: RulesetIdentityDto, language: RulesetIdentityDto, sourcePackages: Array<RulesetSourcePackageDto>, dependencyLock: Array<RulesetLockEntryDto>, requiredOperations: Array<RulesetRequirementDto>, requiredCapabilities: Array<RulesetRequirementDto>, exportedRoots: Array<string>, definitions: Array<RulesetDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<RulesetRelationshipDto>, derivationSlots: number, overlaySlots: number, fingerprints: RulesetFingerprintDto, };
+export type RulesetPatchChangeDto = { plane: string, path: string, before: string, after: string, effective: boolean, };
+
+export type RulesetMixinProvenanceDto = { identity: string, fingerprint: string, parameters: Array<string>, order: number, };
+
+export type RulesetDerivationProvenanceDto = { definitionId: string, owner: string, base: string, baseFingerprint: string, mixins: Array<RulesetMixinProvenanceDto>, localPatchFingerprint: string, materializedFingerprint: string, changes: Array<RulesetPatchChangeDto>, };
+
+export type RulesetOverlayProvenanceDto = { overlay: string, target: string, expectedFingerprint: string, beforeFingerprint: string, afterFingerprint: string, plane: string, conflictPolicy: string, patchFingerprint: string, order: number, changes: Array<RulesetPatchChangeDto>, };
+
+export type RulesetArtifactSummaryDto = { schema: RulesetIdentityDto, artifactId: string, composition: RulesetIdentityDto, language: RulesetIdentityDto, sourcePackages: Array<RulesetSourcePackageDto>, dependencyLock: Array<RulesetLockEntryDto>, requiredOperations: Array<RulesetRequirementDto>, requiredCapabilities: Array<RulesetRequirementDto>, exportedRoots: Array<string>, definitions: Array<RulesetDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<RulesetRelationshipDto>, derivationSlots: number, overlaySlots: number, derivations: Array<RulesetDerivationProvenanceDto>, overlays: Array<RulesetOverlayProvenanceDto>, fingerprints: RulesetFingerprintDto, };
+
+export type RulesetUpgradeFieldDto = { plane: string, path: string, before: string, after: string, };
+
+export type RulesetUpgradeDefinitionDto = { definitionId: string, change: string, descendant: boolean, causes: Array<string>, fields: Array<RulesetUpgradeFieldDto>, };
+
+export type RulesetUpgradeImpactDto = { fromArtifactId: string, toArtifactId: string, sourceChanges: Array<string>, definitions: Array<RulesetUpgradeDefinitionDto>, };
 
 export type GameplayCostDto = { resourceId: string, amount: number, };
 
@@ -54,11 +68,9 @@ export type GameplayResultDto = { status: string, code: string | null, message: 
 
 export type GameplaySessionDto = { actorId: string, stateRevision: number, acceptedRandomValues: number, actions: Array<GameplayActionDto>, preflights: Array<GameplayPreflightDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, lastResult: GameplayResultDto | null, };
 
-export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, activationRevision: number, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
+export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
 
-export type RulesetSourceIdDto = "fresh" | "missingSupport";
-
-export type RulesetCompileRequestDto = { sourceId: RulesetSourceIdDto, };
+export type RulesetCompileRequestDto = { sourceId: string, };
 
 export type PreparedRulesetCompileRequestDto = { preparedSource: string, };
 

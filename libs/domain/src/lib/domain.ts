@@ -1,6 +1,7 @@
 import type {
   GameplayRandomPlanConditionDto,
   GameplayRandomPlanEntryDto,
+  RulesetPatchChangeDto,
   RulesetArtifactSummaryDto,
   RulesetDiagnosticDto,
   RulesetWorkspaceResponseDto,
@@ -21,11 +22,62 @@ export interface RulesetLockView {
 
 export interface RulesetDefinitionView {
   readonly id: string;
+  readonly fingerprint: string;
   readonly label: string;
   readonly contract: string;
   readonly owner: string;
   readonly source: string;
   readonly references: readonly string[];
+}
+
+export interface RulesetPatchChangeView {
+  readonly plane: string;
+  readonly path: string;
+  readonly transition: string;
+  readonly effective: boolean;
+}
+
+export interface RulesetDerivationView {
+  readonly definitionId: string;
+  readonly owner: string;
+  readonly base: string;
+  readonly baseFingerprint: string;
+  readonly mixins: readonly {
+    readonly identity: string;
+    readonly fingerprint: string;
+    readonly parameters: string;
+    readonly order: number;
+  }[];
+  readonly localPatchFingerprint: string;
+  readonly materializedFingerprint: string;
+  readonly changes: readonly RulesetPatchChangeView[];
+}
+
+export interface RulesetOverlayView {
+  readonly overlay: string;
+  readonly target: string;
+  readonly impact: string;
+  readonly expectedFingerprint: string;
+  readonly beforeFingerprint: string;
+  readonly afterFingerprint: string;
+  readonly patchFingerprint: string;
+  readonly order: number;
+  readonly changes: readonly RulesetPatchChangeView[];
+}
+
+export interface RulesetUpgradeImpactView {
+  readonly transition: string;
+  readonly sourceChanges: readonly string[];
+  readonly definitions: readonly {
+    readonly definitionId: string;
+    readonly status: string;
+    readonly causes: readonly string[];
+    readonly fields: readonly {
+      readonly plane: string;
+      readonly path: string;
+      readonly transition: string;
+    }[];
+  }[];
 }
 
 export interface RulesetRelationshipView {
@@ -47,6 +99,8 @@ export interface RulesetArtifactInspectionView {
   readonly definitions: readonly RulesetDefinitionView[];
   readonly policyBindingIds: readonly string[];
   readonly relationships: readonly RulesetRelationshipView[];
+  readonly derivations: readonly RulesetDerivationView[];
+  readonly overlays: readonly RulesetOverlayView[];
   readonly reservedSlots: string;
   readonly fingerprints: readonly {
     readonly plane: string;
@@ -64,6 +118,7 @@ export interface RulesetWorkspaceView {
   readonly gameplay: GameplayWorkspaceView | null;
   readonly activeArtifactId: string | null;
   readonly artifact: RulesetArtifactInspectionView | null;
+  readonly upgradeImpact: RulesetUpgradeImpactView | null;
   readonly diagnostics: readonly RulesetDiagnosticDto[];
 }
 
@@ -132,6 +187,27 @@ export function rulesetWorkspaceView(
     activeArtifactId: response.activeArtifact?.artifactId ?? null,
     artifact:
       inspectedArtifact === null ? null : artifactInspection(inspectedArtifact),
+    upgradeImpact:
+      response.upgradeImpact === null
+        ? null
+        : {
+            transition: `${response.upgradeImpact.fromArtifactId} → ${response.upgradeImpact.toArtifactId}`,
+            sourceChanges: response.upgradeImpact.sourceChanges,
+            definitions: response.upgradeImpact.definitions.map(
+              (definition) => ({
+                definitionId: definition.definitionId,
+                status: definition.descendant
+                  ? `${definition.change} derived descendant`
+                  : definition.change,
+                causes: definition.causes,
+                fields: definition.fields.map((field) => ({
+                  plane: field.plane,
+                  path: field.path,
+                  transition: `${field.before} → ${field.after}`,
+                })),
+              }),
+            ),
+          },
     diagnostics: response.diagnostics,
   };
 
@@ -298,6 +374,7 @@ function artifactInspection(
     exportedRoots: artifact.exportedRoots,
     definitions: artifact.definitions.map((definition) => ({
       id: definition.id,
+      fingerprint: definition.fingerprint,
       label: definition.label ?? definition.id,
       contract: `${definition.kind} · ${definition.visibility} · ${definition.extensionPolicy}`,
       owner: `${definition.packageId}@${definition.packageVersion}`,
@@ -310,11 +387,51 @@ function artifactInspection(
       edge: `${relationship.source} → ${relationship.target}`,
       order: relationship.order,
     })),
+    derivations: artifact.derivations.map((derivation) => ({
+      definitionId: derivation.definitionId,
+      owner: derivation.owner,
+      base: derivation.base,
+      baseFingerprint: derivation.baseFingerprint,
+      mixins: derivation.mixins.map((mixin) => ({
+        identity: mixin.identity,
+        fingerprint: mixin.fingerprint,
+        parameters:
+          mixin.parameters.length === 0
+            ? 'no parameters'
+            : mixin.parameters.join(', '),
+        order: mixin.order,
+      })),
+      localPatchFingerprint: derivation.localPatchFingerprint,
+      materializedFingerprint: derivation.materializedFingerprint,
+      changes: derivation.changes.map(patchChangeView),
+    })),
+    overlays: artifact.overlays.map((overlay) => ({
+      overlay: overlay.overlay,
+      target: overlay.target,
+      impact: `${overlay.plane} · ${overlay.conflictPolicy}`,
+      expectedFingerprint: overlay.expectedFingerprint,
+      beforeFingerprint: overlay.beforeFingerprint,
+      afterFingerprint: overlay.afterFingerprint,
+      patchFingerprint: overlay.patchFingerprint,
+      order: overlay.order,
+      changes: overlay.changes.map(patchChangeView),
+    })),
     reservedSlots: `${artifact.derivationSlots} derivation · ${artifact.overlaySlots} overlay`,
     fingerprints: [
       { plane: 'Source', value: artifact.fingerprints.source },
       { plane: 'Semantic', value: artifact.fingerprints.semantic },
       { plane: 'Presentation', value: artifact.fingerprints.presentation },
     ],
+  };
+}
+
+function patchChangeView(
+  change: RulesetPatchChangeDto,
+): RulesetPatchChangeView {
+  return {
+    plane: change.plane,
+    path: change.path,
+    transition: `${change.before} → ${change.after}`,
+    effective: change.effective,
   };
 }

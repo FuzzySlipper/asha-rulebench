@@ -38,6 +38,7 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     status: 'noActiveRuleset',
     activeArtifact: null,
     candidateArtifact: null,
+    upgradeImpact: null,
     activationRevision: 0,
     gameplayAvailable: false,
     gameplay: null,

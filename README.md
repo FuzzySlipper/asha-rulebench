@@ -1,8 +1,8 @@
 # ASHA Rulebench
 
 ASHA Rulebench is the authoring and inspection product for compiled Asha RPG
-rulesets. Den tasks #5953 and #5955 now build on the deliberate empty boundary
-from #5952:
+rulesets. Den tasks #5953, #5955, and #5957 now build on the deliberate empty
+boundary from #5952:
 
 - no prototype content is bundled;
 - no ruleset is selected by default;
@@ -30,10 +30,11 @@ Activation creates one fresh Asha RPG authority session. The browser displays
 Rust-provided action catalogs, source identity, candidates, preflight, random
 requests, accepted events, trace, and state. It sends only typed intents,
 explicit random evidence, and typed reaction decisions. The current field
-manual has three ordinary TypeScript-authored actions whose sequential workflow
-moves an actor, applies a modifier, spends a bounded resource, resolves d6 and
-five-d4 requests, and suspends/resumes a reaction against the same state
-revision. Rust owns all interpretation and mutation.
+manual has four TypeScript-authored actions, including one materialized derived
+action. Their sequential workflow moves an actor, applies a modifier, spends a
+bounded resource, resolves d6 and five-d4 requests, and suspends/resumes a
+reaction against the same state revision. Rust owns all interpretation and
+mutation.
 
 ## Retained product surfaces
 
@@ -86,8 +87,23 @@ cross-repository certification remains downstream, but the old prototype
 expectations have been retired rather than preserved there.
 
 Non-claims: session persistence across process restarts or artifact activation,
-replay/checkpoints, derivation/mixins/overlays, migration, nested reaction
-windows, and exhaustive cross-product certification are not implemented here.
+replay/checkpoints, migration, nested reaction windows, upgrade migration
+policy, and exhaustive cross-product certification are not implemented here.
+
+The fresh composition now demonstrates one primary base, two ordered typed
+mixins, a local relational patch, an authorized semantic overlay, and a
+presentation-only overlay. Rulebench displays the exact base/mixin chain,
+parameters, patch fingerprints, before/after values, effectiveness, impact
+planes, and final definition fingerprints emitted by Asha RPG; it does not
+reimplement materialization semantics.
+
+After an artifact is active, the field-manual 1.1 source can be compiled as a
+candidate without activation. The Rust host structurally compares the two
+fully materialized accepted artifacts and Rulebench displays changed package
+sources, changed definitions, derived descendants, causes, and exact semantic
+or presentation field transitions. Source selection is an open string request
+validated against the authoring-owned options, so adding ordinary content does
+not extend a Rust enum or product protocol vocabulary.
 
 See [docs/empty-ruleset-boundary.md](docs/empty-ruleset-boundary.md) for the
 deletion and retention inventory.
