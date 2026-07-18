@@ -21,3 +21,5 @@ export type RulesetFingerprintDto = { source: string, semantic: string, presenta
 export type RulesetArtifactSummaryDto = { schema: RulesetIdentityDto, artifactId: string, composition: RulesetIdentityDto, language: RulesetIdentityDto, sourcePackages: Array<RulesetSourcePackageDto>, dependencyLock: Array<RulesetLockEntryDto>, requiredOperations: Array<RulesetRequirementDto>, requiredCapabilities: Array<RulesetRequirementDto>, exportedRoots: Array<string>, definitions: Array<RulesetDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<RulesetRelationshipDto>, derivationSlots: number, overlaySlots: number, fingerprints: RulesetFingerprintDto, };
 
 export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, activationRevision: number, gameplayAvailable: boolean, diagnostics: Array<RulesetDiagnosticDto>, };
+
+export type RulesetCompileRequestDto = { preparedSource: string, };

@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -6,13 +6,6 @@ import { join } from 'node:path';
 const root = process.cwd();
 const forwardedArguments = process.argv.slice(2);
 if (forwardedArguments[0] === '--') forwardedArguments.shift();
-
-const preparation = spawnSync('pnpm', ['run', 'ruleset:prepare'], {
-  cwd: root,
-  stdio: 'inherit',
-  shell: false,
-});
-if (preparation.status !== 0) process.exit(preparation.status ?? 1);
 
 const hostPort = await freePort();
 const hostUrl = `http://127.0.0.1:${hostPort}`;
@@ -45,8 +38,6 @@ const rustHost = spawn(
     '--',
     '--address',
     `127.0.0.1:${hostPort}`,
-    '--prepared',
-    'tmp/ruleset/prepared-ruleset.json',
   ],
   { cwd: root, stdio: 'inherit', shell: false },
 );

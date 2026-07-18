@@ -48,6 +48,27 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
   ).toBeVisible();
   await expect(workspace).toContainText('Activation revision 1');
+  const activeArtifact = workspace
+    .getByText('Active artifact', { exact: true })
+    .locator('..')
+    .locator('dd');
+  const activeArtifactId = await activeArtifact.innerText();
+
+  await workspace
+    .getByRole('button', { name: 'Use Invalid missing support' })
+    .click();
+  await expect(workspace).toContainText(
+    'Selected source: Invalid missing support',
+  );
+  await workspace
+    .getByRole('button', { name: 'Compile explicit manifest' })
+    .click();
+  await expect(workspace).toContainText('RULESET_DEFINITION_REFERENCE_MISSING');
+  await expect(
+    workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
+  ).toBeVisible();
+  await expect(workspace).toContainText('Activation revision 1');
+  await expect(activeArtifact).toHaveText(activeArtifactId);
   await expect(
     workspace.getByRole('button', { name: /execute|roll|resolve/i }),
   ).toHaveCount(0);

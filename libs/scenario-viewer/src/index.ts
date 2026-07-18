@@ -1,9 +1,19 @@
-import { ChangeDetectionStrategy, Component, type OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  signal,
+  type OnInit,
+} from '@angular/core';
 import {
   ApplicationMenubarComponent,
   type ApplicationMenuGroup,
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
+import {
+  prepareRulebenchRulesetSource,
+  RULEBENCH_RULESET_SOURCE_OPTIONS,
+  type RulebenchRulesetSourceId,
+} from '@asha-rulebench/content-authoring';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 @Component({
@@ -199,6 +209,24 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
           <p class="eyebrow">ASHA Rulebench · explicit artifact lifecycle</p>
           <h1>{{ view.headline }}</h1>
           <p class="summary">{{ view.summary }}</p>
+          <div class="actions" aria-label="TypeScript ruleset source">
+            @for (source of sourceOptions; track source.id) {
+              <button
+                class="secondary"
+                type="button"
+                [attr.aria-pressed]="selectedSourceId() === source.id"
+                [disabled]="store.busy()"
+                (click)="selectSource(source.id)"
+              >
+                Use {{ source.label }}
+              </button>
+            }
+          </div>
+          <p class="summary">
+            Selected source: <strong>{{ selectedSourceLabel() }}</strong
+            >. The compile click prepares this TypeScript package graph again in
+            the browser before contacting Rust.
+          </p>
           <div class="actions" aria-label="Ruleset lifecycle controls">
             <button
               type="button"
@@ -414,8 +442,9 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 <strong>No candidate artifact</strong>
                 <p>
                   The host starts without runtime truth. The compile action
-                  submits the one explicit prepared composition to Rust; no
-                  directory or global registry is scanned.
+                  freshly prepares the selected TypeScript package graph and
+                  submits that explicit composition to Rust; no directory or
+                  global registry is scanned.
                 </p>
               </div>
             </arb-workbench-panel>
@@ -460,6 +489,12 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 })
 export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly store = createBrowserRulesetWorkspaceStore();
+  protected readonly sourceOptions = RULEBENCH_RULESET_SOURCE_OPTIONS;
+  protected readonly selectedSourceId =
+    signal<RulebenchRulesetSourceId>('fresh');
+  protected readonly selectedSourceLabel = () =>
+    this.sourceOptions.find((source) => source.id === this.selectedSourceId())
+      ?.label ?? 'Unknown source';
 
   protected readonly menuGroups: readonly ApplicationMenuGroup[] = [
     {
@@ -491,7 +526,12 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected compileRuleset(): void {
-    void this.store.compile();
+    const preparation = prepareRulebenchRulesetSource(this.selectedSourceId());
+    void this.store.compile(preparation);
+  }
+
+  protected selectSource(sourceId: RulebenchRulesetSourceId): void {
+    this.selectedSourceId.set(sourceId);
   }
 
   protected activateRuleset(): void {

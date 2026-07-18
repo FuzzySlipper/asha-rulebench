@@ -46,6 +46,33 @@ liveScenario(
       layerSnapshot: { visibleState: await workspace.innerText() },
     });
 
+    const activeArtifact = workspace
+      .getByText('Active artifact', { exact: true })
+      .locator('..')
+      .locator('dd');
+    const activeArtifactId = await activeArtifact.innerText();
+    await workspace
+      .getByRole('button', { name: 'Use Invalid missing support' })
+      .click();
+    await workspace
+      .getByRole('button', { name: 'Compile explicit manifest' })
+      .click();
+    await expect(workspace).toContainText(
+      'RULESET_DEFINITION_REFERENCE_MISSING',
+    );
+    await expect(
+      workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
+    ).toBeVisible();
+    await expect(workspace).toContainText('Activation revision 1');
+    await expect(activeArtifact).toHaveText(activeArtifactId);
+    await collector.milestone(
+      'invalid TypeScript recompile preserves active artifact',
+      {
+        screenshot: true,
+        layerSnapshot: { visibleState: await workspace.innerText() },
+      },
+    );
+
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(workspace).toBeVisible();
     await collector.milestone('active artifact mobile inspection', {

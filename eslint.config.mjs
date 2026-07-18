@@ -86,6 +86,7 @@ const depConstraints = [
   {
     "sourceTag": "scope:feature",
     "onlyDependOnLibsWithTags": [
+      "scope:content-authoring",
       "scope:protocol",
       "scope:platform",
       "scope:domain",

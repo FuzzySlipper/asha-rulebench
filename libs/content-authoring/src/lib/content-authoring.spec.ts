@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FRESH_RULESET_PACKAGE_SOURCES,
   prepareFreshRulebenchRuleset,
+  prepareRulebenchRulesetSource,
 } from './content-authoring.js';
 
 describe('fresh Rulebench ruleset package graph', () => {
@@ -38,5 +39,21 @@ describe('fresh Rulebench ruleset package graph', () => {
         (source) => source.manifest.identity.id,
       ),
     ).toEqual(['rulebench.field-manual', 'rulebench.primitives']);
+  });
+
+  it('prepares the selected source on demand and exposes invalid graph diagnostics', () => {
+    const accepted = prepareRulebenchRulesetSource('fresh');
+    const rejected = prepareRulebenchRulesetSource('missing-support');
+
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      expect(accepted.preparedSource).toContain('rulebench.signal-flare');
+    }
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) {
+      expect(rejected.diagnostics[0]?.code).toBe(
+        'RULESET_DEFINITION_REFERENCE_MISSING',
+      );
+    }
   });
 });

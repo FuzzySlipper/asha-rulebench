@@ -11,19 +11,24 @@ rulesets. Den task #5953 now builds on the deliberate empty boundary from #5952:
 - one explicit fresh TypeScript composition can be compiled, inspected, and
   atomically activated without introducing gameplay authority.
 
-Content enters only through the explicit manifest/compiler boundary. The
+Content enters only through the explicit manifest/compiler boundary. Each
+compile click prepares the currently selected TypeScript package graph in the
+browser and sends that prepared source through a generated request DTO. The
 current fresh composition resolves an exact package lock and exported-root
-closure, normalizes to RPG IR, passes Rust semantic compilation, round-trips
-through the closed portable artifact loader, and only then becomes an explicit
-activation candidate. Source directories and import side effects never
-determine runtime meaning.
+closure; Rust derives its private normalized execution input from that one
+closed definition graph, compiles it, round-trips the portable artifact through
+the authoritative loader, and only then creates an activation candidate.
+Source directories, server startup, and import side effects never determine
+runtime meaning. A selectable invalid graph proves source diagnostics remain
+user-reachable without replacing the active artifact.
 
 ## Retained product surfaces
 
 - `apps/app`: Angular bootstrap.
 - `apps/app-e2e`: focused compiler/activation browser and managed live evidence.
-- `libs/content-authoring`: one fresh immutable TypeScript package graph; no
-  global registry, discovery, callbacks, scenarios, or raw-IR product catalog.
+- `libs/content-authoring`: fresh immutable TypeScript package graph choices and
+  on-demand preparation; no global registry, discovery, callbacks, scenarios,
+  or raw-IR product catalog.
 - `libs/protocol`: generated Rust host DTOs plus a strict decoder.
 - `libs/transport`, `libs/domain`, `libs/store`: generated-DTO transport,
   pure inspection mapping, and explicit lifecycle state.

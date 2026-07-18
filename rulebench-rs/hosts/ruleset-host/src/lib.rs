@@ -10,7 +10,7 @@ use rpg_ir::{
     CompiledRulesetArtifact, MaterializedRulesetDefinitionKind, MaterializedRulesetVisibility,
     RulesetDependencyRelationship, RulesetExtensionPolicy, RulesetRelationshipKind,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -140,6 +140,13 @@ pub struct RulesetWorkspaceResponseDto {
     pub diagnostics: Vec<RulesetDiagnosticDto>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetCompileRequestDto {
+    pub prepared_source: String,
+}
+
 #[derive(Debug, Clone)]
 struct ActivationSlots<Bundle> {
     candidate: Option<Bundle>,
@@ -183,14 +190,12 @@ impl<Bundle> ActivationSlots<Bundle> {
 }
 
 pub struct RulesetHost {
-    prepared_source: Vec<u8>,
     slots: Mutex<ActivationSlots<CompiledRulesetBundle>>,
 }
 
 impl RulesetHost {
-    pub fn new(prepared_source: Vec<u8>) -> Self {
+    pub fn new() -> Self {
         Self {
-            prepared_source,
             slots: Mutex::new(ActivationSlots::default()),
         }
     }
@@ -200,8 +205,8 @@ impl RulesetHost {
         response_from_slots(true, &slots, Vec::new())
     }
 
-    pub fn compile_candidate(&self) -> RulesetWorkspaceResponseDto {
-        let compilation = compile_prepared_ruleset_json(&self.prepared_source);
+    pub fn compile_candidate(&self, prepared_source: &str) -> RulesetWorkspaceResponseDto {
+        let compilation = compile_prepared_ruleset_json(prepared_source.as_bytes());
         match compilation {
             Ok(bundle) => match close_portable_artifact(bundle) {
                 Ok(loaded) => {
@@ -467,6 +472,7 @@ pub fn generated_protocol() -> String {
         RulesetFingerprintDto::decl(),
         RulesetArtifactSummaryDto::decl(),
         RulesetWorkspaceResponseDto::decl(),
+        RulesetCompileRequestDto::decl(),
     ];
     let exports = declarations
         .into_iter()
@@ -506,9 +512,9 @@ mod tests {
 
     #[test]
     fn failed_compilation_cannot_create_a_candidate_or_active_artifact() {
-        let host = RulesetHost::new(br#"{"unexpected":true}"#.to_vec());
+        let host = RulesetHost::new();
 
-        let compilation = host.compile_candidate();
+        let compilation = host.compile_candidate(r#"{"unexpected":true}"#);
         assert!(!compilation.ok);
         assert_eq!(compilation.status, RulesetLifecycleStatus::NoActiveRuleset);
         assert!(compilation.candidate_artifact.is_none());

@@ -27,7 +27,11 @@ export interface TextFileInputPort {
 }
 
 export interface JsonHttpPort {
-  readonly request: (method: 'GET' | 'POST', path: string) => Promise<unknown>;
+  readonly request: (
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ) => Promise<unknown>;
 }
 
 export const browserClock: ClockPort = {
@@ -70,10 +74,14 @@ export const browserTextFileInput = (): TextFileInputPort => ({
 });
 
 export const browserJsonHttp = (): JsonHttpPort => ({
-  request: async (method, path) => {
+  request: async (method, path, body) => {
     const response = await fetch(path, {
       method,
-      headers: { accept: 'application/json' },
+      headers: {
+        accept: 'application/json',
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     return response.json();
   },
