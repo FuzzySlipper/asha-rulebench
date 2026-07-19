@@ -22,7 +22,7 @@
     "e2e:gate": "playwright test --config apps/app-e2e/playwright.config.mts --grep @gate",
     "e2e:live": "pnpm run e2e:live-artifacts",
     "e2e:live-artifacts": "playwright test --config apps/app-e2e/playwright.config.mts --grep @live-artifact",
-    "ruleset:prepare": "tsc -p tools/content-compiler/tsconfig.json && node tmp/content-compiler/tools/scripts/emit-prepared-ruleset.js --output tmp/ruleset/prepared-ruleset.json",
+    "ruleset:prepare": "tsc -p tools/content-compiler/tsconfig.json && node tmp/content-compiler/tools/scripts/emit-prepared-ruleset.js --output tmp/ruleset/prepared-ruleset.json --workspace-root examples/rulesets/field-manual-v1 --package-root . --package-root ../shared --module src/ruleset.ts --declaration ruleset",
     "generate:protocol": "cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-ruleset-host --bin generate_ruleset_protocol -- libs/protocol/src/generated/ruleset-protocol.ts",
     "check:generated": "cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-ruleset-host --bin generate_ruleset_protocol -- --check libs/protocol/src/generated/ruleset-protocol.ts",
     "test:rust": "cargo test --manifest-path rulebench-rs/Cargo.toml --workspace"

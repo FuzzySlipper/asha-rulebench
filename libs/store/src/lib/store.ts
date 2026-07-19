@@ -7,6 +7,7 @@ import { browserJsonHttp } from '@asha-rulebench/platform';
 import type {
   GameplayCommandRequestDto,
   GameplayReactionRequestDto,
+  RulesetCompileRequestDto,
 } from '@asha-rulebench/protocol';
 import {
   createRulesetTransport,
@@ -37,8 +38,8 @@ export class RulesetWorkspaceStore {
     await this.run(() => this.transport.status());
   }
 
-  public async compile(sourceId: string): Promise<void> {
-    await this.run(() => this.transport.compile(sourceId));
+  public async compile(request: RulesetCompileRequestDto): Promise<void> {
+    await this.run(() => this.transport.compile(request));
   }
 
   public async activate(): Promise<void> {

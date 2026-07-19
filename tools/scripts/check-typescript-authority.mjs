@@ -119,9 +119,10 @@ export function inspectTypeScriptAuthority(source, fileName = "fixture.ts") {
   );
   const diagnostics = [];
   const seen = new Set();
-  const contentAuthoringFile = fileName
-    .replaceAll("\\", "/")
-    .startsWith("libs/content-authoring/");
+  const normalizedFileName = fileName.replaceAll("\\", "/");
+  const contentAuthoringFile =
+    normalizedFileName.startsWith("libs/content-authoring/") ||
+    normalizedFileName.startsWith("examples/rulesets/");
   const rpgPolicyFile = fileName
     .replaceAll("\\", "/")
     .startsWith("libs/rpg-policy/");
@@ -432,7 +433,11 @@ function isNullish(node) {
 
 function collectProductionTypeScript() {
   const files = [];
-  for (const directory of [join(root, "apps"), join(root, "libs")]) {
+  for (const directory of [
+    join(root, "apps"),
+    join(root, "libs"),
+    join(root, "examples"),
+  ]) {
     walk(directory, files);
   }
   return files.filter((file) => {

@@ -24,12 +24,13 @@ pnpm run verify
 ```
 
 The required check runs static product validation, the pinned Rust host tests,
-generated-protocol drift, and the focused browser gate. It proves the one fresh
-TypeScript composition is freshly prepared by the trusted authoring host for a
-user-selected request, reaches Rust compilation and a closed artifact loader,
-appears in the user-facing inspection view, and activates atomically. It also
-proves that a subsequent invalid source graph displays its TypeScript
-diagnostics while preserving the active artifact and activation revision. It
+generated-protocol drift, and the focused browser gate. It proves an explicit
+workspace module/export is freshly built by the trusted authoring subprocess
+for a user-selected request, reaches Rust compilation and a closed artifact
+loader, appears in the user-facing inspection view, and activates atomically.
+It also proves subsequent invalid package and TypeScript build graphs display
+diagnostics while preserving the active artifact, authority session, and
+activation revision. It
 does not prove process-restart storage, migration policy, or an exhaustive
 content corpus. The focused gate does cover the fresh gameplay, portable
 checkpoint restore, deterministic Rust replay, and

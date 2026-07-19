@@ -27,7 +27,7 @@ describe('ruleset workspace store', () => {
     };
     const store = new RulesetWorkspaceStore(transportReturning(rejected));
 
-    await store.compile('fresh');
+    await store.compile(exampleWorkspace());
 
     expect(store.state().kind).toBe('ready');
     expect(store.view()?.phase).toBe('empty');
@@ -50,7 +50,7 @@ describe('ruleset workspace store', () => {
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
-    await store.compile('fresh');
+    await store.compile(exampleWorkspace());
 
     const state = store.state();
     expect(state.kind).toBe('error');
@@ -102,7 +102,7 @@ describe('ruleset workspace store', () => {
     };
     const store = new RulesetWorkspaceStore(transport);
     await store.refresh();
-    await store.compile('missingSupport');
+    await store.compile(exampleWorkspace());
 
     expect(compileRequests).toBe(1);
     expect(store.view()?.phase).toBe('active');
@@ -125,6 +125,15 @@ function transportReturning(
     react: async () => response,
     restoreCheckpoint: async () => response,
     replay: async () => response,
+  };
+}
+
+function exampleWorkspace() {
+  return {
+    workspaceRoot: 'examples/rulesets/field-manual-v1',
+    packageRoots: ['.', '../shared'],
+    module: 'src/ruleset.ts',
+    declaration: 'ruleset',
   };
 }
 

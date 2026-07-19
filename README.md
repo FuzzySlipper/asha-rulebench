@@ -9,22 +9,24 @@ boundary from #5952:
 - no scenario, import, filename, or startup behavior can construct a ruleset;
 - no Rulebench-owned combat, replay, or semantic authority remains;
 - the UI starts and clearly reports **No compiled ruleset active**;
-- one explicit fresh TypeScript composition can be compiled, inspected,
+- one explicitly selected TypeScript manifest can be compiled, inspected,
   atomically activated, and exercised through Asha RPG authority without
   introducing TypeScript gameplay authority.
 
 Content enters only through the explicit manifest/compiler boundary. Each
-compile click sends the explicit source selection through a generated request
-DTO. A loopback trusted-authoring gateway prepares that TypeScript package graph
-for the request and passes only its closed prepared source to Rust. The current
-fresh composition resolves an exact package lock and exported-root closure;
+compile click sends a workspace root, explicit package roots, one root module,
+and one exported declaration through a generated request DTO. A loopback
+trusted-authoring gateway launches a fresh constrained TypeScript build for
+that request and passes only its closed prepared source to Rust. It does not
+scan directories or consult a product source catalog. The current example
+composition resolves an exact package lock and exported-root closure;
 Rust derives its private normalized execution input from that one closed
 definition graph, compiles it, round-trips the portable artifact through the
 authoritative loader, and only then creates an activation candidate. Source
 directories, server startup, browser execution, and import side effects never
-determine runtime meaning. A selectable invalid graph proves source diagnostics
-remain user-reachable without replacing the active artifact or its persistent
-session.
+determine runtime meaning. Invalid build and package graphs prove source
+diagnostics remain user-reachable without replacing the active artifact or its
+persistent session.
 
 Activation creates one fresh Asha RPG authority session. The browser displays
 Rust-provided action catalogs, source identity, candidates, preflight, random
@@ -48,9 +50,11 @@ events, or maintain a second gameplay state path.
 
 - `apps/app`: Angular bootstrap.
 - `apps/app-e2e`: focused compiler/activation browser and managed live evidence.
-- `libs/content-authoring`: fresh immutable TypeScript package graph choices and
-  on-demand preparation; no global registry, discovery, callbacks, scenarios,
-  or raw-IR product catalog.
+- `libs/content-authoring`: the narrow immutable declaration shape accepted by
+  the workspace loader; no content catalog, global registry, discovery,
+  callbacks, scenarios, or raw-IR product catalog.
+- `examples/rulesets`: explicit example workspaces used by tests and demos.
+  They have no privileged loader path.
 - `libs/protocol`: generated Rust host DTOs plus a strict decoder.
 - `libs/transport`, `libs/domain`, `libs/store`: generated-DTO transport,
   pure inspection mapping, and explicit lifecycle state.
@@ -106,13 +110,15 @@ parameters, patch fingerprints, before/after values, effectiveness, impact
 planes, and final definition fingerprints emitted by Asha RPG; it does not
 reimplement materialization semantics.
 
-After an artifact is active, the field-manual 1.1 source can be compiled as a
+After an artifact is active, the field-manual 1.1 example workspace can be compiled as a
 candidate without activation. The Rust host structurally compares the two
 fully materialized accepted artifacts and Rulebench displays changed package
 sources, changed definitions, derived descendants, causes, and exact semantic
-or presentation field transitions. Source selection is an open string request
-validated against the authoring-owned options, so adding ordinary content does
-not extend a Rust enum or product protocol vocabulary.
+or presentation field transitions. Workspace selection is an explicit location
+request rather than a source ID, so adding ordinary content does not extend a
+Rust enum, switch, or product catalog.
 
 See [docs/empty-ruleset-boundary.md](docs/empty-ruleset-boundary.md) for the
 deletion and retention inventory.
+See [docs/ruleset-workspaces.md](docs/ruleset-workspaces.md) for the downstream
+manifest contract and loader constraints.

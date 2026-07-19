@@ -20,16 +20,21 @@ const authoringModuleUrl = pathToFileURL(
     root,
     'tmp',
     'content-compiler',
-    'libs',
-    'content-authoring',
-    'src',
-    'index.js',
+    'tools',
+    'scripts',
+    'load-ruleset-workspace.js',
   ),
 );
-const { prepareRulebenchRulesetSource, RULEBENCH_RULESET_SOURCE_OPTIONS } =
-  await import(`${authoringModuleUrl.href}?startup=${Date.now()}`);
-const knownSourceIds = new Set(
-  RULEBENCH_RULESET_SOURCE_OPTIONS.map((option) => option.id),
+const { parseWorkspaceLoaderOutput } = await import(
+  `${authoringModuleUrl.href}?startup=${Date.now()}`
+);
+const workspaceLoaderPath = join(
+  root,
+  'tmp',
+  'content-compiler',
+  'tools',
+  'scripts',
+  'load-ruleset-workspace.js',
 );
 
 const rustHostPort = await freePort();
@@ -73,8 +78,8 @@ await waitForHost(`${rustHostUrl}/api/ruleset/health`, rustHost);
 const authoringGateway = await startAuthoringGateway(
   gatewayPort,
   rustHostUrl,
-  prepareRulebenchRulesetSource,
-  knownSourceIds,
+  workspaceLoaderPath,
+  parseWorkspaceLoaderOutput,
 );
 
 const angular = spawn(
@@ -126,30 +131,21 @@ function freePort() {
   });
 }
 
-function startAuthoringGateway(port, rustHostUrl, prepareSource, sourceIds) {
+function startAuthoringGateway(
+  port,
+  rustHostUrl,
+  loaderPath,
+  parseLoaderOutput,
+) {
   const server = createHttpServer(async (request, response) => {
     try {
       if (request.method === 'POST' && request.url === '/api/ruleset/compile') {
         const body = await readJsonBody(request);
-        if (
-          body === null ||
-          typeof body !== 'object' ||
-          Array.isArray(body) ||
-          !('sourceId' in body) ||
-          typeof body.sourceId !== 'string' ||
-          !sourceIds.has(body.sourceId)
-        ) {
-          await respondWithGatewayDiagnostic(
-            response,
-            rustHostUrl,
-            400,
-            'RULESET_SOURCE_SELECTION_INVALID',
-            '$.sourceId',
-            `sourceId must be one of ${[...sourceIds].join(', ')}`,
-          );
-          return;
-        }
-        const preparation = prepareSource(body.sourceId);
+        const preparation = await prepareWorkspace(
+          loaderPath,
+          parseLoaderOutput,
+          body,
+        );
         if (!preparation.ok) {
           const workspace = await rustWorkspace(rustHostUrl);
           sendJson(response, 200, {
@@ -191,6 +187,89 @@ function startAuthoringGateway(port, rustHostUrl, prepareSource, sourceIds) {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => resolve(server));
+  });
+}
+
+function prepareWorkspace(loaderPath, parseLoaderOutput, input) {
+  return new Promise((resolve, reject) => {
+    const compiler = spawn(process.execPath, [loaderPath], {
+      cwd: root,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false,
+    });
+    const output = [];
+    const errors = [];
+    let outputLength = 0;
+    let errorLength = 0;
+    let settled = false;
+    const timeout = setTimeout(() => {
+      compiler.kill('SIGTERM');
+      if (!settled) {
+        settled = true;
+        reject(new Error('authoring subprocess exceeded 30 seconds'));
+      }
+    }, 30_000);
+    const collect = (chunks, chunk, length, label) => {
+      const nextLength = length + chunk.length;
+      if (nextLength > 1_048_576) {
+        compiler.kill('SIGTERM');
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          reject(new Error(`${label} exceeded 1 MiB`));
+        }
+        return length;
+      }
+      chunks.push(chunk);
+      return nextLength;
+    };
+    compiler.stdout.on('data', (chunk) => {
+      outputLength = collect(output, chunk, outputLength, 'authoring output');
+    });
+    compiler.stderr.on('data', (chunk) => {
+      errorLength = collect(errors, chunk, errorLength, 'authoring errors');
+    });
+    compiler.once('error', (error) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+    compiler.once('exit', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(
+          new Error(
+            `authoring subprocess exited ${code}: ${Buffer.concat(errors).toString('utf8')}`,
+          ),
+        );
+        return;
+      }
+      try {
+        const parsed = parseLoaderOutput(
+          Buffer.concat(output).toString('utf8'),
+        );
+        if (
+          parsed === null ||
+          typeof parsed !== 'object' ||
+          Array.isArray(parsed) ||
+          !('ok' in parsed) ||
+          typeof parsed.ok !== 'boolean' ||
+          !('diagnostics' in parsed) ||
+          !Array.isArray(parsed.diagnostics)
+        ) {
+          reject(new Error('authoring subprocess returned an invalid result'));
+          return;
+        }
+        resolve(parsed);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    compiler.stdin.end(JSON.stringify(input));
   });
 }
 

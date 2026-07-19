@@ -76,7 +76,7 @@ export type GameplaySessionDto = { actorId: string, stateRevision: number, accep
 
 export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
 
-export type RulesetCompileRequestDto = { sourceId: string, };
+export type RulesetCompileRequestDto = { workspaceRoot: string, packageRoots: Array<string>, module: string, declaration: string, };
 
 export type PreparedRulesetCompileRequestDto = { preparedSource: string, };
 

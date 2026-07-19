@@ -10,6 +10,7 @@ import {
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
 import type { GameplayActionView } from '@asha-rulebench/domain';
+import type { RulesetCompileRequestDto } from '@asha-rulebench/protocol';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 @Component({
@@ -79,6 +80,30 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
         flex-wrap: wrap;
         gap: 0.65rem;
         margin-top: 0.6rem;
+      }
+
+      .manifest-fields {
+        display: grid;
+        gap: 0.65rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 72rem;
+      }
+
+      .manifest-fields label {
+        color: var(--arb-muted);
+        display: grid;
+        font-size: 0.78rem;
+        gap: 0.3rem;
+      }
+
+      .manifest-input {
+        background: var(--arb-bg);
+        border: 1px solid var(--arb-border);
+        color: var(--arb-foreground);
+        font: inherit;
+        min-height: 2.8rem;
+        padding: 0.65rem;
+        width: 100%;
       }
 
       button {
@@ -202,6 +227,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
       }
 
       @media (max-width: 50rem) {
+        .manifest-fields,
         .panels {
           grid-template-columns: 1fr;
         }
@@ -230,28 +256,61 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
           <p class="eyebrow">ASHA Rulebench · explicit artifact lifecycle</p>
           <h1>{{ view.headline }}</h1>
           <p class="summary">{{ view.summary }}</p>
-          <div class="actions" aria-label="TypeScript ruleset source">
-            @for (source of sourceOptions; track source.id) {
-              <button
-                class="secondary"
-                type="button"
-                [attr.aria-pressed]="selectedSourceId() === source.id"
+          <div class="manifest-fields" aria-label="Ruleset manifest entrypoint">
+            <label>
+              Workspace root
+              <input
+                #workspaceRootInput
+                class="manifest-input"
                 [disabled]="store.busy()"
-                (click)="selectSource(source.id)"
-              >
-                Use {{ source.label }}
-              </button>
-            }
+                placeholder="/home/dev/my-game"
+                [value]="workspaceRoot()"
+                (input)="setWorkspaceRoot(workspaceRootInput.value)"
+              />
+            </label>
+            <label>
+              Package roots (comma separated)
+              <input
+                #packageRootsInput
+                class="manifest-input"
+                [disabled]="store.busy()"
+                placeholder="packages/rules, packages/content"
+                [value]="packageRootsText()"
+                (input)="setPackageRoots(packageRootsInput.value)"
+              />
+            </label>
+            <label>
+              Root module
+              <input
+                #moduleInput
+                class="manifest-input"
+                [disabled]="store.busy()"
+                placeholder="packages/rules/src/ruleset.ts"
+                [value]="rootModule()"
+                (input)="setRootModule(moduleInput.value)"
+              />
+            </label>
+            <label>
+              Exported declaration
+              <input
+                #declarationInput
+                class="manifest-input"
+                [disabled]="store.busy()"
+                placeholder="ruleset"
+                [value]="declaration()"
+                (input)="setDeclaration(declarationInput.value)"
+              />
+            </label>
           </div>
           <p class="summary">
-            Selected source: <strong>{{ selectedSourceLabel() }}</strong
-            >. The compile click asks the trusted authoring host to prepare this
-            TypeScript package graph again before contacting Rust.
+            Selected workspace: <strong>{{ workspaceIdentity() }}</strong
+            >. The compile click builds only this explicit module graph in the
+            trusted authoring subprocess before contacting Rust.
           </p>
           <div class="actions" aria-label="Ruleset lifecycle controls">
             <button
               type="button"
-              [disabled]="store.busy()"
+              [disabled]="store.busy() || !manifestSelectionComplete()"
               (click)="compileRuleset()"
             >
               Compile explicit manifest
@@ -1036,24 +1095,25 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 })
 export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly store = createBrowserRulesetWorkspaceStore();
-  protected readonly sourceOptions: readonly {
-    readonly id: 'fresh' | 'freshUpgrade' | 'missingSupport';
-    readonly label: string;
-  }[] = [
-    { id: 'fresh', label: 'Valid field manual' },
-    { id: 'freshUpgrade', label: 'Field manual 1.1 candidate' },
-    { id: 'missingSupport', label: 'Invalid missing support' },
-  ];
-  protected readonly selectedSourceId = signal<
-    'fresh' | 'freshUpgrade' | 'missingSupport'
-  >('fresh');
+  protected readonly workspaceRoot = signal('');
+  protected readonly packageRootsText = signal('');
+  protected readonly rootModule = signal('');
+  protected readonly declaration = signal('');
   protected readonly selectedActionId = signal<string | null>(null);
   protected readonly selectedTargetId = signal<string | null>(null);
   protected readonly randomEvidence = signal('');
   protected readonly evidenceError = signal<string | null>(null);
-  protected readonly selectedSourceLabel = () =>
-    this.sourceOptions.find((source) => source.id === this.selectedSourceId())
-      ?.label ?? 'Unknown source';
+  protected readonly workspaceIdentity = () => {
+    if (!this.manifestSelectionComplete()) {
+      return 'No manifest entrypoint selected';
+    }
+    return `${this.workspaceRoot()}/${this.rootModule()}#${this.declaration()}`;
+  };
+  protected readonly manifestSelectionComplete = () =>
+    this.workspaceRoot().trim().length > 0 &&
+    this.packageRoots().length > 0 &&
+    this.rootModule().trim().length > 0 &&
+    this.declaration().trim().length > 0;
 
   protected readonly menuGroups: readonly ApplicationMenuGroup[] = [
     {
@@ -1085,13 +1145,36 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected compileRuleset(): void {
-    void this.store.compile(this.selectedSourceId());
+    const request: RulesetCompileRequestDto = {
+      workspaceRoot: this.workspaceRoot(),
+      packageRoots: this.packageRoots(),
+      module: this.rootModule(),
+      declaration: this.declaration(),
+    };
+    void this.store.compile(request);
   }
 
-  protected selectSource(
-    sourceId: 'fresh' | 'freshUpgrade' | 'missingSupport',
-  ): void {
-    this.selectedSourceId.set(sourceId);
+  protected setWorkspaceRoot(value: string): void {
+    this.workspaceRoot.set(value);
+  }
+
+  protected setPackageRoots(value: string): void {
+    this.packageRootsText.set(value);
+  }
+
+  protected setRootModule(value: string): void {
+    this.rootModule.set(value);
+  }
+
+  protected setDeclaration(value: string): void {
+    this.declaration.set(value);
+  }
+
+  private packageRoots(): string[] {
+    return this.packageRootsText()
+      .split(',')
+      .map((root) => root.trim())
+      .filter((root) => root.length > 0);
   }
 
   protected activateRuleset(): void {

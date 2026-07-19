@@ -46,11 +46,14 @@ The retained boundary now has its first fresh consumer. `rulebench.fresh-start`
 names one base package, one contributed support/mixin package, and two ordered
 overlay packages. It resolves seven exact lock edges and closes four action
 roots plus typed stat, defense,
-resource, modifier, and damage support. A loopback trusted-authoring gateway prepares the
-selected package graph for each compile request, and Rust derives execution
+resource, modifier, and damage support. A loopback trusted-authoring gateway
+builds one explicitly selected workspace module/export for each compile request,
+then Asha RPG prepares only its exported package graph. Rust derives execution
 semantics only from that closed definition graph before emitting and reloading
-the artifact. The selectable missing-support graph exposes source diagnostics
-while preserving any active artifact. The product still starts inactive.
+the artifact. Missing-support and invalid-build workspaces expose package and
+source diagnostics while preserving any active artifact and session. No
+product source ID catalog or switch selects content. The product still starts
+inactive.
 
 ## #5955 transition
 

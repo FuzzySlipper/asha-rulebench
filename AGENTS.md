@@ -34,7 +34,8 @@ closed artifact.
 /apps/app-e2e          focused compiler lifecycle and managed-live evidence
 /libs/components       reusable presentation primitives
 /libs/platform         browser/host ports
-/libs/content-authoring fresh immutable package/composition declarations
+/libs/content-authoring immutable workspace declaration boundary
+/examples/rulesets       explicit non-privileged authoring examples
 /libs/protocol         Rust-generated lifecycle DTOs and strict decoder
 /libs/transport        generated-DTO-only compiler host client
 /libs/domain           pure artifact-to-inspection mapping

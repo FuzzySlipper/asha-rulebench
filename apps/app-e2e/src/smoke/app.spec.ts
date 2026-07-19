@@ -24,6 +24,7 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
       .getByRole('menuitem', { name: 'Explicit compiler workspace' }),
   ).toHaveAttribute('aria-disabled', 'true');
 
+  await selectWorkspace(workspace, 'examples/rulesets/field-manual-v1');
   await workspace
     .getByRole('button', { name: 'Compile explicit manifest' })
     .click();
@@ -135,9 +136,7 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     .locator('dd');
   const activeArtifactId = await activeArtifact.innerText();
 
-  await workspace
-    .getByRole('button', { name: 'Use Field manual 1.1 candidate' })
-    .click();
+  await selectWorkspace(workspace, 'examples/rulesets/field-manual-v1_1');
   await workspace
     .getByRole('button', { name: 'Compile explicit manifest' })
     .click();
@@ -172,21 +171,20 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   await expect(workspace).toContainText('Activation revision 2');
   await expect(workspace).toContainText('Revision 0 · actor hero');
   await expect(activeArtifact).toHaveText(candidateArtifactId);
-
-  await workspace
-    .getByRole('button', { name: 'Use Invalid missing support' })
+  await actionCard(workspace, 'rulebench.tactical-advance')
+    .getByRole('button', { name: 'Select action' })
     .click();
-  await expect(workspace).toContainText(
-    'Selected source: Invalid missing support',
-  );
+  await workspace.getByLabel('Random evidence').fill('');
+  await workspace.getByRole('button', { name: 'Submit typed intent' }).click();
+  await expect(workspace).toContainText('Revision 1 · actor hero');
+
+  await selectWorkspace(workspace, 'examples/rulesets/invalid-missing-support');
   await workspace
     .getByRole('button', { name: 'Compile explicit manifest' })
     .click();
   await expect(workspace).toContainText('RULESET_DEFINITION_REFERENCE_MISSING');
   await expect(workspace).toContainText('Package: rulebench.field-manual');
-  await expect(workspace).toContainText(
-    'Definition: rulebench.arc-lash',
-  );
+  await expect(workspace).toContainText('Definition: rulebench.arc-lash');
   await expect(workspace).toContainText(
     'Source: packages/rulebench-field-manual.ts#rulebench.arc-lash',
   );
@@ -194,7 +192,17 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
   ).toBeVisible();
   await expect(workspace).toContainText('Activation revision 2');
-  await expect(workspace).toContainText('Revision 0 · actor hero');
+  await expect(workspace).toContainText('Revision 1 · actor hero');
+  await expect(activeArtifact).toHaveText(candidateArtifactId);
+  await selectWorkspace(workspace, 'examples/rulesets/invalid-build');
+  await workspace
+    .getByRole('button', { name: 'Compile explicit manifest' })
+    .click();
+  await expect(workspace).toContainText('RULESET_WORKSPACE_BUILD_FAILED');
+  await expect(workspace).toContainText('TS2322');
+  await expect(workspace).toContainText('src/ruleset.ts#ruleset');
+  await expect(workspace).toContainText('Activation revision 2');
+  await expect(workspace).toContainText('Revision 1 · actor hero');
   await expect(activeArtifact).toHaveText(candidateArtifactId);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(workspace).toBeVisible();
@@ -210,4 +218,16 @@ function actionCard(workspace: Locator, actionId: string) {
     .locator('li.action-card')
     .filter({ hasText: actionId })
     .filter({ hasNotText: `${actionId}-` });
+}
+
+async function selectWorkspace(
+  workspace: Locator,
+  workspaceRoot: string,
+): Promise<void> {
+  await workspace.getByLabel('Workspace root').fill(workspaceRoot);
+  await workspace
+    .getByLabel('Package roots (comma separated)')
+    .fill('., ../shared');
+  await workspace.getByLabel('Root module').fill('src/ruleset.ts');
+  await workspace.getByLabel('Exported declaration').fill('ruleset');
 }

@@ -16,7 +16,9 @@ export interface JsonHttpClient {
 
 export interface RulesetTransport {
   readonly status: () => Promise<RulesetWorkspaceResponseDto>;
-  readonly compile: (sourceId: string) => Promise<RulesetWorkspaceResponseDto>;
+  readonly compile: (
+    request: RulesetCompileRequestDto,
+  ) => Promise<RulesetWorkspaceResponseDto>;
   readonly activate: () => Promise<RulesetWorkspaceResponseDto>;
   readonly command: (
     command: GameplayCommandRequestDto,
@@ -40,10 +42,8 @@ export function createRulesetTransport(http: JsonHttpClient): RulesetTransport {
 
   return {
     status: () => request('GET', '/api/ruleset'),
-    compile: (sourceId) => {
-      const compileRequest: RulesetCompileRequestDto = { sourceId };
-      return request('POST', '/api/ruleset/compile', compileRequest);
-    },
+    compile: (compileRequest) =>
+      request('POST', '/api/ruleset/compile', compileRequest),
     activate: () => request('POST', '/api/ruleset/activate'),
     command: (command) => request('POST', '/api/ruleset/command', command),
     react: (reaction) => request('POST', '/api/ruleset/reaction', reaction),
