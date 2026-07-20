@@ -1646,23 +1646,30 @@ class SetupDiagnosticsComponent {
                     class="secondary"
                     type="button"
                     [attr.data-setup-path]="
-                      owner === 'vitality'
+                      owner === 'vitality' &&
+                      participantVitalityCount(participant) === 0
                         ? participantPath(participantIndex, 'capabilities')
                         : null
                     "
                     [attr.aria-invalid]="
-                      owner === 'vitality'
+                      owner === 'vitality' &&
+                      participantVitalityCount(participant) === 0
                         ? setupHasExactError(
                             participantPath(participantIndex, 'capabilities')
                           )
                         : null
                     "
                     [attr.aria-describedby]="
-                      owner === 'vitality'
+                      owner === 'vitality' &&
+                      participantVitalityCount(participant) === 0
                         ? setupExactDescribedBy(
                             participantPath(participantIndex, 'capabilities')
                           )
                         : null
+                    "
+                    [disabled]="
+                      owner === 'vitality' &&
+                      participantVitalityCount(participant) !== 0
                     "
                     (click)="addParticipantCapability(participantIndex, owner)"
                   >
@@ -2114,8 +2121,37 @@ class SetupDiagnosticsComponent {
                     [showPath]="true"
                   />
                   <button
+                    #setupControl
                     class="secondary"
                     type="button"
+                    [attr.data-setup-path]="
+                      isDuplicateVitalityCapability(
+                        participant,
+                        capabilityIndex
+                      )
+                        ? capabilityPath(participantIndex, capabilityIndex)
+                        : null
+                    "
+                    [attr.aria-invalid]="
+                      isDuplicateVitalityCapability(
+                        participant,
+                        capabilityIndex
+                      )
+                        ? setupHasError(
+                            capabilityPath(participantIndex, capabilityIndex)
+                          )
+                        : null
+                    "
+                    [attr.aria-describedby]="
+                      isDuplicateVitalityCapability(
+                        participant,
+                        capabilityIndex
+                      )
+                        ? setupDescribedBy(
+                            capabilityPath(participantIndex, capabilityIndex)
+                          )
+                        : null
+                    "
                     (click)="
                       removeParticipantCapability(
                         participantIndex,
@@ -2871,8 +2907,40 @@ class SetupDiagnosticsComponent {
                     [showPath]="true"
                   />
                   <button
+                    #setupControl
                     class="secondary"
                     type="button"
+                    [attr.data-setup-path]="
+                      isDuplicateTraversalCapability(cell, capabilityIndex)
+                        ? cellCapabilityFieldPath(
+                            cellIndex,
+                            capabilityIndex,
+                            'value'
+                          )
+                        : null
+                    "
+                    [attr.aria-invalid]="
+                      isDuplicateTraversalCapability(cell, capabilityIndex)
+                        ? setupHasExactError(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'value'
+                            )
+                          )
+                        : null
+                    "
+                    [attr.aria-describedby]="
+                      isDuplicateTraversalCapability(cell, capabilityIndex)
+                        ? setupExactDescribedBy(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'value'
+                            )
+                          )
+                        : null
+                    "
                     (click)="removeCellCapability(cellIndex, capabilityIndex)"
                   >
                     Remove capability
@@ -3828,6 +3896,25 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return `$.participants[${participantIndex}].capabilities[${capabilityIndex}]`;
   }
 
+  protected participantVitalityCount(
+    participant: EncounterParticipantSetupDto,
+  ): number {
+    return participant.capabilities.filter(
+      (capability) => capability.owner === 'vitality',
+    ).length;
+  }
+
+  protected isDuplicateVitalityCapability(
+    participant: EncounterParticipantSetupDto,
+    capabilityIndex: number,
+  ): boolean {
+    const capability = participant.capabilities[capabilityIndex];
+    if (capability?.owner !== 'vitality') return false;
+    return participant.capabilities
+      .slice(0, capabilityIndex)
+      .some((candidate) => candidate.owner === 'vitality');
+  }
+
   protected capabilityFieldPath(
     participantIndex: number,
     capabilityIndex: number,
@@ -3845,6 +3932,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     capabilityIndex: number,
   ): string {
     return `$.board.cells[${cellIndex}].capabilities[${capabilityIndex}]`;
+  }
+
+  protected isDuplicateTraversalCapability(
+    cell: EncounterSetupRequestDto['board']['cells'][number],
+    capabilityIndex: number,
+  ): boolean {
+    const capability = cell.capabilities[capabilityIndex];
+    if (capability?.value.kind !== 'traversal') return false;
+    return cell.capabilities
+      .slice(0, capabilityIndex)
+      .some((candidate) => candidate.value.kind === 'traversal');
   }
 
   protected cellCapabilityFieldPath(
@@ -4264,6 +4362,12 @@ function isExplicitSetupParentRoute(
   }
   if (/\.capabilities\[\d+\]$/.test(diagnosticPath)) {
     return controlPath.startsWith(`${diagnosticPath}.`);
+  }
+  if (diagnosticPath.endsWith('.capabilities')) {
+    return /^\[\d+\]$/.test(controlPath.slice(diagnosticPath.length));
+  }
+  if (/\.capabilities\[\d+\]\.value$/.test(diagnosticPath)) {
+    return controlPath === `${diagnosticPath}.movementCost`;
   }
   return false;
 }

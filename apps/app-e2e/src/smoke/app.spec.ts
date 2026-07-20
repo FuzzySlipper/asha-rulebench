@@ -340,6 +340,21 @@ test('plays an encounter through the interaction-first authority loop @gate', as
 
   await capabilityId.fill('capability.traversal');
   await capabilityVersion.fill('1');
+  const movementCost = traversalCapability.locator(
+    '[data-setup-path$=".value.movementCost"]',
+  );
+  await movementCost.fill('0');
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText(
+    'RPG_SETUP_CELL_TRAVERSAL_INVALID',
+  );
+  await expectDescribedSetupError(encounterDialog, movementCost);
+  await expect(movementCost).toBeFocused();
+  await expectUniqueSetupErrorIds(encounterDialog);
+
+  await movementCost.fill('1');
   const firstParticipant = draftEditors.nth(0);
   await firstParticipant
     .getByRole('group', { name: 'vitality capability 1' })
@@ -354,6 +369,41 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(encounterDialog).toContainText('RPG_SETUP_VITALITY_REQUIRED');
   await expectDescribedSetupError(encounterDialog, addVitality);
   await expect(addVitality).toBeFocused();
+  await expectUniqueSetupErrorIds(encounterDialog);
+
+  await importEncounterDocument(encounterDialog, artifactId, {
+    first: {
+      id: 'pathfinder',
+      label: 'Pathfinder',
+      teamId: 'team.gold',
+      x: 0,
+      y: 0,
+    },
+    second: {
+      id: 'sentinel',
+      label: 'Sentinel',
+      teamId: 'team.violet',
+      x: 4,
+      y: 0,
+    },
+    firstExtraVitality: 10,
+    secondVitality: 40,
+  });
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText('RPG_SETUP_VITALITY_REQUIRED');
+  const importedFirstParticipant = encounterDialog
+    .locator('.participant-editor')
+    .nth(0);
+  await expect(
+    importedFirstParticipant.getByRole('button', { name: 'Add vitality' }),
+  ).toBeDisabled();
+  const duplicateVitalityRemove = importedFirstParticipant
+    .getByRole('group', { name: 'vitality capability 5' })
+    .getByRole('button', { name: 'Remove capability' });
+  await expectDescribedSetupError(encounterDialog, duplicateVitalityRemove);
+  await expect(duplicateVitalityRemove).toBeFocused();
   await expectUniqueSetupErrorIds(encounterDialog);
   await encounterDialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(participants).toContainText('Scout · team.gold');
@@ -430,6 +480,7 @@ async function importEncounterDocument(
   artifactId: string,
   setup: {
     readonly first: EncounterParticipantInput;
+    readonly firstExtraVitality?: number;
     readonly second: EncounterParticipantInput;
     readonly secondVitality: number;
   },
@@ -439,7 +490,7 @@ async function importEncounterDocument(
     artifactId,
     board: { width: 5, height: 3, cells: [] },
     participants: [
-      participantSetup(setup.first, 40),
+      participantSetup(setup.first, 40, setup.firstExtraVitality),
       participantSetup(setup.second, setup.secondVitality),
     ],
     turn: {
@@ -466,6 +517,7 @@ async function importEncounterDocument(
 function participantSetup(
   participant: EncounterParticipantInput,
   vitality: number,
+  extraVitality?: number,
 ) {
   return {
     id: participant.id,
@@ -486,6 +538,14 @@ function participantSetup(
         id: 'focus',
         value: { current: 3, max: 3 },
       },
+      ...(extraVitality === undefined
+        ? []
+        : [
+            {
+              owner: 'vitality',
+              value: { current: extraVitality, max: 40 },
+            },
+          ]),
     ],
   };
 }
