@@ -79,9 +79,12 @@ fingerprints.
 
 Build, missing-export, evaluation, package-resolution, graph, compatibility,
 materialization, normalization, and Rust artifact diagnostics all return
-through the same workspace response. Failure at any stage reads the current
-Rust workspace state and adds diagnostics; it does not replace the compiled
-candidate, active artifact, authority session, checkpoint, or replay archive.
+through the same workspace response. Root-loading and TypeScript-preparation
+failures read the current Rust workspace state and add diagnostics without
+replacing an already staged candidate. If prepared input reaches Rust but fails
+Rust compilation or portable-artifact closure, Rulebench clears the staged
+candidate. Neither failure path replaces the active artifact, authority
+session, checkpoint, or replay archive.
 
 ## Loading and switching
 
