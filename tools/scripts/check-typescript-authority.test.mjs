@@ -63,9 +63,12 @@ test("TypeScript authority check rejects returned gameplay-state mutation", () =
 test("content authoring accepts a pure combinator over published builders", () => {
   const source = `
     import { applyModifier, damage, sequence } from "@asha-rpg/authoring";
-    import type { RpgIrFormula } from "@asha-rpg/ir";
-    export const paired = (amount: RpgIrFormula) => sequence(
-      damage({ amount, type: damageType("force") }),
+    import type { RpgIrFormula, RulesetCatalogReference } from "@asha-rpg/authoring";
+    export const paired = (
+      amount: RpgIrFormula,
+      force: RulesetCatalogReference<"damageType", "sample.primitives">,
+    ) => sequence(
+      damage({ amount, type: force }),
       applyModifier(modifierOptions),
     );
   `;
