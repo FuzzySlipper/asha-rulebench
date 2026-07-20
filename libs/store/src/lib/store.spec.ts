@@ -1,5 +1,6 @@
 import type { RulesetWorkspaceResponseDto } from '@asha-rulebench/protocol';
 import type { RulesetTransport } from '@asha-rulebench/transport';
+import { memoryStorage } from '@asha-rulebench/platform';
 import { describe, expect, it } from 'vitest';
 
 import { RulesetWorkspaceStore } from './store.js';
@@ -25,7 +26,10 @@ describe('ruleset workspace store', () => {
         },
       ],
     };
-    const store = new RulesetWorkspaceStore(transportReturning(rejected));
+    const store = new RulesetWorkspaceStore(
+      transportReturning(rejected),
+      memoryStorage(),
+    );
 
     await store.compile(exampleWorkspace());
 
@@ -48,7 +52,7 @@ describe('ruleset workspace store', () => {
       restoreCheckpoint: async () => emptyResponse(),
       replay: async () => emptyResponse(),
     };
-    const store = new RulesetWorkspaceStore(transport);
+    const store = new RulesetWorkspaceStore(transport, memoryStorage());
     await store.refresh();
     await store.compile(exampleWorkspace());
 
@@ -100,7 +104,7 @@ describe('ruleset workspace store', () => {
       restoreCheckpoint: async () => active,
       replay: async () => active,
     };
-    const store = new RulesetWorkspaceStore(transport);
+    const store = new RulesetWorkspaceStore(transport, memoryStorage());
     await store.refresh();
     await store.compile(exampleWorkspace());
 
@@ -111,6 +115,43 @@ describe('ruleset workspace store', () => {
     expect(store.view()?.diagnostics[0]?.code).toBe(
       'RULESET_DEFINITION_REFERENCE_MISSING',
     );
+  });
+
+  it('persists successful roots in most-recent order without selecting startup content', async () => {
+    const storage = memoryStorage();
+    const store = new RulesetWorkspaceStore(
+      transportReturning(emptyResponse()),
+      storage,
+    );
+
+    expect(store.rulesetRoot()).toBe('');
+    await store.compile({ rulesetRoot: 'examples/rulesets/field-manual' });
+    await store.compile({ rulesetRoot: 'examples/rulesets/ember-skirmish' });
+    await store.compile({ rulesetRoot: 'examples/rulesets/field-manual' });
+
+    expect(store.recentRulesetRoots()).toEqual([
+      'examples/rulesets/field-manual',
+      'examples/rulesets/ember-skirmish',
+    ]);
+    const reloaded = new RulesetWorkspaceStore(
+      transportReturning(emptyResponse()),
+      storage,
+    );
+    expect(reloaded.rulesetRoot()).toBe('');
+    expect(reloaded.recentRulesetRoots()).toEqual(store.recentRulesetRoots());
+  });
+
+  it('does not add rejected roots to the switch menu', async () => {
+    const rejected = { ...emptyResponse(), ok: false };
+    const store = new RulesetWorkspaceStore(
+      transportReturning(rejected),
+      memoryStorage(),
+    );
+
+    await store.compile({ rulesetRoot: 'examples/rulesets/invalid-build' });
+
+    expect(store.rulesetRoot()).toBe('examples/rulesets/invalid-build');
+    expect(store.recentRulesetRoots()).toEqual([]);
   });
 });
 
@@ -130,10 +171,7 @@ function transportReturning(
 
 function exampleWorkspace() {
   return {
-    workspaceRoot: 'examples/rulesets/field-manual-v1',
-    packageRoots: ['.', '../shared'],
-    module: 'src/ruleset.ts',
-    declaration: 'ruleset',
+    rulesetRoot: 'examples/rulesets/field-manual',
   };
 }
 

@@ -1,16 +1,19 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   signal,
+  type ElementRef,
   type OnInit,
+  viewChild,
 } from '@angular/core';
 import {
   ApplicationMenubarComponent,
   type ApplicationMenuGroup,
+  type ApplicationMenuItem,
   WorkbenchPanelComponent,
 } from '@asha-rulebench/components';
 import type { GameplayActionView } from '@asha-rulebench/domain';
-import type { RulesetCompileRequestDto } from '@asha-rulebench/protocol';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 @Component({
@@ -244,10 +247,12 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
       >
         <arb-application-menubar
           panelTools
-          [groups]="menuGroups"
+          [groups]="menuGroups()"
+          [busy]="store.busy()"
           [statusMessage]="
             store.view()?.headline ?? 'Connecting to Rust compiler'
           "
+          (itemInvoked)="handleMenuItem($event)"
         />
       </arb-workbench-panel>
 
@@ -256,64 +261,33 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
           <p class="eyebrow">ASHA Rulebench · explicit artifact lifecycle</p>
           <h1>{{ view.headline }}</h1>
           <p class="summary">{{ view.summary }}</p>
-          <div class="manifest-fields" aria-label="Ruleset manifest entrypoint">
+          <div class="manifest-fields" aria-label="Ruleset loader controls">
             <label>
-              Workspace root
+              Ruleset root
               <input
-                #workspaceRootInput
+                #rulesetRootInput
                 class="manifest-input"
                 [disabled]="store.busy()"
-                placeholder="/home/dev/my-game"
-                [value]="workspaceRoot()"
-                (input)="setWorkspaceRoot(workspaceRootInput.value)"
-              />
-            </label>
-            <label>
-              Package roots (comma separated)
-              <input
-                #packageRootsInput
-                class="manifest-input"
-                [disabled]="store.busy()"
-                placeholder="packages/rules, packages/content"
-                [value]="packageRootsText()"
-                (input)="setPackageRoots(packageRootsInput.value)"
-              />
-            </label>
-            <label>
-              Root module
-              <input
-                #moduleInput
-                class="manifest-input"
-                [disabled]="store.busy()"
-                placeholder="packages/rules/src/ruleset.ts"
-                [value]="rootModule()"
-                (input)="setRootModule(moduleInput.value)"
-              />
-            </label>
-            <label>
-              Exported declaration
-              <input
-                #declarationInput
-                class="manifest-input"
-                [disabled]="store.busy()"
-                placeholder="ruleset"
-                [value]="declaration()"
-                (input)="setDeclaration(declarationInput.value)"
+                placeholder="rulesets/field-manual"
+                [value]="store.rulesetRoot()"
+                (input)="store.selectRulesetRoot(rulesetRootInput.value)"
               />
             </label>
           </div>
           <p class="summary">
-            Selected workspace: <strong>{{ workspaceIdentity() }}</strong
-            >. The compile click builds only this explicit module graph in the
-            trusted authoring subprocess before contacting Rust.
+            Selected root: <strong>{{ rulesetIdentity() }}</strong
+            >. Rulebench infers <code>ruleset.ts#ruleset</code>, permits owned
+            sources under this root plus the repository's
+            <code>foundations/</code>, and builds only that closed graph before
+            contacting Rust.
           </p>
           <div class="actions" aria-label="Ruleset lifecycle controls">
             <button
               type="button"
-              [disabled]="store.busy() || !manifestSelectionComplete()"
+              [disabled]="store.busy() || !rootSelectionComplete()"
               (click)="compileRuleset()"
             >
-              Compile explicit manifest
+              Load ruleset candidate
             </button>
             <button
               class="secondary"
@@ -402,7 +376,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                       } @else {
                         @for (
                           randomPath of action.randomPlan;
-                          track randomPath
+                          track $index
                         ) {
                           <span class="muted">{{ randomPath }}</span>
                         }
@@ -435,7 +409,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 @if (selectedAction(); as action) {
                   <p class="section-label">Command {{ action.name }}</p>
                   <div class="actions" aria-label="Rust candidate selection">
-                    @for (candidate of action.candidateIds; track candidate) {
+                    @for (candidate of action.candidateIds; track $index) {
                       <button
                         class="secondary"
                         type="button"
@@ -552,13 +526,13 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                   }
                   <p class="section-label">Accepted events</p>
                   <ul class="row-list">
-                    @for (event of result.events; track event) {
+                    @for (event of result.events; track $index) {
                       <li>{{ event }}</li>
                     }
                   </ul>
                   <p class="section-label">Trace</p>
                   <ul class="row-list">
-                    @for (trace of result.trace; track trace) {
+                    @for (trace of result.trace; track $index) {
                       <li>
                         <code>{{ trace }}</code>
                       </li>
@@ -624,7 +598,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 <ul class="row-list">
                   @for (
                     source of gameplay.archive.sourcePackages;
-                    track source
+                    track $index
                   ) {
                     <li>
                       <code>{{ source }}</code>
@@ -633,7 +607,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 </ul>
                 <p class="section-label">Exact dependency lock</p>
                 <ul class="row-list">
-                  @for (edge of gameplay.archive.dependencyLock; track edge) {
+                  @for (edge of gameplay.archive.dependencyLock; track $index) {
                     <li>
                       <code>{{ edge }}</code>
                     </li>
@@ -643,7 +617,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 <ul class="row-list">
                   @for (
                     fingerprint of gameplay.archive.fingerprints;
-                    track fingerprint
+                    track $index
                   ) {
                     <li>
                       <code>{{ fingerprint }}</code>
@@ -654,7 +628,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 <ul class="row-list">
                   @for (
                     operation of gameplay.archive.operationSchemas;
-                    track operation
+                    track $index
                   ) {
                     <li>
                       <code>{{ operation }}</code>
@@ -662,7 +636,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                   }
                   @for (
                     capability of gameplay.archive.capabilitySchemas;
-                    track capability
+                    track $index
                   ) {
                     <li>
                       <code>{{ capability }}</code>
@@ -673,7 +647,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                 <ul class="row-list">
                   @for (
                     definition of gameplay.archive.definitionFingerprints;
-                    track definition
+                    track $index
                   ) {
                     <li>
                       <code>{{ definition }}</code>
@@ -718,10 +692,10 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                         {{ entry.outcome }}</strong
                       >
                       <code>{{ entry.transition }}</code>
-                      @for (evidence of entry.randomEvidence; track evidence) {
+                      @for (evidence of entry.randomEvidence; track $index) {
                         <span>Random: {{ evidence }}</span>
                       }
-                      @for (event of entry.events; track event) {
+                      @for (event of entry.events; track $index) {
                         <span>Event: {{ event }}</span>
                       }
                     </li>
@@ -798,7 +772,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                   </p>
                   <p class="section-label">Changed package sources</p>
                   <ul class="row-list">
-                    @for (source of impact.sourceChanges; track source) {
+                    @for (source of impact.sourceChanges; track $index) {
                       <li>
                         <code>{{ source }}</code>
                       </li>
@@ -815,12 +789,12 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                       <li>
                         <strong>{{ definition.definitionId }}</strong>
                         <span>{{ definition.status }}</span>
-                        @for (cause of definition.causes; track cause) {
+                        @for (cause of definition.causes; track $index) {
                           <span class="muted">{{ cause }}</span>
                         }
                         @for (
                           field of definition.fields;
-                          track field.plane + field.path
+                          track field.plane + field.path + $index
                         ) {
                           <span>{{ field.plane }} · {{ field.path }}</span>
                           <code>{{ field.transition }}</code>
@@ -876,7 +850,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
               <div class="panel-body">
                 <p class="section-label">Exported roots</p>
                 <ul class="row-list">
-                  @for (root of artifact.exportedRoots; track root) {
+                  @for (root of artifact.exportedRoots; track $index) {
                     <li>
                       <strong>{{ root }}</strong>
                     </li>
@@ -917,12 +891,12 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
               <div class="panel-body">
                 <p class="section-label">Rust-owned semantic requirements</p>
                 <ul class="row-list">
-                  @for (operation of artifact.operations; track operation) {
+                  @for (operation of artifact.operations; track $index) {
                     <li>
                       <strong>{{ operation }}</strong>
                     </li>
                   }
-                  @for (capability of artifact.capabilities; track capability) {
+                  @for (capability of artifact.capabilities; track $index) {
                     <li>
                       <strong>{{ capability }}</strong>
                     </li>
@@ -972,7 +946,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                       <code>{{ derivation.localPatchFingerprint }}</code>
                       @for (
                         change of derivation.changes;
-                        track change.plane + change.path
+                        track change.plane + change.path + $index
                       ) {
                         <span>
                           {{ change.plane }} · {{ change.path }} ·
@@ -999,7 +973,7 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
                       <code>{{ overlay.afterFingerprint }}</code>
                       @for (
                         change of overlay.changes;
-                        track change.plane + change.path
+                        track change.plane + change.path + $index
                       ) {
                         <span>
                           {{ change.plane }} · {{ change.path }} ·
@@ -1095,86 +1069,73 @@ import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 })
 export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly store = createBrowserRulesetWorkspaceStore();
-  protected readonly workspaceRoot = signal('');
-  protected readonly packageRootsText = signal('');
-  protected readonly rootModule = signal('');
-  protected readonly declaration = signal('');
+  private readonly rulesetRootInput =
+    viewChild<ElementRef<HTMLInputElement>>('rulesetRootInput');
   protected readonly selectedActionId = signal<string | null>(null);
   protected readonly selectedTargetId = signal<string | null>(null);
   protected readonly randomEvidence = signal('');
   protected readonly evidenceError = signal<string | null>(null);
-  protected readonly workspaceIdentity = () => {
-    if (!this.manifestSelectionComplete()) {
-      return 'No manifest entrypoint selected';
+  protected readonly rulesetIdentity = () => {
+    if (!this.rootSelectionComplete()) {
+      return 'No ruleset root selected';
     }
-    return `${this.workspaceRoot()}/${this.rootModule()}#${this.declaration()}`;
+    return `${this.store.rulesetRoot().trim()}/ruleset.ts#ruleset`;
   };
-  protected readonly manifestSelectionComplete = () =>
-    this.workspaceRoot().trim().length > 0 &&
-    this.packageRoots().length > 0 &&
-    this.rootModule().trim().length > 0 &&
-    this.declaration().trim().length > 0;
+  protected readonly rootSelectionComplete = () =>
+    this.store.rulesetRoot().trim().length > 0;
 
-  protected readonly menuGroups: readonly ApplicationMenuGroup[] = [
-    {
-      id: 'ruleset',
-      label: 'Ruleset',
-      items: [
-        {
-          id: 'explicit-compiler',
-          label: 'Explicit compiler workspace',
-          disabled: true,
-        },
-      ],
-    },
-    {
-      id: 'run',
-      label: 'Run',
-      items: [
-        {
-          id: 'persistent-authority',
-          label: 'Persistent authority session',
-          disabled: true,
-        },
-      ],
-    },
-  ];
+  protected readonly menuGroups = computed<readonly ApplicationMenuGroup[]>(
+    () => [
+      {
+        id: 'ruleset',
+        label: 'Ruleset',
+        items: [
+          {
+            id: 'load-ruleset-root',
+            label: 'Load ruleset root…',
+            disabled: this.store.busy(),
+          },
+          ...this.store.recentRulesetRoots().map((rulesetRoot, index) => ({
+            id: `recent-ruleset-root-${index}`,
+            label: `Switch to ${rulesetRoot}`,
+            disabled: this.store.busy(),
+          })),
+        ],
+      },
+      {
+        id: 'run',
+        label: 'Run',
+        items: [
+          {
+            id: 'persistent-authority',
+            label: 'Persistent authority session',
+            disabled: true,
+          },
+        ],
+      },
+    ],
+  );
 
   public ngOnInit(): void {
     void this.store.refresh();
   }
 
+  protected handleMenuItem(item: ApplicationMenuItem): void {
+    if (item.id === 'load-ruleset-root') {
+      this.rulesetRootInput()?.nativeElement.focus();
+      return;
+    }
+    const recentIndex = recentRulesetRootIndex(item.id);
+    if (recentIndex === null) return;
+    const rulesetRoot = this.store.recentRulesetRoots()[recentIndex];
+    if (rulesetRoot === undefined) return;
+    this.store.selectRulesetRoot(rulesetRoot);
+    void this.store.compile({ rulesetRoot });
+  }
+
   protected compileRuleset(): void {
-    const request: RulesetCompileRequestDto = {
-      workspaceRoot: this.workspaceRoot(),
-      packageRoots: this.packageRoots(),
-      module: this.rootModule(),
-      declaration: this.declaration(),
-    };
-    void this.store.compile(request);
-  }
-
-  protected setWorkspaceRoot(value: string): void {
-    this.workspaceRoot.set(value);
-  }
-
-  protected setPackageRoots(value: string): void {
-    this.packageRootsText.set(value);
-  }
-
-  protected setRootModule(value: string): void {
-    this.rootModule.set(value);
-  }
-
-  protected setDeclaration(value: string): void {
-    this.declaration.set(value);
-  }
-
-  private packageRoots(): string[] {
-    return this.packageRootsText()
-      .split(',')
-      .map((root) => root.trim())
-      .filter((root) => root.length > 0);
+    const rulesetRoot = this.store.rulesetRoot().trim();
+    void this.store.compile({ rulesetRoot });
   }
 
   protected activateRuleset(): void {
@@ -1262,4 +1223,11 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }
     return values;
   }
+}
+
+function recentRulesetRootIndex(itemId: string): number | null {
+  const prefix = 'recent-ruleset-root-';
+  if (!itemId.startsWith(prefix)) return null;
+  const index = Number(itemId.slice(prefix.length));
+  return Number.isSafeInteger(index) && index >= 0 ? index : null;
 }

@@ -487,10 +487,7 @@ pub struct RulesetWorkspaceResponseDto {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
 pub struct RulesetCompileRequestDto {
-    pub workspace_root: String,
-    pub package_roots: Vec<String>,
-    pub module: String,
-    pub declaration: String,
+    pub ruleset_root: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]

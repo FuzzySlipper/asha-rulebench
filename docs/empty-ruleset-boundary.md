@@ -22,19 +22,19 @@ No compatibility shim or placeholder corpus replaces them.
 
 ## Retained surfaces and concrete consumers
 
-| Surface                                    | Current use                                | Required future consumer                                      |
-| ------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------- |
-| Angular app and shell                      | boot the empty product                     | #5953 compiler/activation composition                         |
-| scenario-viewer feature                    | render no-active-ruleset state             | #5953 artifact inspection; #5955 runtime workflow             |
-| components                                 | render panels and disabled honest controls | #5953 diagnostics/activation; #5955 candidates/readouts       |
-| platform ports                             | generic browser boundary                   | #5953 manifest input, diagnostics copy, local selection state |
-| theme                                      | render current product                     | #5953 and #5955 product presentation                          |
-| focused Playwright harness                 | verify/inspect empty state                 | #5953 compilation journey; #5955 gameplay journey             |
-| structural and TypeScript authority guards | protect current boundaries                 | #5953 immutable authoring boundary                            |
+| Surface                                    | Current use                                | Required future consumer                                |
+| ------------------------------------------ | ------------------------------------------ | ------------------------------------------------------- |
+| Angular app and shell                      | boot the empty product                     | #5953 compiler/activation composition                   |
+| scenario-viewer feature                    | render no-active-ruleset state             | #5953 artifact inspection; #5955 runtime workflow       |
+| components                                 | render panels and disabled honest controls | #5953 diagnostics/activation; #5955 candidates/readouts |
+| platform ports                             | generic browser boundary                   | root input, diagnostics copy, recent-root state         |
+| theme                                      | render current product                     | #5953 and #5955 product presentation                    |
+| focused Playwright harness                 | verify/inspect empty state                 | #5953 compilation journey; #5955 gameplay journey       |
+| structural and TypeScript authority guards | protect current boundaries                 | #5953 immutable authoring boundary                      |
 
 ## Next authority boundary
 
-#5953 may activate content only after compiling one explicit manifest and its
+#5953 may activate content only after compiling one explicit root declaration and its
 exported-root closure into a closed Rust-validated artifact. It must introduce
 fresh protocol, transport, store, and host surfaces from that contract. It may
 not revive deleted catalogs, startup defaults, scenario-defined rulesets, or
@@ -47,13 +47,14 @@ names one base package, one contributed support/mixin package, and two ordered
 overlay packages. It resolves seven exact lock edges and closes four action
 roots plus typed stat, defense,
 resource, modifier, and damage support. A loopback trusted-authoring gateway
-builds one explicitly selected workspace module/export for each compile request,
+builds the inferred `ruleset.ts#ruleset` entrypoint under one explicitly selected
+canonical root for each compile request,
 then Asha RPG prepares only its exported package graph. Rust derives execution
 semantics only from that closed definition graph before emitting and reloading
-the artifact. Missing-support and invalid-build workspaces expose package and
+the artifact. Invalid layout, escaped-source, and invalid-build roots expose
 source diagnostics while preserving any active artifact and session. No
-product source ID catalog or switch selects content. The product still starts
-inactive.
+product source ID catalog selects content. The top menu switches only among
+successfully compiled explicit paths, and the product still starts inactive.
 
 ## #5955 transition
 

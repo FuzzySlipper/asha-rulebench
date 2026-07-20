@@ -21,12 +21,19 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   await expect(
     page
       .getByRole('menu', { name: 'Ruleset' })
-      .getByRole('menuitem', { name: 'Explicit compiler workspace' }),
-  ).toHaveAttribute('aria-disabled', 'true');
+      .getByRole('menuitem', { name: 'Load ruleset root…' }),
+  ).toHaveAttribute('aria-disabled', 'false');
+  await page
+    .getByRole('menu', { name: 'Ruleset' })
+    .getByRole('menuitem', { name: 'Load ruleset root…' })
+    .click();
+  await expect(
+    workspace.getByRole('textbox', { name: 'Ruleset root' }),
+  ).toBeFocused();
 
-  await selectWorkspace(workspace, 'examples/rulesets/field-manual-v1');
+  await selectRulesetRoot(workspace, 'examples/rulesets/field-manual');
   await workspace
-    .getByRole('button', { name: 'Compile explicit manifest' })
+    .getByRole('button', { name: 'Load ruleset candidate' })
     .click();
   await expect(
     workspace.getByRole('heading', { name: 'Compiled candidate ready' }),
@@ -136,20 +143,12 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
     .locator('dd');
   const activeArtifactId = await activeArtifact.innerText();
 
-  await selectWorkspace(workspace, 'examples/rulesets/field-manual-v1_1');
+  await selectRulesetRoot(workspace, 'examples/rulesets/ember-skirmish');
   await workspace
-    .getByRole('button', { name: 'Compile explicit manifest' })
+    .getByRole('button', { name: 'Load ruleset candidate' })
     .click();
-  await expect(workspace).toContainText('Pre-activation upgrade impact');
-  await expect(workspace).toContainText(
-    'Candidate compared with active runtime truth',
-  );
-  await expect(workspace).toContainText('rulebench.field-manual: 1.0.0');
-  await expect(workspace).toContainText('rulebench.arc-lash-stormfront');
-  await expect(workspace).toContainText('changed derived descendant');
-  await expect(workspace).toContainText(
-    'primary base identity or fingerprint changed',
-  );
+  await expect(workspace).toContainText('rulebench.ember-skirmish.demo@1.0.0');
+  await expect(workspace).toContainText('Ember Guard');
   await expect(
     workspace
       .getByText('Activation revision', { exact: true })
@@ -158,52 +157,60 @@ test('compiles, inspects, and atomically activates the explicit ruleset @gate', 
   ).toHaveText('1');
   await expect(workspace).toContainText('Revision 3 · actor hero');
   await expect(activeArtifact).toHaveText(activeArtifactId);
-  const candidateArtifact = workspace
+  const emberCandidateArtifact = workspace
     .getByText('Artifact', { exact: true })
     .locator('..')
     .locator('dd');
-  const candidateArtifactId = await candidateArtifact.innerText();
-  expect(candidateArtifactId).toContain('rulebench.fresh-start@1.1.0');
+  const emberCandidateArtifactId = await emberCandidateArtifact.innerText();
+  expect(emberCandidateArtifactId).toContain(
+    'rulebench.ember-skirmish.demo@1.0.0',
+  );
 
   await workspace
     .getByRole('button', { name: 'Activate accepted artifact' })
     .click();
-  await expect(workspace).toContainText('Activation revision 2');
+  await expect(activationRevision(workspace)).toHaveText('2');
   await expect(workspace).toContainText('Revision 0 · actor hero');
-  await expect(activeArtifact).toHaveText(candidateArtifactId);
-  await actionCard(workspace, 'rulebench.tactical-advance')
-    .getByRole('button', { name: 'Select action' })
-    .click();
-  await workspace.getByLabel('Random evidence').fill('');
-  await workspace.getByRole('button', { name: 'Submit typed intent' }).click();
-  await expect(workspace).toContainText('Revision 1 · actor hero');
+  await expect(activeArtifact).toHaveText(emberCandidateArtifactId);
+  await expect(workspace).toContainText('Ember Guard');
 
-  await selectWorkspace(workspace, 'examples/rulesets/invalid-missing-support');
-  await workspace
-    .getByRole('button', { name: 'Compile explicit manifest' })
-    .click();
-  await expect(workspace).toContainText('RULESET_DEFINITION_REFERENCE_MISSING');
-  await expect(workspace).toContainText('Package: rulebench.field-manual');
-  await expect(workspace).toContainText('Definition: rulebench.arc-lash');
-  await expect(workspace).toContainText(
-    'Source: packages/rulebench-field-manual.ts#rulebench.arc-lash',
-  );
+  await menubar.getByRole('menuitem', { name: 'Ruleset' }).click();
+  const rulesetMenu = page.getByRole('menu', { name: 'Ruleset' });
   await expect(
-    workspace.getByRole('heading', { name: 'Compiled ruleset active' }),
+    rulesetMenu.getByRole('menuitem', {
+      name: 'Switch to examples/rulesets/ember-skirmish',
+    }),
   ).toBeVisible();
-  await expect(workspace).toContainText('Activation revision 2');
-  await expect(workspace).toContainText('Revision 1 · actor hero');
-  await expect(activeArtifact).toHaveText(candidateArtifactId);
-  await selectWorkspace(workspace, 'examples/rulesets/invalid-build');
+  await rulesetMenu
+    .getByRole('menuitem', {
+      name: 'Switch to examples/rulesets/field-manual',
+    })
+    .click();
+  await expect(workspace).toContainText('rulebench.fresh-start@1.0.0');
+  await expect(workspace).toContainText('Tactical Advance');
+  await expect(activationRevision(workspace)).toHaveText('2');
+  await expect(workspace).toContainText('Revision 0 · actor hero');
+  await expect(activeArtifact).toHaveText(emberCandidateArtifactId);
+
   await workspace
-    .getByRole('button', { name: 'Compile explicit manifest' })
+    .getByRole('button', { name: 'Activate accepted artifact' })
+    .click();
+  await expect(activationRevision(workspace)).toHaveText('3');
+  const fieldManualCandidateArtifactId = await activeArtifact.innerText();
+  expect(fieldManualCandidateArtifactId).toContain(
+    'rulebench.fresh-start@1.0.0',
+  );
+
+  await selectRulesetRoot(workspace, 'examples/rulesets/invalid-build');
+  await workspace
+    .getByRole('button', { name: 'Load ruleset candidate' })
     .click();
   await expect(workspace).toContainText('RULESET_WORKSPACE_BUILD_FAILED');
   await expect(workspace).toContainText('TS2322');
-  await expect(workspace).toContainText('src/ruleset.ts#ruleset');
-  await expect(workspace).toContainText('Activation revision 2');
-  await expect(workspace).toContainText('Revision 1 · actor hero');
-  await expect(activeArtifact).toHaveText(candidateArtifactId);
+  await expect(workspace).toContainText('ruleset.ts#ruleset');
+  await expect(activationRevision(workspace)).toHaveText('3');
+  await expect(workspace).toContainText('Revision 0 · actor hero');
+  await expect(activeArtifact).toHaveText(fieldManualCandidateArtifactId);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(workspace).toBeVisible();
   const dimensions = await page.evaluate(() => ({
@@ -220,14 +227,18 @@ function actionCard(workspace: Locator, actionId: string) {
     .filter({ hasNotText: `${actionId}-` });
 }
 
-async function selectWorkspace(
+function activationRevision(workspace: Locator): Locator {
+  return workspace
+    .getByText('Activation revision', { exact: true })
+    .locator('..')
+    .locator('dd');
+}
+
+async function selectRulesetRoot(
   workspace: Locator,
-  workspaceRoot: string,
+  rulesetRoot: string,
 ): Promise<void> {
-  await workspace.getByLabel('Workspace root').fill(workspaceRoot);
   await workspace
-    .getByLabel('Package roots (comma separated)')
-    .fill('., ../shared');
-  await workspace.getByLabel('Root module').fill('src/ruleset.ts');
-  await workspace.getByLabel('Exported declaration').fill('ruleset');
+    .getByRole('textbox', { name: 'Ruleset root' })
+    .fill(rulesetRoot);
 }

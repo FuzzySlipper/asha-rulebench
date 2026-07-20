@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
 import {
+  basename,
   dirname,
   extname,
-  isAbsolute,
   join,
   relative,
   resolve,
@@ -20,11 +20,8 @@ import ts from 'typescript';
 
 import { isRulesetWorkspaceDeclaration } from '../../libs/content-authoring/src/index.js';
 
-export interface RulesetWorkspaceInput {
-  readonly workspaceRoot: string;
-  readonly packageRoots: readonly string[];
-  readonly module: string;
-  readonly declaration: string;
+export interface RulesetRootInput {
+  readonly rulesetRoot: string;
 }
 
 export type RulesetWorkspaceLoadResult =
@@ -43,7 +40,12 @@ type RulesetWorkspaceFailure = Extract<
   { readonly ok: false }
 >;
 
-interface ResolvedWorkspaceInput extends RulesetWorkspaceInput {
+interface ResolvedWorkspaceInput {
+  readonly rulesetRoot: string;
+  readonly workspaceRoot: string;
+  readonly packageRoots: readonly string[];
+  readonly module: 'ruleset.ts';
+  readonly declaration: 'ruleset';
   readonly resolvedWorkspaceRoot: string;
   readonly resolvedPackageRoots: readonly string[];
   readonly resolvedModule: string;
@@ -95,8 +97,8 @@ export async function loadRulesetWorkspace(
     if (escapedSource !== undefined) {
       return failure(
         'RULESET_WORKSPACE_IMPORT_OUTSIDE_PACKAGE_ROOTS',
-        '$.packageRoots',
-        `Imported source ${normalizedPath(escapedSource.fileName)} is outside the explicit package roots`,
+        '$.rulesetRoot',
+        `Imported source ${normalizedPath(escapedSource.fileName)} is outside the selected ruleset root and its repository foundations`,
         resolved.value,
       );
     }
@@ -106,7 +108,7 @@ export async function loadRulesetWorkspace(
     if (disallowedImport !== undefined) {
       return failure(
         'RULESET_WORKSPACE_IMPORT_NOT_ALLOWED',
-        '$.module',
+        '$.rulesetRoot',
         `Authoring modules may import only relative modules and published Asha RPG packages, not ${disallowedImport}`,
         resolved.value,
       );
@@ -144,7 +146,7 @@ export async function loadRulesetWorkspace(
     } catch (error: unknown) {
       return failure(
         'RULESET_WORKSPACE_EVALUATION_FAILED',
-        '$.module',
+        '$.rulesetRoot',
         error instanceof Error ? error.message : String(error),
         resolved.value,
       );
@@ -152,7 +154,7 @@ export async function loadRulesetWorkspace(
     if (!isRecord(moduleNamespace)) {
       return failure(
         'RULESET_WORKSPACE_MODULE_INVALID',
-        '$.module',
+        '$.rulesetRoot',
         'The selected module did not expose an ES module namespace',
         resolved.value,
       );
@@ -160,7 +162,7 @@ export async function loadRulesetWorkspace(
     if (!(resolved.value.declaration in moduleNamespace)) {
       return failure(
         'RULESET_WORKSPACE_DECLARATION_NOT_EXPORTED',
-        '$.declaration',
+        '$.rulesetRoot',
         `Module does not export ${resolved.value.declaration}`,
         resolved.value,
       );
@@ -169,7 +171,7 @@ export async function loadRulesetWorkspace(
     if (!isRulesetWorkspaceDeclaration(declaration)) {
       return failure(
         'RULESET_WORKSPACE_DECLARATION_INVALID',
-        '$.declaration',
+        '$.rulesetRoot',
         'Export must be immutable package and composition data',
         resolved.value,
       );
@@ -227,7 +229,7 @@ async function resolveWorkspaceInput(
       'Compile input must be an object',
     );
   }
-  const exactKeys = ['declaration', 'module', 'packageRoots', 'workspaceRoot'];
+  const exactKeys = ['rulesetRoot'];
   if (
     Object.keys(input).length !== exactKeys.length ||
     !exactKeys.every((key) => key in input)
@@ -238,72 +240,54 @@ async function resolveWorkspaceInput(
       `Compile input must contain exactly ${exactKeys.join(', ')}`,
     );
   }
-  const workspaceRoot = input['workspaceRoot'];
-  const packageRoots = input['packageRoots'];
-  const module = input['module'];
-  const declaration = input['declaration'];
-  if (typeof workspaceRoot !== 'string' || workspaceRoot.trim().length === 0) {
+  const rulesetRoot = input['rulesetRoot'];
+  if (typeof rulesetRoot !== 'string' || rulesetRoot.trim().length === 0) {
     return failureWithoutSource(
-      'RULESET_WORKSPACE_ROOT_INVALID',
-      '$.workspaceRoot',
-      'workspaceRoot must be a non-empty path',
+      'RULESET_ROOT_PATH_INVALID',
+      '$.rulesetRoot',
+      'rulesetRoot must be a non-empty path',
     );
   }
-  if (
-    typeof module !== 'string' ||
-    module.trim().length === 0 ||
-    isAbsolute(module)
-  ) {
+  const resolvedWorkspaceRoot = resolve(gatewayRoot, rulesetRoot);
+  const rulesetsDirectory = dirname(resolvedWorkspaceRoot);
+  if (basename(rulesetsDirectory) !== 'rulesets') {
     return failureWithoutSource(
-      'RULESET_WORKSPACE_MODULE_INVALID',
-      '$.module',
-      'module must be a non-empty path relative to workspaceRoot',
+      'RULESET_ROOT_LAYOUT_INVALID',
+      '$.rulesetRoot',
+      'rulesetRoot must be a direct child of a rulesets directory',
     );
   }
-  if (
-    typeof declaration !== 'string' ||
-    !/^[$A-Z_a-z][$0-9A-Z_a-z]*$/.test(declaration)
-  ) {
-    return failureWithoutSource(
-      'RULESET_WORKSPACE_DECLARATION_INVALID',
-      '$.declaration',
-      'declaration must be one exported JavaScript identifier',
-    );
+  const module = 'ruleset.ts';
+  const declaration = 'ruleset';
+  const workspaceRoot = rulesetRoot;
+  const resolvedModule = join(resolvedWorkspaceRoot, module);
+  const repositoryRoot = dirname(rulesetsDirectory);
+  const resolvedFoundationsRoot = join(repositoryRoot, 'foundations');
+  const resolvedPackageRoots = [resolvedWorkspaceRoot];
+  try {
+    const foundationsStat = await stat(resolvedFoundationsRoot);
+    if (!foundationsStat.isDirectory()) {
+      return failureWithoutSource(
+        'RULESET_ROOT_FOUNDATIONS_INVALID',
+        '$.rulesetRoot',
+        'The conventional foundations path exists but is not a directory',
+      );
+    }
+    resolvedPackageRoots.push(resolvedFoundationsRoot);
+  } catch (error: unknown) {
+    if (!isMissingPath(error)) {
+      return failureWithoutSource(
+        'RULESET_ROOT_FOUNDATIONS_UNREADABLE',
+        '$.rulesetRoot',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
-  if (
-    !Array.isArray(packageRoots) ||
-    packageRoots.length === 0 ||
-    !packageRoots.every(
-      (packageRoot) =>
-        typeof packageRoot === 'string' && packageRoot.trim().length > 0,
-    )
-  ) {
-    return failureWithoutSource(
-      'RULESET_WORKSPACE_PACKAGE_ROOTS_INVALID',
-      '$.packageRoots',
-      'packageRoots must contain at least one explicit path',
-    );
-  }
-  const resolvedWorkspaceRoot = resolve(gatewayRoot, workspaceRoot);
-  const resolvedModule = resolve(resolvedWorkspaceRoot, module);
-  if (!isWithinRoot(resolvedModule, resolvedWorkspaceRoot)) {
-    return failureWithoutSource(
-      'RULESET_WORKSPACE_MODULE_OUTSIDE_ROOT',
-      '$.module',
-      'module must remain within workspaceRoot',
-    );
-  }
-  const resolvedPackageRoots = packageRoots.map((packageRoot) =>
-    resolve(resolvedWorkspaceRoot, packageRoot),
+  const packageRoots = resolvedPackageRoots.map((packageRoot) =>
+    normalizedPath(relative(resolvedWorkspaceRoot, packageRoot) || '.'),
   );
-  if (!isWithinAnyRoot(resolvedModule, resolvedPackageRoots)) {
-    return failureWithoutSource(
-      'RULESET_WORKSPACE_MODULE_OUTSIDE_PACKAGE_ROOTS',
-      '$.packageRoots',
-      'module must be contained by an explicit package root',
-    );
-  }
   const resolvedValue: ResolvedWorkspaceInput = {
+    rulesetRoot,
     workspaceRoot,
     packageRoots,
     module,
@@ -322,8 +306,8 @@ async function resolveWorkspaceInput(
     }
   } catch (error: unknown) {
     return failure(
-      'RULESET_WORKSPACE_SOURCE_NOT_FOUND',
-      '$.module',
+      'RULESET_ROOT_ENTRY_NOT_FOUND',
+      '$.rulesetRoot',
       error instanceof Error ? error.message : String(error),
       resolvedValue,
     );
@@ -339,7 +323,7 @@ function typescriptDiagnostic(
   if (diagnostic.file === undefined || diagnostic.start === undefined) {
     return diagnosticValue(
       'RULESET_WORKSPACE_BUILD_FAILED',
-      '$.module',
+      '$.rulesetRoot',
       `TS${diagnostic.code}: ${message}`,
       input,
     );
@@ -362,7 +346,7 @@ function failure(
   code: string,
   path: string,
   message: string,
-  input: RulesetWorkspaceInput,
+  input: ResolvedWorkspaceInput,
 ): RulesetWorkspaceFailure {
   return {
     ok: false,
@@ -393,7 +377,7 @@ function diagnosticValue(
   code: string,
   path: string,
   message: string,
-  input: Pick<RulesetWorkspaceInput, 'module' | 'declaration'>,
+  input: Pick<ResolvedWorkspaceInput, 'module' | 'declaration'>,
 ): RulesetCompilerDiagnostic {
   return {
     stage: 'source',
@@ -486,6 +470,10 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isMissingPath(error: unknown): boolean {
+  return isRecord(error) && 'code' in error && error['code'] === 'ENOENT';
+}
+
 async function createBuildRoot(gatewayRoot: string): Promise<string> {
   const parent = join(resolve(gatewayRoot), 'tmp', 'ruleset-workspaces');
   await mkdir(parent, { recursive: true });
@@ -506,7 +494,7 @@ async function run(): Promise<void> {
     input = JSON.parse(await readStandardInput());
   } catch (error: unknown) {
     const result = failureWithoutSource(
-      'RULESET_WORKSPACE_INPUT_INVALID',
+      'RULESET_ROOT_INPUT_INVALID',
       '$',
       error instanceof Error ? error.message : String(error),
     );

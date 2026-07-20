@@ -9,13 +9,14 @@ boundary from #5952:
 - no scenario, import, filename, or startup behavior can construct a ruleset;
 - no Rulebench-owned combat, replay, or semantic authority remains;
 - the UI starts and clearly reports **No compiled ruleset active**;
-- one explicitly selected TypeScript manifest can be compiled, inspected,
+- one explicitly selected TypeScript ruleset root can be compiled, inspected,
   atomically activated, and exercised through Asha RPG authority without
   introducing TypeScript gameplay authority.
 
-Content enters only through the explicit manifest/compiler boundary. Each
-compile click sends a workspace root, explicit package roots, one root module,
-and one exported declaration through a generated request DTO. A loopback
+Content enters only through the canonical ruleset-root compiler boundary. Each
+compile click sends one `rulesetRoot` through a generated request DTO. The root
+must be a direct child of `rulesets/`; Rulebench infers `ruleset.ts#ruleset` and
+permits only that root plus its repository's conventional `foundations/`. A loopback
 trusted-authoring gateway launches a fresh constrained TypeScript build for
 that request and passes only its closed prepared source to Rust. It does not
 scan directories or consult a product source catalog. The current example
@@ -51,10 +52,12 @@ events, or maintain a second gameplay state path.
 - `apps/app`: Angular bootstrap.
 - `apps/app-e2e`: focused compiler/activation browser and managed live evidence.
 - `libs/content-authoring`: the narrow immutable declaration shape accepted by
-  the workspace loader; no content catalog, global registry, discovery,
+  the root loader; no content catalog, global registry, discovery,
   callbacks, scenarios, or raw-IR product catalog.
-- `examples/rulesets`: explicit example workspaces used by tests and demos.
+- `examples/rulesets`: independently owned example roots used by tests and demos.
   They have no privileged loader path.
+- `examples/foundations`: explicitly imported packages shared by more than one
+  example root; never a ruleset catalog or discovery location.
 - `libs/protocol`: generated Rust host DTOs plus a strict decoder.
 - `libs/transport`, `libs/domain`, `libs/store`: generated-DTO transport,
   pure inspection mapping, and explicit lifecycle state.
@@ -110,13 +113,15 @@ parameters, patch fingerprints, before/after values, effectiveness, impact
 planes, and final definition fingerprints emitted by Asha RPG; it does not
 reimplement materialization semantics.
 
-After an artifact is active, the field-manual 1.1 example workspace can be compiled as a
+After an artifact is active, the independently rooted Field Manual 1.1 example can be compiled as a
 candidate without activation. The Rust host structurally compares the two
 fully materialized accepted artifacts and Rulebench displays changed package
 sources, changed definitions, derived descendants, causes, and exact semantic
-or presentation field transitions. Workspace selection is an explicit location
-request rather than a source ID, so adding ordinary content does not extend a
-Rust enum, switch, or product catalog.
+or presentation field transitions. The Ruleset menu also retains successfully
+compiled root paths and can compile a recent root as a candidate without
+silently activating it. Root selection is an explicit location request rather
+than a source ID, so adding ordinary content does not extend a Rust enum,
+switch, or product catalog.
 
 See [docs/empty-ruleset-boundary.md](docs/empty-ruleset-boundary.md) for the
 deletion and retention inventory.

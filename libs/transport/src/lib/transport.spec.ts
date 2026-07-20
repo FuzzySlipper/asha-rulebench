@@ -19,10 +19,7 @@ describe('ruleset transport', () => {
 
     const transport = createRulesetTransport(http);
     await transport.compile({
-      workspaceRoot: 'examples/rulesets/field-manual-v1',
-      packageRoots: ['.', '../shared'],
-      module: 'src/ruleset.ts',
-      declaration: 'ruleset',
+      rulesetRoot: 'examples/rulesets/field-manual',
     });
     await transport.restoreCheckpoint();
     await transport.replay();
@@ -32,10 +29,7 @@ describe('ruleset transport', () => {
         method: 'POST',
         path: '/api/ruleset/compile',
         body: {
-          workspaceRoot: 'examples/rulesets/field-manual-v1',
-          packageRoots: ['.', '../shared'],
-          module: 'src/ruleset.ts',
-          declaration: 'ruleset',
+          rulesetRoot: 'examples/rulesets/field-manual',
         },
       },
       {

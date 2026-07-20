@@ -3,11 +3,16 @@ import {
   rulesetWorkspaceView,
   type RulesetWorkspaceView,
 } from '@asha-rulebench/domain';
-import { browserJsonHttp } from '@asha-rulebench/platform';
+import {
+  browserJsonHttp,
+  browserStorage,
+  type KeyValueStoragePort,
+} from '@asha-rulebench/platform';
 import type {
   GameplayCommandRequestDto,
   GameplayReactionRequestDto,
   RulesetCompileRequestDto,
+  RulesetWorkspaceResponseDto,
 } from '@asha-rulebench/protocol';
 import {
   createRulesetTransport,
@@ -24,22 +29,44 @@ export type AsyncState<Value> =
       readonly previous: Value | null;
     };
 
+const RECENT_RULESET_ROOTS_KEY = 'asha-rulebench.recent-ruleset-roots.v1';
+const RECENT_RULESET_ROOT_LIMIT = 8;
+
 export class RulesetWorkspaceStore {
   private readonly mutableState = signal<AsyncState<RulesetWorkspaceView>>({
     kind: 'idle',
   });
+  private readonly mutableRulesetRoot = signal('');
+  private readonly mutableRecentRulesetRoots = signal<readonly string[]>([]);
   public readonly state = this.mutableState.asReadonly();
   public readonly view = computed(() => currentView(this.mutableState()));
   public readonly busy = computed(() => this.mutableState().kind === 'loading');
+  public readonly rulesetRoot = this.mutableRulesetRoot.asReadonly();
+  public readonly recentRulesetRoots =
+    this.mutableRecentRulesetRoots.asReadonly();
 
-  public constructor(private readonly transport: RulesetTransport) {}
+  public constructor(
+    private readonly transport: RulesetTransport,
+    private readonly storage: KeyValueStoragePort,
+  ) {
+    this.mutableRecentRulesetRoots.set(readRecentRulesetRoots(storage));
+  }
 
   public async refresh(): Promise<void> {
     await this.run(() => this.transport.status());
   }
 
   public async compile(request: RulesetCompileRequestDto): Promise<void> {
-    await this.run(() => this.transport.compile(request));
+    const rulesetRoot = request.rulesetRoot.trim();
+    this.mutableRulesetRoot.set(rulesetRoot);
+    const response = await this.run(() =>
+      this.transport.compile({ rulesetRoot }),
+    );
+    if (response?.ok === true) this.rememberRulesetRoot(rulesetRoot);
+  }
+
+  public selectRulesetRoot(rulesetRoot: string): void {
+    this.mutableRulesetRoot.set(rulesetRoot);
   }
 
   public async activate(): Promise<void> {
@@ -64,7 +91,7 @@ export class RulesetWorkspaceStore {
 
   private async run(
     request: () => ReturnType<RulesetTransport['status']>,
-  ): Promise<void> {
+  ): Promise<RulesetWorkspaceResponseDto | null> {
     const previous = currentView(this.mutableState());
     this.mutableState.set({ kind: 'loading', previous });
     try {
@@ -73,6 +100,7 @@ export class RulesetWorkspaceStore {
         kind: 'ready',
         value: rulesetWorkspaceView(response),
       });
+      return response;
     } catch (error: unknown) {
       this.mutableState.set({
         kind: 'error',
@@ -82,12 +110,28 @@ export class RulesetWorkspaceStore {
             : 'Unknown ruleset transport failure',
         previous,
       });
+      return null;
     }
+  }
+
+  private rememberRulesetRoot(rulesetRoot: string): void {
+    if (rulesetRoot.length === 0) return;
+    const next = [
+      rulesetRoot,
+      ...this.mutableRecentRulesetRoots().filter(
+        (candidate) => candidate !== rulesetRoot,
+      ),
+    ].slice(0, RECENT_RULESET_ROOT_LIMIT);
+    this.mutableRecentRulesetRoots.set(next);
+    this.storage.setItem(RECENT_RULESET_ROOTS_KEY, JSON.stringify(next));
   }
 }
 
 export function createBrowserRulesetWorkspaceStore(): RulesetWorkspaceStore {
-  return new RulesetWorkspaceStore(createRulesetTransport(browserJsonHttp()));
+  return new RulesetWorkspaceStore(
+    createRulesetTransport(browserJsonHttp()),
+    browserStorage(),
+  );
 }
 
 function currentView(
@@ -96,4 +140,25 @@ function currentView(
   if (state.kind === 'ready') return state.value;
   if (state.kind === 'loading' || state.kind === 'error') return state.previous;
   return null;
+}
+
+function readRecentRulesetRoots(
+  storage: KeyValueStoragePort,
+): readonly string[] {
+  const stored = storage.getItem(RECENT_RULESET_ROOTS_KEY);
+  if (stored === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.trim().length > 0,
+      )
+      .map((value) => value.trim())
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .slice(0, RECENT_RULESET_ROOT_LIMIT);
+  } catch {
+    return [];
+  }
 }

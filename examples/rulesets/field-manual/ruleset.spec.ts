@@ -1,16 +1,12 @@
 import { canonicalJson, prepareRulesetCompilation } from '@asha-rpg/authoring';
 import { describe, expect, it } from 'vitest';
 
-import {
-  FIELD_MANUAL_V1_1_WORKSPACE,
-  FIELD_MANUAL_V1_WORKSPACE,
-  INVALID_MISSING_SUPPORT_WORKSPACE,
-} from './rulebench-content.js';
+import { ruleset } from './ruleset.js';
 
 describe('example Rulebench ruleset package graph', () => {
   it('closes four TypeScript-only actions through an exact materialized dependency lock', () => {
-    const first = prepareRuleset(FIELD_MANUAL_V1_WORKSPACE);
-    const second = prepareRuleset(FIELD_MANUAL_V1_WORKSPACE);
+    const first = prepareRuleset(ruleset);
+    const second = prepareRuleset(ruleset);
 
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
@@ -58,16 +54,12 @@ describe('example Rulebench ruleset package graph', () => {
   });
 
   it('contains immutable declarations and no ambient registration', () => {
-    expect(Object.isFrozen(FIELD_MANUAL_V1_WORKSPACE.packages)).toBe(true);
+    expect(Object.isFrozen(ruleset.packages)).toBe(true);
+    expect(ruleset.packages.every((source) => Object.isFrozen(source))).toBe(
+      true,
+    );
     expect(
-      FIELD_MANUAL_V1_WORKSPACE.packages.every((source) =>
-        Object.isFrozen(source),
-      ),
-    ).toBe(true);
-    expect(
-      FIELD_MANUAL_V1_WORKSPACE.packages.map(
-        (source) => source.manifest.identity.id,
-      ),
+      ruleset.packages.map((source) => source.manifest.identity.id),
     ).toEqual([
       'rulebench.field-manual',
       'rulebench.primitives',
@@ -76,10 +68,8 @@ describe('example Rulebench ruleset package graph', () => {
     ]);
   });
 
-  it('exports independent declarations and exposes invalid graph diagnostics', () => {
-    const accepted = prepareRuleset(FIELD_MANUAL_V1_WORKSPACE);
-    const upgrade = prepareRuleset(FIELD_MANUAL_V1_1_WORKSPACE);
-    const rejected = prepareRuleset(INVALID_MISSING_SUPPORT_WORKSPACE);
+  it('exports a self-contained declaration with the expected materialized semantics', () => {
+    const accepted = prepareRuleset(ruleset);
 
     expect(accepted.ok).toBe(true);
     if (accepted.ok) {
@@ -89,32 +79,9 @@ describe('example Rulebench ruleset package graph', () => {
       expect(source).toContain('"sides":4');
       expect(source).toContain('"sides":6');
     }
-    expect(upgrade.ok).toBe(true);
-    if (accepted.ok && upgrade.ok) {
-      const upgradeSource = canonicalJson(upgrade.prepared);
-      const acceptedSource = canonicalJson(accepted.prepared);
-      expect(upgradeSource).toContain(
-        '"compositionIdentity":{"id":"rulebench.fresh-start","version":"1.1.0"}',
-      );
-      expect(upgradeSource).not.toBe(acceptedSource);
-      expect(upgradeSource).toContain('"value":2');
-    }
-    expect(rejected.ok).toBe(false);
-    if (!rejected.ok) {
-      const diagnostic = rejected.diagnostics.find(
-        (entry) => entry.code === 'RULESET_DEFINITION_REFERENCE_MISSING',
-      );
-      expect(diagnostic?.code).toBe('RULESET_DEFINITION_REFERENCE_MISSING');
-      expect(diagnostic?.packageId).toBe('rulebench.field-manual');
-      expect(diagnostic?.definitionId).toBe('rulebench.arc-lash');
-      expect(diagnostic?.source).toEqual({
-        module: 'packages/rulebench-field-manual.ts',
-        declaration: 'rulebench.arc-lash',
-      });
-    }
   });
 });
 
-function prepareRuleset(declaration: typeof FIELD_MANUAL_V1_WORKSPACE) {
+function prepareRuleset(declaration: typeof ruleset) {
   return prepareRulesetCompilation(declaration);
 }

@@ -25,8 +25,8 @@ pnpm run verify
 
 The required check runs static product validation, the pinned Rust host tests,
 generated-protocol drift, and the focused browser gate. It proves an explicit
-workspace module/export is freshly built by the trusted authoring subprocess
-for a user-selected request, reaches Rust compilation and a closed artifact
+ruleset root is freshly built through inferred `ruleset.ts#ruleset` by the
+trusted authoring subprocess for a user-selected request, reaches Rust compilation and a closed artifact
 loader, appears in the user-facing inspection view, and activates atomically.
 It also proves subsequent invalid package and TypeScript build graphs display
 diagnostics while preserving the active artifact, authority session, and
@@ -34,8 +34,8 @@ activation revision. It
 does not prove process-restart storage, migration policy, or an exhaustive
 content corpus. The focused gate does cover the fresh gameplay, portable
 checkpoint restore, deterministic Rust replay, and
-derivation/mixin/overlay graph, including visible materialization provenance
-and a pre-activation 1.0-to-1.1 upgrade-impact report.
+derivation/mixin/overlay graph, including visible materialization provenance,
+independent-root activation, and recent-root switching from the top menu.
 
 ## Downstream posture
 
@@ -52,10 +52,10 @@ BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 Inspect all milestone screenshots and the evidence packet. The current live
-claim covers the inactive startup state, per-click source preparation, explicit
-compilation, artifact inspection, activation revision, persistent gameplay
-commands and reaction completion, a pre-activation upgrade-impact report, and
-failed-recompilation preservation. It also covers the in-memory checkpoint and
+claim covers the inactive startup state, per-click source preparation, root-only
+compilation, top-menu switching, artifact inspection, activation revision,
+persistent gameplay commands and reaction completion, and failed-recompilation
+preservation. It also covers the in-memory checkpoint and
 replay archive, exact binding inspection, checkpoint restore, and deterministic
 Rust replay. Persistence across activation/process restart, migration policy,
 and exhaustive certification remain explicit non-claims.
