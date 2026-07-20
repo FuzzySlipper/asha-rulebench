@@ -17,6 +17,7 @@ const localWebServer = process.env['BASE_URL']
         env: {
           ...process.env,
           RULEBENCH_EPHEMERAL_ARTIFACTS: '1',
+          RULEBENCH_ANGULAR_CONFIGURATION: 'e2e',
           RULEBENCH_RANDOM_TAPE: '10,3,4,1,2,3,4,1',
           RULEBENCH_RULESET_CONFIG: '.rulebench/rulesets.example.json',
         },
@@ -25,6 +26,7 @@ const localWebServer = process.env['BASE_URL']
 
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
+  retries: 0,
   preserveOutput: 'always',
   use: {
     baseURL,

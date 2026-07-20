@@ -33,6 +33,7 @@ describe('ruleset workspace view mapping', () => {
   it('reports active artifact identity with the persistent authority view', () => {
     const active = artifact();
     const activeResponse = response('active', active, null);
+    activeResponse.encounterSetupRequired = false;
     activeResponse.gameplayAvailable = true;
     activeResponse.gameplay = gameplay();
     const view = rulesetWorkspaceView(activeResponse);
@@ -41,9 +42,8 @@ describe('ruleset workspace view mapping', () => {
     expect(view.activeArtifactId).toBe(active.artifactId);
     expect(view.gameplayAvailable).toBe(true);
     expect(view.gameplay?.stateRevision).toBe(2);
-    expect(view.gameplay?.actions[0]?.randomPlan).toEqual([
-      'if no-roll branch: formulaDice 5d4',
-    ]);
+    expect(view.gameplay?.actions[0]?.candidateIds).toEqual(['raider']);
+    expect(view.gameplay?.turn.initiativeOrder).toEqual(['hero', 'raider']);
     expect(view.gameplay?.archive.verificationStatus).toBe('verified');
     expect(view.gameplay?.archive.replayEntries[0]?.transition).toContain(
       'awaitingReaction ward r2',
@@ -110,6 +110,13 @@ function response(
     candidateArtifact,
     upgradeImpact: null,
     activationRevision: status === 'active' ? 1 : 0,
+    hostRandomSource: {
+      policyId: 'rulebench.automatic-random',
+      policyVersion: 1,
+      sourceId: 'rulebench.system-random',
+      sourceVersion: 1,
+    },
+    encounterSetupRequired: status === 'active',
     gameplayAvailable: false,
     gameplay: null,
     diagnostics: [],
@@ -118,43 +125,41 @@ function response(
 
 function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
   return {
+    artifactId: 'rulebench.fresh-start@1.0.0:fnv1a64:4444444444444444',
     actorId: 'hero',
     stateRevision: 2,
     acceptedRandomValues: '3',
+    randomSource: {
+      policyId: 'rulebench.automatic-random',
+      policyVersion: 1,
+      sourceId: 'rulebench.system-random',
+      sourceVersion: 1,
+    },
+    board: { width: 5, height: 3, cells: [] },
+    turn: {
+      initiativeOrder: ['hero', 'raider'],
+      currentActorId: 'hero',
+      round: 1,
+      turn: 3,
+    },
     actions: [
       {
-        id: 'rulebench.wardbreaker-volley',
-        name: 'Wardbreaker Volley',
-        sourcePath: 'packages/rulebench-field-manual.ts',
-        team: 'hostile',
-        maximumRange: 3,
-        maximumTargets: 1,
-        costs: [{ resourceId: 'focus', amount: 1 }],
-        randomPlan: [
-          {
-            request: {
-              kind: 'formulaDice',
-              count: 5,
-              sides: 4,
-              path: '$.damage',
-            },
-            conditions: [{ kind: 'checkNoRoll', path: '$.program' }],
-          },
-        ],
-        candidateIds: ['raider'],
-      },
-    ],
-    preflights: [
-      {
-        actionId: 'rulebench.wardbreaker-volley',
-        targetId: 'raider',
+        definitionId: 'rulebench.wardbreaker-volley',
+        label: 'Wardbreaker Volley',
         available: true,
-        code: null,
-        message: 'accepted',
+        unavailable: null,
+        maximumTargets: 1,
+        options: {
+          participantIds: ['raider'],
+          cellIds: [],
+          areaIds: [],
+        },
       },
     ],
     entities: [],
     pendingReaction: null,
+    log: [],
+    outcome: { status: 'inProgress', winningTeamIds: [] },
     lastResult: null,
     archive: {
       checkpointSchema: 'asha.rpg.session.checkpoint@1',

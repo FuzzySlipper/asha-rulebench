@@ -54,10 +54,10 @@ BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 Inspect all milestone screenshots and the evidence packet. The current live
-claim covers the inactive startup state, per-click source preparation,
-artifact inspection as a secondary dialog, activation, the desktop and narrow
-combat workspace, authority target choice, real system-supplied automatic roll
-feedback, inline reaction completion, and replay of the exact recorded values.
-The fixed bootstrap encounter is not general participant, turn, or board setup.
-Persistence across activation/process restart, migration policy, and exhaustive
-certification remain explicit non-claims.
+claim covers inactive startup, per-click source preparation, artifact
+inspection as a secondary dialog, activation, explicit artifact-pinned setup,
+the desktop and narrow combat workspace, alternating authority-owned turns,
+authority target choice, real system-supplied automatic roll feedback, inline
+reaction completion, and replay of the exact recorded values. Persistent setup
+libraries, persistence across activation/process restart, multiplayer, AI,
+migration policy, and exhaustive certification remain explicit non-claims.

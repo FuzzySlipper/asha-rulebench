@@ -25,6 +25,24 @@ describe('ruleset transport', () => {
     await transport.compile({
       rulesetRoot: 'examples/rulesets/field-manual',
     });
+    await transport.startEncounter({
+      schema: { id: 'asha.rpg.encounter.setup', version: 1 },
+      artifactId: 'artifact-1',
+      board: { width: 5, height: 3, cells: [] },
+      participants: [],
+      turn: {
+        initiativeOrder: [],
+        currentActorId: '',
+        round: 1,
+        turn: 1,
+      },
+      randomSource: {
+        policyId: 'rulebench.automatic-random',
+        policyVersion: 1,
+        sourceId: 'rulebench.system-random',
+        sourceVersion: 1,
+      },
+    });
     await transport.command({
       expectedRevision: 2,
       actionId: 'action.arc-lash',
@@ -50,6 +68,28 @@ describe('ruleset transport', () => {
         path: '/api/ruleset/compile',
         body: {
           rulesetRoot: 'examples/rulesets/field-manual',
+        },
+      },
+      {
+        method: 'POST',
+        path: '/api/ruleset/encounter',
+        body: {
+          schema: { id: 'asha.rpg.encounter.setup', version: 1 },
+          artifactId: 'artifact-1',
+          board: { width: 5, height: 3, cells: [] },
+          participants: [],
+          turn: {
+            initiativeOrder: [],
+            currentActorId: '',
+            round: 1,
+            turn: 1,
+          },
+          randomSource: {
+            policyId: 'rulebench.automatic-random',
+            policyVersion: 1,
+            sourceId: 'rulebench.system-random',
+            sourceVersion: 1,
+          },
         },
       },
       {
@@ -132,6 +172,13 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     candidateArtifact: null,
     upgradeImpact: null,
     activationRevision: 0,
+    hostRandomSource: {
+      policyId: 'rulebench.automatic-random',
+      policyVersion: 1,
+      sourceId: 'rulebench.system-random',
+      sourceVersion: 1,
+    },
+    encounterSetupRequired: false,
     gameplayAvailable: false,
     gameplay: null,
     diagnostics: [],

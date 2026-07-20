@@ -1,15 +1,19 @@
 import type {
-  GameplayActionDto,
+  EncounterBoardDto,
+  EncounterCellCapabilityDto,
+  EncounterCellCapabilityValueDto,
+  EncounterCellDto,
+  EncounterRandomSourceDto,
+  EncounterTurnDto,
+  GameplayActionOptionsDto,
   GameplayArchiveDto,
-  GameplayCostDto,
+  GameplayAuthorityActionDto,
   GameplayEntityDto,
   GameplayEventDto,
+  GameplayLogEntryDto,
   GameplayModifierDto,
   GameplayNamedValueDto,
-  GameplayPreflightDto,
-  GameplayRandomPlanConditionDto,
-  GameplayRandomPlanConditionKindDto,
-  GameplayRandomPlanEntryDto,
+  GameplayOutcomeDto,
   GameplayRandomEvidenceDto,
   GameplayRandomRequestDto,
   GameplayReactionDto,
@@ -60,6 +64,8 @@ export function decodeRulesetWorkspaceResponse(
       'candidateArtifact',
       'upgradeImpact',
       'activationRevision',
+      'hostRandomSource',
+      'encounterSetupRequired',
       'gameplayAvailable',
       'gameplay',
       'diagnostics',
@@ -85,6 +91,14 @@ export function decodeRulesetWorkspaceResponse(
       record['activationRevision'],
       '$.activationRevision',
     ),
+    hostRandomSource: encounterRandomSource(
+      record['hostRandomSource'],
+      '$.hostRandomSource',
+    ),
+    encounterSetupRequired: requiredBoolean(
+      record['encounterSetupRequired'],
+      '$.encounterSetupRequired',
+    ),
     gameplayAvailable: requiredBoolean(
       record['gameplayAvailable'],
       '$.gameplayAvailable',
@@ -105,19 +119,25 @@ function nullableGameplay(
   exactKeys(
     record,
     [
+      'artifactId',
       'actorId',
       'stateRevision',
       'acceptedRandomValues',
+      'randomSource',
+      'board',
+      'turn',
       'actions',
-      'preflights',
       'entities',
       'pendingReaction',
+      'log',
+      'outcome',
       'lastResult',
       'archive',
     ],
     path,
   );
   return {
+    artifactId: requiredString(record['artifactId'], `${path}.artifactId`),
     actorId: requiredString(record['actorId'], `${path}.actorId`),
     stateRevision: nonNegativeInteger(
       record['stateRevision'],
@@ -127,12 +147,15 @@ function nullableGameplay(
       record['acceptedRandomValues'],
       `${path}.acceptedRandomValues`,
     ),
-    actions: requiredArray(record['actions'], `${path}.actions`).map(
-      (entry, index) => gameplayAction(entry, `${path}.actions[${index}]`),
+    randomSource: encounterRandomSource(
+      record['randomSource'],
+      `${path}.randomSource`,
     ),
-    preflights: requiredArray(record['preflights'], `${path}.preflights`).map(
+    board: encounterBoard(record['board'], `${path}.board`),
+    turn: encounterTurn(record['turn'], `${path}.turn`),
+    actions: requiredArray(record['actions'], `${path}.actions`).map(
       (entry, index) =>
-        gameplayPreflight(entry, `${path}.preflights[${index}]`),
+        gameplayAuthorityAction(entry, `${path}.actions[${index}]`),
     ),
     entities: requiredArray(record['entities'], `${path}.entities`).map(
       (entry, index) => gameplayEntity(entry, `${path}.entities[${index}]`),
@@ -141,8 +164,179 @@ function nullableGameplay(
       record['pendingReaction'],
       `${path}.pendingReaction`,
     ),
+    log: requiredArray(record['log'], `${path}.log`).map((entry, index) =>
+      gameplayLogEntry(entry, `${path}.log[${index}]`),
+    ),
+    outcome: gameplayOutcome(record['outcome'], `${path}.outcome`),
     lastResult: nullableResult(record['lastResult'], `${path}.lastResult`),
     archive: gameplayArchive(record['archive'], `${path}.archive`),
+  };
+}
+
+function encounterRandomSource(
+  value: unknown,
+  path: string,
+): EncounterRandomSourceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['policyId', 'policyVersion', 'sourceId', 'sourceVersion'],
+    path,
+  );
+  return {
+    policyId: requiredString(record['policyId'], `${path}.policyId`),
+    policyVersion: nonNegativeInteger(
+      record['policyVersion'],
+      `${path}.policyVersion`,
+    ),
+    sourceId: requiredString(record['sourceId'], `${path}.sourceId`),
+    sourceVersion: nonNegativeInteger(
+      record['sourceVersion'],
+      `${path}.sourceVersion`,
+    ),
+  };
+}
+
+function encounterBoard(value: unknown, path: string): EncounterBoardDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['width', 'height', 'cells'], path);
+  return {
+    width: nonNegativeInteger(record['width'], `${path}.width`),
+    height: nonNegativeInteger(record['height'], `${path}.height`),
+    cells: requiredArray(record['cells'], `${path}.cells`).map((entry, index) =>
+      encounterCell(entry, `${path}.cells[${index}]`),
+    ),
+  };
+}
+
+function encounterCell(value: unknown, path: string): EncounterCellDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['id', 'position', 'capabilities'], path);
+  const position = requiredRecord(record['position'], `${path}.position`);
+  exactKeys(position, ['x', 'y'], `${path}.position`);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    position: {
+      x: nonNegativeInteger(position['x'], `${path}.position.x`),
+      y: nonNegativeInteger(position['y'], `${path}.position.y`),
+    },
+    capabilities: requiredArray(
+      record['capabilities'],
+      `${path}.capabilities`,
+    ).map((entry, index) =>
+      encounterCellCapability(entry, `${path}.capabilities[${index}]`),
+    ),
+  };
+}
+
+function encounterCellCapability(
+  value: unknown,
+  path: string,
+): EncounterCellCapabilityDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['id', 'version', 'definitionId', 'value'], path);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    version: nonNegativeInteger(record['version'], `${path}.version`),
+    definitionId: nullableString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    value: encounterCellCapabilityValue(record['value'], `${path}.value`),
+  };
+}
+
+function encounterCellCapabilityValue(
+  value: unknown,
+  path: string,
+): EncounterCellCapabilityValueDto {
+  const record = requiredRecord(value, path);
+  const kind = requiredString(record['kind'], `${path}.kind`);
+  switch (kind) {
+    case 'traversal':
+      exactKeys(record, ['kind', 'passable', 'movementCost'], path);
+      return {
+        kind,
+        passable: requiredBoolean(record['passable'], `${path}.passable`),
+        movementCost: nonNegativeInteger(
+          record['movementCost'],
+          `${path}.movementCost`,
+        ),
+      };
+    case 'flag':
+      exactKeys(record, ['kind', 'value'], path);
+      return {
+        kind,
+        value: requiredBoolean(record['value'], `${path}.value`),
+      };
+    case 'integer':
+      exactKeys(record, ['kind', 'value'], path);
+      return {
+        kind,
+        value: requiredInteger(record['value'], `${path}.value`),
+      };
+    case 'identifier':
+      exactKeys(record, ['kind', 'valueId'], path);
+      return {
+        kind,
+        valueId: requiredString(record['valueId'], `${path}.valueId`),
+      };
+    default:
+      throw new RulesetProtocolDecodeError(path, `unknown cell value ${kind}`);
+  }
+}
+
+function encounterTurn(value: unknown, path: string): EncounterTurnDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['initiativeOrder', 'currentActorId', 'round', 'turn'],
+    path,
+  );
+  return {
+    initiativeOrder: stringArray(
+      record['initiativeOrder'],
+      `${path}.initiativeOrder`,
+    ),
+    currentActorId: requiredString(
+      record['currentActorId'],
+      `${path}.currentActorId`,
+    ),
+    round: nonNegativeInteger(record['round'], `${path}.round`),
+    turn: nonNegativeInteger(record['turn'], `${path}.turn`),
+  };
+}
+
+function gameplayLogEntry(value: unknown, path: string): GameplayLogEntryDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['sequence', 'stateRevision', 'actorId', 'actionId', 'events'],
+    path,
+  );
+  return {
+    sequence: nonNegativeIntegerString(record['sequence'], `${path}.sequence`),
+    stateRevision: nonNegativeIntegerString(
+      record['stateRevision'],
+      `${path}.stateRevision`,
+    ),
+    actorId: requiredString(record['actorId'], `${path}.actorId`),
+    actionId: requiredString(record['actionId'], `${path}.actionId`),
+    events: requiredArray(record['events'], `${path}.events`).map(
+      (entry, index) => gameplayEvent(entry, `${path}.events[${index}]`),
+    ),
+  };
+}
+
+function gameplayOutcome(value: unknown, path: string): GameplayOutcomeDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['status', 'winningTeamIds'], path);
+  return {
+    status: requiredString(record['status'], `${path}.status`),
+    winningTeamIds: stringArray(
+      record['winningTeamIds'],
+      `${path}.winningTeamIds`,
+    ),
   };
 }
 
@@ -300,53 +494,65 @@ function gameplayReplayBoundary(
   };
 }
 
-function gameplayAction(value: unknown, path: string): GameplayActionDto {
+function gameplayAuthorityAction(
+  value: unknown,
+  path: string,
+): GameplayAuthorityActionDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
     [
-      'id',
-      'name',
-      'sourcePath',
-      'team',
-      'maximumRange',
+      'definitionId',
+      'label',
+      'available',
+      'unavailable',
       'maximumTargets',
-      'costs',
-      'randomPlan',
-      'candidateIds',
+      'options',
     ],
     path,
   );
   return {
-    id: requiredString(record['id'], `${path}.id`),
-    name: requiredString(record['name'], `${path}.name`),
-    sourcePath: requiredString(record['sourcePath'], `${path}.sourcePath`),
-    team: requiredString(record['team'], `${path}.team`),
-    maximumRange: nonNegativeInteger(
-      record['maximumRange'],
-      `${path}.maximumRange`,
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
     ),
+    label: requiredString(record['label'], `${path}.label`),
+    available: requiredBoolean(record['available'], `${path}.available`),
+    unavailable:
+      record['unavailable'] === null
+        ? null
+        : gameplayUnavailable(record['unavailable'], `${path}.unavailable`),
     maximumTargets: nonNegativeInteger(
       record['maximumTargets'],
       `${path}.maximumTargets`,
     ),
-    costs: requiredArray(record['costs'], `${path}.costs`).map((entry, index) =>
-      gameplayCost(entry, `${path}.costs[${index}]`),
-    ),
-    randomPlan: requiredArray(record['randomPlan'], `${path}.randomPlan`).map(
-      (entry, index) =>
-        gameplayRandomPlanEntry(entry, `${path}.randomPlan[${index}]`),
-    ),
-    candidateIds: stringArray(record['candidateIds'], `${path}.candidateIds`),
+    options: gameplayActionOptions(record['options'], `${path}.options`),
   };
 }
 
-function gameplayCost(value: unknown, path: string): GameplayCostDto {
+function gameplayUnavailable(value: unknown, path: string) {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['resourceId', 'amount'], path);
+  exactKeys(record, ['code', 'path', 'message'], path);
   return {
-    resourceId: requiredString(record['resourceId'], `${path}.resourceId`),
-    amount: requiredInteger(record['amount'], `${path}.amount`),
+    code: requiredString(record['code'], `${path}.code`),
+    path: requiredString(record['path'], `${path}.path`),
+    message: requiredString(record['message'], `${path}.message`),
+  };
+}
+
+function gameplayActionOptions(
+  value: unknown,
+  path: string,
+): GameplayActionOptionsDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['participantIds', 'cellIds', 'areaIds'], path);
+  return {
+    participantIds: stringArray(
+      record['participantIds'],
+      `${path}.participantIds`,
+    ),
+    cellIds: stringArray(record['cellIds'], `${path}.cellIds`),
+    areaIds: stringArray(record['areaIds'], `${path}.areaIds`),
   };
 }
 
@@ -364,82 +570,17 @@ function gameplayRandomRequest(
   };
 }
 
-function gameplayRandomPlanEntry(
-  value: unknown,
-  path: string,
-): GameplayRandomPlanEntryDto {
-  const record = requiredRecord(value, path);
-  exactKeys(record, ['request', 'conditions'], path);
-  return {
-    request: gameplayRandomRequest(record['request'], `${path}.request`),
-    conditions: requiredArray(record['conditions'], `${path}.conditions`).map(
-      (condition, index) =>
-        gameplayRandomPlanCondition(condition, `${path}.conditions[${index}]`),
-    ),
-  };
-}
-
-function gameplayRandomPlanCondition(
-  value: unknown,
-  path: string,
-): GameplayRandomPlanConditionDto {
-  const record = requiredRecord(value, path);
-  exactKeys(record, ['kind', 'path'], path);
-  return {
-    kind: randomPlanConditionKind(record['kind'], `${path}.kind`),
-    path: requiredString(record['path'], `${path}.path`),
-  };
-}
-
-function randomPlanConditionKind(
-  value: unknown,
-  path: string,
-): GameplayRandomPlanConditionKindDto {
-  const kind = requiredString(value, path);
-  switch (kind) {
-    case 'whenThen':
-    case 'whenOtherwise':
-    case 'checkHit':
-    case 'checkMiss':
-    case 'checkSaved':
-    case 'checkFailed':
-    case 'checkNoRoll':
-    case 'allPreviousTrue':
-    case 'anyPreviousFalse':
-      return kind;
-    default:
-      throw new RulesetProtocolDecodeError(
-        path,
-        `unknown random branch ${kind}`,
-      );
-  }
-}
-
-function gameplayPreflight(value: unknown, path: string): GameplayPreflightDto {
-  const record = requiredRecord(value, path);
-  exactKeys(
-    record,
-    ['actionId', 'targetId', 'available', 'code', 'message'],
-    path,
-  );
-  return {
-    actionId: requiredString(record['actionId'], `${path}.actionId`),
-    targetId: requiredString(record['targetId'], `${path}.targetId`),
-    available: requiredBoolean(record['available'], `${path}.available`),
-    code: nullableString(record['code'], `${path}.code`),
-    message: requiredString(record['message'], `${path}.message`),
-  };
-}
-
 function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
     [
       'id',
-      'team',
+      'label',
+      'teamId',
       'x',
       'y',
+      'definitionIds',
       'vitality',
       'stats',
       'defenses',
@@ -450,9 +591,14 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
   );
   return {
     id: requiredString(record['id'], `${path}.id`),
-    team: requiredString(record['team'], `${path}.team`),
+    label: requiredString(record['label'], `${path}.label`),
+    teamId: requiredString(record['teamId'], `${path}.teamId`),
     x: nonNegativeInteger(record['x'], `${path}.x`),
     y: nonNegativeInteger(record['y'], `${path}.y`),
+    definitionIds: stringArray(
+      record['definitionIds'],
+      `${path}.definitionIds`,
+    ),
     vitality: gameplayNamedValue(record['vitality'], `${path}.vitality`),
     stats: gameplayNamedValues(record['stats'], `${path}.stats`),
     defenses: gameplayNamedValues(record['defenses'], `${path}.defenses`),

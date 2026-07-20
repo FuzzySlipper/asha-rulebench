@@ -48,6 +48,7 @@ describe('ruleset workspace store', () => {
         throw new Error('host offline');
       },
       activate: async () => emptyResponse(),
+      startEncounter: async () => emptyResponse(),
       command: async () => emptyResponse(),
       react: async () => emptyResponse(),
       restoreCheckpoint: async () => emptyResponse(),
@@ -101,6 +102,7 @@ describe('ruleset workspace store', () => {
         };
       },
       activate: async () => active,
+      startEncounter: async () => active,
       command: async () => active,
       react: async () => active,
       restoreCheckpoint: async () => active,
@@ -210,6 +212,7 @@ function transportReturning(
     status: async () => response,
     compile: async () => response,
     activate: async () => response,
+    startEncounter: async () => response,
     command: async () => response,
     react: async () => response,
     restoreCheckpoint: async () => response,
@@ -231,6 +234,13 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
     candidateArtifact: null,
     upgradeImpact: null,
     activationRevision: 0,
+    hostRandomSource: {
+      policyId: 'rulebench.automatic-random',
+      policyVersion: 1,
+      sourceId: 'rulebench.system-random',
+      sourceVersion: 1,
+    },
+    encounterSetupRequired: false,
     gameplayAvailable: false,
     gameplay: null,
     diagnostics: [],

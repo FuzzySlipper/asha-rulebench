@@ -39,6 +39,20 @@ test('plays an encounter through the interaction-first authority loop @gate', as
     .click();
   await expect(rulesetDialog).toBeHidden();
 
+  const encounterDialog = page.getByRole('dialog', {
+    name: 'Encounter setup',
+  });
+  await configureEncounter(encounterDialog, {
+    first: { id: 'hero', label: 'Hero', teamId: 'team.blue', x: 0, y: 0 },
+    second: {
+      id: 'raider',
+      label: 'Raider',
+      teamId: 'team.red',
+      x: 4,
+      y: 0,
+    },
+  });
+
   const battlefield = workspace.getByRole('region', { name: '1. Battlefield' });
   const participants = workspace.getByRole('region', {
     name: '2. Participants',
@@ -65,14 +79,15 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(
     battlefield.getByRole('grid', { name: 'Combat grid' }),
   ).toBeVisible();
-  await expect(participants).toContainText('hero · ally');
-  await expect(participants).toContainText('raider · enemy');
+  await expect(participants).toContainText('Hero · team.blue');
+  await expect(participants).toContainText('Raider · team.red');
   await expect(participants).toContainText('Current actor');
   await expect(turnStatus).toContainText('hero is acting');
+  await expect(turnStatus).toContainText('Round 1 · turn 1');
   await expect(turnStatus).toContainText('Authority revision 0');
 
   const heroCell = battlefield.getByRole('gridcell', {
-    name: /hero, ally.*current actor/,
+    name: /Hero, team.blue.*current actor/,
   });
   await heroCell.focus();
   await heroCell.press('ArrowRight');
@@ -82,7 +97,7 @@ test('plays an encounter through the interaction-first authority loop @gate', as
 
   await chooseAction(actionPalette, 'Tactical Advance');
   const tacticalTarget = battlefield.getByRole('gridcell', {
-    name: /raider, enemy.*available target/,
+    name: /Raider, team.red.*available target/,
   });
   await expect(tacticalTarget).toBeVisible();
   await tacticalTarget.click();
@@ -90,6 +105,8 @@ test('plays an encounter through the interaction-first authority loop @gate', as
     .getByRole('button', { name: /^Use Tactical Advance/ })
     .click();
   await expect(turnStatus).toContainText('Authority revision 1');
+  await expect(turnStatus).toContainText('raider is acting');
+  await expect(turnStatus).toContainText('Round 1 · turn 2');
   await expect(participants).toContainText('cell (2, 0)');
   await expect(participants).toContainText('exposed -2');
 
@@ -98,15 +115,18 @@ test('plays an encounter through the interaction-first authority loop @gate', as
     'Arc Lash',
     'rulebench.arc-lash-stormfront',
   );
+  await actionPalette.getByRole('button', { name: 'Target hero' }).click();
   await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
   await expect(turnStatus).toContainText('Authority revision 2');
-  await expect(participants).toContainText('focus 1/2');
+  await expect(turnStatus).toContainText('hero is acting');
+  await expect(participants).toContainText('focus 2/3');
   await expect(combatLog).toContainText('Automatic roll · 1d20 → 10');
   await expect(combatLog).toContainText('Automatic roll · 1d6 → 3');
   await expect(combatLog).toContainText('Automatic roll · 1d6 → 4');
   await expect(combatLog).toContainText('damageApplied:');
 
   await chooseAction(actionPalette, 'Wardbreaker Volley');
+  await actionPalette.getByRole('button', { name: 'Target raider' }).click();
   await actionPalette
     .getByRole('button', { name: /^Use Wardbreaker Volley/ })
     .click();
@@ -117,7 +137,8 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(actionPalette.locator('.reaction-card')).toBeFocused();
   await actionPalette.getByRole('button', { name: /^Raise ward/ }).click();
   await expect(turnStatus).toContainText('Authority revision 3');
-  await expect(participants).toContainText('focus 0/2');
+  await expect(turnStatus).toContainText('raider is acting');
+  await expect(participants).toContainText('focus 2/3');
   await expect(combatLog).toContainText('reactionResolved:');
   await expect(combatLog).toContainText('Automatic roll');
   const combatLogContents = combatLog.getByRole('group', {
@@ -150,6 +171,57 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(replayDialog).toContainText('Rust replay verified 4 record(s)');
   await replayDialog.getByRole('button', { name: 'Close' }).click();
 
+  await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
+  await configureEncounter(encounterDialog, {
+    first: {
+      id: 'scout',
+      label: 'Scout',
+      teamId: 'team.gold',
+      x: 0,
+      y: 1,
+    },
+    second: {
+      id: 'brute',
+      label: 'Brute',
+      teamId: 'team.violet',
+      x: 4,
+      y: 1,
+    },
+  });
+  await expect(participants).toContainText('Scout · team.gold');
+  await expect(participants).toContainText('Brute · team.violet');
+  await expect(turnStatus).toContainText('scout is acting');
+  await expect(turnStatus).toContainText('Authority revision 0');
+
+  await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
+  await encounterDialog
+    .getByRole('button', { name: 'Add participant' })
+    .click();
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText(
+    'RPG_SETUP_PARTICIPANT_ACTION_REQUIRED',
+  );
+  await encounterDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(participants).toContainText('Scout · team.gold');
+  await expect(turnStatus).toContainText('Authority revision 0');
+
+  await chooseAction(
+    actionPalette,
+    'Arc Lash',
+    'rulebench.arc-lash-stormfront',
+  );
+  await actionPalette.getByRole('button', { name: 'Target brute' }).click();
+  await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
+  const gameplayFailure = combatLog.getByRole('alert');
+  await expect(gameplayFailure).toContainText(
+    'Gameplay request could not be completed',
+  );
+  await expect(gameplayFailure).toContainText('RULESET_RANDOM_TAPE_EXHAUSTED');
+  await expect(combatLog).toBeFocused();
+  await expect(turnStatus).toContainText('Authority revision 0');
+
   const nextRulesetDialog = await openRulesetDialog(page, workspace);
   await selectCustomRulesetRoot(
     nextRulesetDialog,
@@ -164,32 +236,7 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(nextRulesetDialog).toContainText('TS2322');
   await expect(nextRulesetDialog).toContainText('active');
   await nextRulesetDialog.getByRole('button', { name: 'Close' }).click();
-  await expect(turnStatus).toContainText('Authority revision 3');
-
-  const exhaustedTapeDialog = await openRulesetDialog(page, workspace);
-  await selectConfiguredRuleset(exhaustedTapeDialog, 'Field Manual');
-  await exhaustedTapeDialog
-    .getByRole('button', { name: 'Load ruleset candidate' })
-    .click();
-  await expect(exhaustedTapeDialog).toContainText('Rust validation accepted');
-  await exhaustedTapeDialog
-    .getByRole('button', { name: 'Activate accepted artifact' })
-    .click();
-  await expect(exhaustedTapeDialog).toBeHidden();
-  await expect(turnStatus).toContainText('Authority revision 0');
-
-  await chooseAction(
-    actionPalette,
-    'Arc Lash',
-    'rulebench.arc-lash-stormfront',
-  );
-  await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
-  const gameplayFailure = combatLog.getByRole('alert');
-  await expect(gameplayFailure).toContainText(
-    'Gameplay request could not be completed',
-  );
-  await expect(gameplayFailure).toContainText('RULESET_RANDOM_TAPE_EXHAUSTED');
-  await expect(combatLog).toBeFocused();
+  await expect(participants).toContainText('Scout · team.gold');
   await expect(turnStatus).toContainText('Authority revision 0');
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -201,6 +248,63 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   }));
   expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
 });
+
+interface EncounterParticipantInput {
+  readonly id: string;
+  readonly label: string;
+  readonly teamId: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+async function configureEncounter(
+  dialog: Locator,
+  setup: {
+    readonly first: EncounterParticipantInput;
+    readonly second: EncounterParticipantInput;
+  },
+): Promise<void> {
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Add participant' }).click();
+  await dialog.getByRole('button', { name: 'Add participant' }).click();
+  const editors = dialog.locator('.participant-editor');
+  await fillParticipant(editors.nth(0), setup.first);
+  await fillParticipant(editors.nth(1), setup.second);
+  for (const editor of [editors.nth(0), editors.nth(1)]) {
+    const definitions = editor.getByRole('checkbox');
+    const count = await definitions.count();
+    for (let index = 0; index < count; index += 1) {
+      await definitions.nth(index).check();
+    }
+  }
+  await dialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(dialog).toBeHidden();
+}
+
+async function fillParticipant(
+  editor: Locator,
+  participant: EncounterParticipantInput,
+): Promise<void> {
+  await editor
+    .getByRole('textbox', { name: 'ID', exact: true })
+    .fill(participant.id);
+  await editor.getByRole('textbox', { name: 'Label' }).fill(participant.label);
+  await editor
+    .getByRole('textbox', { name: 'Team ID' })
+    .fill(participant.teamId);
+  await editor
+    .getByRole('spinbutton', { name: 'Position X' })
+    .fill(participant.x.toString());
+  await editor
+    .getByRole('spinbutton', { name: 'Position Y' })
+    .fill(participant.y.toString());
+  await editor.getByRole('spinbutton', { name: 'Vitality' }).fill('40');
+  await editor.getByRole('spinbutton', { name: 'Power stat' }).fill('3');
+  await editor.getByRole('spinbutton', { name: 'Guard defense' }).fill('12');
+  await editor.getByRole('spinbutton', { name: 'Focus resource' }).fill('3');
+}
 
 async function openRulesetDialog(
   page: Page,

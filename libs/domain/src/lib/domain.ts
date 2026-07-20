@@ -1,6 +1,4 @@
 import type {
-  GameplayRandomPlanConditionDto,
-  GameplayRandomPlanEntryDto,
   RulesetPatchChangeDto,
   RulesetArtifactSummaryDto,
   RulesetDiagnosticDto,
@@ -114,6 +112,13 @@ export interface RulesetWorkspaceView {
   readonly headline: string;
   readonly summary: string;
   readonly activationRevision: number;
+  readonly encounterSetupRequired: boolean;
+  readonly hostRandomSource: {
+    readonly policyId: string;
+    readonly policyVersion: number;
+    readonly sourceId: string;
+    readonly sourceVersion: number;
+  };
   readonly gameplayAvailable: boolean;
   readonly gameplay: GameplayWorkspaceView | null;
   readonly activeArtifactId: string | null;
@@ -125,27 +130,23 @@ export interface RulesetWorkspaceView {
 export interface GameplayActionView {
   readonly id: string;
   readonly name: string;
-  readonly source: string;
-  readonly team: string;
-  readonly maximumRange: number;
+  readonly available: boolean;
+  readonly unavailable: string | null;
   readonly maximumTargets: number;
   readonly candidateIds: readonly string[];
-  readonly costs: readonly string[];
-  readonly randomPlan: readonly string[];
-  readonly preflight: readonly {
-    readonly targetId: string;
-    readonly available: boolean;
-    readonly message: string;
-  }[];
+  readonly cellIds: readonly string[];
+  readonly areaIds: readonly string[];
 }
 
 export interface GameplayEntityView {
   readonly id: string;
-  readonly team: string;
+  readonly label: string;
+  readonly teamId: string;
   readonly x: number;
   readonly y: number;
   readonly position: string;
   readonly vitality: string;
+  readonly definitionIds: readonly string[];
   readonly stats: readonly string[];
   readonly defenses: readonly string[];
   readonly resources: readonly string[];
@@ -153,11 +154,39 @@ export interface GameplayEntityView {
 }
 
 export interface GameplayWorkspaceView {
+  readonly artifactId: string;
   readonly actorId: string;
   readonly stateRevision: number;
   readonly acceptedRandomValues: string;
+  readonly board: {
+    readonly width: number;
+    readonly height: number;
+    readonly cells: readonly {
+      readonly id: string;
+      readonly x: number;
+      readonly y: number;
+      readonly capabilities: readonly string[];
+    }[];
+  };
+  readonly turn: {
+    readonly initiativeOrder: readonly string[];
+    readonly currentActorId: string;
+    readonly round: number;
+    readonly turn: number;
+  };
   readonly actions: readonly GameplayActionView[];
   readonly entities: readonly GameplayEntityView[];
+  readonly log: readonly {
+    readonly sequence: string;
+    readonly stateRevision: string;
+    readonly actorId: string;
+    readonly actionId: string;
+    readonly events: readonly string[];
+  }[];
+  readonly outcome: {
+    readonly status: string;
+    readonly winningTeamIds: readonly string[];
+  };
   readonly pendingReaction: {
     readonly reactionId: string;
     readonly actionId: string;
@@ -222,6 +251,8 @@ export function rulesetWorkspaceView(
     response.candidateArtifact ?? response.activeArtifact;
   const common = {
     activationRevision: response.activationRevision,
+    encounterSetupRequired: response.encounterSetupRequired,
+    hostRandomSource: response.hostRandomSource,
     gameplayAvailable: response.gameplayAvailable,
     gameplay:
       response.gameplay === null ? null : gameplayView(response.gameplay),
@@ -268,8 +299,9 @@ export function rulesetWorkspaceView(
       phase: 'active',
       statusLabel: `Activation revision ${response.activationRevision}`,
       headline: 'Compiled ruleset active',
-      summary:
-        'The complete accepted artifact replaced the active slot atomically and opened one persistent Rust authority session.',
+      summary: response.encounterSetupRequired
+        ? 'The complete accepted artifact replaced the active slot atomically. Create an explicit artifact-pinned encounter before play.'
+        : 'The complete accepted artifact and explicit encounter setup are active in one persistent Rust authority session.',
     };
   }
   return {
@@ -286,34 +318,51 @@ function gameplayView(
   gameplay: NonNullable<RulesetWorkspaceResponseDto['gameplay']>,
 ): GameplayWorkspaceView {
   return {
+    artifactId: gameplay.artifactId,
     actorId: gameplay.actorId,
     stateRevision: gameplay.stateRevision,
     acceptedRandomValues: gameplay.acceptedRandomValues,
+    board: {
+      width: gameplay.board.width,
+      height: gameplay.board.height,
+      cells: gameplay.board.cells.map((cell) => ({
+        id: cell.id,
+        x: cell.position.x,
+        y: cell.position.y,
+        capabilities: cell.capabilities.map(
+          (capability) =>
+            `${capability.id}@${capability.version} ${capability.value.kind}`,
+        ),
+      })),
+    },
+    turn: {
+      initiativeOrder: gameplay.turn.initiativeOrder,
+      currentActorId: gameplay.turn.currentActorId,
+      round: gameplay.turn.round,
+      turn: gameplay.turn.turn,
+    },
     actions: gameplay.actions.map((action) => ({
-      id: action.id,
-      name: action.name,
-      source: action.sourcePath,
-      team: action.team,
-      maximumRange: action.maximumRange,
+      id: action.definitionId,
+      name: action.label,
+      available: action.available,
+      unavailable:
+        action.unavailable === null
+          ? null
+          : `${action.unavailable.code}: ${action.unavailable.message}`,
       maximumTargets: action.maximumTargets,
-      candidateIds: action.candidateIds,
-      costs: action.costs.map((cost) => `${cost.amount} ${cost.resourceId}`),
-      randomPlan: action.randomPlan.map(randomPlanLabel),
-      preflight: gameplay.preflights
-        .filter((preflight) => preflight.actionId === action.id)
-        .map((preflight) => ({
-          targetId: preflight.targetId,
-          available: preflight.available,
-          message: preflight.message,
-        })),
+      candidateIds: action.options.participantIds,
+      cellIds: action.options.cellIds,
+      areaIds: action.options.areaIds,
     })),
     entities: gameplay.entities.map((entity) => ({
       id: entity.id,
-      team: entity.team,
+      label: entity.label,
+      teamId: entity.teamId,
       x: entity.x,
       y: entity.y,
       position: `(${entity.x}, ${entity.y})`,
       vitality: `${entity.vitality.current}/${entity.vitality.maximum ?? 'unbounded'}`,
+      definitionIds: entity.definitionIds,
       stats: entity.stats.map((value) => `${value.id} ${value.current}`),
       defenses: entity.defenses.map((value) => `${value.id} ${value.current}`),
       resources: entity.resources.map(
@@ -325,6 +374,14 @@ function gameplayView(
           `${modifier.id} ${modifier.value} (${modifier.remainingTurns} turns, ${modifier.stackingGroup})`,
       ),
     })),
+    log: gameplay.log.map((entry) => ({
+      sequence: entry.sequence,
+      stateRevision: entry.stateRevision,
+      actorId: entry.actorId,
+      actionId: entry.actionId,
+      events: entry.events.map((event) => `${event.kind}: ${event.summary}`),
+    })),
+    outcome: gameplay.outcome,
     pendingReaction:
       gameplay.pendingReaction === null
         ? null
@@ -396,42 +453,6 @@ function gameplayView(
       })),
     },
   };
-}
-
-function randomPlanLabel(entry: GameplayRandomPlanEntryDto): string {
-  const request = `${entry.request.kind} ${entry.request.count}d${entry.request.sides}`;
-  if (entry.conditions.length === 0) {
-    return `always: ${request}`;
-  }
-  const conditions = entry.conditions.map(randomConditionLabel).join(' and ');
-  return `if ${conditions}: ${request}`;
-}
-
-function randomConditionLabel(
-  condition: GameplayRandomPlanConditionDto,
-): string {
-  switch (condition.kind) {
-    case 'whenThen':
-      return 'predicate true';
-    case 'whenOtherwise':
-      return 'predicate false';
-    case 'checkHit':
-      return 'check hit';
-    case 'checkMiss':
-      return 'check miss';
-    case 'checkSaved':
-      return 'check saved';
-    case 'checkFailed':
-      return 'check failed';
-    case 'checkNoRoll':
-      return 'no-roll branch';
-    case 'allPreviousTrue':
-      return 'all prior predicates true';
-    case 'anyPreviousFalse':
-      return 'all prior predicates false';
-    default:
-      return condition.kind;
-  }
 }
 
 function artifactInspection(

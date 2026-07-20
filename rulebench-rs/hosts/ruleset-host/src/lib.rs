@@ -6,14 +6,13 @@ use std::{
 };
 
 use rpg_compiler::{
-    compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRpgAction,
-    CompiledRulesetBundle, RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity,
-    RpgDiagnosticStage, RpgRandomPlanCondition, RpgRandomPlanConditionKind, RpgRandomPlanEntry,
+    compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRulesetBundle,
+    RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity, RpgDiagnosticStage,
 };
 use rpg_core::{
-    ActiveRpgModifier, GridPosition, RpgCapabilityState, RpgDomainEvent, RpgEntityState, RpgIntent,
-    RpgRandomEvidence, RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest,
-    RpgResolutionReceipt, RpgResolutionRejection, RpgTraceStep, Team,
+    BoundedValue, GridPosition, RpgDomainEvent, RpgRandomEvidence, RpgRandomRequest,
+    RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt, RpgResolutionRejection,
+    RpgTeamId, RpgTraceStep,
 };
 use rpg_ir::{
     CompiledRulesetArtifact, MaterializedRulesetDefinitionKind, MaterializedRulesetVisibility,
@@ -21,9 +20,12 @@ use rpg_ir::{
     RulesetImpactPlane, RulesetRelationshipKind,
 };
 use rpg_runtime::{
-    RpgAuthorityCommand, RpgAuthoritySession, RpgCheckpointPhase, RpgCommandOutcome,
-    RpgReactionCommand, RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation,
-    RpgReplayPhase, RpgSessionCheckpoint,
+    RpgActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure, RpgBoardSetup,
+    RpgCellCapabilitySetup, RpgCellCapabilityValue, RpgCellSetup, RpgCheckpointPhase,
+    RpgCommandOutcome, RpgEncounterOutcomeView, RpgEncounterSetup, RpgInitialCapability,
+    RpgParticipantSetup, RpgRandomSource, RpgRandomSourceBinding, RpgRandomSourceFailure,
+    RpgReactionProposal, RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation,
+    RpgReplayPhase, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnInitialization,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -242,6 +244,198 @@ pub struct RulesetUpgradeImpactDto {
     pub definitions: Vec<RulesetUpgradeDefinitionDto>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterSchemaDto {
+    pub id: String,
+    pub version: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterPositionDto {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterBoundedValueDto {
+    pub current: i32,
+    pub max: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum EncounterCellCapabilityValueDto {
+    Traversal { passable: bool, movement_cost: u32 },
+    Flag { value: bool },
+    Integer { value: i32 },
+    Identifier { value_id: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterCellCapabilityDto {
+    pub id: String,
+    pub version: u32,
+    pub definition_id: Option<String>,
+    pub value: EncounterCellCapabilityValueDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterCellDto {
+    pub id: String,
+    pub position: EncounterPositionDto,
+    pub capabilities: Vec<EncounterCellCapabilityDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterBoardDto {
+    pub width: u32,
+    pub height: u32,
+    pub cells: Vec<EncounterCellDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(
+    tag = "owner",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+#[ts(tag = "owner", rename_all = "camelCase")]
+pub enum EncounterInitialCapabilityDto {
+    Vitality {
+        value: EncounterBoundedValueDto,
+    },
+    Stat {
+        id: String,
+        value: i32,
+    },
+    Defense {
+        id: String,
+        value: i32,
+    },
+    Resource {
+        id: String,
+        value: EncounterBoundedValueDto,
+    },
+    Modifier {
+        stacking_group: String,
+        id: String,
+        value: i32,
+        remaining_turns: u32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterParticipantSetupDto {
+    pub id: String,
+    pub label: String,
+    pub team_id: String,
+    pub position: EncounterPositionDto,
+    pub definition_ids: Vec<String>,
+    pub capabilities: Vec<EncounterInitialCapabilityDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterTurnDto {
+    pub initiative_order: Vec<String>,
+    pub current_actor_id: String,
+    pub round: u32,
+    pub turn: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterRandomSourceDto {
+    pub policy_id: String,
+    pub policy_version: u32,
+    pub source_id: String,
+    pub source_version: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct EncounterSetupRequestDto {
+    pub schema: EncounterSchemaDto,
+    pub artifact_id: String,
+    pub board: EncounterBoardDto,
+    pub participants: Vec<EncounterParticipantSetupDto>,
+    pub turn: EncounterTurnDto,
+    pub random_source: EncounterRandomSourceDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayUnavailableDto {
+    pub code: String,
+    pub path: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayActionOptionsDto {
+    pub participant_ids: Vec<String>,
+    pub cell_ids: Vec<String>,
+    pub area_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayAuthorityActionDto {
+    pub definition_id: String,
+    pub label: String,
+    pub available: bool,
+    pub unavailable: Option<GameplayUnavailableDto>,
+    pub maximum_targets: u32,
+    pub options: GameplayActionOptionsDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayLogEntryDto {
+    pub sequence: String,
+    pub state_revision: String,
+    pub actor_id: String,
+    pub action_id: String,
+    pub events: Vec<GameplayEventDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayOutcomeDto {
+    pub status: String,
+    pub winning_team_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
@@ -341,9 +535,11 @@ pub struct GameplayModifierDto {
 #[ts(rename_all = "camelCase")]
 pub struct GameplayEntityDto {
     pub id: String,
-    pub team: String,
+    pub label: String,
+    pub team_id: String,
     pub x: u32,
     pub y: u32,
+    pub definition_ids: Vec<String>,
     pub vitality: GameplayNamedValueDto,
     pub stats: Vec<GameplayNamedValueDto>,
     pub defenses: Vec<GameplayNamedValueDto>,
@@ -469,13 +665,18 @@ pub struct GameplayArchiveDto {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct GameplaySessionDto {
+    pub artifact_id: String,
     pub actor_id: String,
     pub state_revision: u32,
     pub accepted_random_values: String,
-    pub actions: Vec<GameplayActionDto>,
-    pub preflights: Vec<GameplayPreflightDto>,
+    pub random_source: EncounterRandomSourceDto,
+    pub board: EncounterBoardDto,
+    pub turn: EncounterTurnDto,
+    pub actions: Vec<GameplayAuthorityActionDto>,
     pub entities: Vec<GameplayEntityDto>,
     pub pending_reaction: Option<GameplayReactionDto>,
+    pub log: Vec<GameplayLogEntryDto>,
+    pub outcome: GameplayOutcomeDto,
     pub last_result: Option<GameplayResultDto>,
     pub archive: GameplayArchiveDto,
 }
@@ -490,6 +691,8 @@ pub struct RulesetWorkspaceResponseDto {
     pub candidate_artifact: Option<RulesetArtifactSummaryDto>,
     pub upgrade_impact: Option<RulesetUpgradeImpactDto>,
     pub activation_revision: u32,
+    pub host_random_source: EncounterRandomSourceDto,
+    pub encounter_setup_required: bool,
     pub gameplay_available: bool,
     pub gameplay: Option<GameplaySessionDto>,
     pub diagnostics: Vec<RulesetDiagnosticDto>,
@@ -528,26 +731,25 @@ pub struct GameplayReactionRequestDto {
     pub option_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GameplayRandomSourceFailure {
-    pub code: String,
-    pub path: String,
-    pub message: String,
+#[derive(Debug)]
+pub struct SystemGameplayRandomSource {
+    binding: RpgRandomSourceBinding,
 }
 
-pub trait GameplayRandomSource: Send {
-    fn draw(&mut self, request: &RpgRandomRequest)
-        -> Result<Vec<u32>, GameplayRandomSourceFailure>;
+impl Default for SystemGameplayRandomSource {
+    fn default() -> Self {
+        Self {
+            binding: random_source_binding("rulebench.system-random"),
+        }
+    }
 }
 
-#[derive(Debug, Default)]
-pub struct SystemGameplayRandomSource;
+impl RpgRandomSource for SystemGameplayRandomSource {
+    fn binding(&self) -> &RpgRandomSourceBinding {
+        &self.binding
+    }
 
-impl GameplayRandomSource for SystemGameplayRandomSource {
-    fn draw(
-        &mut self,
-        request: &RpgRandomRequest,
-    ) -> Result<Vec<u32>, GameplayRandomSourceFailure> {
+    fn draw(&mut self, request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
         if request.sides == 0 {
             return Err(random_source_failure(
                 "RULESET_RANDOM_REQUEST_SIDES_INVALID",
@@ -563,12 +765,14 @@ impl GameplayRandomSource for SystemGameplayRandomSource {
 
 #[derive(Debug)]
 pub struct ScriptedGameplayRandomSource {
+    binding: RpgRandomSourceBinding,
     values: VecDeque<u32>,
 }
 
 impl ScriptedGameplayRandomSource {
     pub fn new(values: impl IntoIterator<Item = u32>) -> Self {
         Self {
+            binding: random_source_binding("rulebench.roll-tape"),
             values: values.into_iter().collect(),
         }
     }
@@ -578,11 +782,12 @@ impl ScriptedGameplayRandomSource {
     }
 }
 
-impl GameplayRandomSource for ScriptedGameplayRandomSource {
-    fn draw(
-        &mut self,
-        request: &RpgRandomRequest,
-    ) -> Result<Vec<u32>, GameplayRandomSourceFailure> {
+impl RpgRandomSource for ScriptedGameplayRandomSource {
+    fn binding(&self) -> &RpgRandomSourceBinding {
+        &self.binding
+    }
+
+    fn draw(&mut self, request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
         if request.sides == 0 {
             return Err(random_source_failure(
                 "RULESET_RANDOM_REQUEST_SIDES_INVALID",
@@ -631,7 +836,7 @@ impl GameplayRandomSource for ScriptedGameplayRandomSource {
     }
 }
 
-fn system_die_value(sides: u32, path: &str) -> Result<u32, GameplayRandomSourceFailure> {
+fn system_die_value(sides: u32, path: &str) -> Result<u32, RpgRandomSourceFailure> {
     let unbiased_range = u32::MAX - (u32::MAX % sides);
     loop {
         let mut bytes = [0_u8; 4];
@@ -653,17 +858,33 @@ fn random_source_failure(
     code: &str,
     path: &str,
     message: impl Into<String>,
-) -> GameplayRandomSourceFailure {
-    GameplayRandomSourceFailure {
+) -> RpgRandomSourceFailure {
+    RpgRandomSourceFailure {
         code: code.to_owned(),
         path: path.to_owned(),
         message: message.into(),
+        expected_request: None,
+        actual_request: None,
+    }
+}
+
+fn random_source_binding(source_id: &str) -> RpgRandomSourceBinding {
+    RpgRandomSourceBinding {
+        policy_id: "rulebench.automatic-random".to_owned(),
+        policy_version: 1,
+        source_id: source_id.to_owned(),
+        source_version: 1,
     }
 }
 
 #[derive(Debug)]
 struct ActiveRuleset {
     bundle: CompiledRulesetBundle,
+    encounter: Option<ActiveEncounter>,
+}
+
+#[derive(Debug)]
+struct ActiveEncounter {
     session: RpgAuthoritySession,
     last_result: Option<GameplayResultDto>,
     initial_checkpoint: RpgSessionCheckpoint,
@@ -674,11 +895,23 @@ struct ActiveRuleset {
     verification_message: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct ActivationSlots {
     candidate: Option<CompiledRulesetBundle>,
     active: Option<ActiveRuleset>,
     activation_revision: u32,
+    random_source_binding: RpgRandomSourceBinding,
+}
+
+impl Default for ActivationSlots {
+    fn default() -> Self {
+        Self {
+            candidate: None,
+            active: None,
+            activation_revision: 0,
+            random_source_binding: random_source_binding("rulebench.system-random"),
+        }
+    }
 }
 
 impl ActivationSlots {
@@ -690,39 +923,16 @@ impl ActivationSlots {
         self.candidate = None;
     }
 
-    fn activate(&mut self) -> Result<bool, RpgReplayFailure> {
+    fn activate(&mut self) -> bool {
         let Some(candidate) = self.candidate.take() else {
-            return Ok(false);
-        };
-        let session =
-            RpgAuthoritySession::from_compiled_ruleset(candidate.clone(), initial_gameplay_state());
-        let checkpoint = match session.checkpoint() {
-            Ok(checkpoint) => checkpoint,
-            Err(failure) => {
-                self.candidate = Some(candidate);
-                return Err(failure);
-            }
-        };
-        let checkpoint_bytes = match session.checkpoint_json() {
-            Ok(checkpoint_bytes) => checkpoint_bytes,
-            Err(failure) => {
-                self.candidate = Some(candidate);
-                return Err(failure);
-            }
+            return false;
         };
         self.active = Some(ActiveRuleset {
             bundle: candidate,
-            session,
-            last_result: None,
-            initial_checkpoint: checkpoint.clone(),
-            latest_checkpoint: checkpoint,
-            latest_checkpoint_bytes: checkpoint_bytes,
-            replay_entries: Vec::new(),
-            verification_status: "notRun".to_owned(),
-            verification_message: "No replay verification has run yet".to_owned(),
+            encounter: None,
         });
         self.activation_revision += 1;
-        Ok(true)
+        true
     }
 
     fn status(&self) -> RulesetLifecycleStatus {
@@ -736,7 +946,7 @@ impl ActivationSlots {
     }
 }
 
-impl ActiveRuleset {
+impl ActiveEncounter {
     fn store_entry(&mut self, entry: RpgReplayEntry) -> Result<(), RpgReplayFailure> {
         let checkpoint = self.session.checkpoint()?;
         let checkpoint_bytes = self.session.checkpoint_json()?;
@@ -751,7 +961,7 @@ impl ActiveRuleset {
 
 pub struct RulesetHost {
     slots: Mutex<ActivationSlots>,
-    random_source: Mutex<Box<dyn GameplayRandomSource>>,
+    random_source: Mutex<Box<dyn RpgRandomSource>>,
 }
 
 impl Default for RulesetHost {
@@ -762,12 +972,16 @@ impl Default for RulesetHost {
 
 impl RulesetHost {
     pub fn new() -> Self {
-        Self::with_random_source(SystemGameplayRandomSource)
+        Self::with_random_source(SystemGameplayRandomSource::default())
     }
 
-    pub fn with_random_source(source: impl GameplayRandomSource + 'static) -> Self {
+    pub fn with_random_source(source: impl RpgRandomSource + 'static) -> Self {
+        let random_source_binding = source.binding().clone();
         Self {
-            slots: Mutex::new(ActivationSlots::default()),
+            slots: Mutex::new(ActivationSlots {
+                random_source_binding,
+                ..ActivationSlots::default()
+            }),
             random_source: Mutex::new(Box::new(source)),
         }
     }
@@ -803,8 +1017,8 @@ impl RulesetHost {
     pub fn activate_candidate(&self) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         match slots.activate() {
-            Ok(true) => response_from_slots(true, &slots, Vec::new()),
-            Ok(false) => response_from_slots(
+            true => response_from_slots(true, &slots, Vec::new()),
+            false => response_from_slots(
                 false,
                 &slots,
                 vec![RulesetDiagnosticDto {
@@ -821,10 +1035,79 @@ impl RulesetHost {
                     actual: None,
                 }],
             ),
-            Err(failure) => {
-                response_from_slots(false, &slots, diagnostics_from_replay_failure(failure))
-            }
         }
+    }
+
+    pub fn start_encounter(
+        &self,
+        request: EncounterSetupRequestDto,
+    ) -> RulesetWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(bundle) = slots.active.as_ref().map(|active| active.bundle.clone()) else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic_at_stage(
+                    "setup",
+                    "RPG_SETUP_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.artifactId",
+                    "activate a compiled artifact before creating an encounter",
+                )],
+            );
+        };
+        let setup = encounter_setup(request);
+        if setup.random_source != slots.random_source_binding {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic_at_stage(
+                    "setup",
+                    "RPG_RANDOM_SOURCE_BINDING_MISMATCH",
+                    "$.randomSource",
+                    "encounter random source must match the source selected by this host",
+                )],
+            );
+        }
+        let session = match RpgAuthoritySession::from_setup(bundle, setup) {
+            Ok(session) => session,
+            Err(failure) => {
+                return response_from_slots(false, &slots, diagnostics_from_setup_failure(failure));
+            }
+        };
+        let checkpoint = match session.checkpoint() {
+            Ok(checkpoint) => checkpoint,
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_replay_failure(failure),
+                );
+            }
+        };
+        let checkpoint_bytes = match session.checkpoint_json() {
+            Ok(checkpoint_bytes) => checkpoint_bytes,
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_replay_failure(failure),
+                );
+            }
+        };
+        let encounter = ActiveEncounter {
+            session,
+            last_result: None,
+            initial_checkpoint: checkpoint.clone(),
+            latest_checkpoint: checkpoint,
+            latest_checkpoint_bytes: checkpoint_bytes,
+            replay_entries: Vec::new(),
+            verification_status: "notRun".to_owned(),
+            verification_message: "No replay verification has run yet".to_owned(),
+        };
+        if let Some(active) = &mut slots.active {
+            active.encounter = Some(encounter);
+        }
+        response_from_slots(true, &slots, Vec::new())
     }
 
     pub fn execute_command(
@@ -832,14 +1115,18 @@ impl RulesetHost {
         request: GameplayCommandRequestDto,
     ) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-        let Some(active) = &mut slots.active else {
+        let Some(active) = slots
+            .active
+            .as_mut()
+            .and_then(|active| active.encounter.as_mut())
+        else {
             return response_from_slots(
                 false,
                 &slots,
                 vec![host_diagnostic(
                     "RPG_SESSION_ACTIVE_ARTIFACT_REQUIRED",
                     "$.activeArtifact",
-                    "activate a compiled artifact before submitting gameplay",
+                    "create an encounter before submitting gameplay",
                 )],
             );
         };
@@ -847,20 +1134,23 @@ impl RulesetHost {
             .random_source
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let recorded = submit_with_automatic_random(
-            &mut active.session,
-            RpgIntent {
+        let recorded = active.session.submit_with_random_source_recorded(
+            RpgActionProposal {
+                expected_revision: u64::from(request.expected_revision),
                 action_id: request.action_id,
                 actor_id: request.actor_id,
                 target_ids: request.target_ids,
             },
-            u64::from(request.expected_revision),
             random_source.as_mut(),
         );
         let (outcome, entry) = match recorded {
             Ok(recorded) => recorded,
-            Err(diagnostics) => {
-                return response_from_slots(false, &slots, diagnostics);
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_automatic_failure(failure),
+                );
             }
         };
         if let Err(failure) = active.store_entry(entry) {
@@ -879,14 +1169,18 @@ impl RulesetHost {
         request: GameplayReactionRequestDto,
     ) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-        let Some(active) = &mut slots.active else {
+        let Some(active) = slots
+            .active
+            .as_mut()
+            .and_then(|active| active.encounter.as_mut())
+        else {
             return response_from_slots(
                 false,
                 &slots,
                 vec![host_diagnostic(
                     "RPG_SESSION_ACTIVE_ARTIFACT_REQUIRED",
                     "$.activeArtifact",
-                    "activate a compiled artifact before resolving a reaction",
+                    "create an encounter before resolving a reaction",
                 )],
             );
         };
@@ -894,17 +1188,22 @@ impl RulesetHost {
             .random_source
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let recorded = react_with_automatic_random(
-            &mut active.session,
-            request.reaction_id,
-            request.option_id,
-            u64::from(request.expected_revision),
+        let recorded = active.session.react_with_random_source_recorded(
+            RpgReactionProposal {
+                expected_revision: u64::from(request.expected_revision),
+                reaction_id: request.reaction_id,
+                option_id: request.option_id,
+            },
             random_source.as_mut(),
         );
         let (outcome, entry) = match recorded {
             Ok(recorded) => recorded,
-            Err(diagnostics) => {
-                return response_from_slots(false, &slots, diagnostics);
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_automatic_failure(failure),
+                );
             }
         };
         if let Err(failure) = active.store_entry(entry) {
@@ -920,14 +1219,18 @@ impl RulesetHost {
 
     pub fn restore_latest_checkpoint(&self) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-        let Some(active) = &mut slots.active else {
+        let Some(active) = slots
+            .active
+            .as_mut()
+            .and_then(|active| active.encounter.as_mut())
+        else {
             return response_from_slots(
                 false,
                 &slots,
                 vec![host_diagnostic(
                     "RPG_CHECKPOINT_ACTIVE_ARTIFACT_REQUIRED",
                     "$.activeArtifact",
-                    "activate a compiled artifact before restoring a checkpoint",
+                    "create an encounter before restoring a checkpoint",
                 )],
             );
         };
@@ -950,14 +1253,18 @@ impl RulesetHost {
 
     pub fn replay_archive(&self) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
-        let Some(active) = &mut slots.active else {
+        let Some(active) = slots
+            .active
+            .as_mut()
+            .and_then(|active| active.encounter.as_mut())
+        else {
             return response_from_slots(
                 false,
                 &slots,
                 vec![host_diagnostic(
                     "RPG_REPLAY_ACTIVE_ARTIFACT_REQUIRED",
                     "$.activeArtifact",
-                    "activate a compiled artifact before replaying stored records",
+                    "create an encounter before replaying stored records",
                 )],
             );
         };
@@ -998,134 +1305,6 @@ impl RulesetHost {
             }
         }
     }
-}
-
-const MAXIMUM_AUTOMATIC_RANDOM_REQUESTS: usize = 64;
-const MAXIMUM_AUTOMATIC_RANDOM_VALUES: usize = 4_096;
-
-fn submit_with_automatic_random(
-    session: &mut RpgAuthoritySession,
-    intent: RpgIntent,
-    expected_revision: u64,
-    random_source: &mut dyn GameplayRandomSource,
-) -> Result<(RpgCommandOutcome, RpgReplayEntry), Vec<RulesetDiagnosticDto>> {
-    let checkpoint = session
-        .checkpoint()
-        .map_err(diagnostics_from_replay_failure)?;
-    let mut random_values = Vec::new();
-    for _ in 0..MAXIMUM_AUTOMATIC_RANDOM_REQUESTS {
-        let mut probe = RpgAuthoritySession::restore_checkpoint(checkpoint.clone())
-            .map_err(diagnostics_from_replay_failure)?;
-        let command = RpgAuthorityCommand {
-            expected_revision,
-            intent: intent.clone(),
-            random_values: random_values.clone(),
-        };
-        let outcome = probe.submit(command.clone());
-        let Some(request) = required_random_request(&outcome) else {
-            return session
-                .submit_recorded(command)
-                .map_err(diagnostics_from_replay_failure);
-        };
-        extend_automatic_random_values(&mut random_values, request, random_source)?;
-    }
-    Err(vec![host_diagnostic(
-        "RULESET_RANDOM_REQUEST_LIMIT_EXCEEDED",
-        "$.randomRequest",
-        "authority did not reach a terminal result within the automatic roll request limit",
-    )])
-}
-
-fn react_with_automatic_random(
-    session: &mut RpgAuthoritySession,
-    reaction_id: String,
-    option_id: Option<String>,
-    expected_revision: u64,
-    random_source: &mut dyn GameplayRandomSource,
-) -> Result<(RpgCommandOutcome, RpgReplayEntry), Vec<RulesetDiagnosticDto>> {
-    let checkpoint = session
-        .checkpoint()
-        .map_err(diagnostics_from_replay_failure)?;
-    let mut additional_random_values = Vec::new();
-    for _ in 0..MAXIMUM_AUTOMATIC_RANDOM_REQUESTS {
-        let mut probe = RpgAuthoritySession::restore_checkpoint(checkpoint.clone())
-            .map_err(diagnostics_from_replay_failure)?;
-        let command = RpgReactionCommand {
-            expected_revision,
-            reaction_id: reaction_id.clone(),
-            option_id: option_id.clone(),
-            additional_random_values: additional_random_values.clone(),
-        };
-        let outcome = probe.react(command.clone());
-        let Some(request) = required_random_request(&outcome) else {
-            return session
-                .react_recorded(command)
-                .map_err(diagnostics_from_replay_failure);
-        };
-        extend_automatic_random_values(&mut additional_random_values, request, random_source)?;
-    }
-    Err(vec![host_diagnostic(
-        "RULESET_RANDOM_REQUEST_LIMIT_EXCEEDED",
-        "$.randomRequest",
-        "authority did not reach a terminal result within the automatic roll request limit",
-    )])
-}
-
-fn required_random_request(outcome: &RpgCommandOutcome) -> Option<&RpgRandomRequest> {
-    let RpgCommandOutcome::Rejected(rejection) = outcome else {
-        return None;
-    };
-    rejection.random_request.as_deref()
-}
-
-fn extend_automatic_random_values(
-    random_values: &mut Vec<u32>,
-    request: &RpgRandomRequest,
-    random_source: &mut dyn GameplayRandomSource,
-) -> Result<(), Vec<RulesetDiagnosticDto>> {
-    if request.count == 0 {
-        return Err(vec![host_diagnostic(
-            "RULESET_RANDOM_REQUEST_COUNT_INVALID",
-            &request.path,
-            "authority requested zero random values",
-        )]);
-    }
-    let requested_count = usize::try_from(request.count).map_err(|_| {
-        vec![host_diagnostic(
-            "RULESET_RANDOM_REQUEST_COUNT_INVALID",
-            &request.path,
-            "authority random request count exceeds this host's address space",
-        )]
-    })?;
-    if random_values.len().saturating_add(requested_count) > MAXIMUM_AUTOMATIC_RANDOM_VALUES {
-        return Err(vec![host_diagnostic(
-            "RULESET_RANDOM_VALUE_LIMIT_EXCEEDED",
-            &request.path,
-            "authority requested more automatic roll values than the host safety limit",
-        )]);
-    }
-    let values = random_source
-        .draw(request)
-        .map_err(|failure| vec![random_source_diagnostic(failure)])?;
-    if values.len() != requested_count {
-        return Err(vec![host_diagnostic(
-            "RULESET_RANDOM_SOURCE_COUNT_MISMATCH",
-            &request.path,
-            "random source returned a different number of values than authority requested",
-        )]);
-    }
-    if values
-        .iter()
-        .any(|value| *value == 0 || *value > request.sides)
-    {
-        return Err(vec![host_diagnostic(
-            "RULESET_RANDOM_SOURCE_VALUE_INVALID",
-            &request.path,
-            "random source returned a value outside the authority die bounds",
-        )]);
-    }
-    random_values.extend(values);
-    Ok(())
 }
 
 fn close_portable_artifact(
@@ -1174,8 +1353,20 @@ fn response_from_slots(
             .map(|bundle| artifact_summary(bundle.artifact())),
         upgrade_impact,
         activation_revision: slots.activation_revision,
-        gameplay_available: slots.active.is_some(),
-        gameplay: slots.active.as_ref().map(gameplay_session),
+        host_random_source: encounter_random_source(&slots.random_source_binding),
+        encounter_setup_required: slots
+            .active
+            .as_ref()
+            .is_some_and(|active| active.encounter.is_none()),
+        gameplay_available: slots
+            .active
+            .as_ref()
+            .is_some_and(|active| active.encounter.is_some()),
+        gameplay: slots
+            .active
+            .as_ref()
+            .and_then(|active| active.encounter.as_ref())
+            .map(gameplay_session),
         diagnostics,
     }
 }
@@ -1429,74 +1620,213 @@ fn json_field_path(parent: &str, field: &str) -> String {
     }
 }
 
-fn initial_gameplay_state() -> RpgCapabilityState {
-    let hero = RpgEntityState::new("hero", Team::Ally, GridPosition { x: 0, y: 0 }, 28)
-        .with_stat("power", 3)
-        .with_defense("guard", 13)
-        .with_resource("focus", 2, 2);
-    let raider = RpgEntityState::new("raider", Team::Enemy, GridPosition { x: 4, y: 0 }, 36)
-        .with_stat("power", 2)
-        .with_defense("guard", 12)
-        .with_resource("focus", 2, 2);
-    let mut state = RpgCapabilityState::default();
-    state.insert_entity(hero);
-    state.insert_entity(raider);
-    state
+fn encounter_setup(request: EncounterSetupRequestDto) -> RpgEncounterSetup {
+    RpgEncounterSetup {
+        schema: RpgSchemaIdentity {
+            id: request.schema.id,
+            version: request.schema.version,
+        },
+        artifact_id: request.artifact_id,
+        board: RpgBoardSetup {
+            width: request.board.width,
+            height: request.board.height,
+            cells: request
+                .board
+                .cells
+                .into_iter()
+                .map(|cell| RpgCellSetup {
+                    id: cell.id,
+                    position: grid_position(cell.position),
+                    capabilities: cell
+                        .capabilities
+                        .into_iter()
+                        .map(|capability| RpgCellCapabilitySetup {
+                            id: capability.id,
+                            version: capability.version,
+                            definition_id: capability.definition_id,
+                            value: match capability.value {
+                                EncounterCellCapabilityValueDto::Traversal {
+                                    passable,
+                                    movement_cost,
+                                } => RpgCellCapabilityValue::Traversal {
+                                    passable,
+                                    movement_cost,
+                                },
+                                EncounterCellCapabilityValueDto::Flag { value } => {
+                                    RpgCellCapabilityValue::Flag { value }
+                                }
+                                EncounterCellCapabilityValueDto::Integer { value } => {
+                                    RpgCellCapabilityValue::Integer { value }
+                                }
+                                EncounterCellCapabilityValueDto::Identifier { value_id } => {
+                                    RpgCellCapabilityValue::Identifier { value_id }
+                                }
+                            },
+                        })
+                        .collect(),
+                })
+                .collect(),
+        },
+        participants: request
+            .participants
+            .into_iter()
+            .map(|participant| RpgParticipantSetup {
+                id: participant.id,
+                label: participant.label,
+                team_id: RpgTeamId::named(participant.team_id),
+                position: grid_position(participant.position),
+                definition_ids: participant.definition_ids,
+                capabilities: participant
+                    .capabilities
+                    .into_iter()
+                    .map(initial_capability)
+                    .collect(),
+            })
+            .collect(),
+        turn: RpgTurnInitialization {
+            initiative_order: request.turn.initiative_order,
+            current_actor_id: request.turn.current_actor_id,
+            round: u64::from(request.turn.round),
+            turn: u64::from(request.turn.turn),
+        },
+        random_source: RpgRandomSourceBinding {
+            policy_id: request.random_source.policy_id,
+            policy_version: request.random_source.policy_version,
+            source_id: request.random_source.source_id,
+            source_version: request.random_source.source_version,
+        },
+    }
 }
 
-fn gameplay_session(active: &ActiveRuleset) -> GameplaySessionDto {
-    let actor_id = "hero";
-    let state = active.session.state();
-    let actions = active
-        .session
-        .ruleset()
-        .actions()
-        .map(|action| gameplay_action(&active.session, actor_id, action))
-        .collect();
-    let mut preflights = Vec::new();
-    for action in active.session.ruleset().actions() {
-        for target in state.entities().filter(|entity| entity.id() != actor_id) {
-            let intent = RpgIntent {
-                action_id: action.id.clone(),
-                actor_id: actor_id.to_owned(),
-                target_ids: vec![target.id().to_owned()],
-            };
-            let result = active.session.ruleset().preflight(state, &intent);
-            preflights.push(match result {
-                Ok(()) => GameplayPreflightDto {
-                    action_id: action.id.clone(),
-                    target_id: target.id().to_owned(),
-                    available: true,
-                    code: None,
-                    message: "Rust authority accepts this intent at the active revision".to_owned(),
-                },
-                Err(rejection) => GameplayPreflightDto {
-                    action_id: action.id.clone(),
-                    target_id: target.id().to_owned(),
-                    available: false,
-                    code: Some(rejection.code),
-                    message: rejection.message,
-                },
-            });
-        }
+fn grid_position(position: EncounterPositionDto) -> GridPosition {
+    GridPosition {
+        x: position.x,
+        y: position.y,
     }
+}
+
+fn initial_capability(capability: EncounterInitialCapabilityDto) -> RpgInitialCapability {
+    match capability {
+        EncounterInitialCapabilityDto::Vitality { value } => RpgInitialCapability::Vitality {
+            value: bounded_value(value),
+        },
+        EncounterInitialCapabilityDto::Stat { id, value } => {
+            RpgInitialCapability::Stat { id, value }
+        }
+        EncounterInitialCapabilityDto::Defense { id, value } => {
+            RpgInitialCapability::Defense { id, value }
+        }
+        EncounterInitialCapabilityDto::Resource { id, value } => RpgInitialCapability::Resource {
+            id,
+            value: bounded_value(value),
+        },
+        EncounterInitialCapabilityDto::Modifier {
+            stacking_group,
+            id,
+            value,
+            remaining_turns,
+        } => RpgInitialCapability::Modifier {
+            stacking_group,
+            id,
+            value,
+            remaining_turns,
+        },
+    }
+}
+
+fn bounded_value(value: EncounterBoundedValueDto) -> BoundedValue {
+    BoundedValue {
+        current: value.current,
+        max: value.max,
+    }
+}
+
+fn encounter_random_source(binding: &RpgRandomSourceBinding) -> EncounterRandomSourceDto {
+    EncounterRandomSourceDto {
+        policy_id: binding.policy_id.clone(),
+        policy_version: binding.policy_version,
+        source_id: binding.source_id.clone(),
+        source_version: binding.source_version,
+    }
+}
+
+fn encounter_board(board: &RpgBoardSetup) -> EncounterBoardDto {
+    EncounterBoardDto {
+        width: board.width,
+        height: board.height,
+        cells: board
+            .cells
+            .iter()
+            .map(|cell| EncounterCellDto {
+                id: cell.id.clone(),
+                position: EncounterPositionDto {
+                    x: cell.position.x,
+                    y: cell.position.y,
+                },
+                capabilities: cell
+                    .capabilities
+                    .iter()
+                    .map(|capability| EncounterCellCapabilityDto {
+                        id: capability.id.clone(),
+                        version: capability.version,
+                        definition_id: capability.definition_id.clone(),
+                        value: match &capability.value {
+                            RpgCellCapabilityValue::Traversal {
+                                passable,
+                                movement_cost,
+                            } => EncounterCellCapabilityValueDto::Traversal {
+                                passable: *passable,
+                                movement_cost: *movement_cost,
+                            },
+                            RpgCellCapabilityValue::Flag { value } => {
+                                EncounterCellCapabilityValueDto::Flag { value: *value }
+                            }
+                            RpgCellCapabilityValue::Integer { value } => {
+                                EncounterCellCapabilityValueDto::Integer { value: *value }
+                            }
+                            RpgCellCapabilityValue::Identifier { value_id } => {
+                                EncounterCellCapabilityValueDto::Identifier {
+                                    value_id: value_id.clone(),
+                                }
+                            }
+                        },
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+fn encounter_turn(turn: &rpg_runtime::RpgTurnState) -> EncounterTurnDto {
+    EncounterTurnDto {
+        initiative_order: turn.initiative_order.clone(),
+        current_actor_id: turn.current_actor_id.clone(),
+        round: dto_revision(turn.round),
+        turn: dto_revision(turn.turn),
+    }
+}
+
+fn gameplay_session(active: &ActiveEncounter) -> GameplaySessionDto {
+    let view = active.session.encounter_view();
     GameplaySessionDto {
-        actor_id: actor_id.to_owned(),
-        state_revision: dto_revision(state.revision()),
-        accepted_random_values: active.session.accepted_random_values().to_string(),
-        actions,
-        preflights,
-        entities: state.entities().map(gameplay_entity).collect(),
-        pending_reaction: active
-            .session
-            .pending_reaction()
-            .map(|pending| gameplay_reaction(&pending.request)),
+        artifact_id: view.artifact_id.clone(),
+        actor_id: view.turn.current_actor_id.clone(),
+        state_revision: dto_revision(view.state_revision),
+        accepted_random_values: view.accepted_random_position.to_string(),
+        random_source: encounter_random_source(&view.random_source),
+        board: encounter_board(&view.board),
+        turn: encounter_turn(&view.turn),
+        actions: view.actions.iter().map(gameplay_authority_action).collect(),
+        entities: view.participants.iter().map(gameplay_entity).collect(),
+        pending_reaction: view.pending_reaction.as_ref().map(gameplay_reaction),
+        log: view.log.iter().map(gameplay_log_entry).collect(),
+        outcome: gameplay_outcome(&view.outcome),
         last_result: active.last_result.clone(),
         archive: gameplay_archive(active),
     }
 }
 
-fn gameplay_archive(active: &ActiveRuleset) -> GameplayArchiveDto {
+fn gameplay_archive(active: &ActiveEncounter) -> GameplayArchiveDto {
     let checkpoint = &active.latest_checkpoint;
     let binding = &checkpoint.artifact_binding;
     GameplayArchiveDto {
@@ -1688,74 +2018,88 @@ fn gameplay_random_evidence_label(evidence: &RpgRandomEvidence) -> String {
     )
 }
 
-fn gameplay_action(
-    session: &RpgAuthoritySession,
-    actor_id: &str,
-    action: CompiledRpgAction,
-) -> GameplayActionDto {
-    let candidate_ids = session
-        .ruleset()
-        .candidate_ids(session.state(), actor_id, &action.id)
-        .unwrap_or_default();
-    GameplayActionDto {
-        id: action.id,
-        name: action.name,
-        source_path: action.source_path,
-        team: match action.targets.team {
-            rpg_ir::RpgIrTeamConstraint::Hostile => "hostile",
-            rpg_ir::RpgIrTeamConstraint::Ally => "ally",
-            rpg_ir::RpgIrTeamConstraint::Any => "any",
-        }
-        .to_owned(),
-        maximum_range: action.targets.maximum_range,
-        maximum_targets: action.targets.maximum_targets,
-        costs: action
-            .costs
-            .into_iter()
-            .map(|cost| GameplayCostDto {
-                resource_id: cost.resource_id,
-                amount: cost.amount,
-            })
-            .collect(),
-        random_plan: action
-            .random_plan
-            .iter()
-            .map(gameplay_random_plan_entry)
-            .collect(),
-        candidate_ids,
+fn gameplay_authority_action(action: &rpg_runtime::RpgActionView) -> GameplayAuthorityActionDto {
+    GameplayAuthorityActionDto {
+        definition_id: action.definition_id.clone(),
+        label: action.label.clone(),
+        available: action.available,
+        unavailable: action
+            .unavailable
+            .as_ref()
+            .map(|rejection| GameplayUnavailableDto {
+                code: rejection.code.clone(),
+                path: rejection.path.clone(),
+                message: rejection.message.clone(),
+            }),
+        maximum_targets: action.maximum_targets,
+        options: GameplayActionOptionsDto {
+            participant_ids: action.options.participant_ids.clone(),
+            cell_ids: action.options.cell_ids.clone(),
+            area_ids: action.options.area_ids.clone(),
+        },
     }
 }
 
-fn gameplay_entity(entity: &RpgEntityState) -> GameplayEntityDto {
+fn gameplay_log_entry(entry: &rpg_runtime::RpgEncounterLogEntry) -> GameplayLogEntryDto {
+    GameplayLogEntryDto {
+        sequence: entry.sequence.to_string(),
+        state_revision: entry.state_revision.to_string(),
+        actor_id: entry.actor_id.clone(),
+        action_id: entry.action_id.clone(),
+        events: entry.events.iter().map(gameplay_event).collect(),
+    }
+}
+
+fn gameplay_outcome(outcome: &RpgEncounterOutcomeView) -> GameplayOutcomeDto {
+    match outcome {
+        RpgEncounterOutcomeView::InProgress => GameplayOutcomeDto {
+            status: "inProgress".to_owned(),
+            winning_team_ids: Vec::new(),
+        },
+        RpgEncounterOutcomeView::Completed { winning_team_ids } => GameplayOutcomeDto {
+            status: "completed".to_owned(),
+            winning_team_ids: winning_team_ids.iter().map(ToString::to_string).collect(),
+        },
+    }
+}
+
+fn gameplay_entity(entity: &rpg_runtime::RpgParticipantView) -> GameplayEntityDto {
     GameplayEntityDto {
-        id: entity.id().to_owned(),
-        team: match entity.team() {
-            Team::Ally => "ally",
-            Team::Enemy => "enemy",
-        }
-        .to_owned(),
-        x: entity.position().x,
-        y: entity.position().y,
+        id: entity.id.clone(),
+        label: entity.label.clone(),
+        team_id: entity.team_id.to_string(),
+        x: entity.position.x,
+        y: entity.position.y,
+        definition_ids: entity.definition_ids.clone(),
         vitality: GameplayNamedValueDto {
             id: "vitality".to_owned(),
-            current: entity.vitality().current,
-            maximum: Some(entity.vitality().max),
+            current: entity.vitality.current,
+            maximum: Some(entity.vitality.max),
         },
         stats: entity
-            .stats()
-            .map(|(id, value)| named_value(id, value, None))
+            .stats
+            .iter()
+            .map(|value| named_value(&value.id, value.value, None))
             .collect(),
         defenses: entity
-            .defenses()
-            .map(|(id, value)| named_value(id, value, None))
+            .defenses
+            .iter()
+            .map(|value| named_value(&value.id, value.value, None))
             .collect(),
         resources: entity
-            .resources()
-            .map(|(id, value)| named_value(id, value.current, Some(value.max)))
+            .resources
+            .iter()
+            .map(|value| named_value(&value.id, value.value.current, Some(value.value.max)))
             .collect(),
         modifiers: entity
-            .modifiers()
-            .map(|(group, modifier)| gameplay_modifier(group, modifier))
+            .modifiers
+            .iter()
+            .map(|modifier| GameplayModifierDto {
+                stacking_group: modifier.stacking_group.clone(),
+                id: modifier.id.clone(),
+                value: modifier.value,
+                remaining_turns: modifier.remaining_turns,
+            })
             .collect(),
     }
 }
@@ -1765,15 +2109,6 @@ fn named_value(id: &str, current: i32, maximum: Option<i32>) -> GameplayNamedVal
         id: id.to_owned(),
         current,
         maximum,
-    }
-}
-
-fn gameplay_modifier(group: &str, modifier: &ActiveRpgModifier) -> GameplayModifierDto {
-    GameplayModifierDto {
-        stacking_group: group.to_owned(),
-        id: modifier.id().to_owned(),
-        value: modifier.value(),
-        remaining_turns: modifier.remaining_turns(),
     }
 }
 
@@ -1893,48 +2228,6 @@ fn gameplay_random_evidence(evidence: &RpgRandomEvidence) -> GameplayRandomEvide
     }
 }
 
-fn gameplay_random_plan_entry(entry: &RpgRandomPlanEntry) -> GameplayRandomPlanEntryDto {
-    GameplayRandomPlanEntryDto {
-        request: gameplay_random_request(&entry.request),
-        conditions: entry
-            .conditions
-            .iter()
-            .map(gameplay_random_plan_condition)
-            .collect(),
-    }
-}
-
-fn gameplay_random_plan_condition(
-    condition: &RpgRandomPlanCondition,
-) -> GameplayRandomPlanConditionDto {
-    GameplayRandomPlanConditionDto {
-        kind: match condition.kind {
-            RpgRandomPlanConditionKind::WhenThen => GameplayRandomPlanConditionKindDto::WhenThen,
-            RpgRandomPlanConditionKind::WhenOtherwise => {
-                GameplayRandomPlanConditionKindDto::WhenOtherwise
-            }
-            RpgRandomPlanConditionKind::CheckHit => GameplayRandomPlanConditionKindDto::CheckHit,
-            RpgRandomPlanConditionKind::CheckMiss => GameplayRandomPlanConditionKindDto::CheckMiss,
-            RpgRandomPlanConditionKind::CheckSaved => {
-                GameplayRandomPlanConditionKindDto::CheckSaved
-            }
-            RpgRandomPlanConditionKind::CheckFailed => {
-                GameplayRandomPlanConditionKindDto::CheckFailed
-            }
-            RpgRandomPlanConditionKind::CheckNoRoll => {
-                GameplayRandomPlanConditionKindDto::CheckNoRoll
-            }
-            RpgRandomPlanConditionKind::AllPreviousTrue => {
-                GameplayRandomPlanConditionKindDto::AllPreviousTrue
-            }
-            RpgRandomPlanConditionKind::AnyPreviousFalse => {
-                GameplayRandomPlanConditionKindDto::AnyPreviousFalse
-            }
-        },
-        path: condition.path.clone(),
-    }
-}
-
 fn gameplay_trace(trace: &RpgTraceStep) -> GameplayTraceDto {
     GameplayTraceDto {
         path: trace.path.clone(),
@@ -2024,6 +2317,25 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
                 "{target_id} gained {modifier_id} {value} for {remaining_turns} turn(s)"
             ),
         ),
+        RpgDomainEvent::ModifierDurationChanged {
+            target_id,
+            modifier_id,
+            remaining_turns,
+            ..
+        } => (
+            "modifierDurationChanged",
+            format!(
+                "{target_id} {modifier_id} duration changed to {remaining_turns} turn(s)"
+            ),
+        ),
+        RpgDomainEvent::ModifierExpired {
+            target_id,
+            modifier_id,
+            ..
+        } => (
+            "modifierExpired",
+            format!("{target_id} {modifier_id} expired"),
+        ),
         RpgDomainEvent::PositionChanged {
             entity_id,
             previous,
@@ -2064,8 +2376,17 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
 }
 
 fn host_diagnostic(code: &str, path: &str, message: &str) -> RulesetDiagnosticDto {
+    host_diagnostic_at_stage("gameplay", code, path, message)
+}
+
+fn host_diagnostic_at_stage(
+    stage: &str,
+    code: &str,
+    path: &str,
+    message: &str,
+) -> RulesetDiagnosticDto {
     RulesetDiagnosticDto {
-        stage: "gameplay".to_owned(),
+        stage: stage.to_owned(),
         severity: "error".to_owned(),
         code: code.to_owned(),
         path: path.to_owned(),
@@ -2079,8 +2400,36 @@ fn host_diagnostic(code: &str, path: &str, message: &str) -> RulesetDiagnosticDt
     }
 }
 
-fn random_source_diagnostic(failure: GameplayRandomSourceFailure) -> RulesetDiagnosticDto {
+fn random_source_diagnostic(failure: RpgRandomSourceFailure) -> RulesetDiagnosticDto {
     host_diagnostic(&failure.code, &failure.path, &failure.message)
+}
+
+fn diagnostics_from_automatic_failure(
+    failure: RpgAutomaticCommandFailure,
+) -> Vec<RulesetDiagnosticDto> {
+    match failure {
+        RpgAutomaticCommandFailure::RandomSource(failure) => {
+            vec![random_source_diagnostic(failure)]
+        }
+        RpgAutomaticCommandFailure::Replay(failure) => diagnostics_from_replay_failure(failure),
+    }
+}
+
+fn diagnostics_from_setup_failure(
+    failure: rpg_runtime::RpgEncounterSetupFailure,
+) -> Vec<RulesetDiagnosticDto> {
+    failure
+        .diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            host_diagnostic_at_stage(
+                "setup",
+                &diagnostic.code,
+                &diagnostic.path,
+                &diagnostic.message,
+            )
+        })
+        .collect()
 }
 
 fn diagnostics_from_replay_failure(failure: RpgReplayFailure) -> Vec<RulesetDiagnosticDto> {
@@ -2394,13 +2743,24 @@ pub fn generated_protocol() -> String {
         RulesetUpgradeFieldDto::decl(),
         RulesetUpgradeDefinitionDto::decl(),
         RulesetUpgradeImpactDto::decl(),
-        GameplayCostDto::decl(),
+        EncounterSchemaDto::decl(),
+        EncounterPositionDto::decl(),
+        EncounterBoundedValueDto::decl(),
+        EncounterCellCapabilityValueDto::decl(),
+        EncounterCellCapabilityDto::decl(),
+        EncounterCellDto::decl(),
+        EncounterBoardDto::decl(),
+        EncounterInitialCapabilityDto::decl(),
+        EncounterParticipantSetupDto::decl(),
+        EncounterTurnDto::decl(),
+        EncounterRandomSourceDto::decl(),
+        EncounterSetupRequestDto::decl(),
+        GameplayUnavailableDto::decl(),
+        GameplayActionOptionsDto::decl(),
+        GameplayAuthorityActionDto::decl(),
+        GameplayLogEntryDto::decl(),
+        GameplayOutcomeDto::decl(),
         GameplayRandomRequestDto::decl(),
-        GameplayRandomPlanConditionKindDto::decl(),
-        GameplayRandomPlanConditionDto::decl(),
-        GameplayRandomPlanEntryDto::decl(),
-        GameplayActionDto::decl(),
-        GameplayPreflightDto::decl(),
         GameplayNamedValueDto::decl(),
         GameplayModifierDto::decl(),
         GameplayEntityDto::decl(),
@@ -2433,10 +2793,11 @@ pub fn generated_protocol() -> String {
 #[cfg(test)]
 mod tests {
     use rpg_core::{RpgRandomRequest, RpgRandomRequestKind};
+    use rpg_runtime::RpgRandomSource;
 
     use super::{
-        initial_gameplay_state, GameplayRandomSource, RulesetHost, RulesetLifecycleStatus,
-        ScriptedGameplayRandomSource, SystemGameplayRandomSource,
+        RulesetHost, RulesetLifecycleStatus, ScriptedGameplayRandomSource,
+        SystemGameplayRandomSource,
     };
 
     fn random_request(count: u32, sides: u32) -> RpgRandomRequest {
@@ -2446,23 +2807,6 @@ mod tests {
             sides,
             path: "$.test".to_owned(),
         }
-    }
-
-    #[test]
-    fn initial_gameplay_state_is_explicit_and_inactive_until_artifact_activation() {
-        let state = initial_gameplay_state();
-        assert_eq!(state.revision(), 0);
-        assert_eq!(state.entity("hero").unwrap().position().x, 0);
-        assert_eq!(state.entity("raider").unwrap().position().x, 4);
-        assert_eq!(
-            state
-                .entity("hero")
-                .unwrap()
-                .resource("focus")
-                .unwrap()
-                .current,
-            2
-        );
     }
 
     #[test]
@@ -2509,7 +2853,7 @@ mod tests {
 
     #[test]
     fn system_random_source_stays_inside_authority_die_bounds() {
-        let mut source = SystemGameplayRandomSource;
+        let mut source = SystemGameplayRandomSource::default();
 
         let values = source.draw(&random_request(128, 20)).unwrap();
         assert_eq!(values.len(), 128);

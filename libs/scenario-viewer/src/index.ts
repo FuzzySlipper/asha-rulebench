@@ -20,9 +20,14 @@ import type {
   GameplayActionView,
   GameplayEntityView,
 } from '@asha-rulebench/domain';
+import type {
+  EncounterInitialCapabilityDto,
+  EncounterParticipantSetupDto,
+  EncounterSetupRequestDto,
+} from '@asha-rulebench/protocol';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
-type DialogName = 'ruleset' | 'artifact' | 'replay' | null;
+type DialogName = 'ruleset' | 'encounter' | 'artifact' | 'replay' | null;
 
 interface BoardCell {
   readonly x: number;
@@ -345,13 +350,44 @@ interface BoardCell {
       }
 
       .ruleset-input,
-      .ruleset-select {
+      .ruleset-select,
+      .setup-input,
+      .setup-select {
         background: var(--arb-bg);
         border: 1px solid var(--arb-border);
         color: var(--arb-foreground);
         min-height: 2.8rem;
         padding: 0.6rem;
         width: 100%;
+      }
+
+      .setup-grid,
+      .participant-editor {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .setup-grid {
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      }
+
+      .participant-editor {
+        border: 1px solid var(--arb-border);
+        padding: 0.8rem;
+      }
+
+      .definition-choices {
+        border: 0;
+        display: grid;
+        gap: 0.45rem;
+        margin: 0;
+        padding: 0;
+      }
+
+      .definition-choice {
+        align-items: center;
+        display: flex;
+        gap: 0.5rem;
       }
 
       .diagnostic {
@@ -491,12 +527,14 @@ interface BoardCell {
                         @if (cell.entity; as entity) {
                           <span
                             class="piece"
-                            [class.enemy]="entity.team === 'enemy'"
+                            [class.enemy]="
+                              isOpposingTeam(entity, gameplay.actorId)
+                            "
                           >
                             <span class="piece-token" aria-hidden="true">{{
                               entity.id.slice(0, 2)
                             }}</span>
-                            <strong>{{ entity.id }}</strong>
+                            <strong>{{ entity.label }}</strong>
                             <span>{{ entity.vitality }}</span>
                           </span>
                         } @else {
@@ -510,8 +548,19 @@ interface BoardCell {
                 <div class="empty-state">
                   <strong>No active encounter</strong>
                   <p>{{ view.summary }}</p>
-                  <button type="button" (click)="openDialog('ruleset')">
-                    Open ruleset setup
+                  <button
+                    type="button"
+                    (click)="
+                      openDialog(
+                        view.encounterSetupRequired ? 'encounter' : 'ruleset'
+                      )
+                    "
+                  >
+                    {{
+                      view.encounterSetupRequired
+                        ? 'Create encounter'
+                        : 'Open ruleset setup'
+                    }}
                   </button>
                 </div>
               }
@@ -534,7 +583,8 @@ interface BoardCell {
                       class="participant"
                       [class.current]="entity.id === gameplay.actorId"
                     >
-                      <strong>{{ entity.id }} · {{ entity.team }}</strong>
+                      <strong>{{ entity.label }} · {{ entity.teamId }}</strong>
+                      <code>{{ entity.id }}</code>
                       @if (entity.id === gameplay.actorId) {
                         <span class="section-label">Current actor</span>
                       }
@@ -563,7 +613,8 @@ interface BoardCell {
                 </ul>
               } @else {
                 <p class="muted">
-                  Participants appear after an accepted artifact is activated.
+                  Participants appear after an explicit encounter setup is
+                  accepted.
                 </p>
               }
             </div>
@@ -579,6 +630,14 @@ interface BoardCell {
                 <p class="section-label">{{ view.statusLabel }}</p>
                 @if (view.gameplay; as gameplay) {
                   <strong>{{ gameplay.actorId }} is acting</strong>
+                  <span
+                    >Round {{ gameplay.turn.round }} · turn
+                    {{ gameplay.turn.turn }}</span
+                  >
+                  <span class="muted"
+                    >Initiative:
+                    {{ gameplay.turn.initiativeOrder.join(' → ') }}</span
+                  >
                   <span>Authority revision {{ gameplay.stateRevision }}</span>
                   <span class="muted">{{
                     gameplay.pendingReaction === null
@@ -652,7 +711,7 @@ interface BoardCell {
                           type="button"
                           [attr.aria-pressed]="selectedActionId() === action.id"
                           [disabled]="
-                            store.busy() || action.candidateIds.length === 0
+                            store.busy() || !action.available
                           "
                           (click)="selectAction(action)"
                         >
@@ -664,11 +723,13 @@ interface BoardCell {
                             }}</span
                           >
                           <span class="muted"
-                            >Range {{ action.maximumRange }} · up to
-                            {{ action.maximumTargets }} target{{
+                            >Up to {{ action.maximumTargets }} target{{
                               action.maximumTargets === 1 ? '' : 's'
                             }}</span
                           >
+                          @if (action.unavailable) {
+                            <span class="muted">{{ action.unavailable }}</span>
+                          }
                         </button>
                       </li>
                     }
@@ -711,7 +772,11 @@ interface BoardCell {
                       </p>
                       <button
                         type="button"
-                        [disabled]="store.busy() || selectedTargetId() === null"
+                        [disabled]="
+                          store.busy() ||
+                          (action.maximumTargets > 0 &&
+                            selectedTargetId() === null)
+                        "
                         (click)="executeAction()"
                       >
                         Use {{ action.name
@@ -791,6 +856,26 @@ interface BoardCell {
                     <strong>{{ result.code }}</strong>
                   </p>
                 }
+              }
+              @if (view.gameplay; as gameplay) {
+                <ul class="event-list" aria-label="Encounter history">
+                  @for (entry of gameplay.log; track entry.sequence) {
+                    <li>
+                      <strong
+                        >{{ entry.sequence }}. {{ entry.actorId }} ·
+                        {{ entry.actionId }}</strong
+                      >
+                      <span class="muted"
+                        >Authority revision {{ entry.stateRevision }}</span
+                      >
+                      @for (event of entry.events; track $index) {
+                        <span>{{ event }}</span>
+                      }
+                    </li>
+                  } @empty {
+                    <li>No accepted actions yet.</li>
+                  }
+                </ul>
               } @else {
                 <p class="muted">
                   Automatic rolls and accepted authority events will appear here
@@ -910,6 +995,412 @@ interface BoardCell {
               <span>{{ diagnostic.path }} · {{ diagnostic.message }}</span>
             </div>
           }
+        }
+      </div>
+    </arb-application-dialog>
+
+    <arb-application-dialog
+      dialogId="encounter-dialog"
+      dialogTitle="Encounter setup"
+      dialogDescription="Build an explicit artifact-pinned board and participant roster. Rust validates the complete setup before replacing any session."
+      [open]="openDialogName() === 'encounter'"
+      (closeRequested)="closeDialog()"
+    >
+      <div class="dialog-body">
+        @if (setupDraft(); as setup) {
+          <p class="section-label">Artifact binding</p>
+          <code>{{ setup.artifactId }}</code>
+          <div class="setup-grid">
+            <label>
+              <span class="section-label">Board width</span>
+              <input
+                #boardWidthInput
+                class="setup-input"
+                type="number"
+                min="1"
+                max="1024"
+                [value]="setup.board.width"
+                (input)="updateBoardExtent('width', boardWidthInput.value)"
+              />
+            </label>
+            <label>
+              <span class="section-label">Board height</span>
+              <input
+                #boardHeightInput
+                class="setup-input"
+                type="number"
+                min="1"
+                max="1024"
+                [value]="setup.board.height"
+                (input)="updateBoardExtent('height', boardHeightInput.value)"
+              />
+            </label>
+            <label>
+              <span class="section-label">Round</span>
+              <input
+                #roundInput
+                class="setup-input"
+                type="number"
+                min="1"
+                [value]="setup.turn.round"
+                (input)="updateTurnCounter('round', roundInput.value)"
+              />
+            </label>
+            <label>
+              <span class="section-label">Turn</span>
+              <input
+                #turnInput
+                class="setup-input"
+                type="number"
+                min="1"
+                [value]="setup.turn.turn"
+                (input)="updateTurnCounter('turn', turnInput.value)"
+              />
+            </label>
+          </div>
+
+          <div>
+            <p class="section-label">Selected automatic random source</p>
+            <code
+              >{{ setup.randomSource.policyId }}@{{
+                setup.randomSource.policyVersion
+              }} · {{ setup.randomSource.sourceId }}@{{
+                setup.randomSource.sourceVersion
+              }}</code
+            >
+          </div>
+
+          <div class="button-row">
+            <button class="secondary" type="button" (click)="addParticipant()">
+              Add participant
+            </button>
+            <button class="secondary" type="button" (click)="addTerrainCell()">
+              Add terrain cell
+            </button>
+          </div>
+
+          @for (
+            participant of setup.participants;
+            track $index;
+            let participantIndex = $index
+          ) {
+            <section
+              class="participant-editor"
+              [attr.aria-label]="'Participant ' + (participantIndex + 1)"
+            >
+              <div class="button-row">
+                <strong>Participant {{ participantIndex + 1 }}</strong>
+                <button
+                  class="secondary"
+                  type="button"
+                  [disabled]="participantIndex === 0"
+                  (click)="moveParticipant(participantIndex, -1)"
+                >
+                  Move earlier
+                </button>
+                <button
+                  class="secondary"
+                  type="button"
+                  [disabled]="participantIndex === setup.participants.length - 1"
+                  (click)="moveParticipant(participantIndex, 1)"
+                >
+                  Move later
+                </button>
+                <button
+                  class="secondary"
+                  type="button"
+                  (click)="removeParticipant(participantIndex)"
+                >
+                  Remove
+                </button>
+              </div>
+              <div class="setup-grid">
+                <label>
+                  <span class="section-label">ID</span>
+                  <input
+                    #participantIdInput
+                    class="setup-input"
+                    [value]="participant.id"
+                    (input)="
+                      updateParticipantText(
+                        participantIndex,
+                        'id',
+                        participantIdInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Label</span>
+                  <input
+                    #participantLabelInput
+                    class="setup-input"
+                    [value]="participant.label"
+                    (input)="
+                      updateParticipantText(
+                        participantIndex,
+                        'label',
+                        participantLabelInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Team ID</span>
+                  <input
+                    #participantTeamInput
+                    class="setup-input"
+                    [value]="participant.teamId"
+                    (input)="
+                      updateParticipantText(
+                        participantIndex,
+                        'teamId',
+                        participantTeamInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Position X</span>
+                  <input
+                    #participantXInput
+                    class="setup-input"
+                    type="number"
+                    min="0"
+                    [value]="participant.position.x"
+                    (input)="
+                      updateParticipantPosition(
+                        participantIndex,
+                        'x',
+                        participantXInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Position Y</span>
+                  <input
+                    #participantYInput
+                    class="setup-input"
+                    type="number"
+                    min="0"
+                    [value]="participant.position.y"
+                    (input)="
+                      updateParticipantPosition(
+                        participantIndex,
+                        'y',
+                        participantYInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Vitality</span>
+                  <input
+                    #vitalityInput
+                    class="setup-input"
+                    type="number"
+                    min="0"
+                    [value]="capabilityValue(participant, 'vitality')"
+                    (input)="
+                      updateBoundedCapability(
+                        participantIndex,
+                        'vitality',
+                        vitalityInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Power stat</span>
+                  <input
+                    #powerInput
+                    class="setup-input"
+                    type="number"
+                    [value]="capabilityValue(participant, 'stat')"
+                    (input)="
+                      updateNumberCapability(
+                        participantIndex,
+                        'stat',
+                        powerInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Guard defense</span>
+                  <input
+                    #guardInput
+                    class="setup-input"
+                    type="number"
+                    [value]="capabilityValue(participant, 'defense')"
+                    (input)="
+                      updateNumberCapability(
+                        participantIndex,
+                        'defense',
+                        guardInput.value
+                      )
+                    "
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Focus resource</span>
+                  <input
+                    #focusInput
+                    class="setup-input"
+                    type="number"
+                    min="0"
+                    [value]="capabilityValue(participant, 'resource')"
+                    (input)="
+                      updateBoundedCapability(
+                        participantIndex,
+                        'resource',
+                        focusInput.value
+                      )
+                    "
+                  />
+                </label>
+              </div>
+              <fieldset class="definition-choices">
+                <legend class="section-label">Owned action definitions</legend>
+                @for (definition of actionDefinitions(); track definition.id) {
+                  <label class="definition-choice">
+                    <input
+                      type="checkbox"
+                      [checked]="participant.definitionIds.includes(definition.id)"
+                      (change)="
+                        toggleParticipantDefinition(
+                          participantIndex,
+                          definition.id
+                        )
+                      "
+                    />
+                    <span>{{ definition.label }} · {{ definition.id }}</span>
+                  </label>
+                }
+              </fieldset>
+            </section>
+          } @empty {
+            <p class="muted">
+              Add every participant explicitly. Setup contains no hidden roster
+              or action script.
+            </p>
+          }
+
+          @for (cell of setup.board.cells; track $index; let cellIndex = $index) {
+            <section
+              class="participant-editor"
+              [attr.aria-label]="'Terrain cell ' + (cellIndex + 1)"
+            >
+              <div class="button-row">
+                <strong>Terrain cell {{ cellIndex + 1 }}</strong>
+                <button
+                  class="secondary"
+                  type="button"
+                  (click)="removeTerrainCell(cellIndex)"
+                >
+                  Remove
+                </button>
+              </div>
+              <div class="setup-grid">
+                <label>
+                  <span class="section-label">Cell ID</span>
+                  <input
+                    #cellIdInput
+                    class="setup-input"
+                    [value]="cell.id"
+                    (input)="updateCellId(cellIndex, cellIdInput.value)"
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Position X</span>
+                  <input
+                    #cellXInput
+                    class="setup-input"
+                    type="number"
+                    min="0"
+                    [value]="cell.position.x"
+                    (input)="updateCellPosition(cellIndex, 'x', cellXInput.value)"
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Position Y</span>
+                  <input
+                    #cellYInput
+                    class="setup-input"
+                    type="number"
+                    min="0"
+                    [value]="cell.position.y"
+                    (input)="updateCellPosition(cellIndex, 'y', cellYInput.value)"
+                  />
+                </label>
+                <label>
+                  <span class="section-label">Traversal</span>
+                  <select
+                    #passableSelect
+                    class="setup-select"
+                    [value]="cellPassable(cell) ? 'passable' : 'blocked'"
+                    (change)="
+                      updateCellPassable(
+                        cellIndex,
+                        passableSelect.value === 'passable'
+                      )
+                    "
+                  >
+                    <option value="passable">Passable</option>
+                    <option value="blocked">Blocked</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+          }
+
+          <label for="current-actor" class="section-label"
+            >Starting actor</label
+          >
+          <select
+            #currentActorSelect
+            id="current-actor"
+            class="setup-select"
+            [value]="setup.turn.currentActorId"
+            (change)="setCurrentActor(currentActorSelect.value)"
+          >
+            @for (participant of setup.participants; track $index) {
+              <option [value]="participant.id">
+                {{ participant.label || participant.id }}
+              </option>
+            }
+          </select>
+          <p class="muted">
+            Initiative follows the participant order shown above. Actions,
+            targets, reactions, rolls, expected events, and winners are not part
+            of setup.
+          </p>
+
+          @for (
+            diagnostic of setupDiagnostics();
+            track diagnostic.code + diagnostic.path
+          ) {
+            <div class="diagnostic" role="alert">
+              <strong>{{ diagnostic.code }}</strong>
+              <span>{{ diagnostic.path }} · {{ diagnostic.message }}</span>
+            </div>
+          }
+
+          <div class="button-row">
+            <button
+              type="button"
+              [disabled]="store.busy() || setup.participants.length === 0"
+              (click)="startEncounter()"
+            >
+              Validate and start encounter
+            </button>
+            <button class="secondary" type="button" (click)="closeDialog()">
+              Cancel
+            </button>
+          </div>
+        } @else {
+          <p>Activate an accepted artifact before creating an encounter.</p>
         }
       </div>
     </arb-application-dialog>
@@ -1081,6 +1572,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly openDialogName = signal<DialogName>(null);
   protected readonly selectedActionId = signal<string | null>(null);
   protected readonly selectedTargetId = signal<string | null>(null);
+  protected readonly setupDraft = signal<EncounterSetupRequestDto | null>(null);
 
   private readonly rulesetRootInput =
     viewChild<ElementRef<HTMLInputElement>>('rulesetRootInput');
@@ -1110,13 +1602,11 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   );
 
   protected readonly boardWidth = computed(() => {
-    const entities = this.store.view()?.gameplay?.entities ?? [];
-    return Math.max(5, ...entities.map((entity) => entity.x + 1));
+    return this.store.view()?.gameplay?.board.width ?? 1;
   });
 
   protected readonly boardHeight = computed(() => {
-    const entities = this.store.view()?.gameplay?.entities ?? [];
-    return Math.max(3, ...entities.map((entity) => entity.y + 1));
+    return this.store.view()?.gameplay?.board.height ?? 1;
   });
 
   protected readonly boardColumns = computed(
@@ -1157,6 +1647,18 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     );
   });
 
+  protected readonly actionDefinitions = computed(() =>
+    (this.store.view()?.artifact?.definitions ?? []).filter((definition) =>
+      definition.contract.startsWith('action'),
+    ),
+  );
+
+  protected readonly setupDiagnostics = computed(() =>
+    (this.store.view()?.diagnostics ?? []).filter(
+      (diagnostic) => diagnostic.stage === 'setup',
+    ),
+  );
+
   protected readonly interactionDiagnostics = computed(() => {
     if (this.store.busy()) return [];
     const view = this.store.view();
@@ -1194,6 +1696,14 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         id: 'session',
         label: 'Session',
         items: [
+          {
+            id: 'setup-encounter',
+            label: this.store.view()?.gameplayAvailable
+              ? 'Start new encounter…'
+              : 'Create encounter…',
+            disabled:
+              this.store.busy() || this.store.view()?.phase !== 'active',
+          },
           {
             id: 'inspect-replay',
             label: 'Replay and checkpoints…',
@@ -1254,6 +1764,11 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       this.openDialog('replay');
       return;
     }
+    if (item.id === 'setup-encounter') {
+      this.prepareEncounterDraft();
+      this.openDialog('encounter');
+      return;
+    }
     if (item.id === 'focus-battlefield') {
       this.boardPanel()?.focus();
       return;
@@ -1289,8 +1804,371 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected activateRuleset(): void {
     void this.store.activate().then(() => {
-      if (this.store.view()?.phase === 'active') this.closeDialog();
+      if (this.store.view()?.phase === 'active') {
+        this.prepareEncounterDraft();
+        this.openDialog('encounter');
+      }
     });
+  }
+
+  protected prepareEncounterDraft(): void {
+    const view = this.store.view();
+    if (
+      view?.activeArtifactId === null ||
+      view?.activeArtifactId === undefined
+    ) {
+      this.setupDraft.set(null);
+      return;
+    }
+    this.setupDraft.set({
+      schema: { id: 'asha.rpg.encounter.setup', version: 1 },
+      artifactId: view.activeArtifactId,
+      board: { width: 5, height: 3, cells: [] },
+      participants: [],
+      turn: {
+        initiativeOrder: [],
+        currentActorId: '',
+        round: 1,
+        turn: 1,
+      },
+      randomSource: view.hostRandomSource,
+    });
+  }
+
+  protected updateBoardExtent(field: 'width' | 'height', value: string): void {
+    this.updateSetup((setup) => ({
+      ...setup,
+      board: { ...setup.board, [field]: formInteger(value) },
+    }));
+  }
+
+  protected updateTurnCounter(field: 'round' | 'turn', value: string): void {
+    this.updateSetup((setup) => ({
+      ...setup,
+      turn: { ...setup.turn, [field]: formInteger(value) },
+    }));
+  }
+
+  protected addParticipant(): void {
+    this.updateSetup((setup) => {
+      const participantNumber = setup.participants.length + 1;
+      const id = `participant-${participantNumber}`;
+      const participant: EncounterParticipantSetupDto = {
+        id,
+        label: `Participant ${participantNumber}`,
+        teamId: `team-${participantNumber}`,
+        position: { x: participantNumber - 1, y: 0 },
+        definitionIds: [],
+        capabilities: [
+          { owner: 'vitality', value: { current: 10, max: 10 } },
+          { owner: 'stat', id: 'power', value: 0 },
+          { owner: 'defense', id: 'guard', value: 10 },
+          {
+            owner: 'resource',
+            id: 'focus',
+            value: { current: 2, max: 2 },
+          },
+        ],
+      };
+      const participants = [...setup.participants, participant];
+      const initiativeOrder = participants.map((entry) => entry.id);
+      return {
+        ...setup,
+        participants,
+        turn: {
+          ...setup.turn,
+          initiativeOrder,
+          currentActorId: setup.turn.currentActorId || id,
+        },
+      };
+    });
+  }
+
+  protected removeParticipant(index: number): void {
+    this.updateSetup((setup) => {
+      const participants = setup.participants.filter(
+        (_participant, participantIndex) => participantIndex !== index,
+      );
+      const initiativeOrder = participants.map((entry) => entry.id);
+      const currentActorId = initiativeOrder.includes(setup.turn.currentActorId)
+        ? setup.turn.currentActorId
+        : (initiativeOrder[0] ?? '');
+      return {
+        ...setup,
+        participants,
+        turn: { ...setup.turn, initiativeOrder, currentActorId },
+      };
+    });
+  }
+
+  protected moveParticipant(index: number, offset: -1 | 1): void {
+    this.updateSetup((setup) => {
+      const destination = index + offset;
+      if (destination < 0 || destination >= setup.participants.length) {
+        return setup;
+      }
+      const participants = [...setup.participants];
+      const participant = participants[index];
+      const displaced = participants[destination];
+      if (participant === undefined || displaced === undefined) return setup;
+      participants[index] = displaced;
+      participants[destination] = participant;
+      return {
+        ...setup,
+        participants,
+        turn: {
+          ...setup.turn,
+          initiativeOrder: participants.map((entry) => entry.id),
+        },
+      };
+    });
+  }
+
+  protected updateParticipantText(
+    index: number,
+    field: 'id' | 'label' | 'teamId',
+    value: string,
+  ): void {
+    this.updateSetup((setup) => {
+      const previousId = setup.participants[index]?.id;
+      const participants = setup.participants.map((participant, entryIndex) =>
+        entryIndex === index ? { ...participant, [field]: value } : participant,
+      );
+      const initiativeOrder = participants.map((participant) => participant.id);
+      const currentActorId =
+        field === 'id' && setup.turn.currentActorId === previousId
+          ? value
+          : setup.turn.currentActorId;
+      return {
+        ...setup,
+        participants,
+        turn: { ...setup.turn, initiativeOrder, currentActorId },
+      };
+    });
+  }
+
+  protected updateParticipantPosition(
+    index: number,
+    field: 'x' | 'y',
+    value: string,
+  ): void {
+    this.updateParticipant(index, (participant) => ({
+      ...participant,
+      position: { ...participant.position, [field]: formInteger(value) },
+    }));
+  }
+
+  protected toggleParticipantDefinition(
+    index: number,
+    definitionId: string,
+  ): void {
+    this.updateParticipant(index, (participant) => ({
+      ...participant,
+      definitionIds: participant.definitionIds.includes(definitionId)
+        ? participant.definitionIds.filter((id) => id !== definitionId)
+        : [...participant.definitionIds, definitionId],
+    }));
+  }
+
+  protected capabilityValue(
+    participant: EncounterParticipantSetupDto,
+    owner: EncounterInitialCapabilityDto['owner'],
+  ): number {
+    const capability = participant.capabilities.find(
+      (entry) => entry.owner === owner,
+    );
+    if (capability === undefined) return 0;
+    return typeof capability.value === 'number'
+      ? capability.value
+      : capability.value.current;
+  }
+
+  protected updateNumberCapability(
+    index: number,
+    owner: 'stat' | 'defense',
+    value: string,
+  ): void {
+    this.updateCapability(index, owner, (capability) => {
+      if (capability.owner === 'stat') {
+        return { ...capability, value: formSignedInteger(value) };
+      }
+      if (capability.owner === 'defense') {
+        return { ...capability, value: formSignedInteger(value) };
+      }
+      return capability;
+    });
+  }
+
+  protected updateBoundedCapability(
+    index: number,
+    owner: 'vitality' | 'resource',
+    value: string,
+  ): void {
+    const next = formInteger(value);
+    this.updateCapability(index, owner, (capability) => {
+      if (capability.owner === 'vitality') {
+        return { ...capability, value: { current: next, max: next } };
+      }
+      if (capability.owner === 'resource') {
+        return { ...capability, value: { current: next, max: next } };
+      }
+      return capability;
+    });
+  }
+
+  protected addTerrainCell(): void {
+    this.updateSetup((setup) => {
+      const cellNumber = setup.board.cells.length + 1;
+      return {
+        ...setup,
+        board: {
+          ...setup.board,
+          cells: [
+            ...setup.board.cells,
+            {
+              id: `terrain-${cellNumber}`,
+              position: { x: 0, y: 0 },
+              capabilities: [
+                {
+                  id: 'capability.traversal',
+                  version: 1,
+                  definitionId: null,
+                  value: {
+                    kind: 'traversal',
+                    passable: true,
+                    movementCost: 1,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      };
+    });
+  }
+
+  protected removeTerrainCell(index: number): void {
+    this.updateSetup((setup) => ({
+      ...setup,
+      board: {
+        ...setup.board,
+        cells: setup.board.cells.filter(
+          (_cell, cellIndex) => cellIndex !== index,
+        ),
+      },
+    }));
+  }
+
+  protected updateCellId(index: number, id: string): void {
+    this.updateCell(index, (cell) => ({ ...cell, id }));
+  }
+
+  protected updateCellPosition(
+    index: number,
+    field: 'x' | 'y',
+    value: string,
+  ): void {
+    this.updateCell(index, (cell) => ({
+      ...cell,
+      position: { ...cell.position, [field]: formInteger(value) },
+    }));
+  }
+
+  protected cellPassable(
+    cell: EncounterSetupRequestDto['board']['cells'][number],
+  ): boolean {
+    const traversal = cell.capabilities.find(
+      (capability) => capability.value.kind === 'traversal',
+    );
+    return traversal?.value.kind === 'traversal'
+      ? traversal.value.passable
+      : true;
+  }
+
+  protected updateCellPassable(index: number, passable: boolean): void {
+    this.updateCell(index, (cell) => ({
+      ...cell,
+      capabilities: cell.capabilities.map((capability) =>
+        capability.value.kind === 'traversal'
+          ? {
+              ...capability,
+              value: { ...capability.value, passable },
+            }
+          : capability,
+      ),
+    }));
+  }
+
+  protected setCurrentActor(currentActorId: string): void {
+    this.updateSetup((setup) => ({
+      ...setup,
+      turn: { ...setup.turn, currentActorId },
+    }));
+  }
+
+  protected startEncounter(): void {
+    const setup = this.setupDraft();
+    if (setup === null) return;
+    void this.store.startEncounter(setup).then((started) => {
+      if (started) {
+        this.selectedActionId.set(null);
+        this.selectedTargetId.set(null);
+        this.closeDialog();
+        this.boardPanel()?.focus();
+      }
+    });
+  }
+
+  private updateSetup(
+    update: (setup: EncounterSetupRequestDto) => EncounterSetupRequestDto,
+  ): void {
+    this.setupDraft.update((setup) => (setup === null ? null : update(setup)));
+  }
+
+  private updateParticipant(
+    index: number,
+    update: (
+      participant: EncounterParticipantSetupDto,
+    ) => EncounterParticipantSetupDto,
+  ): void {
+    this.updateSetup((setup) => ({
+      ...setup,
+      participants: setup.participants.map((participant, participantIndex) =>
+        participantIndex === index ? update(participant) : participant,
+      ),
+    }));
+  }
+
+  private updateCapability(
+    participantIndex: number,
+    owner: EncounterInitialCapabilityDto['owner'],
+    update: (
+      capability: EncounterInitialCapabilityDto,
+    ) => EncounterInitialCapabilityDto,
+  ): void {
+    this.updateParticipant(participantIndex, (participant) => ({
+      ...participant,
+      capabilities: participant.capabilities.map((capability) =>
+        capability.owner === owner ? update(capability) : capability,
+      ),
+    }));
+  }
+
+  private updateCell(
+    index: number,
+    update: (
+      cell: EncounterSetupRequestDto['board']['cells'][number],
+    ) => EncounterSetupRequestDto['board']['cells'][number],
+  ): void {
+    this.updateSetup((setup) => ({
+      ...setup,
+      board: {
+        ...setup.board,
+        cells: setup.board.cells.map((cell, cellIndex) =>
+          cellIndex === index ? update(cell) : cell,
+        ),
+      },
+    }));
   }
 
   protected restoreCheckpoint(): void {
@@ -1303,7 +2181,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected selectAction(action: GameplayActionView): void {
     this.selectedActionId.set(action.id);
-    this.selectedTargetId.set(action.candidateIds[0] ?? null);
+    this.selectedTargetId.set(null);
   }
 
   protected chooseGridCell(cell: BoardCell): void {
@@ -1319,15 +2197,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       gameplay === null ||
       gameplay === undefined ||
       actionId === null ||
-      targetId === null
+      (targetId === null && this.selectedAction()?.maximumTargets !== 0)
     ) {
       return;
     }
+    this.selectedActionId.set(null);
+    this.selectedTargetId.set(null);
     void this.store.command({
       expectedRevision: gameplay.stateRevision,
       actionId,
       actorId: gameplay.actorId,
-      targetIds: [targetId],
+      targetIds: targetId === null ? [] : [targetId],
     });
   }
 
@@ -1346,7 +2226,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     if (cell.entity === null) return `${coordinate}, empty`;
     const actor = cell.entity.id === actorId ? ', current actor' : '';
     const target = cell.targetable ? ', available target' : '';
-    return `${coordinate}, ${cell.entity.id}, ${cell.entity.team}, vitality ${cell.entity.vitality}${actor}${target}`;
+    return `${coordinate}, ${cell.entity.label}, ${cell.entity.teamId}, vitality ${cell.entity.vitality}${actor}${target}`;
+  }
+
+  protected isOpposingTeam(
+    entity: GameplayEntityView,
+    actorId: string,
+  ): boolean {
+    const actor = this.store
+      .view()
+      ?.gameplay?.entities.find((candidate) => candidate.id === actorId);
+    return actor !== undefined && actor.teamId !== entity.teamId;
   }
 
   protected moveGridFocus(event: KeyboardEvent, index: number): void {
@@ -1373,4 +2263,14 @@ function recentRulesetRootIndex(itemId: string): number | null {
   if (!itemId.startsWith(prefix)) return null;
   const index = Number(itemId.slice(prefix.length));
   return Number.isSafeInteger(index) && index >= 0 ? index : null;
+}
+
+function formInteger(value: string): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function formSignedInteger(value: string): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : 0;
 }

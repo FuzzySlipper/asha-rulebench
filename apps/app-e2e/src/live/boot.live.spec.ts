@@ -5,7 +5,7 @@ liveScenario(
   'play through the interaction-first combat shell @live-artifact',
   async ({ page, collector, liveBaseUrl }) => {
     collector.addNonClaim(
-      'This proves the current fixed hero and raider bootstrap encounter. General participant setup, turn sequencing, and authored board metadata remain deferred campaign work.',
+      'This proves one explicitly authored encounter setup and several authority-owned turns. Persistent setup libraries, saves, multiplayer, and AI remain out of scope.',
     );
     collector.addNonClaim(
       'System rolls are intentionally unpredictable. Replay proves the exact values actually recorded; it does not regenerate entropy.',
@@ -71,6 +71,10 @@ liveScenario(
     await rulesetDialog
       .getByRole('button', { name: 'Activate accepted artifact' })
       .click();
+    const encounterDialog = page.getByRole('dialog', {
+      name: 'Encounter setup',
+    });
+    await configureEncounter(encounterDialog);
 
     const battlefield = workspace.getByRole('region', {
       name: '1. Battlefield',
@@ -102,8 +106,8 @@ liveScenario(
     await expect(
       battlefield.getByRole('grid', { name: 'Combat grid' }),
     ).toBeVisible();
-    await expect(participants).toContainText('hero · ally');
-    await expect(participants).toContainText('raider · enemy');
+    await expect(participants).toContainText('Hero · team.blue');
+    await expect(participants).toContainText('Raider · team.red');
     await expect(turnStatus).toContainText('Authority revision 0');
     await collector.milestone(
       'desktop combat workspace is the primary surface',
@@ -116,9 +120,10 @@ liveScenario(
     await chooseAction(actionPalette, 'Tactical Advance');
     await expect(
       battlefield.getByRole('gridcell', {
-        name: /raider, enemy.*available target/,
+        name: /Raider, team.red.*available target/,
       }),
     ).toBeVisible();
+    await actionPalette.getByRole('button', { name: 'Target raider' }).click();
     await actionPalette
       .getByRole('button', { name: /^Use Tactical Advance/ })
       .click();
@@ -130,9 +135,10 @@ liveScenario(
       'Arc Lash',
       'rulebench.arc-lash-stormfront',
     );
+    await actionPalette.getByRole('button', { name: 'Target hero' }).click();
     await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
     await expect(turnStatus).toContainText('Authority revision 2');
-    await expect(participants).toContainText('focus 1/2');
+    await expect(participants).toContainText('focus 2/3');
     await expect(combatLog).toContainText('Automatic roll · 1d20 →');
     await collector.milestone(
       'automatic system roll returned visible authority evidence',
@@ -143,6 +149,7 @@ liveScenario(
     );
 
     await chooseAction(actionPalette, 'Wardbreaker Volley');
+    await actionPalette.getByRole('button', { name: 'Target raider' }).click();
     await actionPalette
       .getByRole('button', { name: /^Use Wardbreaker Volley/ })
       .click();
@@ -193,6 +200,60 @@ liveScenario(
     });
   },
 );
+
+async function configureEncounter(dialog: Locator): Promise<void> {
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Add participant' }).click();
+  await dialog.getByRole('button', { name: 'Add participant' }).click();
+  const editors = dialog.locator('.participant-editor');
+  await fillParticipant(editors.nth(0), {
+    id: 'hero',
+    label: 'Hero',
+    teamId: 'team.blue',
+    x: '0',
+  });
+  await fillParticipant(editors.nth(1), {
+    id: 'raider',
+    label: 'Raider',
+    teamId: 'team.red',
+    x: '4',
+  });
+  for (const editor of [editors.nth(0), editors.nth(1)]) {
+    const definitions = editor.getByRole('checkbox');
+    for (let index = 0; index < (await definitions.count()); index += 1) {
+      await definitions.nth(index).check();
+    }
+  }
+  await dialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(dialog).toBeHidden();
+}
+
+async function fillParticipant(
+  editor: Locator,
+  participant: {
+    readonly id: string;
+    readonly label: string;
+    readonly teamId: string;
+    readonly x: string;
+  },
+): Promise<void> {
+  await editor
+    .getByRole('textbox', { name: 'ID', exact: true })
+    .fill(participant.id);
+  await editor.getByRole('textbox', { name: 'Label' }).fill(participant.label);
+  await editor
+    .getByRole('textbox', { name: 'Team ID' })
+    .fill(participant.teamId);
+  await editor
+    .getByRole('spinbutton', { name: 'Position X' })
+    .fill(participant.x);
+  await editor.getByRole('spinbutton', { name: 'Vitality' }).fill('40');
+  await editor.getByRole('spinbutton', { name: 'Power stat' }).fill('3');
+  await editor.getByRole('spinbutton', { name: 'Guard defense' }).fill('12');
+  await editor.getByRole('spinbutton', { name: 'Focus resource' }).fill('3');
+}
 
 async function openRulesetDialog(
   page: Page,

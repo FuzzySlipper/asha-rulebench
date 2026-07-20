@@ -36,25 +36,47 @@ export type RulesetUpgradeDefinitionDto = { definitionId: string, change: string
 
 export type RulesetUpgradeImpactDto = { fromArtifactId: string, toArtifactId: string, sourceChanges: Array<string>, definitions: Array<RulesetUpgradeDefinitionDto>, };
 
-export type GameplayCostDto = { resourceId: string, amount: number, };
+export type EncounterSchemaDto = { id: string, version: number, };
+
+export type EncounterPositionDto = { x: number, y: number, };
+
+export type EncounterBoundedValueDto = { current: number, max: number, };
+
+export type EncounterCellCapabilityValueDto = { "kind": "traversal", passable: boolean, movementCost: number, } | { "kind": "flag", value: boolean, } | { "kind": "integer", value: number, } | { "kind": "identifier", valueId: string, };
+
+export type EncounterCellCapabilityDto = { id: string, version: number, definitionId: string | null, value: EncounterCellCapabilityValueDto, };
+
+export type EncounterCellDto = { id: string, position: EncounterPositionDto, capabilities: Array<EncounterCellCapabilityDto>, };
+
+export type EncounterBoardDto = { width: number, height: number, cells: Array<EncounterCellDto>, };
+
+export type EncounterInitialCapabilityDto = { "owner": "vitality", value: EncounterBoundedValueDto, } | { "owner": "stat", id: string, value: number, } | { "owner": "defense", id: string, value: number, } | { "owner": "resource", id: string, value: EncounterBoundedValueDto, } | { "owner": "modifier", stackingGroup: string, id: string, value: number, remainingTurns: number, };
+
+export type EncounterParticipantSetupDto = { id: string, label: string, teamId: string, position: EncounterPositionDto, definitionIds: Array<string>, capabilities: Array<EncounterInitialCapabilityDto>, };
+
+export type EncounterTurnDto = { initiativeOrder: Array<string>, currentActorId: string, round: number, turn: number, };
+
+export type EncounterRandomSourceDto = { policyId: string, policyVersion: number, sourceId: string, sourceVersion: number, };
+
+export type EncounterSetupRequestDto = { schema: EncounterSchemaDto, artifactId: string, board: EncounterBoardDto, participants: Array<EncounterParticipantSetupDto>, turn: EncounterTurnDto, randomSource: EncounterRandomSourceDto, };
+
+export type GameplayUnavailableDto = { code: string, path: string, message: string, };
+
+export type GameplayActionOptionsDto = { participantIds: Array<string>, cellIds: Array<string>, areaIds: Array<string>, };
+
+export type GameplayAuthorityActionDto = { definitionId: string, label: string, available: boolean, unavailable: GameplayUnavailableDto | null, maximumTargets: number, options: GameplayActionOptionsDto, };
+
+export type GameplayLogEntryDto = { sequence: string, stateRevision: string, actorId: string, actionId: string, events: Array<GameplayEventDto>, };
+
+export type GameplayOutcomeDto = { status: string, winningTeamIds: Array<string>, };
 
 export type GameplayRandomRequestDto = { kind: string, count: number, sides: number, path: string, };
-
-export type GameplayRandomPlanConditionKindDto = "whenThen" | "whenOtherwise" | "checkHit" | "checkMiss" | "checkSaved" | "checkFailed" | "checkNoRoll" | "allPreviousTrue" | "anyPreviousFalse";
-
-export type GameplayRandomPlanConditionDto = { kind: GameplayRandomPlanConditionKindDto, path: string, };
-
-export type GameplayRandomPlanEntryDto = { request: GameplayRandomRequestDto, conditions: Array<GameplayRandomPlanConditionDto>, };
-
-export type GameplayActionDto = { id: string, name: string, sourcePath: string, team: string, maximumRange: number, maximumTargets: number, costs: Array<GameplayCostDto>, randomPlan: Array<GameplayRandomPlanEntryDto>, candidateIds: Array<string>, };
-
-export type GameplayPreflightDto = { actionId: string, targetId: string, available: boolean, code: string | null, message: string, };
 
 export type GameplayNamedValueDto = { id: string, current: number, maximum: number | null, };
 
 export type GameplayModifierDto = { stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type GameplayEntityDto = { id: string, team: string, x: number, y: number, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
+export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
 
 export type GameplayEventDto = { kind: string, summary: string, };
 
@@ -74,9 +96,9 @@ export type GameplayReplayEntryDto = { sequence: number, operation: string, outc
 
 export type GameplayArchiveDto = { checkpointSchema: string, replaySchemaVersion: number, eventSchemaVersion: number, artifactId: string, artifactSchema: string, composition: string, language: string, operationSchemas: Array<string>, capabilitySchemas: Array<string>, sourcePackages: Array<string>, dependencyLock: Array<string>, fingerprints: RulesetFingerprintDto, definitionFingerprints: Array<string>, stateRevision: string, acceptedRandomPosition: string, phase: string, stateHash: string, checkpointBytes: number, replayEntries: Array<GameplayReplayEntryDto>, verificationStatus: string, verificationMessage: string, };
 
-export type GameplaySessionDto = { actorId: string, stateRevision: number, acceptedRandomValues: string, actions: Array<GameplayActionDto>, preflights: Array<GameplayPreflightDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
+export type GameplaySessionDto = { artifactId: string, actorId: string, stateRevision: number, acceptedRandomValues: string, randomSource: EncounterRandomSourceDto, board: EncounterBoardDto, turn: EncounterTurnDto, actions: Array<GameplayAuthorityActionDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, log: Array<GameplayLogEntryDto>, outcome: GameplayOutcomeDto, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
 
-export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
+export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, hostRandomSource: EncounterRandomSourceDto, encounterSetupRequired: boolean, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
 
 export type RulesetCompileRequestDto = { rulesetRoot: string, };
 

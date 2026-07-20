@@ -105,11 +105,16 @@ combat log form the primary keyboard-operable loop. Ruleset loading,
 artifact/provenance inspection, checkpoints, and replay remain reachable from
 the top menu as secondary dialogs.
 
-Gameplay requests no longer carry browser-authored random values. The Rust host
-probes an unchanged Asha RPG checkpoint, draws exactly the count and sides in
-each authoritative random request, and records only the terminal command and
-its consumed evidence. Normal sessions use system entropy. The deterministic
-browser journey may configure a host-side roll tape; it is not a user control
-or TypeScript authority path. The fixed hero/raider bootstrap, inferred
-presentation grid extent, and single current actor are explicit temporary
-non-claims pending general encounter and turn setup.
+Gameplay requests do not carry browser-authored random values. The Rust host
+passes the selected host source into Asha RPG's public automatic command API,
+which requests the exact count and sides for each executed branch and records
+the terminal command with its consumed evidence. Normal sessions use system
+entropy. The deterministic browser journey may configure a host-side roll
+tape; it is not a user control or TypeScript authority path.
+
+Artifact activation and encounter creation are separate operations. The setup
+dialog authors the generated setup DTO directly; Rust validates its artifact,
+board/terrain, participant definitions and capabilities, initiative, counters,
+and random binding before atomically installing a fresh session. The returned
+encounter view, rather than inferred frontend state, owns board extent,
+participants, current turn, legal action options, log, and outcome.

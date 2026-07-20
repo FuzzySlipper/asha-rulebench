@@ -9,6 +9,7 @@ import {
   type KeyValueStoragePort,
 } from '@asha-rulebench/platform';
 import type {
+  EncounterSetupRequestDto,
   GameplayCommandRequestDto,
   GameplayReactionRequestDto,
   RulesetCompileRequestDto,
@@ -97,6 +98,13 @@ export class RulesetWorkspaceStore {
 
   public async activate(): Promise<void> {
     await this.run(() => this.transport.activate());
+  }
+
+  public async startEncounter(
+    setup: EncounterSetupRequestDto,
+  ): Promise<boolean> {
+    const response = await this.run(() => this.transport.startEncounter(setup));
+    return response?.ok === true;
   }
 
   public async command(command: GameplayCommandRequestDto): Promise<void> {

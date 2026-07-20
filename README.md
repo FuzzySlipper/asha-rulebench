@@ -113,11 +113,17 @@ Rust host and generated protocol. Exhaustive
 cross-repository certification remains downstream, but the old prototype
 expectations have been retired rather than preserved there.
 
-Non-claims: the fixed hero/raider bootstrap is not general participant setup,
-turn sequencing and board metadata are not yet content-authored, and archive
-persistence across process restarts or artifact activation, storage migration,
-nested reaction windows, upgrade migration policy, and exhaustive
-cross-product certification are not implemented here.
+The Session menu now builds an explicit artifact-pinned encounter: board and
+terrain cells, participant/team identities, placement, owned definitions,
+initial capabilities, initiative/current actor/counters, and the host random
+binding are generated-protocol forms validated atomically by Rust. Accepted
+actions alternate through the authority-owned turn view; setup never contains
+actions, targets, reactions, rolls, expected events, or a winner.
+
+Non-claims: persistent setup libraries, saves across process restarts or
+artifact activation, multiplayer, AI control, nested reaction windows, upgrade
+migration policy, and exhaustive cross-product certification are not
+implemented here.
 
 The fresh composition now demonstrates one primary base, two ordered typed
 mixins, a local relational patch, an authorized semantic overlay, and a

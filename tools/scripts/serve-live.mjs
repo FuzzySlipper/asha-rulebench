@@ -14,6 +14,8 @@ const rulesetLocationConfig = await loadRulesetLocationConfig(
 );
 const forwardedArguments = process.argv.slice(2);
 if (forwardedArguments[0] === '--') forwardedArguments.shift();
+const angularConfiguration =
+  process.env['RULEBENCH_ANGULAR_CONFIGURATION'] ?? 'rulebench';
 
 const authoringBuild = spawnSync(
   'pnpm',
@@ -94,7 +96,7 @@ const angular = spawn(
     'nx',
     'serve',
     'app',
-    '--configuration=e2e',
+    `--configuration=${angularConfiguration}`,
     '--host',
     '0.0.0.0',
     '--proxy-config',
