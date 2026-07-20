@@ -10,6 +10,7 @@ import type {
   GameplayRandomPlanConditionDto,
   GameplayRandomPlanConditionKindDto,
   GameplayRandomPlanEntryDto,
+  GameplayRandomEvidenceDto,
   GameplayRandomRequestDto,
   GameplayReactionDto,
   GameplayReactionOptionDto,
@@ -556,6 +557,7 @@ function nullableResult(
       'events',
       'trace',
       'randomConsumed',
+      'randomEvidence',
       'stateRevision',
       'randomRequest',
     ],
@@ -575,6 +577,12 @@ function nullableResult(
       record['randomConsumed'],
       `${path}.randomConsumed`,
     ),
+    randomEvidence: requiredArray(
+      record['randomEvidence'],
+      `${path}.randomEvidence`,
+    ).map((entry, index) =>
+      gameplayRandomEvidence(entry, `${path}.randomEvidence[${index}]`),
+    ),
     stateRevision: nonNegativeInteger(
       record['stateRevision'],
       `${path}.stateRevision`,
@@ -586,6 +594,23 @@ function nullableResult(
             record['randomRequest'],
             `${path}.randomRequest`,
           ),
+  };
+}
+
+function gameplayRandomEvidence(
+  value: unknown,
+  path: string,
+): GameplayRandomEvidenceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['kind', 'count', 'sides', 'path', 'values'], path);
+  return {
+    kind: requiredString(record['kind'], `${path}.kind`),
+    count: nonNegativeInteger(record['count'], `${path}.count`),
+    sides: nonNegativeInteger(record['sides'], `${path}.sides`),
+    path: requiredString(record['path'], `${path}.path`),
+    values: requiredArray(record['values'], `${path}.values`).map(
+      (entry, index) => nonNegativeInteger(entry, `${path}.values[${index}]`),
+    ),
   };
 }
 

@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+getrandom.workspace = true
 rpg-compiler.workspace = true
 rpg-core.workspace = true
 rpg-ir.workspace = true

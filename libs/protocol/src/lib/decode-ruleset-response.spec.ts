@@ -108,7 +108,25 @@ describe('ruleset protocol decoder', () => {
         preflights: [],
         entities: [],
         pendingReaction: null,
-        lastResult: null,
+        lastResult: {
+          status: 'accepted',
+          code: null,
+          message: 'Accepted action.one at state revision 1',
+          events: [],
+          trace: [],
+          randomConsumed: '1',
+          randomEvidence: [
+            {
+              kind: 'formulaDice',
+              count: 1,
+              sides: 6,
+              path: '$.damage',
+              values: [4],
+            },
+          ],
+          stateRevision: 1,
+          randomRequest: null,
+        },
         archive: {
           checkpointSchema: 'asha.rpg.session.checkpoint@1',
           replaySchemaVersion: 1,

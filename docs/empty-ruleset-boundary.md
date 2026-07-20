@@ -95,3 +95,21 @@ validation. Rulebench does not execute TypeScript, float package versions,
 reapply events, or own a parallel state path. Process-restart storage,
 activation migration, and exhaustive compatibility evidence remain downstream
 or future work.
+
+## #6014 interaction-first transition
+
+The active-session surface is now organized for direct play rather than proof
+inspection. A DOM combat grid, participants, current actor and revision,
+authority action choices, highlighted legal targets, reaction choices, and the
+combat log form the primary keyboard-operable loop. Ruleset loading,
+artifact/provenance inspection, checkpoints, and replay remain reachable from
+the top menu as secondary dialogs.
+
+Gameplay requests no longer carry browser-authored random values. The Rust host
+probes an unchanged Asha RPG checkpoint, draws exactly the count and sides in
+each authoritative random request, and records only the terminal command and
+its consumed evidence. Normal sessions use system entropy. The deterministic
+browser journey may configure a host-side roll tape; it is not a user control
+or TypeScript authority path. The fixed hero/raider bootstrap, inferred
+presentation grid extent, and single current actor are explicit temporary
+non-claims pending general encounter and turn setup.

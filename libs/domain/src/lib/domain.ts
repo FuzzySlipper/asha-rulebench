@@ -126,6 +126,9 @@ export interface GameplayActionView {
   readonly id: string;
   readonly name: string;
   readonly source: string;
+  readonly team: string;
+  readonly maximumRange: number;
+  readonly maximumTargets: number;
   readonly candidateIds: readonly string[];
   readonly costs: readonly string[];
   readonly randomPlan: readonly string[];
@@ -139,6 +142,8 @@ export interface GameplayActionView {
 export interface GameplayEntityView {
   readonly id: string;
   readonly team: string;
+  readonly x: number;
+  readonly y: number;
   readonly position: string;
   readonly vitality: string;
   readonly stats: readonly string[];
@@ -169,6 +174,12 @@ export interface GameplayWorkspaceView {
     readonly message: string;
     readonly randomConsumed: string;
     readonly randomRequest: string | null;
+    readonly randomEvidence: readonly {
+      readonly kind: string;
+      readonly dice: string;
+      readonly values: readonly number[];
+      readonly path: string;
+    }[];
     readonly events: readonly string[];
     readonly trace: readonly string[];
   } | null;
@@ -282,6 +293,9 @@ function gameplayView(
       id: action.id,
       name: action.name,
       source: action.sourcePath,
+      team: action.team,
+      maximumRange: action.maximumRange,
+      maximumTargets: action.maximumTargets,
       candidateIds: action.candidateIds,
       costs: action.costs.map((cost) => `${cost.amount} ${cost.resourceId}`),
       randomPlan: action.randomPlan.map(randomPlanLabel),
@@ -296,6 +310,8 @@ function gameplayView(
     entities: gameplay.entities.map((entity) => ({
       id: entity.id,
       team: entity.team,
+      x: entity.x,
+      y: entity.y,
       position: `(${entity.x}, ${entity.y})`,
       vitality: `${entity.vitality.current}/${entity.vitality.maximum ?? 'unbounded'}`,
       stats: entity.stats.map((value) => `${value.id} ${value.current}`),
@@ -330,6 +346,14 @@ function gameplayView(
               gameplay.lastResult.randomRequest === null
                 ? null
                 : `${gameplay.lastResult.randomRequest.count}d${gameplay.lastResult.randomRequest.sides} at ${gameplay.lastResult.randomRequest.path}`,
+            randomEvidence: gameplay.lastResult.randomEvidence.map(
+              (evidence) => ({
+                kind: evidence.kind,
+                dice: `${evidence.count}d${evidence.sides}`,
+                values: evidence.values,
+                path: evidence.path,
+              }),
+            ),
             events: gameplay.lastResult.events.map(
               (event) => `${event.kind}: ${event.summary}`,
             ),

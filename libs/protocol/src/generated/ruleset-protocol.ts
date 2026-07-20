@@ -64,7 +64,9 @@ export type GameplayReactionOptionDto = { id: string, label: string, damageReduc
 
 export type GameplayReactionDto = { reactionId: string, actorId: string, targetId: string, actionId: string, options: Array<GameplayReactionOptionDto>, path: string, };
 
-export type GameplayResultDto = { status: string, code: string | null, message: string, events: Array<GameplayEventDto>, trace: Array<GameplayTraceDto>, randomConsumed: string, stateRevision: number, randomRequest: GameplayRandomRequestDto | null, };
+export type GameplayRandomEvidenceDto = { kind: string, count: number, sides: number, path: string, values: Array<number>, };
+
+export type GameplayResultDto = { status: string, code: string | null, message: string, events: Array<GameplayEventDto>, trace: Array<GameplayTraceDto>, randomConsumed: string, randomEvidence: Array<GameplayRandomEvidenceDto>, stateRevision: number, randomRequest: GameplayRandomRequestDto | null, };
 
 export type GameplayReplayBoundaryDto = { revision: string, acceptedRandomPosition: string, phase: string, stateHash: string, };
 
@@ -80,6 +82,6 @@ export type RulesetCompileRequestDto = { rulesetRoot: string, };
 
 export type PreparedRulesetCompileRequestDto = { preparedSource: string, };
 
-export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, randomValues: Array<number>, };
+export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, };
 
-export type GameplayReactionRequestDto = { expectedRevision: number, reactionId: string, optionId: string | null, additionalRandomValues: Array<number>, };
+export type GameplayReactionRequestDto = { expectedRevision: number, reactionId: string, optionId: string | null, };

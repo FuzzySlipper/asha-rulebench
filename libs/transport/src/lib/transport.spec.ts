@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createRulesetTransport, type JsonHttpClient } from './transport.js';
 
 describe('ruleset transport', () => {
-  it('uses generated compile and portable archive routes', async () => {
+  it('sends intents and reactions without browser-authored random evidence', async () => {
     const requests: {
       readonly method: 'GET' | 'POST';
       readonly path: string;
@@ -21,6 +21,17 @@ describe('ruleset transport', () => {
     await transport.compile({
       rulesetRoot: 'examples/rulesets/field-manual',
     });
+    await transport.command({
+      expectedRevision: 2,
+      actionId: 'action.arc-lash',
+      actorId: 'hero',
+      targetIds: ['raider'],
+    });
+    await transport.react({
+      expectedRevision: 2,
+      reactionId: 'reaction.raise-ward',
+      optionId: 'raise-ward',
+    });
     await transport.restoreCheckpoint();
     await transport.replay();
 
@@ -30,6 +41,25 @@ describe('ruleset transport', () => {
         path: '/api/ruleset/compile',
         body: {
           rulesetRoot: 'examples/rulesets/field-manual',
+        },
+      },
+      {
+        method: 'POST',
+        path: '/api/ruleset/command',
+        body: {
+          expectedRevision: 2,
+          actionId: 'action.arc-lash',
+          actorId: 'hero',
+          targetIds: ['raider'],
+        },
+      },
+      {
+        method: 'POST',
+        path: '/api/ruleset/reaction',
+        body: {
+          expectedRevision: 2,
+          reactionId: 'reaction.raise-ward',
+          optionId: 'raise-ward',
         },
       },
       {

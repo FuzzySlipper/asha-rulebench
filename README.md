@@ -29,10 +29,18 @@ determine runtime meaning. Invalid build and package graphs prove source
 diagnostics remain user-reachable without replacing the active artifact or its
 persistent session.
 
-Activation creates one fresh Asha RPG authority session. The browser displays
-Rust-provided action catalogs, source identity, candidates, preflight, random
-requests, accepted events, trace, and state. It sends only typed intents,
-explicit random evidence, and typed reaction decisions. The current field
+Activation creates one fresh Asha RPG authority session. The browser's primary
+surface is an interaction-first combat workspace: a DOM grid, participants,
+current actor and revision, authority-provided actions and targets, reactions,
+automatic rolls, and accepted outcomes remain visible in one play loop.
+Ruleset lifecycle, artifact/provenance, and replay inspection remain available
+as secondary top-menu dialogs. The browser sends only typed intents and typed
+reaction decisions; it has no random-value input or roll-plan interpreter.
+When Asha RPG rejects a probe with an exact random request, the Rust host draws
+only that count and die size from system entropy and retries from an unchanged
+checkpoint. It records one terminal command with the exact consumed evidence.
+The deterministic browser gate injects a host-side roll tape through process
+configuration, never through gameplay UI or a TypeScript semantic path. The current field
 manual has four TypeScript-authored actions, including one materialized derived
 action. Their sequential workflow moves an actor, applies a modifier, spends a
 bounded resource, resolves d6 and five-d4 requests, and suspends/resumes a
@@ -50,7 +58,7 @@ events, or maintain a second gameplay state path.
 ## Retained product surfaces
 
 - `apps/app`: Angular bootstrap.
-- `apps/app-e2e`: focused compiler/activation browser and managed live evidence.
+- `apps/app-e2e`: focused interaction-first browser and managed live evidence.
 - `libs/content-authoring`: the narrow immutable declaration shape accepted by
   the root loader; no content catalog, global registry, discovery,
   callbacks, scenarios, or raw-IR product catalog.
@@ -61,13 +69,12 @@ events, or maintain a second gameplay state path.
 - `libs/protocol`: generated Rust host DTOs plus a strict decoder.
 - `libs/transport`, `libs/domain`, `libs/store`: generated-DTO transport,
   pure inspection mapping, and explicit lifecycle state.
-- `libs/components`: generic workbench panels and menus used for artifact and
-  authority-session inspection.
+- `libs/components`: generic workbench panels, menus, and dialogs used by the
+  combat workspace and its secondary inspection tools.
 - `libs/platform`: browser ports, including the JSON HTTP boundary used by the
   same-origin compiler transport.
-- `libs/scenario-viewer`: compiler, exact lock, closure, diagnostics,
-  fingerprint, activation, commands, reactions, checkpoint, replay, and state
-  inspection.
+- `libs/scenario-viewer`: the interactive combat grid/action/reaction loop plus
+  secondary compiler, provenance, diagnostics, checkpoint, and replay tools.
 - `libs/shell`: routes only.
 - `libs/theme`: product tokens.
 
@@ -102,9 +109,11 @@ Rust host and generated protocol. Exhaustive
 cross-repository certification remains downstream, but the old prototype
 expectations have been retired rather than preserved there.
 
-Non-claims: archive persistence across process restarts or artifact activation,
-storage migration, nested reaction windows, upgrade migration policy, and
-exhaustive cross-product certification are not implemented here.
+Non-claims: the fixed hero/raider bootstrap is not general participant setup,
+turn sequencing and board metadata are not yet content-authored, and archive
+persistence across process restarts or artifact activation, storage migration,
+nested reaction windows, upgrade migration policy, and exhaustive
+cross-product certification are not implemented here.
 
 The fresh composition now demonstrates one primary base, two ordered typed
 mixins, a local relational patch, an authorized semantic overlay, and a

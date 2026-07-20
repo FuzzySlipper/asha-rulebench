@@ -2,14 +2,20 @@ use std::env;
 
 use rulebench_ruleset_host::{
     GameplayCommandRequestDto, GameplayReactionRequestDto, PreparedRulesetCompileRequestDto,
-    RulesetDiagnosticDto, RulesetHost, RulesetWorkspaceResponseDto,
+    RulesetDiagnosticDto, RulesetHost, RulesetWorkspaceResponseDto, ScriptedGameplayRandomSource,
 };
 use serde::de::DeserializeOwned;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let options = Options::parse()?;
-    let host = RulesetHost::new();
+    let host = match env::var("RULEBENCH_RANDOM_TAPE") {
+        Ok(source) => RulesetHost::with_random_source(ScriptedGameplayRandomSource::new(
+            parse_random_tape(&source)?,
+        )),
+        Err(env::VarError::NotPresent) => RulesetHost::new(),
+        Err(error) => return Err(error.into()),
+    };
     let server = Server::http(&options.address)?;
     println!("RULESET_HOST_URL=http://{}", options.address);
 
@@ -27,6 +33,24 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         )?;
     }
     Ok(())
+}
+
+fn parse_random_tape(source: &str) -> Result<Vec<u32>, String> {
+    if source.trim().is_empty() {
+        return Err("RULEBENCH_RANDOM_TAPE must contain comma-separated die values".to_owned());
+    }
+    source
+        .split(',')
+        .enumerate()
+        .map(|(index, value)| {
+            value.trim().parse::<u32>().map_err(|error| {
+                format!(
+                    "RULEBENCH_RANDOM_TAPE value {} is invalid: {error}",
+                    index + 1
+                )
+            })
+        })
+        .collect()
 }
 
 fn route(

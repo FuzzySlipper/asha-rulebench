@@ -7,11 +7,13 @@ den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
-`e2e:live` is a compatibility alias for the artifact-only
-`e2e:live-artifacts` group. The current scenario inspects the initially empty
-state, explicit Rust compilation, the closed artifact readout, and atomic
-activation. It does not claim gameplay execution, persistence, replay, or
-downstream certification.
+`e2e:live` is a compatibility alias for the `e2e:live-artifacts` group. The
+current scenario inspects inactive startup and explicit compilation, then plays
+the visible desktop and narrow combat workspace with system-supplied automatic
+rolls, an inline reaction, and exact Rust replay. Artifact and replay evidence
+remain secondary dialogs. It does not claim general encounter setup, authored
+turn/board metadata, process-restart persistence, migration, or downstream
+certification.
 
 Use the printed `local:` URL for Playwright probes. Report the printed `lan:`
 URL for human inspection from another machine.

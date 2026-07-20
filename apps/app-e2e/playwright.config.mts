@@ -14,7 +14,11 @@ const localWebServer = process.env['BASE_URL']
         url: localBaseUrl,
         reuseExistingServer: false,
         cwd: workspaceRoot,
-        env: { ...process.env, RULEBENCH_EPHEMERAL_ARTIFACTS: '1' },
+        env: {
+          ...process.env,
+          RULEBENCH_EPHEMERAL_ARTIFACTS: '1',
+          RULEBENCH_RANDOM_TAPE: '10,3,4,1,2,3,4,1',
+        },
       },
     };
 

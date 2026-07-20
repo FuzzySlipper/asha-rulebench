@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::Mutex,
 };
 
@@ -392,6 +392,17 @@ pub struct GameplayReactionDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct GameplayRandomEvidenceDto {
+    pub kind: String,
+    pub count: u32,
+    pub sides: u32,
+    pub path: String,
+    pub values: Vec<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct GameplayResultDto {
     pub status: String,
     pub code: Option<String>,
@@ -399,6 +410,7 @@ pub struct GameplayResultDto {
     pub events: Vec<GameplayEventDto>,
     pub trace: Vec<GameplayTraceDto>,
     pub random_consumed: String,
+    pub random_evidence: Vec<GameplayRandomEvidenceDto>,
     pub state_revision: u32,
     pub random_request: Option<GameplayRandomRequestDto>,
 }
@@ -505,7 +517,6 @@ pub struct GameplayCommandRequestDto {
     pub action_id: String,
     pub actor_id: String,
     pub target_ids: Vec<String>,
-    pub random_values: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -515,7 +526,139 @@ pub struct GameplayReactionRequestDto {
     pub expected_revision: u32,
     pub reaction_id: String,
     pub option_id: Option<String>,
-    pub additional_random_values: Vec<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GameplayRandomSourceFailure {
+    pub code: String,
+    pub path: String,
+    pub message: String,
+}
+
+pub trait GameplayRandomSource: Send {
+    fn draw(&mut self, request: &RpgRandomRequest)
+        -> Result<Vec<u32>, GameplayRandomSourceFailure>;
+}
+
+#[derive(Debug, Default)]
+pub struct SystemGameplayRandomSource;
+
+impl GameplayRandomSource for SystemGameplayRandomSource {
+    fn draw(
+        &mut self,
+        request: &RpgRandomRequest,
+    ) -> Result<Vec<u32>, GameplayRandomSourceFailure> {
+        if request.sides == 0 {
+            return Err(random_source_failure(
+                "RULESET_RANDOM_REQUEST_SIDES_INVALID",
+                &request.path,
+                "authority requested a die with zero sides",
+            ));
+        }
+        (0..request.count)
+            .map(|_| system_die_value(request.sides, &request.path))
+            .collect()
+    }
+}
+
+#[derive(Debug)]
+pub struct ScriptedGameplayRandomSource {
+    values: VecDeque<u32>,
+}
+
+impl ScriptedGameplayRandomSource {
+    pub fn new(values: impl IntoIterator<Item = u32>) -> Self {
+        Self {
+            values: values.into_iter().collect(),
+        }
+    }
+
+    pub fn remaining(&self) -> usize {
+        self.values.len()
+    }
+}
+
+impl GameplayRandomSource for ScriptedGameplayRandomSource {
+    fn draw(
+        &mut self,
+        request: &RpgRandomRequest,
+    ) -> Result<Vec<u32>, GameplayRandomSourceFailure> {
+        if request.sides == 0 {
+            return Err(random_source_failure(
+                "RULESET_RANDOM_REQUEST_SIDES_INVALID",
+                &request.path,
+                "authority requested a die with zero sides",
+            ));
+        }
+        let count = usize::try_from(request.count).map_err(|_| {
+            random_source_failure(
+                "RULESET_RANDOM_REQUEST_COUNT_INVALID",
+                &request.path,
+                "authority random request count exceeds this host's address space",
+            )
+        })?;
+        if self.values.len() < count {
+            return Err(random_source_failure(
+                "RULESET_RANDOM_TAPE_EXHAUSTED",
+                &request.path,
+                format!(
+                    "authority requested {}d{}, but the configured roll tape has {} value(s) remaining",
+                    request.count,
+                    request.sides,
+                    self.values.len()
+                ),
+            ));
+        }
+        let candidate = self.values.iter().take(count).copied().collect::<Vec<_>>();
+        if let Some((index, value)) = candidate
+            .iter()
+            .enumerate()
+            .find(|(_, value)| **value == 0 || **value > request.sides)
+        {
+            return Err(random_source_failure(
+                "RULESET_RANDOM_TAPE_VALUE_INVALID",
+                &request.path,
+                format!(
+                    "roll tape value {} at request offset {} is outside 1..={} for {}",
+                    value, index, request.sides, request.path
+                ),
+            ));
+        }
+        for _ in 0..count {
+            self.values.pop_front();
+        }
+        Ok(candidate)
+    }
+}
+
+fn system_die_value(sides: u32, path: &str) -> Result<u32, GameplayRandomSourceFailure> {
+    let unbiased_range = u32::MAX - (u32::MAX % sides);
+    loop {
+        let mut bytes = [0_u8; 4];
+        getrandom::fill(&mut bytes).map_err(|error| {
+            random_source_failure(
+                "RULESET_SYSTEM_RANDOM_UNAVAILABLE",
+                path,
+                format!("system random source failed: {error}"),
+            )
+        })?;
+        let value = u32::from_le_bytes(bytes);
+        if value < unbiased_range {
+            return Ok((value % sides) + 1);
+        }
+    }
+}
+
+fn random_source_failure(
+    code: &str,
+    path: &str,
+    message: impl Into<String>,
+) -> GameplayRandomSourceFailure {
+    GameplayRandomSourceFailure {
+        code: code.to_owned(),
+        path: path.to_owned(),
+        message: message.into(),
+    }
 }
 
 #[derive(Debug)]
@@ -608,6 +751,7 @@ impl ActiveRuleset {
 
 pub struct RulesetHost {
     slots: Mutex<ActivationSlots>,
+    random_source: Mutex<Box<dyn GameplayRandomSource>>,
 }
 
 impl Default for RulesetHost {
@@ -618,8 +762,13 @@ impl Default for RulesetHost {
 
 impl RulesetHost {
     pub fn new() -> Self {
+        Self::with_random_source(SystemGameplayRandomSource)
+    }
+
+    pub fn with_random_source(source: impl GameplayRandomSource + 'static) -> Self {
         Self {
             slots: Mutex::new(ActivationSlots::default()),
+            random_source: Mutex::new(Box::new(source)),
         }
     }
 
@@ -694,23 +843,24 @@ impl RulesetHost {
                 )],
             );
         };
-        let recorded = active.session.submit_recorded(RpgAuthorityCommand {
-            expected_revision: u64::from(request.expected_revision),
-            intent: RpgIntent {
+        let mut random_source = self
+            .random_source
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let recorded = submit_with_automatic_random(
+            &mut active.session,
+            RpgIntent {
                 action_id: request.action_id,
                 actor_id: request.actor_id,
                 target_ids: request.target_ids,
             },
-            random_values: request.random_values,
-        });
+            u64::from(request.expected_revision),
+            random_source.as_mut(),
+        );
         let (outcome, entry) = match recorded {
             Ok(recorded) => recorded,
-            Err(failure) => {
-                return response_from_slots(
-                    false,
-                    &slots,
-                    diagnostics_from_replay_failure(failure),
-                );
+            Err(diagnostics) => {
+                return response_from_slots(false, &slots, diagnostics);
             }
         };
         if let Err(failure) = active.store_entry(entry) {
@@ -740,20 +890,21 @@ impl RulesetHost {
                 )],
             );
         };
-        let recorded = active.session.react_recorded(RpgReactionCommand {
-            expected_revision: u64::from(request.expected_revision),
-            reaction_id: request.reaction_id,
-            option_id: request.option_id,
-            additional_random_values: request.additional_random_values,
-        });
+        let mut random_source = self
+            .random_source
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let recorded = react_with_automatic_random(
+            &mut active.session,
+            request.reaction_id,
+            request.option_id,
+            u64::from(request.expected_revision),
+            random_source.as_mut(),
+        );
         let (outcome, entry) = match recorded {
             Ok(recorded) => recorded,
-            Err(failure) => {
-                return response_from_slots(
-                    false,
-                    &slots,
-                    diagnostics_from_replay_failure(failure),
-                );
+            Err(diagnostics) => {
+                return response_from_slots(false, &slots, diagnostics);
             }
         };
         if let Err(failure) = active.store_entry(entry) {
@@ -847,6 +998,134 @@ impl RulesetHost {
             }
         }
     }
+}
+
+const MAXIMUM_AUTOMATIC_RANDOM_REQUESTS: usize = 64;
+const MAXIMUM_AUTOMATIC_RANDOM_VALUES: usize = 4_096;
+
+fn submit_with_automatic_random(
+    session: &mut RpgAuthoritySession,
+    intent: RpgIntent,
+    expected_revision: u64,
+    random_source: &mut dyn GameplayRandomSource,
+) -> Result<(RpgCommandOutcome, RpgReplayEntry), Vec<RulesetDiagnosticDto>> {
+    let checkpoint = session
+        .checkpoint()
+        .map_err(diagnostics_from_replay_failure)?;
+    let mut random_values = Vec::new();
+    for _ in 0..MAXIMUM_AUTOMATIC_RANDOM_REQUESTS {
+        let mut probe = RpgAuthoritySession::restore_checkpoint(checkpoint.clone())
+            .map_err(diagnostics_from_replay_failure)?;
+        let command = RpgAuthorityCommand {
+            expected_revision,
+            intent: intent.clone(),
+            random_values: random_values.clone(),
+        };
+        let outcome = probe.submit(command.clone());
+        let Some(request) = required_random_request(&outcome) else {
+            return session
+                .submit_recorded(command)
+                .map_err(diagnostics_from_replay_failure);
+        };
+        extend_automatic_random_values(&mut random_values, request, random_source)?;
+    }
+    Err(vec![host_diagnostic(
+        "RULESET_RANDOM_REQUEST_LIMIT_EXCEEDED",
+        "$.randomRequest",
+        "authority did not reach a terminal result within the automatic roll request limit",
+    )])
+}
+
+fn react_with_automatic_random(
+    session: &mut RpgAuthoritySession,
+    reaction_id: String,
+    option_id: Option<String>,
+    expected_revision: u64,
+    random_source: &mut dyn GameplayRandomSource,
+) -> Result<(RpgCommandOutcome, RpgReplayEntry), Vec<RulesetDiagnosticDto>> {
+    let checkpoint = session
+        .checkpoint()
+        .map_err(diagnostics_from_replay_failure)?;
+    let mut additional_random_values = Vec::new();
+    for _ in 0..MAXIMUM_AUTOMATIC_RANDOM_REQUESTS {
+        let mut probe = RpgAuthoritySession::restore_checkpoint(checkpoint.clone())
+            .map_err(diagnostics_from_replay_failure)?;
+        let command = RpgReactionCommand {
+            expected_revision,
+            reaction_id: reaction_id.clone(),
+            option_id: option_id.clone(),
+            additional_random_values: additional_random_values.clone(),
+        };
+        let outcome = probe.react(command.clone());
+        let Some(request) = required_random_request(&outcome) else {
+            return session
+                .react_recorded(command)
+                .map_err(diagnostics_from_replay_failure);
+        };
+        extend_automatic_random_values(&mut additional_random_values, request, random_source)?;
+    }
+    Err(vec![host_diagnostic(
+        "RULESET_RANDOM_REQUEST_LIMIT_EXCEEDED",
+        "$.randomRequest",
+        "authority did not reach a terminal result within the automatic roll request limit",
+    )])
+}
+
+fn required_random_request(outcome: &RpgCommandOutcome) -> Option<&RpgRandomRequest> {
+    let RpgCommandOutcome::Rejected(rejection) = outcome else {
+        return None;
+    };
+    rejection.random_request.as_deref()
+}
+
+fn extend_automatic_random_values(
+    random_values: &mut Vec<u32>,
+    request: &RpgRandomRequest,
+    random_source: &mut dyn GameplayRandomSource,
+) -> Result<(), Vec<RulesetDiagnosticDto>> {
+    if request.count == 0 {
+        return Err(vec![host_diagnostic(
+            "RULESET_RANDOM_REQUEST_COUNT_INVALID",
+            &request.path,
+            "authority requested zero random values",
+        )]);
+    }
+    let requested_count = usize::try_from(request.count).map_err(|_| {
+        vec![host_diagnostic(
+            "RULESET_RANDOM_REQUEST_COUNT_INVALID",
+            &request.path,
+            "authority random request count exceeds this host's address space",
+        )]
+    })?;
+    if random_values.len().saturating_add(requested_count) > MAXIMUM_AUTOMATIC_RANDOM_VALUES {
+        return Err(vec![host_diagnostic(
+            "RULESET_RANDOM_VALUE_LIMIT_EXCEEDED",
+            &request.path,
+            "authority requested more automatic roll values than the host safety limit",
+        )]);
+    }
+    let values = random_source
+        .draw(request)
+        .map_err(|failure| vec![random_source_diagnostic(failure)])?;
+    if values.len() != requested_count {
+        return Err(vec![host_diagnostic(
+            "RULESET_RANDOM_SOURCE_COUNT_MISMATCH",
+            &request.path,
+            "random source returned a different number of values than authority requested",
+        )]);
+    }
+    if values
+        .iter()
+        .any(|value| *value == 0 || *value > request.sides)
+    {
+        return Err(vec![host_diagnostic(
+            "RULESET_RANDOM_SOURCE_VALUE_INVALID",
+            &request.path,
+            "random source returned a value outside the authority die bounds",
+        )]);
+    }
+    random_values.extend(values);
+    Ok(())
 }
 
 fn close_portable_artifact(
@@ -1304,7 +1583,7 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
             receipt
                 .random_evidence
                 .iter()
-                .map(gameplay_random_evidence)
+                .map(gameplay_random_evidence_label)
                 .collect(),
             receipt
                 .events
@@ -1316,7 +1595,7 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
             pending
                 .random_evidence
                 .iter()
-                .map(gameplay_random_evidence)
+                .map(gameplay_random_evidence_label)
                 .collect(),
             Vec::new(),
         ),
@@ -1324,7 +1603,7 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
             rejection
                 .random_evidence
                 .iter()
-                .map(gameplay_random_evidence)
+                .map(gameplay_random_evidence_label)
                 .collect(),
             Vec::new(),
         ),
@@ -1393,7 +1672,7 @@ fn replay_phase_label(phase: &RpgReplayPhase) -> String {
     }
 }
 
-fn gameplay_random_evidence(evidence: &RpgRandomEvidence) -> String {
+fn gameplay_random_evidence_label(evidence: &RpgRandomEvidence) -> String {
     format!(
         "{} {}d{} at {} = {}",
         gameplay_random_request(&evidence.request).kind,
@@ -1527,6 +1806,11 @@ fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> Gamepl
             events: Vec::new(),
             trace: pending.trace.iter().map(gameplay_trace).collect(),
             random_consumed: pending.random_attempted.to_string(),
+            random_evidence: pending
+                .random_evidence
+                .iter()
+                .map(gameplay_random_evidence)
+                .collect(),
             state_revision: dto_revision(current_revision),
             random_request: None,
         },
@@ -1545,6 +1829,11 @@ fn accepted_result(receipt: &RpgResolutionReceipt) -> GameplayResultDto {
         events: receipt.events.iter().map(gameplay_event).collect(),
         trace: receipt.trace.iter().map(gameplay_trace).collect(),
         random_consumed: receipt.random_consumed.to_string(),
+        random_evidence: receipt
+            .random_evidence
+            .iter()
+            .map(gameplay_random_evidence)
+            .collect(),
         state_revision: dto_revision(receipt.state_revision),
         random_request: None,
     }
@@ -1558,6 +1847,11 @@ fn rejected_result(rejection: &RpgResolutionRejection, current_revision: u64) ->
         events: Vec::new(),
         trace: rejection.trace.iter().map(gameplay_trace).collect(),
         random_consumed: rejection.random_attempted.to_string(),
+        random_evidence: rejection
+            .random_evidence
+            .iter()
+            .map(gameplay_random_evidence)
+            .collect(),
         state_revision: dto_revision(current_revision),
         random_request: rejection
             .random_request
@@ -1581,6 +1875,21 @@ fn gameplay_random_request(request: &RpgRandomRequest) -> GameplayRandomRequestD
         count: request.count,
         sides: request.sides,
         path: request.path.clone(),
+    }
+}
+
+fn gameplay_random_evidence(evidence: &RpgRandomEvidence) -> GameplayRandomEvidenceDto {
+    GameplayRandomEvidenceDto {
+        kind: match evidence.request.kind {
+            RpgRandomRequestKind::AttackCheck => "attackCheck",
+            RpgRandomRequestKind::SavingThrowCheck => "savingThrowCheck",
+            RpgRandomRequestKind::FormulaDice => "formulaDice",
+        }
+        .to_owned(),
+        count: evidence.request.count,
+        sides: evidence.request.sides,
+        path: evidence.request.path.clone(),
+        values: evidence.values.clone(),
     }
 }
 
@@ -1768,6 +2077,10 @@ fn host_diagnostic(code: &str, path: &str, message: &str) -> RulesetDiagnosticDt
         expected: None,
         actual: None,
     }
+}
+
+fn random_source_diagnostic(failure: GameplayRandomSourceFailure) -> RulesetDiagnosticDto {
+    host_diagnostic(&failure.code, &failure.path, &failure.message)
 }
 
 fn diagnostics_from_replay_failure(failure: RpgReplayFailure) -> Vec<RulesetDiagnosticDto> {
@@ -2095,6 +2408,7 @@ pub fn generated_protocol() -> String {
         GameplayTraceDto::decl(),
         GameplayReactionOptionDto::decl(),
         GameplayReactionDto::decl(),
+        GameplayRandomEvidenceDto::decl(),
         GameplayResultDto::decl(),
         GameplayReplayBoundaryDto::decl(),
         GameplayReplayEntryDto::decl(),
@@ -2118,7 +2432,21 @@ pub fn generated_protocol() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{initial_gameplay_state, RulesetHost, RulesetLifecycleStatus};
+    use rpg_core::{RpgRandomRequest, RpgRandomRequestKind};
+
+    use super::{
+        initial_gameplay_state, GameplayRandomSource, RulesetHost, RulesetLifecycleStatus,
+        ScriptedGameplayRandomSource, SystemGameplayRandomSource,
+    };
+
+    fn random_request(count: u32, sides: u32) -> RpgRandomRequest {
+        RpgRandomRequest {
+            kind: RpgRandomRequestKind::FormulaDice,
+            count,
+            sides,
+            path: "$.test".to_owned(),
+        }
+    }
 
     #[test]
     fn initial_gameplay_state_is_explicit_and_inactive_until_artifact_activation() {
@@ -2156,5 +2484,35 @@ mod tests {
         assert!(!activation.ok);
         assert_eq!(activation.status, RulesetLifecycleStatus::NoActiveRuleset);
         assert_eq!(activation.activation_revision, 0);
+    }
+
+    #[test]
+    fn scripted_random_source_consumes_only_an_accepted_exact_request() {
+        let mut source = ScriptedGameplayRandomSource::new([2, 6, 4]);
+
+        assert_eq!(source.draw(&random_request(2, 6)).unwrap(), vec![2, 6]);
+        assert_eq!(source.remaining(), 1);
+
+        let failure = source.draw(&random_request(2, 6)).unwrap_err();
+        assert_eq!(failure.code, "RULESET_RANDOM_TAPE_EXHAUSTED");
+        assert_eq!(source.remaining(), 1);
+    }
+
+    #[test]
+    fn scripted_random_source_rejects_an_out_of_range_value_without_consuming_it() {
+        let mut source = ScriptedGameplayRandomSource::new([7, 3]);
+
+        let failure = source.draw(&random_request(1, 6)).unwrap_err();
+        assert_eq!(failure.code, "RULESET_RANDOM_TAPE_VALUE_INVALID");
+        assert_eq!(source.remaining(), 2);
+    }
+
+    #[test]
+    fn system_random_source_stays_inside_authority_die_bounds() {
+        let mut source = SystemGameplayRandomSource;
+
+        let values = source.draw(&random_request(128, 20)).unwrap();
+        assert_eq!(values.len(), 128);
+        assert!(values.iter().all(|value| (1..=20).contains(value)));
     }
 }
