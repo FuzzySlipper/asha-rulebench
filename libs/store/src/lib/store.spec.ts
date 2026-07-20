@@ -42,6 +42,7 @@ describe('ruleset workspace store', () => {
 
   it('classifies transport failures without discarding the previous view', async () => {
     const transport: RulesetTransport = {
+      configuredRulesets: async () => [],
       status: async () => emptyResponse(),
       compile: async () => {
         throw new Error('host offline');
@@ -72,6 +73,7 @@ describe('ruleset workspace store', () => {
     };
     let compileRequests = 0;
     const transport: RulesetTransport = {
+      configuredRulesets: async () => [],
       status: async () => active,
       compile: async () => {
         compileRequests += 1;
@@ -153,12 +155,58 @@ describe('ruleset workspace store', () => {
     expect(store.rulesetRoot()).toBe('examples/rulesets/invalid-build');
     expect(store.recentRulesetRoots()).toEqual([]);
   });
+
+  it('loads configured source locations without selecting startup content', async () => {
+    const transport: RulesetTransport = {
+      ...transportReturning(emptyResponse()),
+      configuredRulesets: async () => [
+        {
+          id: 'field-manual',
+          label: 'Field Manual',
+          rulesetRoot: 'examples/rulesets/field-manual',
+        },
+      ],
+    };
+    const store = new RulesetWorkspaceStore(transport, memoryStorage());
+
+    await store.refreshConfiguredRulesets();
+
+    expect(store.configuredRulesets()).toEqual([
+      {
+        id: 'field-manual',
+        label: 'Field Manual',
+        rulesetRoot: 'examples/rulesets/field-manual',
+      },
+    ]);
+    expect(store.rulesetRoot()).toBe('');
+    expect(store.rulesetConfigurationError()).toBeNull();
+  });
+
+  it('keeps a configuration failure separate from host workspace state', async () => {
+    const transport: RulesetTransport = {
+      ...transportReturning(emptyResponse()),
+      configuredRulesets: async () => {
+        throw new Error('invalid local ruleset config');
+      },
+    };
+    const store = new RulesetWorkspaceStore(transport, memoryStorage());
+    await store.refresh();
+
+    await store.refreshConfiguredRulesets();
+
+    expect(store.view()?.headline).toBe('No compiled ruleset active');
+    expect(store.configuredRulesets()).toEqual([]);
+    expect(store.rulesetConfigurationError()).toBe(
+      'invalid local ruleset config',
+    );
+  });
 });
 
 function transportReturning(
   response: RulesetWorkspaceResponseDto,
 ): RulesetTransport {
   return {
+    configuredRulesets: async () => [],
     status: async () => response,
     compile: async () => response,
     activate: async () => response,

@@ -13,7 +13,7 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   ).toContainText('No active encounter');
 
   const rulesetDialog = await openRulesetDialog(page, workspace);
-  await selectRulesetRoot(rulesetDialog, 'examples/rulesets/field-manual');
+  await selectConfiguredRuleset(rulesetDialog, 'Field Manual');
   await rulesetDialog
     .getByRole('button', { name: 'Load ruleset candidate' })
     .click();
@@ -125,7 +125,10 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await replayDialog.getByRole('button', { name: 'Close' }).click();
 
   const nextRulesetDialog = await openRulesetDialog(page, workspace);
-  await selectRulesetRoot(nextRulesetDialog, 'examples/rulesets/invalid-build');
+  await selectCustomRulesetRoot(
+    nextRulesetDialog,
+    'examples/rulesets/invalid-build',
+  );
   await nextRulesetDialog
     .getByRole('button', { name: 'Load ruleset candidate' })
     .click();
@@ -136,6 +139,32 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(nextRulesetDialog).toContainText('active');
   await nextRulesetDialog.getByRole('button', { name: 'Close' }).click();
   await expect(turnStatus).toContainText('Authority revision 3');
+
+  const exhaustedTapeDialog = await openRulesetDialog(page, workspace);
+  await selectConfiguredRuleset(exhaustedTapeDialog, 'Field Manual');
+  await exhaustedTapeDialog
+    .getByRole('button', { name: 'Load ruleset candidate' })
+    .click();
+  await expect(exhaustedTapeDialog).toContainText('Rust validation accepted');
+  await exhaustedTapeDialog
+    .getByRole('button', { name: 'Activate accepted artifact' })
+    .click();
+  await expect(exhaustedTapeDialog).toBeHidden();
+  await expect(turnStatus).toContainText('Authority revision 0');
+
+  await chooseAction(
+    actionPalette,
+    'Arc Lash',
+    'rulebench.arc-lash-stormfront',
+  );
+  await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
+  const gameplayFailure = combatLog.getByRole('alert');
+  await expect(gameplayFailure).toContainText(
+    'Gameplay request could not be completed',
+  );
+  await expect(gameplayFailure).toContainText('RULESET_RANDOM_TAPE_EXHAUSTED');
+  await expect(combatLog).toBeFocused();
+  await expect(turnStatus).toContainText('Authority revision 0');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(workspace).toBeVisible();
@@ -155,7 +184,7 @@ async function openRulesetDialog(
   const dialog = page.getByRole('dialog', { name: 'Ruleset setup' });
   await expect(dialog).toBeVisible();
   await expect(
-    dialog.getByRole('textbox', { name: 'Ruleset root' }),
+    dialog.getByRole('combobox', { name: 'Configured ruleset' }),
   ).toBeVisible();
   return dialog;
 }
@@ -211,9 +240,20 @@ async function chooseAction(
   ).toBeVisible();
 }
 
-async function selectRulesetRoot(
+async function selectConfiguredRuleset(
+  dialog: Locator,
+  label: string,
+): Promise<void> {
+  await dialog
+    .getByRole('combobox', { name: 'Configured ruleset' })
+    .selectOption({ label });
+}
+
+async function selectCustomRulesetRoot(
   dialog: Locator,
   rulesetRoot: string,
 ): Promise<void> {
-  await dialog.getByRole('textbox', { name: 'Ruleset root' }).fill(rulesetRoot);
+  await dialog
+    .getByRole('textbox', { name: 'Custom ruleset root' })
+    .fill(rulesetRoot);
 }

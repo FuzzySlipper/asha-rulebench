@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "rulesets": [
+    {
+      "id": "field-manual",
+      "label": "Field Manual",
+      "rulesetRoot": "examples/rulesets/field-manual"
+    },
+    {
+      "id": "field-manual-next",
+      "label": "Field Manual 1.1",
+      "rulesetRoot": "examples/rulesets/field-manual-next"
+    },
+    {
+      "id": "ember-skirmish",
+      "label": "Ember Skirmish",
+      "rulesetRoot": "examples/rulesets/ember-skirmish"
+    }
+  ]
+}

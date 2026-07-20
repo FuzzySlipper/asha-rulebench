@@ -13,8 +13,12 @@ boundary from #5952:
   atomically activated, and exercised through Asha RPG authority without
   introducing TypeScript gameplay authority.
 
-Content enters only through the canonical ruleset-root compiler boundary. Each
-compile click sends one `rulesetRoot` through a generated request DTO. The root
+Content enters only through the canonical ruleset-root compiler boundary. A
+machine-local `.rulebench/rulesets.json` may give source locations friendly
+dropdown labels, while a custom absolute-path input remains available for any
+independent checkout. The configuration cannot select a startup default or
+activate content. Each compile click sends one `rulesetRoot` through a
+generated request DTO. The root
 must be a direct child of `rulesets/`; Rulebench infers `ruleset.ts#ruleset` and
 permits only that root plus its repository's conventional `foundations/`. A loopback
 trusted-authoring gateway launches a fresh constrained TypeScript build for

@@ -5,7 +5,13 @@ import { createServer as createNetServer } from 'node:net';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { loadRulesetLocationConfig } from './ruleset-location-config.mjs';
+
 const root = process.cwd();
+const rulesetLocationConfig = await loadRulesetLocationConfig(
+  root,
+  process.env['RULEBENCH_RULESET_CONFIG'] ?? '.rulebench/rulesets.json',
+);
 const forwardedArguments = process.argv.slice(2);
 if (forwardedArguments[0] === '--') forwardedArguments.shift();
 
@@ -139,6 +145,10 @@ function startAuthoringGateway(
 ) {
   const server = createHttpServer(async (request, response) => {
     try {
+      if (request.method === 'GET' && request.url === '/api/ruleset/config') {
+        sendJson(response, 200, rulesetLocationConfig);
+        return;
+      }
       if (request.method === 'POST' && request.url === '/api/ruleset/compile') {
         const body = await readJsonBody(request);
         const preparation = await prepareWorkspace(

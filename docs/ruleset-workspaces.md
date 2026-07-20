@@ -88,13 +88,39 @@ session, checkpoint, or replay archive.
 
 ## Loading and switching
 
-Rulebench starts with no root selected. **Ruleset → Load ruleset root…** focuses
-the single root input. A successful compile adds that explicit path to the
-recent-root section of the same menu. Choosing a recent root selects and
-compiles it as a new candidate; activation remains a separate user action.
+Rulebench starts with no root selected. **Ruleset → Load or switch ruleset…**
+opens a friendly configured-ruleset selector plus a custom-root input. Selecting
+a configured entry fills the exact root location; loading the candidate and
+activating it remain separate user actions. A successful compile also adds that
+explicit path to the recent-root section of the same menu. Choosing a recent
+root selects and compiles it as a new candidate; activation remains explicit.
 Invalid roots are not added to the recent list, and failed recompilation leaves
-the active artifact and session intact. Recent paths are local presentation
-state, not a gameplay catalog or startup default.
+the active artifact and session intact.
+
+The trusted local server reads `.rulebench/rulesets.json` by default. That file
+is ignored by git so machine-specific absolute paths do not leak into product
+source. Copy `.rulebench/rulesets.example.json` to start with the repository
+examples, then add independent checkouts by friendly label:
+
+```json
+{
+  "schemaVersion": 1,
+  "rulesets": [
+    {
+      "id": "my-rules",
+      "label": "My independent rules",
+      "rulesetRoot": "/home/dev/my-rules/rulesets/main"
+    }
+  ]
+}
+```
+
+Set `RULEBENCH_RULESET_CONFIG` to use a different configuration file. The list
+is read when the local server starts, and invalid shapes fail startup instead
+of silently dropping entries. It only names source locations for the human
+selector: it cannot select a startup default, activate content, contribute to
+artifact identity, or authorize imports. Recent paths and configured paths are
+local presentation state, not a gameplay or package catalog.
 
 The directories under `examples/rulesets` and `examples/foundations` use this
 same downstream-repository shape. They have no privileged loader path. Field

@@ -18,6 +18,7 @@ const localWebServer = process.env['BASE_URL']
           ...process.env,
           RULEBENCH_EPHEMERAL_ARTIFACTS: '1',
           RULEBENCH_RANDOM_TAPE: '10,3,4,1,2,3,4,1',
+          RULEBENCH_RULESET_CONFIG: '.rulebench/rulesets.example.json',
         },
       },
     };

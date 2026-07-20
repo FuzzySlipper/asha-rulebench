@@ -13,11 +13,15 @@ describe('ruleset transport', () => {
     const http: JsonHttpClient = {
       request: async (method, path, body) => {
         requests.push({ method, path, body });
+        if (path === '/api/ruleset/config') {
+          return { schemaVersion: 1, rulesets: [] };
+        }
         return emptyResponse();
       },
     };
 
     const transport = createRulesetTransport(http);
+    await transport.configuredRulesets();
     await transport.compile({
       rulesetRoot: 'examples/rulesets/field-manual',
     });
@@ -36,6 +40,11 @@ describe('ruleset transport', () => {
     await transport.replay();
 
     expect(requests).toEqual([
+      {
+        method: 'GET',
+        path: '/api/ruleset/config',
+        body: undefined,
+      },
       {
         method: 'POST',
         path: '/api/ruleset/compile',
@@ -73,6 +82,45 @@ describe('ruleset transport', () => {
         body: undefined,
       },
     ]);
+  });
+
+  it('strictly decodes configured source locations', async () => {
+    const http: JsonHttpClient = {
+      request: async () => ({
+        schemaVersion: 1,
+        rulesets: [
+          {
+            id: 'field-manual',
+            label: 'Field Manual',
+            rulesetRoot: 'examples/rulesets/field-manual',
+          },
+        ],
+      }),
+    };
+
+    await expect(
+      createRulesetTransport(http).configuredRulesets(),
+    ).resolves.toEqual([
+      {
+        id: 'field-manual',
+        label: 'Field Manual',
+        rulesetRoot: 'examples/rulesets/field-manual',
+      },
+    ]);
+  });
+
+  it('rejects an extended ruleset location response', async () => {
+    const http: JsonHttpClient = {
+      request: async () => ({
+        schemaVersion: 1,
+        rulesets: [],
+        defaultRuleset: 'field-manual',
+      }),
+    };
+
+    await expect(
+      createRulesetTransport(http).configuredRulesets(),
+    ).rejects.toThrow('unexpected defaultRuleset');
   });
 });
 

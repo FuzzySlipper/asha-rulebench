@@ -135,7 +135,8 @@ interface BoardCell {
       }
 
       button,
-      input {
+      input,
+      select {
         font: inherit;
       }
 
@@ -162,7 +163,8 @@ interface BoardCell {
       }
 
       button:focus-visible,
-      input:focus-visible {
+      input:focus-visible,
+      select:focus-visible {
         outline: 3px solid var(--arb-accent-strong);
         outline-offset: 2px;
       }
@@ -337,7 +339,8 @@ interface BoardCell {
         padding-top: 0.6rem;
       }
 
-      .ruleset-input {
+      .ruleset-input,
+      .ruleset-select {
         background: var(--arb-bg);
         border: 1px solid var(--arb-border);
         color: var(--arb-foreground);
@@ -714,6 +717,24 @@ interface BoardCell {
             panelTitle="Combat log"
           >
             <div class="panel-body" aria-live="polite" aria-atomic="false">
+              @if (interactionDiagnostics().length > 0) {
+                <div
+                  class="diagnostic"
+                  role="alert"
+                  aria-live="assertive"
+                  aria-atomic="true"
+                >
+                  <strong>Gameplay request could not be completed</strong>
+                  @for (
+                    diagnostic of interactionDiagnostics();
+                    track diagnostic.code + ':' + diagnostic.path
+                  ) {
+                    <span>
+                      {{ diagnostic.code }} · {{ diagnostic.message }}
+                    </span>
+                  }
+                </div>
+              }
               @if (view.gameplay?.result; as result) {
                 <div tabindex="-1">
                   <p class="section-label">{{ result.status }}</p>
@@ -772,14 +793,43 @@ interface BoardCell {
     <arb-application-dialog
       dialogId="ruleset-dialog"
       dialogTitle="Ruleset setup"
-      dialogDescription="Load an explicit ruleset root, inspect diagnostics, and activate an accepted artifact."
+      dialogDescription="Choose a configured ruleset or custom root, inspect diagnostics, and activate an accepted artifact."
       [open]="openDialogName() === 'ruleset'"
       (closeRequested)="closeDialog()"
     >
       <div class="dialog-body">
         @if (store.view(); as view) {
           <p class="section-label">{{ view.statusLabel }}</p>
-          <label for="ruleset-root" class="section-label">Ruleset root</label>
+          <label for="configured-ruleset" class="section-label"
+            >Configured ruleset</label
+          >
+          <select
+            #configuredRulesetSelect
+            id="configured-ruleset"
+            class="ruleset-select"
+            [disabled]="store.busy()"
+            [value]="configuredRulesetId()"
+            (change)="selectConfiguredRuleset(configuredRulesetSelect.value)"
+          >
+            <option value="">Choose a configured ruleset</option>
+            @for (location of store.configuredRulesets(); track location.id) {
+              <option [value]="location.id">{{ location.label }}</option>
+            }
+          </select>
+          @if (store.rulesetConfigurationError(); as configurationError) {
+            <div class="diagnostic" role="alert">
+              <strong>Local ruleset configuration could not be loaded</strong>
+              <span>{{ configurationError }}</span>
+            </div>
+          } @else if (store.configuredRulesets().length === 0) {
+            <p class="muted">
+              No local rulesets are configured. Custom roots remain available
+              below.
+            </p>
+          }
+          <label for="ruleset-root" class="section-label"
+            >Custom ruleset root</label
+          >
           <input
             #rulesetRootInput
             id="ruleset-root"
@@ -1071,6 +1121,25 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     () => this.store.rulesetRoot().trim().length > 0,
   );
 
+  protected readonly configuredRulesetId = computed(() => {
+    const selectedRoot = this.store.rulesetRoot();
+    return (
+      this.store
+        .configuredRulesets()
+        .find((location) => location.rulesetRoot === selectedRoot)?.id ?? ''
+    );
+  });
+
+  protected readonly interactionDiagnostics = computed(() => {
+    if (this.store.busy()) return [];
+    const view = this.store.view();
+    if (view?.gameplay === null || view?.gameplay === undefined) return [];
+    return view.diagnostics.filter(
+      (diagnostic) =>
+        diagnostic.stage === 'gameplay' || diagnostic.stage === 'replay',
+    );
+  });
+
   protected readonly menuGroups = computed<readonly ApplicationMenuGroup[]>(
     () => [
       {
@@ -1133,10 +1202,16 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         panel.focus();
       }
     });
+    effect(() => {
+      const diagnostics = this.interactionDiagnostics();
+      const panel = this.outcomePanel();
+      if (diagnostics.length > 0 && panel !== undefined) panel.focus();
+    });
   }
 
   public ngOnInit(): void {
     void this.store.refresh();
+    void this.store.refreshConfiguredRulesets();
   }
 
   protected handleMenuItem(item: ApplicationMenuItem): void {
@@ -1176,6 +1251,13 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected compileRuleset(): void {
     const rulesetRoot = this.store.rulesetRoot().trim();
     void this.store.compile({ rulesetRoot });
+  }
+
+  protected selectConfiguredRuleset(locationId: string): void {
+    const location = this.store
+      .configuredRulesets()
+      .find((candidate) => candidate.id === locationId);
+    this.store.selectRulesetRoot(location?.rulesetRoot ?? '');
   }
 
   protected activateRuleset(): void {

@@ -23,9 +23,22 @@ liveScenario(
     });
 
     const rulesetDialog = await openRulesetDialog(page, workspace);
+    await expect(
+      rulesetDialog.getByRole('option', {
+        name: 'Field Manual',
+        exact: true,
+      }),
+    ).toBeAttached();
+    await collector.milestone(
+      'configured rulesets are selectable without typing paths',
+      {
+        screenshot: true,
+        layerSnapshot: { rulesetSetup: await rulesetDialog.innerText() },
+      },
+    );
     await rulesetDialog
-      .getByRole('textbox', { name: 'Ruleset root' })
-      .fill('examples/rulesets/field-manual');
+      .getByRole('combobox', { name: 'Configured ruleset' })
+      .selectOption({ label: 'Field Manual' });
     await rulesetDialog
       .getByRole('button', { name: 'Load ruleset candidate' })
       .click();

@@ -16,6 +16,7 @@ import type {
 } from '@asha-rulebench/protocol';
 import {
   createRulesetTransport,
+  type ConfiguredRulesetLocation,
   type RulesetTransport,
 } from '@asha-rulebench/transport';
 
@@ -38,12 +39,22 @@ export class RulesetWorkspaceStore {
   });
   private readonly mutableRulesetRoot = signal('');
   private readonly mutableRecentRulesetRoots = signal<readonly string[]>([]);
+  private readonly mutableConfiguredRulesets = signal<
+    readonly ConfiguredRulesetLocation[]
+  >([]);
+  private readonly mutableRulesetConfigurationError = signal<string | null>(
+    null,
+  );
   public readonly state = this.mutableState.asReadonly();
   public readonly view = computed(() => currentView(this.mutableState()));
   public readonly busy = computed(() => this.mutableState().kind === 'loading');
   public readonly rulesetRoot = this.mutableRulesetRoot.asReadonly();
   public readonly recentRulesetRoots =
     this.mutableRecentRulesetRoots.asReadonly();
+  public readonly configuredRulesets =
+    this.mutableConfiguredRulesets.asReadonly();
+  public readonly rulesetConfigurationError =
+    this.mutableRulesetConfigurationError.asReadonly();
 
   public constructor(
     private readonly transport: RulesetTransport,
@@ -54,6 +65,21 @@ export class RulesetWorkspaceStore {
 
   public async refresh(): Promise<void> {
     await this.run(() => this.transport.status());
+  }
+
+  public async refreshConfiguredRulesets(): Promise<void> {
+    try {
+      const configuredRulesets = await this.transport.configuredRulesets();
+      this.mutableConfiguredRulesets.set(configuredRulesets);
+      this.mutableRulesetConfigurationError.set(null);
+    } catch (error: unknown) {
+      this.mutableConfiguredRulesets.set([]);
+      this.mutableRulesetConfigurationError.set(
+        error instanceof Error
+          ? error.message
+          : 'Unknown ruleset configuration failure',
+      );
+    }
   }
 
   public async compile(request: RulesetCompileRequestDto): Promise<void> {
