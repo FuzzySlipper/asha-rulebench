@@ -1642,14 +1642,46 @@ class SetupDiagnosticsComponent {
               <div class="button-row" aria-label="Add participant capability">
                 @for (owner of participantCapabilityOwners; track owner) {
                   <button
+                    #setupControl
                     class="secondary"
                     type="button"
+                    [attr.data-setup-path]="
+                      owner === 'vitality'
+                        ? participantPath(participantIndex, 'capabilities')
+                        : null
+                    "
+                    [attr.aria-invalid]="
+                      owner === 'vitality'
+                        ? setupHasExactError(
+                            participantPath(participantIndex, 'capabilities')
+                          )
+                        : null
+                    "
+                    [attr.aria-describedby]="
+                      owner === 'vitality'
+                        ? setupExactDescribedBy(
+                            participantPath(participantIndex, 'capabilities')
+                          )
+                        : null
+                    "
                     (click)="addParticipantCapability(participantIndex, owner)"
                   >
                     Add {{ owner }}
                   </button>
                 }
               </div>
+              <arb-setup-diagnostics
+                [diagnostics]="
+                  setupExactDiagnosticsFor(
+                    participantPath(participantIndex, 'capabilities')
+                  )
+                "
+                [messageId]="
+                  setupDiagnosticId(
+                    participantPath(participantIndex, 'capabilities')
+                  )
+                "
+              />
               @for (
                 capability of participant.capabilities;
                 track $index;
@@ -3885,7 +3917,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   private focusFirstSetupDiagnostic(): void {
     const diagnostic = this.setupDiagnostics()[0];
     if (diagnostic === undefined) return;
-    const candidates = this.setupControls()
+    const candidate = this.setupControls()
       .map((control) => control.nativeElement)
       .map((control) => {
         const path = control.dataset['setupPath'];
@@ -3907,13 +3939,20 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
           readonly specificity: number;
         } => candidate.path !== undefined && candidate.specificity !== null,
       )
-      .sort((left, right) => {
-        if (left.specificity !== right.specificity) {
-          return left.specificity - right.specificity;
+      .reduce<
+        | {
+            readonly control: HTMLElement;
+            readonly path: string;
+            readonly specificity: number;
+          }
+        | undefined
+      >((best, current) => {
+        if (best === undefined || current.specificity < best.specificity) {
+          return current;
         }
-        return right.path.length - left.path.length;
-      });
-    candidates[0]?.control.focus();
+        return best;
+      }, undefined);
+    candidate?.control.focus();
   }
 
   private updateParticipant(
@@ -4198,18 +4237,35 @@ function setupPathMatchSpecificity(
 ): number | null {
   if (diagnosticPath === controlPath) return 0;
   if (
-    controlPath.startsWith(`${diagnosticPath}.`) ||
-    controlPath.startsWith(`${diagnosticPath}[`)
-  ) {
-    return 1;
-  }
-  if (
     diagnosticPath.startsWith(`${controlPath}.`) ||
     diagnosticPath.startsWith(`${controlPath}[`)
   ) {
     return 2;
   }
+  if (isExplicitSetupParentRoute(diagnosticPath, controlPath)) return 1;
   return null;
+}
+
+function isExplicitSetupParentRoute(
+  diagnosticPath: string,
+  controlPath: string,
+): boolean {
+  if (diagnosticPath === '$.board') {
+    return controlPath === '$.board.width' || controlPath === '$.board.height';
+  }
+  if (diagnosticPath === '$.turn') {
+    return controlPath === '$.turn.round' || controlPath === '$.turn.turn';
+  }
+  if (diagnosticPath.endsWith('.position')) {
+    return (
+      controlPath === `${diagnosticPath}.x` ||
+      controlPath === `${diagnosticPath}.y`
+    );
+  }
+  if (/\.capabilities\[\d+\]$/.test(diagnosticPath)) {
+    return controlPath.startsWith(`${diagnosticPath}.`);
+  }
+  return false;
 }
 
 function errorMessage(error: unknown): string {

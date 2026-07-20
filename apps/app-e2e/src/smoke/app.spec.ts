@@ -286,6 +286,27 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expectUniqueSetupErrorIds(encounterDialog);
 
   await secondPositionX.fill('4');
+  const boardWidth = encounterDialog.locator(
+    '[data-setup-path="$.board.width"]',
+  );
+  const unrelatedVitalityCurrent = draftEditors
+    .nth(0)
+    .getByRole('group', { name: 'vitality capability 1' })
+    .getByRole('spinbutton', { name: 'Current' });
+  await boardWidth.fill('0');
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText('RPG_SETUP_BOARD_EXTENT_INVALID');
+  await expectDescribedSetupError(encounterDialog, boardWidth);
+  await expect(boardWidth).toBeFocused();
+  await expect(unrelatedVitalityCurrent).not.toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  await expectUniqueSetupErrorIds(encounterDialog);
+
+  await boardWidth.fill('5');
   await encounterDialog
     .getByRole('button', { name: 'Add terrain cell' })
     .click();
@@ -315,6 +336,24 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expectDescribedSetupError(encounterDialog, capabilityVersion);
   await expect(capabilityId).toBeFocused();
   await expectDescribedSetupError(encounterDialog, traversalCapability);
+  await expectUniqueSetupErrorIds(encounterDialog);
+
+  await capabilityId.fill('capability.traversal');
+  await capabilityVersion.fill('1');
+  const firstParticipant = draftEditors.nth(0);
+  await firstParticipant
+    .getByRole('group', { name: 'vitality capability 1' })
+    .getByRole('button', { name: 'Remove capability' })
+    .click();
+  const addVitality = firstParticipant.getByRole('button', {
+    name: 'Add vitality',
+  });
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText('RPG_SETUP_VITALITY_REQUIRED');
+  await expectDescribedSetupError(encounterDialog, addVitality);
+  await expect(addVitality).toBeFocused();
   await expectUniqueSetupErrorIds(encounterDialog);
   await encounterDialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(participants).toContainText('Scout · team.gold');
