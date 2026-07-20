@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   effect,
+  input,
   signal,
   type ElementRef,
   type OnInit,
@@ -75,10 +76,38 @@ export function authorityTargetIds(
 }
 
 @Component({
+  selector: 'arb-setup-diagnostics',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.id]': 'diagnostics().length === 0 ? null : messageId()',
+    '[attr.hidden]': 'diagnostics().length === 0',
+    '[class.diagnostic]': 'diagnostics().length > 0',
+    '[class.field-diagnostic]': 'diagnostics().length > 0',
+  },
+  template: `
+    @for (diagnostic of diagnostics(); track $index) {
+      <span>
+        @if (showPath()) {
+          {{ diagnostic.path }} ·
+        }
+        {{ diagnostic.message }}
+      </span>
+    }
+  `,
+})
+class SetupDiagnosticsComponent {
+  public readonly diagnostics =
+    input.required<readonly RulesetDiagnosticDto[]>();
+  public readonly messageId = input.required<string>();
+  public readonly showPath = input(false);
+}
+
+@Component({
   selector: 'arb-rulebench-workspace-feature',
   imports: [
     ApplicationDialogComponent,
     ApplicationMenubarComponent,
+    SetupDiagnosticsComponent,
     WorkbenchPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -1224,16 +1253,10 @@ export function authorityTargetIds(
           >
             <p class="section-label">Artifact binding</p>
             <code>{{ setup.artifactId }}</code>
-            @for (
-              diagnostic of setupDiagnosticsFor('$.artifactId');
-              track diagnostic.code + diagnostic.path
-            ) {
-              <span
-                class="diagnostic field-diagnostic"
-                [id]="setupDiagnosticId('$.artifactId')"
-                >{{ diagnostic.message }}</span
-              >
-            }
+            <arb-setup-diagnostics
+              [diagnostics]="setupDiagnosticsFor('$.artifactId')"
+              [messageId]="setupDiagnosticId('$.artifactId')"
+            />
           </div>
           <div class="setup-grid">
             <label>
@@ -1251,16 +1274,10 @@ export function authorityTargetIds(
                 [value]="setup.board.width"
                 (input)="updateBoardExtent('width', boardWidthInput.value)"
               />
-              @for (
-                diagnostic of setupDiagnosticsFor('$.board.width');
-                track diagnostic.code + diagnostic.path
-              ) {
-                <span
-                  class="diagnostic field-diagnostic"
-                  [id]="setupDiagnosticId('$.board.width')"
-                  >{{ diagnostic.message }}</span
-                >
-              }
+              <arb-setup-diagnostics
+                [diagnostics]="setupDiagnosticsFor('$.board.width')"
+                [messageId]="setupDiagnosticId('$.board.width')"
+              />
             </label>
             <label>
               <span class="section-label">Board height</span>
@@ -1277,16 +1294,10 @@ export function authorityTargetIds(
                 [value]="setup.board.height"
                 (input)="updateBoardExtent('height', boardHeightInput.value)"
               />
-              @for (
-                diagnostic of setupDiagnosticsFor('$.board.height');
-                track diagnostic.code + diagnostic.path
-              ) {
-                <span
-                  class="diagnostic field-diagnostic"
-                  [id]="setupDiagnosticId('$.board.height')"
-                  >{{ diagnostic.message }}</span
-                >
-              }
+              <arb-setup-diagnostics
+                [diagnostics]="setupDiagnosticsFor('$.board.height')"
+                [messageId]="setupDiagnosticId('$.board.height')"
+              />
             </label>
             <label>
               <span class="section-label">Round</span>
@@ -1303,16 +1314,10 @@ export function authorityTargetIds(
                 [value]="setup.turn.round"
                 (input)="updateTurnCounter('round', roundInput.value)"
               />
-              @for (
-                diagnostic of setupDiagnosticsFor('$.turn.round');
-                track diagnostic.code + diagnostic.path
-              ) {
-                <span
-                  class="diagnostic field-diagnostic"
-                  [id]="setupDiagnosticId('$.turn.round')"
-                  >{{ diagnostic.message }}</span
-                >
-              }
+              <arb-setup-diagnostics
+                [diagnostics]="setupDiagnosticsFor('$.turn.round')"
+                [messageId]="setupDiagnosticId('$.turn.round')"
+              />
             </label>
             <label>
               <span class="section-label">Turn</span>
@@ -1329,16 +1334,10 @@ export function authorityTargetIds(
                 [value]="setup.turn.turn"
                 (input)="updateTurnCounter('turn', turnInput.value)"
               />
-              @for (
-                diagnostic of setupDiagnosticsFor('$.turn.turn');
-                track diagnostic.code + diagnostic.path
-              ) {
-                <span
-                  class="diagnostic field-diagnostic"
-                  [id]="setupDiagnosticId('$.turn.turn')"
-                  >{{ diagnostic.message }}</span
-                >
-              }
+              <arb-setup-diagnostics
+                [diagnostics]="setupDiagnosticsFor('$.turn.turn')"
+                [messageId]="setupDiagnosticId('$.turn.turn')"
+              />
             </label>
           </div>
 
@@ -1363,16 +1362,10 @@ export function authorityTargetIds(
                 </option>
               }
             </select>
-            @for (
-              diagnostic of setupDiagnosticsFor('$.randomSource');
-              track diagnostic.code + diagnostic.path
-            ) {
-              <span
-                class="diagnostic field-diagnostic"
-                [id]="setupDiagnosticId('$.randomSource')"
-                >{{ diagnostic.message }}</span
-              >
-            }
+            <arb-setup-diagnostics
+              [diagnostics]="setupDiagnosticsFor('$.randomSource')"
+              [messageId]="setupDiagnosticId('$.randomSource')"
+            />
           </label>
 
           <div class="button-row">
@@ -1399,30 +1392,14 @@ export function authorityTargetIds(
               Add terrain cell
             </button>
           </div>
-          @for (
-            diagnostic of setupDiagnosticsFor('$.participants');
-            track diagnostic.code + diagnostic.path
-          ) {
-            @if (diagnostic.path === '$.participants') {
-              <span
-                class="diagnostic field-diagnostic"
-                [id]="setupDiagnosticId('$.participants')"
-                >{{ diagnostic.message }}</span
-              >
-            }
-          }
-          @for (
-            diagnostic of setupDiagnosticsFor('$.board.cells');
-            track diagnostic.code + diagnostic.path
-          ) {
-            @if (diagnostic.path === '$.board.cells') {
-              <span
-                class="diagnostic field-diagnostic"
-                [id]="setupDiagnosticId('$.board.cells')"
-                >{{ diagnostic.message }}</span
-              >
-            }
-          }
+          <arb-setup-diagnostics
+            [diagnostics]="setupExactDiagnosticsFor('$.participants')"
+            [messageId]="setupDiagnosticId('$.participants')"
+          />
+          <arb-setup-diagnostics
+            [diagnostics]="setupExactDiagnosticsFor('$.board.cells')"
+            [messageId]="setupDiagnosticId('$.board.cells')"
+          />
 
           @for (
             participant of setup.participants;
@@ -1486,22 +1463,16 @@ export function authorityTargetIds(
                       )
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      participantPath(participantIndex, 'id')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          participantPath(participantIndex, 'id')
-                        )
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        participantPath(participantIndex, 'id')
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(participantPath(participantIndex, 'id'))
+                    "
+                  />
                 </label>
                 <label>
                   <span class="section-label">Label</span>
@@ -1529,22 +1500,18 @@ export function authorityTargetIds(
                       )
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      participantPath(participantIndex, 'label')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          participantPath(participantIndex, 'label')
-                        )
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        participantPath(participantIndex, 'label')
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(
+                        participantPath(participantIndex, 'label')
+                      )
+                    "
+                  />
                 </label>
                 <label>
                   <span class="section-label">Team ID</span>
@@ -1572,22 +1539,18 @@ export function authorityTargetIds(
                       )
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      participantPath(participantIndex, 'teamId')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          participantPath(participantIndex, 'teamId')
-                        )
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        participantPath(participantIndex, 'teamId')
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(
+                        participantPath(participantIndex, 'teamId')
+                      )
+                    "
+                  />
                 </label>
                 <label>
                   <span class="section-label">Position X</span>
@@ -1619,22 +1582,18 @@ export function authorityTargetIds(
                       )
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      participantPath(participantIndex, 'position.x')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          participantPath(participantIndex, 'position.x')
-                        )
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        participantPath(participantIndex, 'position.x')
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(
+                        participantPath(participantIndex, 'position.x')
+                      )
+                    "
+                  />
                 </label>
                 <label>
                   <span class="section-label">Position Y</span>
@@ -1666,22 +1625,18 @@ export function authorityTargetIds(
                       )
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      participantPath(participantIndex, 'position.y')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          participantPath(participantIndex, 'position.y')
-                        )
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        participantPath(participantIndex, 'position.y')
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(
+                        participantPath(participantIndex, 'position.y')
+                      )
+                    "
+                  />
                 </label>
               </div>
               <div class="button-row" aria-label="Add participant capability">
@@ -1701,7 +1656,6 @@ export function authorityTargetIds(
                 let capabilityIndex = $index
               ) {
                 <fieldset
-                  #setupControl
                   class="definition-choices capability-editor"
                   [attr.data-setup-path]="
                     capabilityPath(participantIndex, capabilityIndex)
@@ -1725,8 +1679,34 @@ export function authorityTargetIds(
                       <label>
                         <span class="section-label">ID</span>
                         <input
+                          #setupControl
                           #capabilityIdInput
                           class="setup-input"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'id'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
                           [value]="capability.id"
                           (input)="
                             updateParticipantCapabilityText(
@@ -1737,14 +1717,60 @@ export function authorityTargetIds(
                             )
                           "
                         />
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                        />
                       </label>
                     }
                     @if (capability.owner === 'modifier') {
                       <label>
                         <span class="section-label">Stacking group</span>
                         <input
+                          #setupControl
                           #stackingGroupInput
                           class="setup-input"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'stackingGroup'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'stackingGroup'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'stackingGroup'
+                              )
+                            )
+                          "
                           [value]="capability.stackingGroup"
                           (input)="
                             updateParticipantCapabilityText(
@@ -1752,6 +1778,26 @@ export function authorityTargetIds(
                               capabilityIndex,
                               'stackingGroup',
                               stackingGroupInput.value
+                            )
+                          "
+                        />
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'stackingGroup'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'stackingGroup'
+                              )
                             )
                           "
                         />
@@ -1764,10 +1810,36 @@ export function authorityTargetIds(
                       <label>
                         <span class="section-label">Current</span>
                         <input
+                          #setupControl
                           #capabilityCurrentInput
                           class="setup-input"
                           type="number"
                           min="0"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'value.current'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.current'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.current'
+                              )
+                            )
+                          "
                           [value]="capability.value.current"
                           (input)="
                             updateParticipantCapabilityNumber(
@@ -1778,14 +1850,60 @@ export function authorityTargetIds(
                             )
                           "
                         />
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.current'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.current'
+                              )
+                            )
+                          "
+                        />
                       </label>
                       <label>
                         <span class="section-label">Maximum</span>
                         <input
+                          #setupControl
                           #capabilityMaximumInput
                           class="setup-input"
                           type="number"
                           min="0"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'value.max'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.max'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.max'
+                              )
+                            )
+                          "
                           [value]="capability.value.max"
                           (input)="
                             updateParticipantCapabilityNumber(
@@ -1796,14 +1914,60 @@ export function authorityTargetIds(
                             )
                           "
                         />
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.max'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value.max'
+                              )
+                            )
+                          "
+                        />
                       </label>
                     } @else {
                       <label>
                         <span class="section-label">Value</span>
                         <input
+                          #setupControl
                           #capabilityValueInput
                           class="setup-input"
                           type="number"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'value'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value'
+                              )
+                            )
+                          "
                           [value]="capability.value"
                           (input)="
                             updateParticipantCapabilityNumber(
@@ -1814,17 +1978,63 @@ export function authorityTargetIds(
                             )
                           "
                         />
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'value'
+                              )
+                            )
+                          "
+                        />
                       </label>
                     }
                     @if (capability.owner === 'modifier') {
                       <label>
                         <span class="section-label">Remaining turns</span>
                         <input
+                          #setupControl
                           #remainingTurnsInput
                           class="setup-input"
                           type="number"
                           min="1"
                           max="1000"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'remainingTurns'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'remainingTurns'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'remainingTurns'
+                              )
+                            )
+                          "
                           [value]="capability.remainingTurns"
                           (input)="
                             updateParticipantCapabilityNumber(
@@ -1835,25 +2045,42 @@ export function authorityTargetIds(
                             )
                           "
                         />
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'remainingTurns'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'remainingTurns'
+                              )
+                            )
+                          "
+                        />
                       </label>
                     }
                   </div>
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      capabilityPath(participantIndex, capabilityIndex)
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          capabilityPath(participantIndex, capabilityIndex)
-                        )
-                      "
-                      >{{ diagnostic.path }} · {{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        capabilityPath(participantIndex, capabilityIndex)
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(
+                        capabilityPath(participantIndex, capabilityIndex)
+                      )
+                    "
+                    [showPath]="true"
+                  />
                   <button
                     class="secondary"
                     type="button"
@@ -1869,7 +2096,6 @@ export function authorityTargetIds(
                 </fieldset>
               }
               <fieldset
-                #setupControl
                 class="definition-choices"
                 [attr.data-setup-path]="
                   participantPath(participantIndex, 'definitionIds')
@@ -1889,7 +2115,21 @@ export function authorityTargetIds(
                 @for (definition of actionDefinitions(); track definition.id) {
                   <label class="definition-choice">
                     <input
+                      #setupControl
                       type="checkbox"
+                      [attr.data-setup-path]="
+                        participantPath(participantIndex, 'definitionIds')
+                      "
+                      [attr.aria-invalid]="
+                        setupHasError(
+                          participantPath(participantIndex, 'definitionIds')
+                        )
+                      "
+                      [attr.aria-describedby]="
+                        setupDescribedBy(
+                          participantPath(participantIndex, 'definitionIds')
+                        )
+                      "
                       [checked]="
                         participant.definitionIds.includes(definition.id)
                       "
@@ -1903,22 +2143,18 @@ export function authorityTargetIds(
                     <span>{{ definition.label }} · {{ definition.id }}</span>
                   </label>
                 }
-                @for (
-                  diagnostic of setupDiagnosticsFor(
-                    participantPath(participantIndex, 'definitionIds')
-                  );
-                  track diagnostic.code + diagnostic.path
-                ) {
-                  <span
-                    class="diagnostic field-diagnostic"
-                    [id]="
-                      setupDiagnosticId(
-                        participantPath(participantIndex, 'definitionIds')
-                      )
-                    "
-                    >{{ diagnostic.message }}</span
-                  >
-                }
+                <arb-setup-diagnostics
+                  [diagnostics]="
+                    setupDiagnosticsFor(
+                      participantPath(participantIndex, 'definitionIds')
+                    )
+                  "
+                  [messageId]="
+                    setupDiagnosticId(
+                      participantPath(participantIndex, 'definitionIds')
+                    )
+                  "
+                />
               </fieldset>
             </section>
           } @empty {
@@ -1964,18 +2200,12 @@ export function authorityTargetIds(
                     [value]="cell.id"
                     (input)="updateCellId(cellIndex, cellIdInput.value)"
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      cellPath(cellIndex, 'id')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="setupDiagnosticId(cellPath(cellIndex, 'id'))"
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(cellPath(cellIndex, 'id'))
+                    "
+                    [messageId]="setupDiagnosticId(cellPath(cellIndex, 'id'))"
+                  />
                 </label>
                 <label>
                   <span class="section-label">Position X</span>
@@ -1997,20 +2227,14 @@ export function authorityTargetIds(
                       updateCellPosition(cellIndex, 'x', cellXInput.value)
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      cellPath(cellIndex, 'position.x')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(cellPath(cellIndex, 'position.x'))
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(cellPath(cellIndex, 'position.x'))
+                    "
+                    [messageId]="
+                      setupDiagnosticId(cellPath(cellIndex, 'position.x'))
+                    "
+                  />
                 </label>
                 <label>
                   <span class="section-label">Position Y</span>
@@ -2032,20 +2256,14 @@ export function authorityTargetIds(
                       updateCellPosition(cellIndex, 'y', cellYInput.value)
                     "
                   />
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      cellPath(cellIndex, 'position.y')
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(cellPath(cellIndex, 'position.y'))
-                      "
-                      >{{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(cellPath(cellIndex, 'position.y'))
+                    "
+                    [messageId]="
+                      setupDiagnosticId(cellPath(cellIndex, 'position.y'))
+                    "
+                  />
                 </label>
               </div>
               <div class="button-row" aria-label="Add cell capability">
@@ -2065,7 +2283,6 @@ export function authorityTargetIds(
                 let capabilityIndex = $index
               ) {
                 <fieldset
-                  #setupControl
                   class="definition-choices capability-editor"
                   [attr.data-setup-path]="
                     cellCapabilityPath(cellIndex, capabilityIndex)
@@ -2089,8 +2306,34 @@ export function authorityTargetIds(
                     <label>
                       <span class="section-label">Capability ID</span>
                       <input
+                        #setupControl
                         #cellCapabilityIdInput
                         class="setup-input"
+                        [attr.data-setup-path]="
+                          cellCapabilityFieldPath(
+                            cellIndex,
+                            capabilityIndex,
+                            'id'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'id'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'id'
+                            )
+                          )
+                        "
                         [value]="capability.id"
                         (input)="
                           updateCellCapabilityText(
@@ -2101,14 +2344,60 @@ export function authorityTargetIds(
                           )
                         "
                       />
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'id'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'id'
+                            )
+                          )
+                        "
+                      />
                     </label>
                     <label>
                       <span class="section-label">Version</span>
                       <input
+                        #setupControl
                         #cellCapabilityVersionInput
                         class="setup-input"
                         type="number"
                         min="1"
+                        [attr.data-setup-path]="
+                          cellCapabilityFieldPath(
+                            cellIndex,
+                            capabilityIndex,
+                            'version'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'version'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'version'
+                            )
+                          )
+                        "
                         [value]="capability.version"
                         (input)="
                           updateCellCapabilityNumber(
@@ -2119,14 +2408,60 @@ export function authorityTargetIds(
                           )
                         "
                       />
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'version'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'version'
+                            )
+                          )
+                        "
+                      />
                     </label>
                     <label>
                       <span class="section-label"
                         >Definition ID (optional)</span
                       >
                       <input
+                        #setupControl
                         #cellDefinitionIdInput
                         class="setup-input"
+                        [attr.data-setup-path]="
+                          cellCapabilityFieldPath(
+                            cellIndex,
+                            capabilityIndex,
+                            'definitionId'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
                         [value]="capability.definitionId ?? ''"
                         (input)="
                           updateCellCapabilityText(
@@ -2137,14 +2472,60 @@ export function authorityTargetIds(
                           )
                         "
                       />
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            cellCapabilityFieldPath(
+                              cellIndex,
+                              capabilityIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                      />
                     </label>
                     @switch (capability.value.kind) {
                       @case ('traversal') {
                         <label>
                           <span class="section-label">Passable</span>
                           <select
+                            #setupControl
                             #cellPassableSelect
                             class="setup-select"
+                            [attr.data-setup-path]="
+                              cellCapabilityFieldPath(
+                                cellIndex,
+                                capabilityIndex,
+                                'value.passable'
+                              )
+                            "
+                            [attr.aria-invalid]="
+                              setupHasError(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.passable'
+                                )
+                              )
+                            "
+                            [attr.aria-describedby]="
+                              setupDescribedBy(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.passable'
+                                )
+                              )
+                            "
                             [value]="
                               capability.value.passable ? 'true' : 'false'
                             "
@@ -2160,14 +2541,60 @@ export function authorityTargetIds(
                             <option value="true">Yes</option>
                             <option value="false">No</option>
                           </select>
+                          <arb-setup-diagnostics
+                            [diagnostics]="
+                              setupDiagnosticsFor(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.passable'
+                                )
+                              )
+                            "
+                            [messageId]="
+                              setupDiagnosticId(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.passable'
+                                )
+                              )
+                            "
+                          />
                         </label>
                         <label>
                           <span class="section-label">Movement cost</span>
                           <input
+                            #setupControl
                             #movementCostInput
                             class="setup-input"
                             type="number"
                             min="1"
+                            [attr.data-setup-path]="
+                              cellCapabilityFieldPath(
+                                cellIndex,
+                                capabilityIndex,
+                                'value.movementCost'
+                              )
+                            "
+                            [attr.aria-invalid]="
+                              setupHasError(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.movementCost'
+                                )
+                              )
+                            "
+                            [attr.aria-describedby]="
+                              setupDescribedBy(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.movementCost'
+                                )
+                              )
+                            "
                             [value]="capability.value.movementCost"
                             (input)="
                               updateCellCapabilityNumber(
@@ -2178,14 +2605,60 @@ export function authorityTargetIds(
                               )
                             "
                           />
+                          <arb-setup-diagnostics
+                            [diagnostics]="
+                              setupDiagnosticsFor(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.movementCost'
+                                )
+                              )
+                            "
+                            [messageId]="
+                              setupDiagnosticId(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.movementCost'
+                                )
+                              )
+                            "
+                          />
                         </label>
                       }
                       @case ('flag') {
                         <label>
                           <span class="section-label">Value</span>
                           <select
+                            #setupControl
                             #cellFlagSelect
                             class="setup-select"
+                            [attr.data-setup-path]="
+                              cellCapabilityFieldPath(
+                                cellIndex,
+                                capabilityIndex,
+                                'value.value'
+                              )
+                            "
+                            [attr.aria-invalid]="
+                              setupHasError(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
+                            [attr.aria-describedby]="
+                              setupDescribedBy(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
                             [value]="capability.value.value ? 'true' : 'false'"
                             (change)="
                               updateCellCapabilityText(
@@ -2199,15 +2672,61 @@ export function authorityTargetIds(
                             <option value="true">True</option>
                             <option value="false">False</option>
                           </select>
+                          <arb-setup-diagnostics
+                            [diagnostics]="
+                              setupDiagnosticsFor(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
+                            [messageId]="
+                              setupDiagnosticId(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
+                          />
                         </label>
                       }
                       @case ('integer') {
                         <label>
                           <span class="section-label">Value</span>
                           <input
+                            #setupControl
                             #cellIntegerInput
                             class="setup-input"
                             type="number"
+                            [attr.data-setup-path]="
+                              cellCapabilityFieldPath(
+                                cellIndex,
+                                capabilityIndex,
+                                'value.value'
+                              )
+                            "
+                            [attr.aria-invalid]="
+                              setupHasError(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
+                            [attr.aria-describedby]="
+                              setupDescribedBy(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
                             [value]="capability.value.value"
                             (input)="
                               updateCellCapabilityNumber(
@@ -2218,14 +2737,60 @@ export function authorityTargetIds(
                               )
                             "
                           />
+                          <arb-setup-diagnostics
+                            [diagnostics]="
+                              setupDiagnosticsFor(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
+                            [messageId]="
+                              setupDiagnosticId(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.value'
+                                )
+                              )
+                            "
+                          />
                         </label>
                       }
                       @case ('identifier') {
                         <label>
                           <span class="section-label">Value ID</span>
                           <input
+                            #setupControl
                             #cellValueIdInput
                             class="setup-input"
+                            [attr.data-setup-path]="
+                              cellCapabilityFieldPath(
+                                cellIndex,
+                                capabilityIndex,
+                                'value.valueId'
+                              )
+                            "
+                            [attr.aria-invalid]="
+                              setupHasError(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.valueId'
+                                )
+                              )
+                            "
+                            [attr.aria-describedby]="
+                              setupDescribedBy(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.valueId'
+                                )
+                              )
+                            "
                             [value]="capability.value.valueId"
                             (input)="
                               updateCellCapabilityText(
@@ -2236,26 +2801,43 @@ export function authorityTargetIds(
                               )
                             "
                           />
+                          <arb-setup-diagnostics
+                            [diagnostics]="
+                              setupDiagnosticsFor(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.valueId'
+                                )
+                              )
+                            "
+                            [messageId]="
+                              setupDiagnosticId(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.valueId'
+                                )
+                              )
+                            "
+                          />
                         </label>
                       }
                     }
                   </div>
-                  @for (
-                    diagnostic of setupDiagnosticsFor(
-                      cellCapabilityPath(cellIndex, capabilityIndex)
-                    );
-                    track diagnostic.code + diagnostic.path
-                  ) {
-                    <span
-                      class="diagnostic field-diagnostic"
-                      [id]="
-                        setupDiagnosticId(
-                          cellCapabilityPath(cellIndex, capabilityIndex)
-                        )
-                      "
-                      >{{ diagnostic.path }} · {{ diagnostic.message }}</span
-                    >
-                  }
+                  <arb-setup-diagnostics
+                    [diagnostics]="
+                      setupDiagnosticsFor(
+                        cellCapabilityPath(cellIndex, capabilityIndex)
+                      )
+                    "
+                    [messageId]="
+                      setupDiagnosticId(
+                        cellCapabilityPath(cellIndex, capabilityIndex)
+                      )
+                    "
+                    [showPath]="true"
+                  />
                   <button
                     class="secondary"
                     type="button"
@@ -2288,34 +2870,27 @@ export function authorityTargetIds(
               </option>
             }
           </select>
-          @for (
-            diagnostic of setupDiagnosticsFor('$.turn.currentActorId');
-            track diagnostic.code + diagnostic.path
-          ) {
-            <span
-              class="diagnostic field-diagnostic"
-              [id]="setupDiagnosticId('$.turn.currentActorId')"
-              >{{ diagnostic.message }}</span
-            >
-          }
+          <arb-setup-diagnostics
+            [diagnostics]="setupDiagnosticsFor('$.turn.currentActorId')"
+            [messageId]="setupDiagnosticId('$.turn.currentActorId')"
+          />
           <p class="muted">
             Initiative follows the participant order shown above. Actions,
             targets, reactions, rolls, expected events, and winners are not part
             of setup.
           </p>
-          @for (
-            diagnostic of setupDiagnosticsFor('$.turn.initiativeOrder');
-            track diagnostic.code + diagnostic.path
-          ) {
-            <span
-              #setupControl
-              class="diagnostic field-diagnostic"
-              tabindex="-1"
-              data-setup-path="$.turn.initiativeOrder"
-              [id]="setupDiagnosticId('$.turn.initiativeOrder')"
-              >{{ diagnostic.message }}</span
-            >
-          }
+          <div
+            #setupControl
+            tabindex="-1"
+            data-setup-path="$.turn.initiativeOrder"
+            [attr.aria-invalid]="setupHasError('$.turn.initiativeOrder')"
+            [attr.aria-describedby]="setupDescribedBy('$.turn.initiativeOrder')"
+          >
+            <arb-setup-diagnostics
+              [diagnostics]="setupDiagnosticsFor('$.turn.initiativeOrder')"
+              [messageId]="setupDiagnosticId('$.turn.initiativeOrder')"
+            />
+          </div>
 
           @for (
             diagnostic of setupDiagnostics();
@@ -3221,6 +3796,14 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return `$.participants[${participantIndex}].capabilities[${capabilityIndex}]`;
   }
 
+  protected capabilityFieldPath(
+    participantIndex: number,
+    capabilityIndex: number,
+    suffix: string,
+  ): string {
+    return `${this.capabilityPath(participantIndex, capabilityIndex)}.${suffix}`;
+  }
+
   protected cellPath(index: number, suffix: string): string {
     return `$.board.cells[${index}].${suffix}`;
   }
@@ -3230,6 +3813,14 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     capabilityIndex: number,
   ): string {
     return `$.board.cells[${cellIndex}].capabilities[${capabilityIndex}]`;
+  }
+
+  protected cellCapabilityFieldPath(
+    cellIndex: number,
+    capabilityIndex: number,
+    suffix: string,
+  ): string {
+    return `${this.cellCapabilityPath(cellIndex, capabilityIndex)}.${suffix}`;
   }
 
   protected setupDiagnosticsFor(path: string): readonly RulesetDiagnosticDto[] {
@@ -3242,10 +3833,16 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return this.setupDiagnosticsFor(path).length > 0;
   }
 
-  protected setupHasExactError(path: string): boolean {
-    return this.setupDiagnostics().some(
+  protected setupExactDiagnosticsFor(
+    path: string,
+  ): readonly RulesetDiagnosticDto[] {
+    return this.setupDiagnostics().filter(
       (diagnostic) => diagnostic.path === path,
     );
+  }
+
+  protected setupHasExactError(path: string): boolean {
+    return this.setupExactDiagnosticsFor(path).length > 0;
   }
 
   protected setupDescribedBy(path: string): string | null {
@@ -3290,19 +3887,33 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     if (diagnostic === undefined) return;
     const candidates = this.setupControls()
       .map((control) => control.nativeElement)
-      .filter((control) => {
+      .map((control) => {
         const path = control.dataset['setupPath'];
-        return (
-          path !== undefined &&
-          diagnosticMatchesSetupPath(diagnostic.path, path)
-        );
+        return {
+          control,
+          path,
+          specificity:
+            path === undefined
+              ? null
+              : setupPathMatchSpecificity(diagnostic.path, path),
+        };
       })
+      .filter(
+        (
+          candidate,
+        ): candidate is {
+          readonly control: HTMLElement;
+          readonly path: string;
+          readonly specificity: number;
+        } => candidate.path !== undefined && candidate.specificity !== null,
+      )
       .sort((left, right) => {
-        const leftLength = left.dataset['setupPath']?.length ?? 0;
-        const rightLength = right.dataset['setupPath']?.length ?? 0;
-        return rightLength - leftLength;
+        if (left.specificity !== right.specificity) {
+          return left.specificity - right.specificity;
+        }
+        return right.path.length - left.path.length;
       });
-    candidates[0]?.focus();
+    candidates[0]?.control.focus();
   }
 
   private updateParticipant(
@@ -3578,11 +4189,27 @@ function diagnosticMatchesSetupPath(
   diagnosticPath: string,
   controlPath: string,
 ): boolean {
-  return (
-    diagnosticPath === controlPath ||
+  return setupPathMatchSpecificity(diagnosticPath, controlPath) !== null;
+}
+
+function setupPathMatchSpecificity(
+  diagnosticPath: string,
+  controlPath: string,
+): number | null {
+  if (diagnosticPath === controlPath) return 0;
+  if (
+    controlPath.startsWith(`${diagnosticPath}.`) ||
+    controlPath.startsWith(`${diagnosticPath}[`)
+  ) {
+    return 1;
+  }
+  if (
     diagnosticPath.startsWith(`${controlPath}.`) ||
     diagnosticPath.startsWith(`${controlPath}[`)
-  );
+  ) {
+    return 2;
+  }
+  return null;
 }
 
 function errorMessage(error: unknown): string {

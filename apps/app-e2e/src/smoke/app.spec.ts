@@ -257,6 +257,70 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(turnStatus).toContainText('Authority revision 0');
 
   await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
+  await authorEncounterDraft(encounterDialog, {
+    first: {
+      id: 'pathfinder',
+      label: 'Pathfinder',
+      teamId: 'team.gold',
+      x: 0,
+      y: 0,
+    },
+    second: {
+      id: 'sentinel',
+      label: 'Sentinel',
+      teamId: 'team.violet',
+      x: 0,
+      y: 0,
+    },
+  });
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText('RPG_SETUP_POSITION_OCCUPIED');
+  const draftEditors = encounterDialog.locator('.participant-editor');
+  const secondPositionX = draftEditors
+    .nth(1)
+    .getByRole('spinbutton', { name: 'Position X' });
+  await expectDescribedSetupError(encounterDialog, secondPositionX);
+  await expect(secondPositionX).toBeFocused();
+  await expectUniqueSetupErrorIds(encounterDialog);
+
+  await secondPositionX.fill('4');
+  await encounterDialog
+    .getByRole('button', { name: 'Add terrain cell' })
+    .click();
+  const terrainCell = encounterDialog.locator('[aria-label="Terrain cell 1"]');
+  await terrainCell.getByRole('button', { name: 'Add traversal' }).click();
+  const traversalCapability = terrainCell.getByRole('group', {
+    name: 'traversal capability 1',
+  });
+  const capabilityId = traversalCapability.getByRole('textbox', {
+    name: 'Capability ID',
+  });
+  const capabilityVersion = traversalCapability.getByRole('spinbutton', {
+    name: 'Version',
+  });
+  await capabilityId.fill('');
+  await capabilityVersion.fill('0');
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toContainText(
+    'RPG_SETUP_CELL_CAPABILITY_ID_INVALID',
+  );
+  await expect(encounterDialog).toContainText(
+    'RPG_SETUP_CELL_CAPABILITY_VERSION_INVALID',
+  );
+  await expectDescribedSetupError(encounterDialog, capabilityId);
+  await expectDescribedSetupError(encounterDialog, capabilityVersion);
+  await expect(capabilityId).toBeFocused();
+  await expectDescribedSetupError(encounterDialog, traversalCapability);
+  await expectUniqueSetupErrorIds(encounterDialog);
+  await encounterDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(participants).toContainText('Scout · team.gold');
+  await expect(turnStatus).toContainText('Authority revision 0');
+
+  await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
   await encounterDialog
     .getByRole('button', { name: 'Add participant' })
     .click();
@@ -394,6 +458,20 @@ async function configureEncounter(
     readonly second: EncounterParticipantInput;
   },
 ): Promise<void> {
+  await authorEncounterDraft(dialog, setup);
+  await dialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(dialog).toBeHidden();
+}
+
+async function authorEncounterDraft(
+  dialog: Locator,
+  setup: {
+    readonly first: EncounterParticipantInput;
+    readonly second: EncounterParticipantInput;
+  },
+): Promise<void> {
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Add participant' }).click();
   await dialog.getByRole('button', { name: 'Add participant' }).click();
@@ -407,10 +485,28 @@ async function configureEncounter(
       await definitions.nth(index).check();
     }
   }
-  await dialog
-    .getByRole('button', { name: 'Validate and start encounter' })
-    .click();
-  await expect(dialog).toBeHidden();
+}
+
+async function expectDescribedSetupError(
+  dialog: Locator,
+  control: Locator,
+): Promise<void> {
+  await expect(control).toHaveAttribute('aria-invalid', 'true');
+  const describedBy = await control.getAttribute('aria-describedby');
+  expect(describedBy).not.toBeNull();
+  if (describedBy === null) {
+    throw new Error('invalid setup control did not name its diagnostic');
+  }
+  const description = dialog.locator(`[id="${describedBy}"]`);
+  await expect(description).toHaveCount(1);
+  await expect(description).toBeVisible();
+}
+
+async function expectUniqueSetupErrorIds(dialog: Locator): Promise<void> {
+  const ids = await dialog
+    .locator('[id^="setup-error-"]')
+    .evaluateAll((elements) => elements.map((element) => element.id));
+  expect(new Set(ids).size).toBe(ids.length);
 }
 
 async function fillParticipant(
