@@ -43,13 +43,19 @@ interface BoardCell {
     `
       :host {
         display: block;
-        min-height: 100vh;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
       }
 
       .workspace {
         display: grid;
         gap: 1px;
-        min-height: 100vh;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
         padding: 1px;
       }
 
@@ -64,10 +70,9 @@ interface BoardCell {
             16rem,
             0.72fr
           );
-        grid-template-rows: minmax(12rem, auto) minmax(9rem, auto) minmax(
-            18rem,
-            auto
-          );
+        grid-template-rows: minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1fr);
+        min-height: 0;
+        overflow: hidden;
       }
 
       .board-panel {
@@ -177,7 +182,7 @@ interface BoardCell {
       .battlefield-wrap {
         align-items: center;
         display: grid;
-        min-height: 25rem;
+        min-height: clamp(18rem, 45vh, 25rem);
         overflow: auto;
       }
 
@@ -357,6 +362,22 @@ interface BoardCell {
       }
 
       @media (max-width: 60rem) {
+        :host {
+          height: auto;
+          min-height: 100vh;
+          min-height: 100dvh;
+          overflow: visible;
+        }
+
+        .workspace {
+          align-content: start;
+          grid-template-rows: auto auto auto;
+          height: auto;
+          min-height: 100vh;
+          min-height: 100dvh;
+          overflow: visible;
+        }
+
         .game-layout {
           grid-template-areas:
             'board participants'
@@ -364,7 +385,10 @@ interface BoardCell {
             'actions actions'
             'outcome outcome';
           grid-template-columns: minmax(0, 1.5fr) minmax(15rem, 0.75fr);
-          grid-template-rows: auto;
+          grid-template-rows:
+            minmax(24rem, 55vh) minmax(10rem, 28vh) minmax(24rem, 55vh)
+            minmax(22rem, 50vh);
+          overflow: visible;
         }
       }
 
@@ -372,6 +396,9 @@ interface BoardCell {
         .game-layout {
           grid-template-areas: 'turn' 'participants' 'board' 'actions' 'outcome';
           grid-template-columns: minmax(0, 1fr);
+          grid-template-rows:
+            13rem minmax(19rem, 45vh) minmax(24rem, 58vh)
+            minmax(30rem, 70vh) minmax(24rem, 58vh);
         }
 
         .battlefield-wrap {

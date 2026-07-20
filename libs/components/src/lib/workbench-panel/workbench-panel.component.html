@@ -12,5 +12,12 @@
     <h2>{{ panelTitle() }}</h2>
     <div class="panel__tools"><ng-content select="[panelTools]" /></div>
   </header>
-  <div class="panel__body"><ng-content /></div>
+  <div
+    class="panel__body"
+    role="group"
+    [attr.aria-label]="panelTitle() + ' contents'"
+    [attr.tabindex]="compact() ? null : 0"
+  >
+    <ng-content />
+  </div>
 </section>

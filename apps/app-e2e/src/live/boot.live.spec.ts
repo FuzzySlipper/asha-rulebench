@@ -11,6 +11,7 @@ liveScenario(
       'System rolls are intentionally unpredictable. Replay proves the exact values actually recorded; it does not regenerate entropy.',
     );
 
+    await page.setViewportSize({ width: 1440, height: 1100 });
     await page.goto(liveBaseUrl);
     const workspace = page.getByLabel('Rulebench interactive combat workspace');
     await expect(workspace).toBeVisible();
@@ -84,6 +85,19 @@ liveScenario(
       name: '4. Action palette',
     });
     const combatLog = workspace.getByRole('region', { name: '5. Combat log' });
+    const applicationMenu = workspace.getByRole('region', {
+      name: '0. Application menu',
+    });
+
+    const menuBounds = await applicationMenu.boundingBox();
+    const battlefieldBounds = await battlefield.boundingBox();
+    expect(menuBounds).not.toBeNull();
+    expect(battlefieldBounds).not.toBeNull();
+    if (menuBounds !== null && battlefieldBounds !== null) {
+      expect(
+        battlefieldBounds.y - (menuBounds.y + menuBounds.height),
+      ).toBeLessThanOrEqual(2);
+    }
 
     await expect(
       battlefield.getByRole('grid', { name: 'Combat grid' }),
@@ -137,6 +151,14 @@ liveScenario(
     await actionPalette.getByRole('button', { name: /^Raise ward/ }).click();
     await expect(turnStatus).toContainText('Authority revision 3');
     await expect(combatLog).toContainText('reactionResolved:');
+    const combatLogContents = combatLog.getByRole('group', {
+      name: 'Combat log contents',
+    });
+    const logOverflow = await combatLogContents.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(logOverflow.scrollHeight).toBeGreaterThan(logOverflow.clientHeight);
 
     const replayDialog = await openReplayDialog(page, workspace);
     await expect(replayDialog).toContainText('4. react reaction.raise-ward');

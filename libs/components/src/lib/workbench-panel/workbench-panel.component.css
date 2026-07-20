@@ -56,6 +56,13 @@ h2 {
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.panel__body:focus-visible {
+  outline: 2px solid var(--arb-accent);
+  outline-offset: -3px;
 }
 
 .panel--compact {

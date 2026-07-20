@@ -48,6 +48,19 @@ test('plays an encounter through the interaction-first authority loop @gate', as
     name: '4. Action palette',
   });
   const combatLog = workspace.getByRole('region', { name: '5. Combat log' });
+  const applicationMenu = workspace.getByRole('region', {
+    name: '0. Application menu',
+  });
+
+  const menuBounds = await applicationMenu.boundingBox();
+  const battlefieldBounds = await battlefield.boundingBox();
+  expect(menuBounds).not.toBeNull();
+  expect(battlefieldBounds).not.toBeNull();
+  if (menuBounds !== null && battlefieldBounds !== null) {
+    expect(
+      battlefieldBounds.y - (menuBounds.y + menuBounds.height),
+    ).toBeLessThanOrEqual(2);
+  }
 
   await expect(
     battlefield.getByRole('grid', { name: 'Combat grid' }),
@@ -107,6 +120,19 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(participants).toContainText('focus 0/2');
   await expect(combatLog).toContainText('reactionResolved:');
   await expect(combatLog).toContainText('Automatic roll');
+  const combatLogContents = combatLog.getByRole('group', {
+    name: 'Combat log contents',
+  });
+  const logOverflow = await combatLogContents.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(logOverflow.scrollHeight).toBeGreaterThan(logOverflow.clientHeight);
+  await combatLogContents.focus();
+  await combatLogContents.press('End');
+  await expect
+    .poll(() => combatLogContents.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
 
   const replayDialog = await openReplayDialog(page, workspace);
   const replayRecords = replayDialog.getByRole('list', {
