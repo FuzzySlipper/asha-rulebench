@@ -116,6 +116,14 @@ function response(
       sourceId: 'rulebench.system-random',
       sourceVersion: 1,
     },
+    supportedRandomSources: [
+      {
+        policyId: 'rulebench.automatic-random',
+        policyVersion: 1,
+        sourceId: 'rulebench.system-random',
+        sourceVersion: 1,
+      },
+    ],
     encounterSetupRequired: status === 'active',
     gameplayAvailable: false,
     gameplay: null,
@@ -154,6 +162,14 @@ function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
           cellIds: [],
           areaIds: [],
         },
+      },
+    ],
+    controls: [
+      {
+        kind: 'endTurn',
+        label: 'End turn',
+        available: true,
+        unavailable: null,
       },
     ],
     entities: [],

@@ -119,6 +119,12 @@ export interface RulesetWorkspaceView {
     readonly sourceId: string;
     readonly sourceVersion: number;
   };
+  readonly supportedRandomSources: readonly {
+    readonly policyId: string;
+    readonly policyVersion: number;
+    readonly sourceId: string;
+    readonly sourceVersion: number;
+  }[];
   readonly gameplayAvailable: boolean;
   readonly gameplay: GameplayWorkspaceView | null;
   readonly activeArtifactId: string | null;
@@ -136,6 +142,13 @@ export interface GameplayActionView {
   readonly candidateIds: readonly string[];
   readonly cellIds: readonly string[];
   readonly areaIds: readonly string[];
+}
+
+export interface GameplayTurnControlView {
+  readonly kind: string;
+  readonly label: string;
+  readonly available: boolean;
+  readonly unavailable: string | null;
 }
 
 export interface GameplayEntityView {
@@ -175,6 +188,7 @@ export interface GameplayWorkspaceView {
     readonly turn: number;
   };
   readonly actions: readonly GameplayActionView[];
+  readonly controls: readonly GameplayTurnControlView[];
   readonly entities: readonly GameplayEntityView[];
   readonly log: readonly {
     readonly sequence: string;
@@ -253,6 +267,7 @@ export function rulesetWorkspaceView(
     activationRevision: response.activationRevision,
     encounterSetupRequired: response.encounterSetupRequired,
     hostRandomSource: response.hostRandomSource,
+    supportedRandomSources: response.supportedRandomSources,
     gameplayAvailable: response.gameplayAvailable,
     gameplay:
       response.gameplay === null ? null : gameplayView(response.gameplay),
@@ -353,6 +368,15 @@ function gameplayView(
       candidateIds: action.options.participantIds,
       cellIds: action.options.cellIds,
       areaIds: action.options.areaIds,
+    })),
+    controls: gameplay.controls.map((control) => ({
+      kind: control.kind,
+      label: control.label,
+      available: control.available,
+      unavailable:
+        control.unavailable === null
+          ? null
+          : `${control.unavailable.code}: ${control.unavailable.message}`,
     })),
     entities: gameplay.entities.map((entity) => ({
       id: entity.id,

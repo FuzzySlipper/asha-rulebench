@@ -51,6 +51,7 @@ describe('ruleset workspace store', () => {
       startEncounter: async () => emptyResponse(),
       command: async () => emptyResponse(),
       react: async () => emptyResponse(),
+      control: async () => emptyResponse(),
       restoreCheckpoint: async () => emptyResponse(),
       replay: async () => emptyResponse(),
     };
@@ -105,6 +106,7 @@ describe('ruleset workspace store', () => {
       startEncounter: async () => active,
       command: async () => active,
       react: async () => active,
+      control: async () => active,
       restoreCheckpoint: async () => active,
       replay: async () => active,
     };
@@ -215,6 +217,7 @@ function transportReturning(
     startEncounter: async () => response,
     command: async () => response,
     react: async () => response,
+    control: async () => response,
     restoreCheckpoint: async () => response,
     replay: async () => response,
   };
@@ -240,6 +243,14 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
       sourceId: 'rulebench.system-random',
       sourceVersion: 1,
     },
+    supportedRandomSources: [
+      {
+        policyId: 'rulebench.automatic-random',
+        policyVersion: 1,
+        sourceId: 'rulebench.system-random',
+        sourceVersion: 1,
+      },
+    ],
     encounterSetupRequired: false,
     gameplayAvailable: false,
     gameplay: null,

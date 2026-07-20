@@ -25,7 +25,8 @@ use rpg_runtime::{
     RpgCommandOutcome, RpgEncounterOutcomeView, RpgEncounterSetup, RpgInitialCapability,
     RpgParticipantSetup, RpgRandomSource, RpgRandomSourceBinding, RpgRandomSourceFailure,
     RpgReactionProposal, RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation,
-    RpgReplayPhase, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnInitialization,
+    RpgReplayPhase, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl,
+    RpgTurnControlProposal, RpgTurnControlReceipt, RpgTurnInitialization,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -420,6 +421,16 @@ pub struct GameplayAuthorityActionDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct GameplayTurnControlDto {
+    pub kind: String,
+    pub label: String,
+    pub available: bool,
+    pub unavailable: Option<GameplayUnavailableDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct GameplayLogEntryDto {
     pub sequence: String,
     pub state_revision: String,
@@ -673,6 +684,7 @@ pub struct GameplaySessionDto {
     pub board: EncounterBoardDto,
     pub turn: EncounterTurnDto,
     pub actions: Vec<GameplayAuthorityActionDto>,
+    pub controls: Vec<GameplayTurnControlDto>,
     pub entities: Vec<GameplayEntityDto>,
     pub pending_reaction: Option<GameplayReactionDto>,
     pub log: Vec<GameplayLogEntryDto>,
@@ -692,6 +704,7 @@ pub struct RulesetWorkspaceResponseDto {
     pub upgrade_impact: Option<RulesetUpgradeImpactDto>,
     pub activation_revision: u32,
     pub host_random_source: EncounterRandomSourceDto,
+    pub supported_random_sources: Vec<EncounterRandomSourceDto>,
     pub encounter_setup_required: bool,
     pub gameplay_available: bool,
     pub gameplay: Option<GameplaySessionDto>,
@@ -729,6 +742,15 @@ pub struct GameplayReactionRequestDto {
     pub expected_revision: u32,
     pub reaction_id: String,
     pub option_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayTurnControlRequestDto {
+    pub expected_revision: u32,
+    pub actor_id: String,
+    pub kind: String,
 }
 
 #[derive(Debug)]
@@ -1217,6 +1239,67 @@ impl RulesetHost {
         )
     }
 
+    pub fn execute_turn_control(
+        &self,
+        request: GameplayTurnControlRequestDto,
+    ) -> RulesetWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = slots
+            .active
+            .as_mut()
+            .and_then(|active| active.encounter.as_mut())
+        else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic(
+                    "RPG_SESSION_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.activeArtifact",
+                    "create an encounter before submitting turn control",
+                )],
+            );
+        };
+        let control = match request.kind.as_str() {
+            "endTurn" => RpgTurnControl::EndTurn,
+            _ => {
+                let message = format!("unsupported turn control {}", request.kind);
+                return response_from_slots(
+                    false,
+                    &slots,
+                    vec![host_diagnostic(
+                        "RPG_TURN_CONTROL_UNSUPPORTED",
+                        "$.kind",
+                        &message,
+                    )],
+                );
+            }
+        };
+        let recorded = active.session.control_recorded(RpgTurnControlProposal {
+            expected_revision: u64::from(request.expected_revision),
+            actor_id: request.actor_id,
+            control,
+        });
+        let (outcome, entry) = match recorded {
+            Ok(recorded) => recorded,
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_replay_failure(failure),
+                );
+            }
+        };
+        if let Err(failure) = active.store_entry(entry) {
+            return response_from_slots(false, &slots, diagnostics_from_replay_failure(failure));
+        }
+        active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
+        response_from_slots(
+            !matches!(outcome, RpgCommandOutcome::Rejected(_)),
+            &slots,
+            Vec::new(),
+        )
+    }
+
     pub fn restore_latest_checkpoint(&self) -> RulesetWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(active) = slots
@@ -1354,6 +1437,7 @@ fn response_from_slots(
         upgrade_impact,
         activation_revision: slots.activation_revision,
         host_random_source: encounter_random_source(&slots.random_source_binding),
+        supported_random_sources: vec![encounter_random_source(&slots.random_source_binding)],
         encounter_setup_required: slots
             .active
             .as_ref()
@@ -1817,6 +1901,7 @@ fn gameplay_session(active: &ActiveEncounter) -> GameplaySessionDto {
         board: encounter_board(&view.board),
         turn: encounter_turn(&view.turn),
         actions: view.actions.iter().map(gameplay_authority_action).collect(),
+        controls: view.controls.iter().map(gameplay_turn_control).collect(),
         entities: view.participants.iter().map(gameplay_entity).collect(),
         pending_reaction: view.pending_reaction.as_ref().map(gameplay_reaction),
         log: view.log.iter().map(gameplay_log_entry).collect(),
@@ -1921,6 +2006,14 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
                 .map(|event| gameplay_event(event).summary)
                 .collect(),
         ),
+        RpgCommandOutcome::ControlAccepted(receipt) => (
+            Vec::new(),
+            receipt
+                .events
+                .iter()
+                .map(|event| gameplay_event(event).summary)
+                .collect(),
+        ),
         RpgCommandOutcome::AwaitingReaction(pending) => (
             pending
                 .random_evidence
@@ -1958,9 +2051,16 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
                     command.expected_revision
                 )
             }
+            RpgReplayOperation::TurnControl { command } => format!(
+                "{} by {} at revision {}",
+                command.control.id(),
+                command.actor_id,
+                command.expected_revision
+            ),
         },
         outcome: match &entry.outcome {
             RpgCommandOutcome::Accepted(_) => "accepted",
+            RpgCommandOutcome::ControlAccepted(_) => "controlAccepted",
             RpgCommandOutcome::AwaitingReaction(_) => "awaitingReaction",
             RpgCommandOutcome::Rejected(_) => "rejected",
         }
@@ -2037,6 +2137,25 @@ fn gameplay_authority_action(action: &rpg_runtime::RpgActionView) -> GameplayAut
             cell_ids: action.options.cell_ids.clone(),
             area_ids: action.options.area_ids.clone(),
         },
+    }
+}
+
+fn gameplay_turn_control(control: &rpg_runtime::RpgTurnControlView) -> GameplayTurnControlDto {
+    GameplayTurnControlDto {
+        kind: match control.control {
+            RpgTurnControl::EndTurn => "endTurn",
+        }
+        .to_owned(),
+        label: control.label.clone(),
+        available: control.available,
+        unavailable: control
+            .unavailable
+            .as_ref()
+            .map(|rejection| GameplayUnavailableDto {
+                code: rejection.code.clone(),
+                path: rejection.path.clone(),
+                message: rejection.message.clone(),
+            }),
     }
 }
 
@@ -2134,6 +2253,7 @@ fn gameplay_reaction(request: &RpgReactionRequest) -> GameplayReactionDto {
 fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> GameplayResultDto {
     match outcome {
         RpgCommandOutcome::Accepted(receipt) => accepted_result(receipt),
+        RpgCommandOutcome::ControlAccepted(receipt) => control_accepted_result(receipt),
         RpgCommandOutcome::AwaitingReaction(pending) => GameplayResultDto {
             status: "awaitingReaction".to_owned(),
             code: None,
@@ -2150,6 +2270,24 @@ fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> Gamepl
             random_request: None,
         },
         RpgCommandOutcome::Rejected(rejection) => rejected_result(rejection, current_revision),
+    }
+}
+
+fn control_accepted_result(receipt: &RpgTurnControlReceipt) -> GameplayResultDto {
+    GameplayResultDto {
+        status: "accepted".to_owned(),
+        code: None,
+        message: format!(
+            "Accepted {} at state revision {}",
+            receipt.control.id(),
+            receipt.state_revision
+        ),
+        events: receipt.events.iter().map(gameplay_event).collect(),
+        trace: Vec::new(),
+        random_consumed: "0".to_owned(),
+        random_evidence: Vec::new(),
+        state_revision: dto_revision(receipt.state_revision),
+        random_request: None,
     }
 }
 
@@ -2758,6 +2896,7 @@ pub fn generated_protocol() -> String {
         GameplayUnavailableDto::decl(),
         GameplayActionOptionsDto::decl(),
         GameplayAuthorityActionDto::decl(),
+        GameplayTurnControlDto::decl(),
         GameplayLogEntryDto::decl(),
         GameplayOutcomeDto::decl(),
         GameplayRandomRequestDto::decl(),
@@ -2779,6 +2918,7 @@ pub fn generated_protocol() -> String {
         PreparedRulesetCompileRequestDto::decl(),
         GameplayCommandRequestDto::decl(),
         GameplayReactionRequestDto::decl(),
+        GameplayTurnControlRequestDto::decl(),
     ];
     let exports = declarations
         .into_iter()

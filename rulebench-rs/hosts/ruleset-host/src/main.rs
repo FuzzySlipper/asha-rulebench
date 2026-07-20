@@ -2,8 +2,8 @@ use std::env;
 
 use rulebench_ruleset_host::{
     EncounterSetupRequestDto, GameplayCommandRequestDto, GameplayReactionRequestDto,
-    PreparedRulesetCompileRequestDto, RulesetDiagnosticDto, RulesetHost,
-    RulesetWorkspaceResponseDto, ScriptedGameplayRandomSource,
+    GameplayTurnControlRequestDto, PreparedRulesetCompileRequestDto, RulesetDiagnosticDto,
+    RulesetHost, RulesetWorkspaceResponseDto, ScriptedGameplayRandomSource,
 };
 use serde::de::DeserializeOwned;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -102,6 +102,15 @@ fn route(
             match decode_request::<GameplayReactionRequestDto>(request) {
                 Ok(reaction) => {
                     let response = host.resolve_reaction(reaction);
+                    (200, response)
+                }
+                Err(diagnostic) => invalid_request(host, diagnostic),
+            }
+        }
+        (&Method::Post, "/api/ruleset/control") => {
+            match decode_request::<GameplayTurnControlRequestDto>(request) {
+                Ok(control) => {
+                    let response = host.execute_turn_control(control);
                     (200, response)
                 }
                 Err(diagnostic) => invalid_request(host, diagnostic),

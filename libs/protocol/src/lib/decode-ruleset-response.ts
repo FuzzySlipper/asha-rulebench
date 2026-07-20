@@ -1,13 +1,18 @@
 import type {
   EncounterBoardDto,
+  EncounterBoundedValueDto,
   EncounterCellCapabilityDto,
   EncounterCellCapabilityValueDto,
   EncounterCellDto,
   EncounterRandomSourceDto,
+  EncounterInitialCapabilityDto,
+  EncounterParticipantSetupDto,
+  EncounterSetupRequestDto,
   EncounterTurnDto,
   GameplayActionOptionsDto,
   GameplayArchiveDto,
   GameplayAuthorityActionDto,
+  GameplayTurnControlDto,
   GameplayEntityDto,
   GameplayEventDto,
   GameplayLogEntryDto,
@@ -65,6 +70,7 @@ export function decodeRulesetWorkspaceResponse(
       'upgradeImpact',
       'activationRevision',
       'hostRandomSource',
+      'supportedRandomSources',
       'encounterSetupRequired',
       'gameplayAvailable',
       'gameplay',
@@ -95,6 +101,12 @@ export function decodeRulesetWorkspaceResponse(
       record['hostRandomSource'],
       '$.hostRandomSource',
     ),
+    supportedRandomSources: requiredArray(
+      record['supportedRandomSources'],
+      '$.supportedRandomSources',
+    ).map((entry, index) =>
+      encounterRandomSource(entry, `$.supportedRandomSources[${index}]`),
+    ),
     encounterSetupRequired: requiredBoolean(
       record['encounterSetupRequired'],
       '$.encounterSetupRequired',
@@ -106,6 +118,35 @@ export function decodeRulesetWorkspaceResponse(
     gameplay: nullableGameplay(record['gameplay'], '$.gameplay'),
     diagnostics: requiredArray(record['diagnostics'], '$.diagnostics').map(
       (entry, index) => diagnostic(entry, `$.diagnostics[${index}]`),
+    ),
+  };
+}
+
+export function decodeEncounterSetupDocument(
+  value: unknown,
+): EncounterSetupRequestDto {
+  const record = requiredRecord(value, '$');
+  exactKeys(
+    record,
+    ['schema', 'artifactId', 'board', 'participants', 'turn', 'randomSource'],
+    '$',
+  );
+  const schema = requiredRecord(record['schema'], '$.schema');
+  exactKeys(schema, ['id', 'version'], '$.schema');
+  return {
+    schema: {
+      id: requiredString(schema['id'], '$.schema.id'),
+      version: nonNegativeInteger(schema['version'], '$.schema.version'),
+    },
+    artifactId: requiredString(record['artifactId'], '$.artifactId'),
+    board: encounterBoard(record['board'], '$.board'),
+    participants: requiredArray(record['participants'], '$.participants').map(
+      (entry, index) => encounterParticipant(entry, `$.participants[${index}]`),
+    ),
+    turn: encounterTurn(record['turn'], '$.turn'),
+    randomSource: encounterRandomSource(
+      record['randomSource'],
+      '$.randomSource',
     ),
   };
 }
@@ -127,6 +168,7 @@ function nullableGameplay(
       'board',
       'turn',
       'actions',
+      'controls',
       'entities',
       'pendingReaction',
       'log',
@@ -157,6 +199,10 @@ function nullableGameplay(
       (entry, index) =>
         gameplayAuthorityAction(entry, `${path}.actions[${index}]`),
     ),
+    controls: requiredArray(record['controls'], `${path}.controls`).map(
+      (entry, index) =>
+        gameplayTurnControl(entry, `${path}.controls[${index}]`),
+    ),
     entities: requiredArray(record['entities'], `${path}.entities`).map(
       (entry, index) => gameplayEntity(entry, `${path}.entities[${index}]`),
     ),
@@ -170,6 +216,106 @@ function nullableGameplay(
     outcome: gameplayOutcome(record['outcome'], `${path}.outcome`),
     lastResult: nullableResult(record['lastResult'], `${path}.lastResult`),
     archive: gameplayArchive(record['archive'], `${path}.archive`),
+  };
+}
+
+function encounterParticipant(
+  value: unknown,
+  path: string,
+): EncounterParticipantSetupDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['id', 'label', 'teamId', 'position', 'definitionIds', 'capabilities'],
+    path,
+  );
+  const position = requiredRecord(record['position'], `${path}.position`);
+  exactKeys(position, ['x', 'y'], `${path}.position`);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    label: requiredString(record['label'], `${path}.label`),
+    teamId: requiredString(record['teamId'], `${path}.teamId`),
+    position: {
+      x: nonNegativeInteger(position['x'], `${path}.position.x`),
+      y: nonNegativeInteger(position['y'], `${path}.position.y`),
+    },
+    definitionIds: stringArray(
+      record['definitionIds'],
+      `${path}.definitionIds`,
+    ),
+    capabilities: requiredArray(
+      record['capabilities'],
+      `${path}.capabilities`,
+    ).map((entry, index) =>
+      encounterInitialCapability(entry, `${path}.capabilities[${index}]`),
+    ),
+  };
+}
+
+function encounterInitialCapability(
+  value: unknown,
+  path: string,
+): EncounterInitialCapabilityDto {
+  const record = requiredRecord(value, path);
+  const owner = requiredString(record['owner'], `${path}.owner`);
+  switch (owner) {
+    case 'vitality':
+      exactKeys(record, ['owner', 'value'], path);
+      return {
+        owner,
+        value: encounterBoundedValue(record['value'], `${path}.value`),
+      };
+    case 'stat':
+    case 'defense':
+      exactKeys(record, ['owner', 'id', 'value'], path);
+      return {
+        owner,
+        id: requiredString(record['id'], `${path}.id`),
+        value: requiredInteger(record['value'], `${path}.value`),
+      };
+    case 'resource':
+      exactKeys(record, ['owner', 'id', 'value'], path);
+      return {
+        owner,
+        id: requiredString(record['id'], `${path}.id`),
+        value: encounterBoundedValue(record['value'], `${path}.value`),
+      };
+    case 'modifier':
+      exactKeys(
+        record,
+        ['owner', 'stackingGroup', 'id', 'value', 'remainingTurns'],
+        path,
+      );
+      return {
+        owner,
+        stackingGroup: requiredString(
+          record['stackingGroup'],
+          `${path}.stackingGroup`,
+        ),
+        id: requiredString(record['id'], `${path}.id`),
+        value: requiredInteger(record['value'], `${path}.value`),
+        remainingTurns: nonNegativeInteger(
+          record['remainingTurns'],
+          `${path}.remainingTurns`,
+        ),
+      };
+    default:
+      throw new RulesetProtocolDecodeError(
+        path,
+        `unknown capability owner ${owner}`,
+      );
+  }
+}
+
+function encounterBoundedValue(
+  value: unknown,
+  path: string,
+): EncounterBoundedValueDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['current', 'max'], path);
+  return {
+    current: requiredInteger(record['current'], `${path}.current`),
+    max: requiredInteger(record['max'], `${path}.max`),
   };
 }
 
@@ -527,6 +673,23 @@ function gameplayAuthorityAction(
       `${path}.maximumTargets`,
     ),
     options: gameplayActionOptions(record['options'], `${path}.options`),
+  };
+}
+
+function gameplayTurnControl(
+  value: unknown,
+  path: string,
+): GameplayTurnControlDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['kind', 'label', 'available', 'unavailable'], path);
+  return {
+    kind: requiredString(record['kind'], `${path}.kind`),
+    label: requiredString(record['label'], `${path}.label`),
+    available: requiredBoolean(record['available'], `${path}.available`),
+    unavailable:
+      record['unavailable'] === null
+        ? null
+        : gameplayUnavailable(record['unavailable'], `${path}.unavailable`),
   };
 }
 

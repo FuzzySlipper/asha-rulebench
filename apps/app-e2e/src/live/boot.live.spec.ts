@@ -117,17 +117,30 @@ liveScenario(
       },
     );
 
+    await actionPalette.getByRole('button', { name: /^End turn/ }).click();
+    await expect(turnStatus).toContainText('raider is acting');
+    await expect(turnStatus).toContainText('Authority revision 1');
+    await actionPalette.getByRole('button', { name: /^End turn/ }).click();
+    await expect(turnStatus).toContainText('hero is acting');
+    await expect(turnStatus).toContainText('Authority revision 2');
+    await collector.milestone('explicit authority turn controls advance play', {
+      screenshot: true,
+      layerSnapshot: { turnStatus: await turnStatus.innerText() },
+    });
+
     await chooseAction(actionPalette, 'Tactical Advance');
     await expect(
       battlefield.getByRole('gridcell', {
         name: /Raider, team.red.*available target/,
       }),
     ).toBeVisible();
-    await actionPalette.getByRole('button', { name: 'Target raider' }).click();
+    await actionPalette
+      .getByRole('button', { name: 'Participant raider' })
+      .click();
     await actionPalette
       .getByRole('button', { name: /^Use Tactical Advance/ })
       .click();
-    await expect(turnStatus).toContainText('Authority revision 1');
+    await expect(turnStatus).toContainText('Authority revision 3');
     await expect(participants).toContainText('cell (2, 0)');
 
     await chooseAction(
@@ -135,9 +148,11 @@ liveScenario(
       'Arc Lash',
       'rulebench.arc-lash-stormfront',
     );
-    await actionPalette.getByRole('button', { name: 'Target hero' }).click();
+    await actionPalette
+      .getByRole('button', { name: 'Participant hero' })
+      .click();
     await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
-    await expect(turnStatus).toContainText('Authority revision 2');
+    await expect(turnStatus).toContainText('Authority revision 4');
     await expect(participants).toContainText('focus 2/3');
     await expect(combatLog).toContainText('Automatic roll · 1d20 →');
     await collector.milestone(
@@ -149,14 +164,16 @@ liveScenario(
     );
 
     await chooseAction(actionPalette, 'Wardbreaker Volley');
-    await actionPalette.getByRole('button', { name: 'Target raider' }).click();
+    await actionPalette
+      .getByRole('button', { name: 'Participant raider' })
+      .click();
     await actionPalette
       .getByRole('button', { name: /^Use Wardbreaker Volley/ })
       .click();
     await expect(actionPalette).toContainText('Reaction for raider');
     await expect(actionPalette.locator('.reaction-card')).toBeFocused();
     await actionPalette.getByRole('button', { name: /^Raise ward/ }).click();
-    await expect(turnStatus).toContainText('Authority revision 3');
+    await expect(turnStatus).toContainText('Authority revision 5');
     await expect(combatLog).toContainText('reactionResolved:');
     const combatLogContents = combatLog.getByRole('group', {
       name: 'Combat log contents',
@@ -168,13 +185,14 @@ liveScenario(
     expect(logOverflow.scrollHeight).toBeGreaterThan(logOverflow.clientHeight);
 
     const replayDialog = await openReplayDialog(page, workspace);
-    await expect(replayDialog).toContainText('4. react reaction.raise-ward');
+    await expect(replayDialog).toContainText('1. control.end-turn by hero');
+    await expect(replayDialog).toContainText('6. react reaction.raise-ward');
     await expect(replayDialog).toContainText('Recorded roll:');
     await replayDialog
       .getByRole('button', { name: 'Verify stored replay' })
       .click();
     await expect(replayDialog).toContainText(
-      'Rust replay verified 4 record(s)',
+      'Rust replay verified 6 record(s)',
     );
     await collector.milestone('recorded system rolls replay exactly in Rust', {
       screenshot: true,
@@ -249,10 +267,28 @@ async function fillParticipant(
   await editor
     .getByRole('spinbutton', { name: 'Position X' })
     .fill(participant.x);
-  await editor.getByRole('spinbutton', { name: 'Vitality' }).fill('40');
-  await editor.getByRole('spinbutton', { name: 'Power stat' }).fill('3');
-  await editor.getByRole('spinbutton', { name: 'Guard defense' }).fill('12');
-  await editor.getByRole('spinbutton', { name: 'Focus resource' }).fill('3');
+  const vitality = editor.getByRole('group', {
+    name: 'vitality capability 1',
+  });
+  await vitality.getByRole('spinbutton', { name: 'Current' }).fill('40');
+  await vitality.getByRole('spinbutton', { name: 'Maximum' }).fill('40');
+  await editor.getByRole('button', { name: 'Add stat' }).click();
+  const stat = editor.getByRole('group', { name: 'stat capability 2' });
+  await stat.getByRole('textbox', { name: 'ID' }).fill('power');
+  await stat.getByRole('spinbutton', { name: 'Value' }).fill('3');
+  await editor.getByRole('button', { name: 'Add defense' }).click();
+  const defense = editor.getByRole('group', {
+    name: 'defense capability 3',
+  });
+  await defense.getByRole('textbox', { name: 'ID' }).fill('guard');
+  await defense.getByRole('spinbutton', { name: 'Value' }).fill('12');
+  await editor.getByRole('button', { name: 'Add resource' }).click();
+  const resource = editor.getByRole('group', {
+    name: 'resource capability 4',
+  });
+  await resource.getByRole('textbox', { name: 'ID' }).fill('focus');
+  await resource.getByRole('spinbutton', { name: 'Current' }).fill('3');
+  await resource.getByRole('spinbutton', { name: 'Maximum' }).fill('3');
 }
 
 async function openRulesetDialog(

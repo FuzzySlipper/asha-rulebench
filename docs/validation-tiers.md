@@ -37,7 +37,11 @@ highlighted authority targets, inline reaction choice, host-supplied exact
 automatic rolls, visible accepted events, keyboard grid movement, narrow
 layout, portable checkpoint restore, deterministic Rust replay, and
 derivation/mixin/overlay graph, including visible materialization provenance,
-independent-root activation, and recent-root switching from the top menu.
+independent-root activation, and recent-root switching from the top menu. The
+gate also selects and decodes a setup document, renders a completed outcome,
+proves artifact-mismatch diagnostics focus their setup control while the
+session survives, authors generic capability rows, and records explicit
+end-turn controls in replay.
 
 ## Downstream posture
 
@@ -57,7 +61,8 @@ Inspect all milestone screenshots and the evidence packet. The current live
 claim covers inactive startup, per-click source preparation, artifact
 inspection as a secondary dialog, activation, explicit artifact-pinned setup,
 the desktop and narrow combat workspace, alternating authority-owned turns,
-authority target choice, real system-supplied automatic roll feedback, inline
-reaction completion, and replay of the exact recorded values. Persistent setup
-libraries, persistence across activation/process restart, multiplayer, AI,
-migration policy, and exhaustive certification remain explicit non-claims.
+participant/cell/area authority target choice, explicit turn control, real
+system-supplied automatic roll feedback, inline reaction completion, completed
+outcome presentation, and replay of the exact recorded values. Persistent
+setup libraries, persistence across activation/process restart, multiplayer,
+AI, migration policy, and exhaustive certification remain explicit non-claims.

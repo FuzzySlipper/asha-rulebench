@@ -3,6 +3,7 @@ import {
   type EncounterSetupRequestDto,
   type GameplayCommandRequestDto,
   type GameplayReactionRequestDto,
+  type GameplayTurnControlRequestDto,
   type RulesetCompileRequestDto,
   type RulesetWorkspaceResponseDto,
 } from '@asha-rulebench/protocol';
@@ -39,6 +40,9 @@ export interface RulesetTransport {
   readonly react: (
     reaction: GameplayReactionRequestDto,
   ) => Promise<RulesetWorkspaceResponseDto>;
+  readonly control: (
+    control: GameplayTurnControlRequestDto,
+  ) => Promise<RulesetWorkspaceResponseDto>;
   readonly restoreCheckpoint: () => Promise<RulesetWorkspaceResponseDto>;
   readonly replay: () => Promise<RulesetWorkspaceResponseDto>;
 }
@@ -65,6 +69,7 @@ export function createRulesetTransport(http: JsonHttpClient): RulesetTransport {
     startEncounter: (setup) => request('POST', '/api/ruleset/encounter', setup),
     command: (command) => request('POST', '/api/ruleset/command', command),
     react: (reaction) => request('POST', '/api/ruleset/reaction', reaction),
+    control: (control) => request('POST', '/api/ruleset/control', control),
     restoreCheckpoint: () => request('POST', '/api/ruleset/checkpoint/restore'),
     replay: () => request('POST', '/api/ruleset/replay'),
   };

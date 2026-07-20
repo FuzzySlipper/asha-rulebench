@@ -12,6 +12,7 @@ import type {
   EncounterSetupRequestDto,
   GameplayCommandRequestDto,
   GameplayReactionRequestDto,
+  GameplayTurnControlRequestDto,
   RulesetCompileRequestDto,
   RulesetWorkspaceResponseDto,
 } from '@asha-rulebench/protocol';
@@ -113,6 +114,10 @@ export class RulesetWorkspaceStore {
 
   public async react(reaction: GameplayReactionRequestDto): Promise<void> {
     await this.run(() => this.transport.react(reaction));
+  }
+
+  public async control(control: GameplayTurnControlRequestDto): Promise<void> {
+    await this.run(() => this.transport.control(control));
   }
 
   public async restoreCheckpoint(): Promise<void> {

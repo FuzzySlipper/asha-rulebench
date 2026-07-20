@@ -42,6 +42,59 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   const encounterDialog = page.getByRole('dialog', {
     name: 'Encounter setup',
   });
+  const artifactId = (
+    await encounterDialog
+      .locator('[data-setup-path="$.artifactId"] code')
+      .textContent()
+  )?.trim();
+  expect(artifactId).toBeTruthy();
+  if (artifactId === undefined || artifactId.length === 0) return;
+  await importEncounterDocument(encounterDialog, artifactId, {
+    first: { id: 'hero', label: 'Hero', teamId: 'team.blue', x: 0, y: 0 },
+    second: {
+      id: 'raider',
+      label: 'Raider',
+      teamId: 'team.red',
+      x: 4,
+      y: 0,
+    },
+    secondVitality: 0,
+  });
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  await expect(encounterDialog).toBeHidden();
+
+  const turnStatus = workspace.getByRole('region', { name: '3. Turn status' });
+  await expect(turnStatus).toContainText('Encounter complete');
+  await expect(turnStatus).toContainText('Winning team: team.blue');
+
+  await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
+  await importEncounterDocument(encounterDialog, 'artifact-mismatch', {
+    first: { id: 'hero', label: 'Hero', teamId: 'team.blue', x: 0, y: 0 },
+    second: {
+      id: 'raider',
+      label: 'Raider',
+      teamId: 'team.red',
+      x: 4,
+      y: 0,
+    },
+    secondVitality: 40,
+  });
+  await encounterDialog
+    .getByRole('button', { name: 'Validate and start encounter' })
+    .click();
+  const artifactBinding = encounterDialog.locator(
+    '[data-setup-path="$.artifactId"]',
+  );
+  await expect(artifactBinding).toContainText(
+    `expected artifact ${artifactId}`,
+  );
+  await expect(artifactBinding).toBeFocused();
+  await encounterDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(turnStatus).toContainText('Encounter complete');
+
+  await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
   await configureEncounter(encounterDialog, {
     first: { id: 'hero', label: 'Hero', teamId: 'team.blue', x: 0, y: 0 },
     second: {
@@ -57,7 +110,6 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   const participants = workspace.getByRole('region', {
     name: '2. Participants',
   });
-  const turnStatus = workspace.getByRole('region', { name: '3. Turn status' });
   const actionPalette = workspace.getByRole('region', {
     name: '4. Action palette',
   });
@@ -86,6 +138,13 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(turnStatus).toContainText('Round 1 · turn 1');
   await expect(turnStatus).toContainText('Authority revision 0');
 
+  await actionPalette.getByRole('button', { name: /^End turn/ }).click();
+  await expect(turnStatus).toContainText('raider is acting');
+  await expect(turnStatus).toContainText('Authority revision 1');
+  await actionPalette.getByRole('button', { name: /^End turn/ }).click();
+  await expect(turnStatus).toContainText('hero is acting');
+  await expect(turnStatus).toContainText('Authority revision 2');
+
   const heroCell = battlefield.getByRole('gridcell', {
     name: /Hero, team.blue.*current actor/,
   });
@@ -104,9 +163,9 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await actionPalette
     .getByRole('button', { name: /^Use Tactical Advance/ })
     .click();
-  await expect(turnStatus).toContainText('Authority revision 1');
+  await expect(turnStatus).toContainText('Authority revision 3');
   await expect(turnStatus).toContainText('raider is acting');
-  await expect(turnStatus).toContainText('Round 1 · turn 2');
+  await expect(turnStatus).toContainText('Round 2 · turn 4');
   await expect(participants).toContainText('cell (2, 0)');
   await expect(participants).toContainText('exposed -2');
 
@@ -115,9 +174,9 @@ test('plays an encounter through the interaction-first authority loop @gate', as
     'Arc Lash',
     'rulebench.arc-lash-stormfront',
   );
-  await actionPalette.getByRole('button', { name: 'Target hero' }).click();
+  await actionPalette.getByRole('button', { name: 'Participant hero' }).click();
   await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
-  await expect(turnStatus).toContainText('Authority revision 2');
+  await expect(turnStatus).toContainText('Authority revision 4');
   await expect(turnStatus).toContainText('hero is acting');
   await expect(participants).toContainText('focus 2/3');
   await expect(combatLog).toContainText('Automatic roll · 1d20 → 10');
@@ -126,7 +185,9 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await expect(combatLog).toContainText('damageApplied:');
 
   await chooseAction(actionPalette, 'Wardbreaker Volley');
-  await actionPalette.getByRole('button', { name: 'Target raider' }).click();
+  await actionPalette
+    .getByRole('button', { name: 'Participant raider' })
+    .click();
   await actionPalette
     .getByRole('button', { name: /^Use Wardbreaker Volley/ })
     .click();
@@ -136,7 +197,7 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   ).toBeVisible();
   await expect(actionPalette.locator('.reaction-card')).toBeFocused();
   await actionPalette.getByRole('button', { name: /^Raise ward/ }).click();
-  await expect(turnStatus).toContainText('Authority revision 3');
+  await expect(turnStatus).toContainText('Authority revision 5');
   await expect(turnStatus).toContainText('raider is acting');
   await expect(participants).toContainText('focus 2/3');
   await expect(combatLog).toContainText('reactionResolved:');
@@ -159,7 +220,9 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   const replayRecords = replayDialog.getByRole('list', {
     name: 'Replay records',
   });
-  await expect(replayRecords).toContainText('4. react reaction.raise-ward');
+  await expect(replayRecords).toContainText('1. control.end-turn by hero');
+  await expect(replayRecords).toContainText('2. control.end-turn by raider');
+  await expect(replayRecords).toContainText('6. react reaction.raise-ward');
   await expect(replayRecords).toContainText('accepted');
   await replayDialog
     .getByRole('button', { name: 'Restore latest checkpoint' })
@@ -168,7 +231,7 @@ test('plays an encounter through the interaction-first authority loop @gate', as
   await replayDialog
     .getByRole('button', { name: 'Verify stored replay' })
     .click();
-  await expect(replayDialog).toContainText('Rust replay verified 4 record(s)');
+  await expect(replayDialog).toContainText('Rust replay verified 6 record(s)');
   await replayDialog.getByRole('button', { name: 'Close' }).click();
 
   await invokeMenuItem(page, workspace, 'Session', 'Start new encounter…');
@@ -212,7 +275,9 @@ test('plays an encounter through the interaction-first authority loop @gate', as
     'Arc Lash',
     'rulebench.arc-lash-stormfront',
   );
-  await actionPalette.getByRole('button', { name: 'Target brute' }).click();
+  await actionPalette
+    .getByRole('button', { name: 'Participant brute' })
+    .click();
   await actionPalette.getByRole('button', { name: /^Use Arc Lash/ }).click();
   const gameplayFailure = combatLog.getByRole('alert');
   await expect(gameplayFailure).toContainText(
@@ -255,6 +320,71 @@ interface EncounterParticipantInput {
   readonly teamId: string;
   readonly x: number;
   readonly y: number;
+}
+
+async function importEncounterDocument(
+  dialog: Locator,
+  artifactId: string,
+  setup: {
+    readonly first: EncounterParticipantInput;
+    readonly second: EncounterParticipantInput;
+    readonly secondVitality: number;
+  },
+): Promise<void> {
+  const document = {
+    schema: { id: 'asha.rpg.encounter.setup', version: 1 },
+    artifactId,
+    board: { width: 5, height: 3, cells: [] },
+    participants: [
+      participantSetup(setup.first, 40),
+      participantSetup(setup.second, setup.secondVitality),
+    ],
+    turn: {
+      initiativeOrder: [setup.first.id, setup.second.id],
+      currentActorId: setup.first.id,
+      round: 1,
+      turn: 1,
+    },
+    randomSource: {
+      policyId: 'rulebench.automatic-random',
+      policyVersion: 1,
+      sourceId: 'rulebench.roll-tape',
+      sourceVersion: 1,
+    },
+  };
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'review-encounter.setup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(document)),
+  });
+  await expect(dialog).toContainText('Loaded review-encounter.setup.json');
+}
+
+function participantSetup(
+  participant: EncounterParticipantInput,
+  vitality: number,
+) {
+  return {
+    id: participant.id,
+    label: participant.label,
+    teamId: participant.teamId,
+    position: { x: participant.x, y: participant.y },
+    definitionIds: [
+      'rulebench.tactical-advance',
+      'rulebench.arc-lash-stormfront',
+      'rulebench.wardbreaker-volley',
+    ],
+    capabilities: [
+      { owner: 'vitality', value: { current: vitality, max: 40 } },
+      { owner: 'stat', id: 'power', value: 3 },
+      { owner: 'defense', id: 'guard', value: 12 },
+      {
+        owner: 'resource',
+        id: 'focus',
+        value: { current: 3, max: 3 },
+      },
+    ],
+  };
 }
 
 async function configureEncounter(
@@ -300,10 +430,31 @@ async function fillParticipant(
   await editor
     .getByRole('spinbutton', { name: 'Position Y' })
     .fill(participant.y.toString());
-  await editor.getByRole('spinbutton', { name: 'Vitality' }).fill('40');
-  await editor.getByRole('spinbutton', { name: 'Power stat' }).fill('3');
-  await editor.getByRole('spinbutton', { name: 'Guard defense' }).fill('12');
-  await editor.getByRole('spinbutton', { name: 'Focus resource' }).fill('3');
+  const vitality = editor.getByRole('group', {
+    name: 'vitality capability 1',
+  });
+  await vitality.getByRole('spinbutton', { name: 'Current' }).fill('40');
+  await vitality.getByRole('spinbutton', { name: 'Maximum' }).fill('40');
+
+  await editor.getByRole('button', { name: 'Add stat' }).click();
+  const stat = editor.getByRole('group', { name: 'stat capability 2' });
+  await stat.getByRole('textbox', { name: 'ID' }).fill('power');
+  await stat.getByRole('spinbutton', { name: 'Value' }).fill('3');
+
+  await editor.getByRole('button', { name: 'Add defense' }).click();
+  const defense = editor.getByRole('group', {
+    name: 'defense capability 3',
+  });
+  await defense.getByRole('textbox', { name: 'ID' }).fill('guard');
+  await defense.getByRole('spinbutton', { name: 'Value' }).fill('12');
+
+  await editor.getByRole('button', { name: 'Add resource' }).click();
+  const resource = editor.getByRole('group', {
+    name: 'resource capability 4',
+  });
+  await resource.getByRole('textbox', { name: 'ID' }).fill('focus');
+  await resource.getByRole('spinbutton', { name: 'Current' }).fill('3');
+  await resource.getByRole('spinbutton', { name: 'Maximum' }).fill('3');
 }
 
 async function openRulesetDialog(

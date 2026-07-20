@@ -35,8 +35,9 @@ persistent session.
 
 Activation creates one fresh Asha RPG authority session. The browser's primary
 surface is an interaction-first combat workspace: a DOM grid, participants,
-current actor and revision, authority-provided actions and targets, reactions,
-automatic rolls, and accepted outcomes remain visible in one play loop.
+current actor and revision, authority-provided participant/cell/area targets,
+explicit turn controls, reactions, automatic rolls, and accepted or completed
+outcomes remain visible in one play loop.
 Ruleset lifecycle, artifact/provenance, and replay inspection remain available
 as secondary top-menu dialogs. The browser sends only typed intents and typed
 reaction decisions; it has no random-value input or roll-plan interpreter.
@@ -113,11 +114,14 @@ Rust host and generated protocol. Exhaustive
 cross-repository certification remains downstream, but the old prototype
 expectations have been retired rather than preserved there.
 
-The Session menu now builds an explicit artifact-pinned encounter: board and
-terrain cells, participant/team identities, placement, owned definitions,
-initial capabilities, initiative/current actor/counters, and the host random
-binding are generated-protocol forms validated atomically by Rust. Accepted
-actions alternate through the authority-owned turn view; setup never contains
+The Session menu now loads a strict JSON setup document or builds an explicit
+artifact-pinned encounter: board and terrain cells, participant/team
+identities, placement, owned definitions, generic participant and cell
+capability DTOs, initiative/current actor/counters, and an explicitly selected
+host-supported random binding are validated atomically by Rust. Rejected setup
+diagnostics are announced, displayed at their matching controls, and focus the
+first invalid path without replacing the active session. Accepted actions and
+end-turn controls advance the authority-owned turn view; setup never contains
 actions, targets, reactions, rolls, expected events, or a winner.
 
 Non-claims: persistent setup libraries, saves across process restarts or

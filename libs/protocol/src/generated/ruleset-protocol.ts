@@ -66,6 +66,8 @@ export type GameplayActionOptionsDto = { participantIds: Array<string>, cellIds:
 
 export type GameplayAuthorityActionDto = { definitionId: string, label: string, available: boolean, unavailable: GameplayUnavailableDto | null, maximumTargets: number, options: GameplayActionOptionsDto, };
 
+export type GameplayTurnControlDto = { kind: string, label: string, available: boolean, unavailable: GameplayUnavailableDto | null, };
+
 export type GameplayLogEntryDto = { sequence: string, stateRevision: string, actorId: string, actionId: string, events: Array<GameplayEventDto>, };
 
 export type GameplayOutcomeDto = { status: string, winningTeamIds: Array<string>, };
@@ -96,9 +98,9 @@ export type GameplayReplayEntryDto = { sequence: number, operation: string, outc
 
 export type GameplayArchiveDto = { checkpointSchema: string, replaySchemaVersion: number, eventSchemaVersion: number, artifactId: string, artifactSchema: string, composition: string, language: string, operationSchemas: Array<string>, capabilitySchemas: Array<string>, sourcePackages: Array<string>, dependencyLock: Array<string>, fingerprints: RulesetFingerprintDto, definitionFingerprints: Array<string>, stateRevision: string, acceptedRandomPosition: string, phase: string, stateHash: string, checkpointBytes: number, replayEntries: Array<GameplayReplayEntryDto>, verificationStatus: string, verificationMessage: string, };
 
-export type GameplaySessionDto = { artifactId: string, actorId: string, stateRevision: number, acceptedRandomValues: string, randomSource: EncounterRandomSourceDto, board: EncounterBoardDto, turn: EncounterTurnDto, actions: Array<GameplayAuthorityActionDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, log: Array<GameplayLogEntryDto>, outcome: GameplayOutcomeDto, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
+export type GameplaySessionDto = { artifactId: string, actorId: string, stateRevision: number, acceptedRandomValues: string, randomSource: EncounterRandomSourceDto, board: EncounterBoardDto, turn: EncounterTurnDto, actions: Array<GameplayAuthorityActionDto>, controls: Array<GameplayTurnControlDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, log: Array<GameplayLogEntryDto>, outcome: GameplayOutcomeDto, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
 
-export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, hostRandomSource: EncounterRandomSourceDto, encounterSetupRequired: boolean, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
+export type RulesetWorkspaceResponseDto = { ok: boolean, status: RulesetLifecycleStatus, activeArtifact: RulesetArtifactSummaryDto | null, candidateArtifact: RulesetArtifactSummaryDto | null, upgradeImpact: RulesetUpgradeImpactDto | null, activationRevision: number, hostRandomSource: EncounterRandomSourceDto, supportedRandomSources: Array<EncounterRandomSourceDto>, encounterSetupRequired: boolean, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<RulesetDiagnosticDto>, };
 
 export type RulesetCompileRequestDto = { rulesetRoot: string, };
 
@@ -107,3 +109,5 @@ export type PreparedRulesetCompileRequestDto = { preparedSource: string, };
 export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, };
 
 export type GameplayReactionRequestDto = { expectedRevision: number, reactionId: string, optionId: string | null, };
+
+export type GameplayTurnControlRequestDto = { expectedRevision: number, actorId: string, kind: string, };

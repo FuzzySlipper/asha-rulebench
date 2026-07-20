@@ -54,6 +54,11 @@ describe('ruleset transport', () => {
       reactionId: 'reaction.raise-ward',
       optionId: 'raise-ward',
     });
+    await transport.control({
+      expectedRevision: 3,
+      actorId: 'raider',
+      kind: 'endTurn',
+    });
     await transport.restoreCheckpoint();
     await transport.replay();
 
@@ -109,6 +114,15 @@ describe('ruleset transport', () => {
           expectedRevision: 2,
           reactionId: 'reaction.raise-ward',
           optionId: 'raise-ward',
+        },
+      },
+      {
+        method: 'POST',
+        path: '/api/ruleset/control',
+        body: {
+          expectedRevision: 3,
+          actorId: 'raider',
+          kind: 'endTurn',
         },
       },
       {
@@ -178,6 +192,14 @@ function emptyResponse(): RulesetWorkspaceResponseDto {
       sourceId: 'rulebench.system-random',
       sourceVersion: 1,
     },
+    supportedRandomSources: [
+      {
+        policyId: 'rulebench.automatic-random',
+        policyVersion: 1,
+        sourceId: 'rulebench.system-random',
+        sourceVersion: 1,
+      },
+    ],
     encounterSetupRequired: false,
     gameplayAvailable: false,
     gameplay: null,

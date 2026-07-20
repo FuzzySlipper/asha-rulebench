@@ -127,3 +127,21 @@ same downstream-repository shape. They have no privileged loader path. Field
 Manual, its independently rooted 1.1 variant, and Ember Skirmish demonstrate
 root isolation, shared-foundation imports, candidate switching, and explicit
 activation.
+
+## Encounter setup documents
+
+After activation, **Session → Create encounter…** accepts an explicitly chosen
+JSON document with the generated `asha.rpg.encounter.setup@1` shape. The file
+is decoded strictly in the browser and its artifact binding is preserved for
+Rust to validate; Rulebench does not infer a setup from the ruleset root or
+silently substitute the active artifact. A mismatched or otherwise invalid
+document leaves the active session unchanged.
+
+The same dialog can author that DTO directly. Participant vitality, stats,
+defenses, resources, and turn-bounded modifiers are generic repeatable rows.
+Cell traversal, flag, integer, and identifier capabilities are likewise
+repeatable and retain their capability identity, version, and optional
+definition binding. The random-source selector contains only bindings the
+running Rust host reports as supported. Setup diagnostics remain summarized
+for inspection and also appear at the matching path-specific control with
+`aria-invalid`, `aria-describedby`, and first-error focus.

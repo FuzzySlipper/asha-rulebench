@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  decodeEncounterSetupDocument,
   decodeRulesetWorkspaceResponse,
   RulesetProtocolDecodeError,
 } from './decode-ruleset-response.js';
@@ -18,6 +19,14 @@ const emptyResponse = {
     sourceId: 'rulebench.system-random',
     sourceVersion: 1,
   },
+  supportedRandomSources: [
+    {
+      policyId: 'rulebench.automatic-random',
+      policyVersion: 1,
+      sourceId: 'rulebench.system-random',
+      sourceVersion: 1,
+    },
+  ],
   encounterSetupRequired: false,
   gameplayAvailable: false,
   gameplay: null,
@@ -126,6 +135,7 @@ describe('ruleset protocol decoder', () => {
           turn: 1,
         },
         actions: [],
+        controls: [],
         entities: [],
         pendingReaction: null,
         log: [],
@@ -212,5 +222,66 @@ describe('ruleset protocol decoder', () => {
         gameplay: { ...response.gameplay, acceptedRandomValues: '00' },
       }),
     ).toThrow('$.gameplay.acceptedRandomValues');
+  });
+
+  it('strictly decodes an explicit encounter setup document', () => {
+    const setup = {
+      schema: { id: 'asha.rpg.encounter.setup', version: 1 },
+      artifactId: 'artifact-1',
+      board: {
+        width: 3,
+        height: 2,
+        cells: [
+          {
+            id: 'cover',
+            position: { x: 1, y: 1 },
+            capabilities: [
+              {
+                id: 'capability.traversal',
+                version: 1,
+                definitionId: null,
+                value: {
+                  kind: 'traversal',
+                  passable: false,
+                  movementCost: 2,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      participants: [
+        {
+          id: 'hero',
+          label: 'Hero',
+          teamId: 'allies',
+          position: { x: 0, y: 0 },
+          definitionIds: ['action.one'],
+          capabilities: [
+            { owner: 'vitality', value: { current: 10, max: 10 } },
+            { owner: 'stat', id: 'power', value: 3 },
+            {
+              owner: 'modifier',
+              stackingGroup: 'stance',
+              id: 'braced',
+              value: 1,
+              remainingTurns: 2,
+            },
+          ],
+        },
+      ],
+      turn: {
+        initiativeOrder: ['hero'],
+        currentActorId: 'hero',
+        round: 1,
+        turn: 1,
+      },
+      randomSource: emptyResponse.hostRandomSource,
+    };
+
+    expect(decodeEncounterSetupDocument(setup)).toEqual(setup);
+    expect(() =>
+      decodeEncounterSetupDocument({ ...setup, expectedEvents: [] }),
+    ).toThrow('$.expectedEvents: unknown field');
   });
 });

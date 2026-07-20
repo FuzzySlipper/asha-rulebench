@@ -21,10 +21,15 @@ import type {
   GameplayEntityView,
 } from '@asha-rulebench/domain';
 import type {
+  EncounterCellCapabilityDto,
   EncounterInitialCapabilityDto,
   EncounterParticipantSetupDto,
+  EncounterRandomSourceDto,
   EncounterSetupRequestDto,
+  RulesetDiagnosticDto,
 } from '@asha-rulebench/protocol';
+import { decodeEncounterSetupDocument } from '@asha-rulebench/protocol';
+import { browserTextFileInput } from '@asha-rulebench/platform';
 import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
 
 type DialogName = 'ruleset' | 'encounter' | 'artifact' | 'replay' | null;
@@ -34,6 +39,39 @@ interface BoardCell {
   readonly y: number;
   readonly entity: GameplayEntityView | null;
   readonly targetable: boolean;
+  readonly selection: AuthorityOptionSelection | null;
+}
+
+export type AuthorityOptionKind = 'participant' | 'cell' | 'area';
+
+export interface AuthorityOptionSelection {
+  readonly kind: AuthorityOptionKind;
+  readonly id: string;
+}
+
+export function toggleAuthorityOption(
+  current: readonly AuthorityOptionSelection[],
+  selection: AuthorityOptionSelection,
+  maximumTargets: number,
+): readonly AuthorityOptionSelection[] {
+  const existing = current.findIndex(
+    (candidate) =>
+      candidate.kind === selection.kind && candidate.id === selection.id,
+  );
+  if (existing >= 0) {
+    return current.filter((_candidate, index) => index !== existing);
+  }
+  if (maximumTargets <= 0) return current;
+  if (current.length >= maximumTargets) {
+    return maximumTargets === 1 ? [selection] : current;
+  }
+  return [...current, selection];
+}
+
+export function authorityTargetIds(
+  selections: readonly AuthorityOptionSelection[],
+): readonly string[] {
+  return selections.map((selection) => selection.id);
 }
 
 @Component({
@@ -390,6 +428,21 @@ interface BoardCell {
         gap: 0.5rem;
       }
 
+      .capability-editor {
+        border: 1px solid var(--arb-border);
+        padding: 0.65rem;
+      }
+
+      .field-diagnostic {
+        display: block;
+        font-size: 0.85rem;
+        margin-top: 0.35rem;
+      }
+
+      [aria-invalid='true'] {
+        border-color: var(--arb-warning);
+      }
+
       .diagnostic {
         border-left: 3px solid var(--arb-warning);
         display: grid;
@@ -510,10 +563,7 @@ interface BoardCell {
                         [class.entity]="cell.entity !== null"
                         [class.current]="cell.entity?.id === gameplay.actorId"
                         [class.targetable]="cell.targetable"
-                        [class.targeted]="
-                          cell.entity !== null &&
-                          cell.entity.id === selectedTargetId()
-                        "
+                        [class.targeted]="isSelectionSelected(cell.selection)"
                         [attr.aria-rowindex]="cell.y + 1"
                         [attr.aria-colindex]="cell.x + 1"
                         [attr.aria-label]="cellLabel(cell, gameplay.actorId)"
@@ -621,6 +671,7 @@ interface BoardCell {
           </arb-workbench-panel>
 
           <arb-workbench-panel
+            #turnPanel
             class="turn-panel"
             [panelNumber]="3"
             panelTitle="Turn status"
@@ -629,21 +680,43 @@ interface BoardCell {
               <div class="status-card">
                 <p class="section-label">{{ view.statusLabel }}</p>
                 @if (view.gameplay; as gameplay) {
-                  <strong>{{ gameplay.actorId }} is acting</strong>
-                  <span
-                    >Round {{ gameplay.turn.round }} · turn
-                    {{ gameplay.turn.turn }}</span
-                  >
-                  <span class="muted"
-                    >Initiative:
-                    {{ gameplay.turn.initiativeOrder.join(' → ') }}</span
-                  >
-                  <span>Authority revision {{ gameplay.stateRevision }}</span>
-                  <span class="muted">{{
-                    gameplay.pendingReaction === null
-                      ? 'Choose any available action.'
-                      : 'A reaction must be resolved before play continues.'
-                  }}</span>
+                  @if (gameplay.outcome.status === 'completed') {
+                    <strong>Encounter complete</strong>
+                    <span
+                      >Winning team{{
+                        gameplay.outcome.winningTeamIds.length === 1 ? '' : 's'
+                      }}:
+                      {{
+                        gameplay.outcome.winningTeamIds.length === 0
+                          ? 'none'
+                          : gameplay.outcome.winningTeamIds.join(', ')
+                      }}</span
+                    >
+                    <span
+                      >Final authority revision
+                      {{ gameplay.stateRevision }}</span
+                    >
+                    <span class="muted"
+                      >Start a new encounter from the Session menu to continue
+                      experimenting.</span
+                    >
+                  } @else {
+                    <strong>{{ gameplay.actorId }} is acting</strong>
+                    <span
+                      >Round {{ gameplay.turn.round }} · turn
+                      {{ gameplay.turn.turn }}</span
+                    >
+                    <span class="muted"
+                      >Initiative:
+                      {{ gameplay.turn.initiativeOrder.join(' → ') }}</span
+                    >
+                    <span>Authority revision {{ gameplay.stateRevision }}</span>
+                    <span class="muted">{{
+                      gameplay.pendingReaction === null
+                        ? 'Choose an authority action or turn control.'
+                        : 'A reaction must be resolved before play continues.'
+                    }}</span>
+                  }
                 } @else {
                   <strong>{{ view.headline }}</strong>
                   <span class="muted"
@@ -703,94 +776,200 @@ interface BoardCell {
                     </div>
                   </div>
                 } @else {
-                  <ul class="action-list" aria-label="Available actions">
-                    @for (action of gameplay.actions; track action.id) {
-                      <li>
-                        <button
-                          class="action-choice"
-                          type="button"
-                          [attr.aria-pressed]="selectedActionId() === action.id"
-                          [disabled]="
-                            store.busy() || !action.available
-                          "
-                          (click)="selectAction(action)"
-                        >
-                          <strong>{{ action.name }}</strong>
-                          <code>{{ action.id }}</code>
-                          <span
-                            >{{ action.candidateIds.length }} available target{{
-                              action.candidateIds.length === 1 ? '' : 's'
-                            }}</span
-                          >
-                          <span class="muted"
-                            >Up to {{ action.maximumTargets }} target{{
-                              action.maximumTargets === 1 ? '' : 's'
-                            }}</span
-                          >
-                          @if (action.unavailable) {
-                            <span class="muted">{{ action.unavailable }}</span>
-                          }
-                        </button>
-                      </li>
-                    }
-                  </ul>
-
-                  @if (selectedAction(); as action) {
-                    <div class="action-context" tabindex="-1">
-                      <div>
-                        <p class="section-label">Selected action</p>
-                        <h3>{{ action.name }}</h3>
-                        <code>{{ action.id }}</code>
-                        <p class="muted">
-                          Rust exposed these legal candidates at revision
-                          {{ gameplay.stateRevision }}.
-                        </p>
-                      </div>
-                      <div
-                        class="target-row"
-                        aria-label="Authority target choices"
-                      >
-                        @for (
-                          candidate of action.candidateIds;
-                          track candidate
-                        ) {
-                          <button
-                            class="secondary"
-                            type="button"
-                            [attr.aria-pressed]="
-                              selectedTargetId() === candidate
-                            "
-                            (click)="selectedTargetId.set(candidate)"
-                          >
-                            Target {{ candidate }}
-                          </button>
-                        }
-                      </div>
-                      <p class="muted">
-                        Rolls happen automatically after you act. Rust requests
-                        and consumes the exact dice for the branch it executes.
-                      </p>
-                      <button
-                        type="button"
-                        [disabled]="
-                          store.busy() ||
-                          (action.maximumTargets > 0 &&
-                            selectedTargetId() === null)
-                        "
-                        (click)="executeAction()"
-                      >
-                        Use {{ action.name
-                        }}{{
-                          selectedTargetId() === null
+                  @if (gameplay.outcome.status === 'completed') {
+                    <div class="empty-state" tabindex="-1">
+                      <strong>Encounter complete</strong>
+                      <p>
+                        Winning team{{
+                          gameplay.outcome.winningTeamIds.length === 1
                             ? ''
-                            : ' on ' + selectedTargetId()
+                            : 's'
+                        }}:
+                        {{
+                          gameplay.outcome.winningTeamIds.length === 0
+                            ? 'none'
+                            : gameplay.outcome.winningTeamIds.join(', ')
                         }}
-                      </button>
+                      </p>
                     </div>
                   } @else {
-                    <p class="muted">
-                      Choose an action to reveal its authority-provided targets.
-                    </p>
+                    <ul class="action-list" aria-label="Available actions">
+                      @for (action of gameplay.actions; track action.id) {
+                        <li>
+                          <button
+                            class="action-choice"
+                            type="button"
+                            [attr.aria-pressed]="
+                              selectedActionId() === action.id
+                            "
+                            [disabled]="store.busy() || !action.available"
+                            (click)="selectAction(action)"
+                          >
+                            <strong>{{ action.name }}</strong>
+                            <code>{{ action.id }}</code>
+                            <span
+                              >{{ actionOptionCount(action) }} available
+                              option{{
+                                actionOptionCount(action) === 1 ? '' : 's'
+                              }}</span
+                            >
+                            <span class="muted"
+                              >Up to {{ action.maximumTargets }} target{{
+                                action.maximumTargets === 1 ? '' : 's'
+                              }}</span
+                            >
+                            @if (action.unavailable) {
+                              <span class="muted">{{
+                                action.unavailable
+                              }}</span>
+                            }
+                          </button>
+                        </li>
+                      }
+                    </ul>
+
+                    @if (selectedAction(); as action) {
+                      <div class="action-context" tabindex="-1">
+                        <div>
+                          <p class="section-label">Selected action</p>
+                          <h3>{{ action.name }}</h3>
+                          <code>{{ action.id }}</code>
+                          <p class="muted">
+                            Rust exposed these legal candidates at revision
+                            {{ gameplay.stateRevision }}.
+                          </p>
+                        </div>
+                        <div
+                          class="target-row"
+                          aria-label="Authority target choices"
+                        >
+                          @for (
+                            candidate of action.candidateIds;
+                            track candidate
+                          ) {
+                            <button
+                              class="secondary"
+                              type="button"
+                              [attr.aria-pressed]="
+                                isOptionSelected('participant', candidate)
+                              "
+                              [disabled]="
+                                optionDisabled(
+                                  'participant',
+                                  candidate,
+                                  action.maximumTargets
+                                )
+                              "
+                              (click)="
+                                toggleOption(
+                                  'participant',
+                                  candidate,
+                                  action.maximumTargets
+                                )
+                              "
+                            >
+                              Participant {{ candidate }}
+                            </button>
+                          }
+                          @for (candidate of action.cellIds; track candidate) {
+                            <button
+                              class="secondary"
+                              type="button"
+                              [attr.aria-pressed]="
+                                isOptionSelected('cell', candidate)
+                              "
+                              [disabled]="
+                                optionDisabled(
+                                  'cell',
+                                  candidate,
+                                  action.maximumTargets
+                                )
+                              "
+                              (click)="
+                                toggleOption(
+                                  'cell',
+                                  candidate,
+                                  action.maximumTargets
+                                )
+                              "
+                            >
+                              Cell {{ candidate }}
+                            </button>
+                          }
+                          @for (candidate of action.areaIds; track candidate) {
+                            <button
+                              class="secondary"
+                              type="button"
+                              [attr.aria-pressed]="
+                                isOptionSelected('area', candidate)
+                              "
+                              [disabled]="
+                                optionDisabled(
+                                  'area',
+                                  candidate,
+                                  action.maximumTargets
+                                )
+                              "
+                              (click)="
+                                toggleOption(
+                                  'area',
+                                  candidate,
+                                  action.maximumTargets
+                                )
+                              "
+                            >
+                              Area {{ candidate }}
+                            </button>
+                          }
+                        </div>
+                        <p class="muted">
+                          Rolls happen automatically after you act. Rust
+                          requests and consumes the exact dice for the branch it
+                          executes.
+                        </p>
+                        <button
+                          type="button"
+                          [disabled]="
+                            store.busy() ||
+                            (action.maximumTargets > 0 &&
+                              selectedOptions().length === 0)
+                          "
+                          (click)="executeAction()"
+                        >
+                          Use {{ action.name
+                          }}{{
+                            selectedOptions().length === 0
+                              ? ''
+                              : ' with ' + selectedOptionSummary()
+                          }}
+                        </button>
+                      </div>
+                    } @else {
+                      <p class="muted">
+                        Choose an action to reveal its authority-provided
+                        targets.
+                      </p>
+                    }
+                    <ul class="action-list" aria-label="Turn controls">
+                      @for (control of gameplay.controls; track control.kind) {
+                        <li>
+                          <button
+                            class="action-choice secondary"
+                            type="button"
+                            [disabled]="store.busy() || !control.available"
+                            (click)="executeTurnControl(control.kind)"
+                          >
+                            <strong>{{ control.label }}</strong>
+                            <code>{{ control.kind }}</code>
+                            @if (control.unavailable) {
+                              <span class="muted">{{
+                                control.unavailable
+                              }}</span>
+                            }
+                          </button>
+                        </li>
+                      }
+                    </ul>
                   }
                 }
               } @else {
@@ -1008,76 +1187,242 @@ interface BoardCell {
     >
       <div class="dialog-body">
         @if (setupDraft(); as setup) {
-          <p class="section-label">Artifact binding</p>
-          <code>{{ setup.artifactId }}</code>
+          <div>
+            <p class="section-label">Setup document</p>
+            <input
+              #setupFileInput
+              class="setup-input"
+              type="file"
+              accept="application/json,.json"
+              [disabled]="store.busy()"
+              (change)="
+                loadSetupDocument(setupFileInput.files);
+                setupFileInput.value = ''
+              "
+            />
+            <p class="muted">
+              {{
+                setupDocumentName() === null
+                  ? 'Choose an explicit JSON setup document, or author one below.'
+                  : 'Loaded ' + setupDocumentName()
+              }}
+            </p>
+            @if (setupImportError(); as importError) {
+              <div class="diagnostic" role="alert">
+                <strong>Setup document was not loaded</strong>
+                <span>{{ importError }}</span>
+              </div>
+            }
+          </div>
+
+          <div
+            #setupControl
+            tabindex="-1"
+            data-setup-path="$.artifactId"
+            [attr.aria-invalid]="setupHasError('$.artifactId')"
+            [attr.aria-describedby]="setupDescribedBy('$.artifactId')"
+          >
+            <p class="section-label">Artifact binding</p>
+            <code>{{ setup.artifactId }}</code>
+            @for (
+              diagnostic of setupDiagnosticsFor('$.artifactId');
+              track diagnostic.code + diagnostic.path
+            ) {
+              <span
+                class="diagnostic field-diagnostic"
+                [id]="setupDiagnosticId('$.artifactId')"
+                >{{ diagnostic.message }}</span
+              >
+            }
+          </div>
           <div class="setup-grid">
             <label>
               <span class="section-label">Board width</span>
               <input
+                #setupControl
                 #boardWidthInput
                 class="setup-input"
                 type="number"
                 min="1"
                 max="1024"
+                data-setup-path="$.board.width"
+                [attr.aria-invalid]="setupHasError('$.board.width')"
+                [attr.aria-describedby]="setupDescribedBy('$.board.width')"
                 [value]="setup.board.width"
                 (input)="updateBoardExtent('width', boardWidthInput.value)"
               />
+              @for (
+                diagnostic of setupDiagnosticsFor('$.board.width');
+                track diagnostic.code + diagnostic.path
+              ) {
+                <span
+                  class="diagnostic field-diagnostic"
+                  [id]="setupDiagnosticId('$.board.width')"
+                  >{{ diagnostic.message }}</span
+                >
+              }
             </label>
             <label>
               <span class="section-label">Board height</span>
               <input
+                #setupControl
                 #boardHeightInput
                 class="setup-input"
                 type="number"
                 min="1"
                 max="1024"
+                data-setup-path="$.board.height"
+                [attr.aria-invalid]="setupHasError('$.board.height')"
+                [attr.aria-describedby]="setupDescribedBy('$.board.height')"
                 [value]="setup.board.height"
                 (input)="updateBoardExtent('height', boardHeightInput.value)"
               />
+              @for (
+                diagnostic of setupDiagnosticsFor('$.board.height');
+                track diagnostic.code + diagnostic.path
+              ) {
+                <span
+                  class="diagnostic field-diagnostic"
+                  [id]="setupDiagnosticId('$.board.height')"
+                  >{{ diagnostic.message }}</span
+                >
+              }
             </label>
             <label>
               <span class="section-label">Round</span>
               <input
+                #setupControl
                 #roundInput
                 class="setup-input"
                 type="number"
                 min="1"
+                max="4294967295"
+                data-setup-path="$.turn.round"
+                [attr.aria-invalid]="setupHasError('$.turn.round')"
+                [attr.aria-describedby]="setupDescribedBy('$.turn.round')"
                 [value]="setup.turn.round"
                 (input)="updateTurnCounter('round', roundInput.value)"
               />
+              @for (
+                diagnostic of setupDiagnosticsFor('$.turn.round');
+                track diagnostic.code + diagnostic.path
+              ) {
+                <span
+                  class="diagnostic field-diagnostic"
+                  [id]="setupDiagnosticId('$.turn.round')"
+                  >{{ diagnostic.message }}</span
+                >
+              }
             </label>
             <label>
               <span class="section-label">Turn</span>
               <input
+                #setupControl
                 #turnInput
                 class="setup-input"
                 type="number"
                 min="1"
+                max="4294967295"
+                data-setup-path="$.turn.turn"
+                [attr.aria-invalid]="setupHasError('$.turn.turn')"
+                [attr.aria-describedby]="setupDescribedBy('$.turn.turn')"
                 [value]="setup.turn.turn"
                 (input)="updateTurnCounter('turn', turnInput.value)"
               />
+              @for (
+                diagnostic of setupDiagnosticsFor('$.turn.turn');
+                track diagnostic.code + diagnostic.path
+              ) {
+                <span
+                  class="diagnostic field-diagnostic"
+                  [id]="setupDiagnosticId('$.turn.turn')"
+                  >{{ diagnostic.message }}</span
+                >
+              }
             </label>
           </div>
 
-          <div>
-            <p class="section-label">Selected automatic random source</p>
-            <code
-              >{{ setup.randomSource.policyId }}@{{
-                setup.randomSource.policyVersion
-              }} · {{ setup.randomSource.sourceId }}@{{
-                setup.randomSource.sourceVersion
-              }}</code
+          <label>
+            <span class="section-label">Automatic random source</span>
+            <select
+              #setupControl
+              #randomSourceSelect
+              class="setup-select"
+              data-setup-path="$.randomSource"
+              [attr.aria-invalid]="setupHasError('$.randomSource')"
+              [attr.aria-describedby]="setupDescribedBy('$.randomSource')"
+              [value]="randomSourceKey(setup.randomSource)"
+              (change)="selectRandomSource(randomSourceSelect.value)"
             >
-          </div>
+              @for (
+                source of supportedRandomSources();
+                track randomSourceKey(source)
+              ) {
+                <option [value]="randomSourceKey(source)">
+                  {{ randomSourceLabel(source) }}
+                </option>
+              }
+            </select>
+            @for (
+              diagnostic of setupDiagnosticsFor('$.randomSource');
+              track diagnostic.code + diagnostic.path
+            ) {
+              <span
+                class="diagnostic field-diagnostic"
+                [id]="setupDiagnosticId('$.randomSource')"
+                >{{ diagnostic.message }}</span
+              >
+            }
+          </label>
 
           <div class="button-row">
-            <button class="secondary" type="button" (click)="addParticipant()">
+            <button
+              #setupControl
+              class="secondary"
+              type="button"
+              data-setup-path="$.participants"
+              [attr.aria-invalid]="setupHasExactError('$.participants')"
+              [attr.aria-describedby]="setupExactDescribedBy('$.participants')"
+              (click)="addParticipant()"
+            >
               Add participant
             </button>
-            <button class="secondary" type="button" (click)="addTerrainCell()">
+            <button
+              #setupControl
+              class="secondary"
+              type="button"
+              data-setup-path="$.board.cells"
+              [attr.aria-invalid]="setupHasExactError('$.board.cells')"
+              [attr.aria-describedby]="setupExactDescribedBy('$.board.cells')"
+              (click)="addTerrainCell()"
+            >
               Add terrain cell
             </button>
           </div>
+          @for (
+            diagnostic of setupDiagnosticsFor('$.participants');
+            track diagnostic.code + diagnostic.path
+          ) {
+            @if (diagnostic.path === '$.participants') {
+              <span
+                class="diagnostic field-diagnostic"
+                [id]="setupDiagnosticId('$.participants')"
+                >{{ diagnostic.message }}</span
+              >
+            }
+          }
+          @for (
+            diagnostic of setupDiagnosticsFor('$.board.cells');
+            track diagnostic.code + diagnostic.path
+          ) {
+            @if (diagnostic.path === '$.board.cells') {
+              <span
+                class="diagnostic field-diagnostic"
+                [id]="setupDiagnosticId('$.board.cells')"
+                >{{ diagnostic.message }}</span
+              >
+            }
+          }
 
           @for (
             participant of setup.participants;
@@ -1101,7 +1446,9 @@ interface BoardCell {
                 <button
                   class="secondary"
                   type="button"
-                  [disabled]="participantIndex === setup.participants.length - 1"
+                  [disabled]="
+                    participantIndex === setup.participants.length - 1
+                  "
                   (click)="moveParticipant(participantIndex, 1)"
                 >
                   Move later
@@ -1118,8 +1465,18 @@ interface BoardCell {
                 <label>
                   <span class="section-label">ID</span>
                   <input
+                    #setupControl
                     #participantIdInput
                     class="setup-input"
+                    [attr.data-setup-path]="
+                      participantPath(participantIndex, 'id')
+                    "
+                    [attr.aria-invalid]="
+                      setupHasError(participantPath(participantIndex, 'id'))
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(participantPath(participantIndex, 'id'))
+                    "
                     [value]="participant.id"
                     (input)="
                       updateParticipantText(
@@ -1129,12 +1486,40 @@ interface BoardCell {
                       )
                     "
                   />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      participantPath(participantIndex, 'id')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          participantPath(participantIndex, 'id')
+                        )
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
                 <label>
                   <span class="section-label">Label</span>
                   <input
+                    #setupControl
                     #participantLabelInput
                     class="setup-input"
+                    [attr.data-setup-path]="
+                      participantPath(participantIndex, 'label')
+                    "
+                    [attr.aria-invalid]="
+                      setupHasError(participantPath(participantIndex, 'label'))
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(
+                        participantPath(participantIndex, 'label')
+                      )
+                    "
                     [value]="participant.label"
                     (input)="
                       updateParticipantText(
@@ -1144,12 +1529,40 @@ interface BoardCell {
                       )
                     "
                   />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      participantPath(participantIndex, 'label')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          participantPath(participantIndex, 'label')
+                        )
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
                 <label>
                   <span class="section-label">Team ID</span>
                   <input
+                    #setupControl
                     #participantTeamInput
                     class="setup-input"
+                    [attr.data-setup-path]="
+                      participantPath(participantIndex, 'teamId')
+                    "
+                    [attr.aria-invalid]="
+                      setupHasError(participantPath(participantIndex, 'teamId'))
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(
+                        participantPath(participantIndex, 'teamId')
+                      )
+                    "
                     [value]="participant.teamId"
                     (input)="
                       updateParticipantText(
@@ -1159,14 +1572,44 @@ interface BoardCell {
                       )
                     "
                   />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      participantPath(participantIndex, 'teamId')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          participantPath(participantIndex, 'teamId')
+                        )
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
                 <label>
                   <span class="section-label">Position X</span>
                   <input
+                    #setupControl
                     #participantXInput
                     class="setup-input"
                     type="number"
                     min="0"
+                    [attr.data-setup-path]="
+                      participantPath(participantIndex, 'position.x')
+                    "
+                    [attr.aria-invalid]="
+                      setupHasError(
+                        participantPath(participantIndex, 'position.x')
+                      )
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(
+                        participantPath(participantIndex, 'position.x')
+                      )
+                    "
                     [value]="participant.position.x"
                     (input)="
                       updateParticipantPosition(
@@ -1176,14 +1619,44 @@ interface BoardCell {
                       )
                     "
                   />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      participantPath(participantIndex, 'position.x')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          participantPath(participantIndex, 'position.x')
+                        )
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
                 <label>
                   <span class="section-label">Position Y</span>
                   <input
+                    #setupControl
                     #participantYInput
                     class="setup-input"
                     type="number"
                     min="0"
+                    [attr.data-setup-path]="
+                      participantPath(participantIndex, 'position.y')
+                    "
+                    [attr.aria-invalid]="
+                      setupHasError(
+                        participantPath(participantIndex, 'position.y')
+                      )
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(
+                        participantPath(participantIndex, 'position.y')
+                      )
+                    "
                     [value]="participant.position.y"
                     (input)="
                       updateParticipantPosition(
@@ -1193,81 +1666,233 @@ interface BoardCell {
                       )
                     "
                   />
-                </label>
-                <label>
-                  <span class="section-label">Vitality</span>
-                  <input
-                    #vitalityInput
-                    class="setup-input"
-                    type="number"
-                    min="0"
-                    [value]="capabilityValue(participant, 'vitality')"
-                    (input)="
-                      updateBoundedCapability(
-                        participantIndex,
-                        'vitality',
-                        vitalityInput.value
-                      )
-                    "
-                  />
-                </label>
-                <label>
-                  <span class="section-label">Power stat</span>
-                  <input
-                    #powerInput
-                    class="setup-input"
-                    type="number"
-                    [value]="capabilityValue(participant, 'stat')"
-                    (input)="
-                      updateNumberCapability(
-                        participantIndex,
-                        'stat',
-                        powerInput.value
-                      )
-                    "
-                  />
-                </label>
-                <label>
-                  <span class="section-label">Guard defense</span>
-                  <input
-                    #guardInput
-                    class="setup-input"
-                    type="number"
-                    [value]="capabilityValue(participant, 'defense')"
-                    (input)="
-                      updateNumberCapability(
-                        participantIndex,
-                        'defense',
-                        guardInput.value
-                      )
-                    "
-                  />
-                </label>
-                <label>
-                  <span class="section-label">Focus resource</span>
-                  <input
-                    #focusInput
-                    class="setup-input"
-                    type="number"
-                    min="0"
-                    [value]="capabilityValue(participant, 'resource')"
-                    (input)="
-                      updateBoundedCapability(
-                        participantIndex,
-                        'resource',
-                        focusInput.value
-                      )
-                    "
-                  />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      participantPath(participantIndex, 'position.y')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          participantPath(participantIndex, 'position.y')
+                        )
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
               </div>
-              <fieldset class="definition-choices">
+              <div class="button-row" aria-label="Add participant capability">
+                @for (owner of participantCapabilityOwners; track owner) {
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="addParticipantCapability(participantIndex, owner)"
+                  >
+                    Add {{ owner }}
+                  </button>
+                }
+              </div>
+              @for (
+                capability of participant.capabilities;
+                track $index;
+                let capabilityIndex = $index
+              ) {
+                <fieldset
+                  #setupControl
+                  class="definition-choices capability-editor"
+                  [attr.data-setup-path]="
+                    capabilityPath(participantIndex, capabilityIndex)
+                  "
+                  [attr.aria-invalid]="
+                    setupHasError(
+                      capabilityPath(participantIndex, capabilityIndex)
+                    )
+                  "
+                  [attr.aria-describedby]="
+                    setupDescribedBy(
+                      capabilityPath(participantIndex, capabilityIndex)
+                    )
+                  "
+                >
+                  <legend class="section-label">
+                    {{ capability.owner }} capability {{ capabilityIndex + 1 }}
+                  </legend>
+                  <div class="setup-grid">
+                    @if (capability.owner !== 'vitality') {
+                      <label>
+                        <span class="section-label">ID</span>
+                        <input
+                          #capabilityIdInput
+                          class="setup-input"
+                          [value]="capability.id"
+                          (input)="
+                            updateParticipantCapabilityText(
+                              participantIndex,
+                              capabilityIndex,
+                              'id',
+                              capabilityIdInput.value
+                            )
+                          "
+                        />
+                      </label>
+                    }
+                    @if (capability.owner === 'modifier') {
+                      <label>
+                        <span class="section-label">Stacking group</span>
+                        <input
+                          #stackingGroupInput
+                          class="setup-input"
+                          [value]="capability.stackingGroup"
+                          (input)="
+                            updateParticipantCapabilityText(
+                              participantIndex,
+                              capabilityIndex,
+                              'stackingGroup',
+                              stackingGroupInput.value
+                            )
+                          "
+                        />
+                      </label>
+                    }
+                    @if (
+                      capability.owner === 'vitality' ||
+                      capability.owner === 'resource'
+                    ) {
+                      <label>
+                        <span class="section-label">Current</span>
+                        <input
+                          #capabilityCurrentInput
+                          class="setup-input"
+                          type="number"
+                          min="0"
+                          [value]="capability.value.current"
+                          (input)="
+                            updateParticipantCapabilityNumber(
+                              participantIndex,
+                              capabilityIndex,
+                              'current',
+                              capabilityCurrentInput.value
+                            )
+                          "
+                        />
+                      </label>
+                      <label>
+                        <span class="section-label">Maximum</span>
+                        <input
+                          #capabilityMaximumInput
+                          class="setup-input"
+                          type="number"
+                          min="0"
+                          [value]="capability.value.max"
+                          (input)="
+                            updateParticipantCapabilityNumber(
+                              participantIndex,
+                              capabilityIndex,
+                              'max',
+                              capabilityMaximumInput.value
+                            )
+                          "
+                        />
+                      </label>
+                    } @else {
+                      <label>
+                        <span class="section-label">Value</span>
+                        <input
+                          #capabilityValueInput
+                          class="setup-input"
+                          type="number"
+                          [value]="capability.value"
+                          (input)="
+                            updateParticipantCapabilityNumber(
+                              participantIndex,
+                              capabilityIndex,
+                              'value',
+                              capabilityValueInput.value
+                            )
+                          "
+                        />
+                      </label>
+                    }
+                    @if (capability.owner === 'modifier') {
+                      <label>
+                        <span class="section-label">Remaining turns</span>
+                        <input
+                          #remainingTurnsInput
+                          class="setup-input"
+                          type="number"
+                          min="1"
+                          max="1000"
+                          [value]="capability.remainingTurns"
+                          (input)="
+                            updateParticipantCapabilityNumber(
+                              participantIndex,
+                              capabilityIndex,
+                              'remainingTurns',
+                              remainingTurnsInput.value
+                            )
+                          "
+                        />
+                      </label>
+                    }
+                  </div>
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      capabilityPath(participantIndex, capabilityIndex)
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          capabilityPath(participantIndex, capabilityIndex)
+                        )
+                      "
+                      >{{ diagnostic.path }} · {{ diagnostic.message }}</span
+                    >
+                  }
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="
+                      removeParticipantCapability(
+                        participantIndex,
+                        capabilityIndex
+                      )
+                    "
+                  >
+                    Remove capability
+                  </button>
+                </fieldset>
+              }
+              <fieldset
+                #setupControl
+                class="definition-choices"
+                [attr.data-setup-path]="
+                  participantPath(participantIndex, 'definitionIds')
+                "
+                [attr.aria-invalid]="
+                  setupHasError(
+                    participantPath(participantIndex, 'definitionIds')
+                  )
+                "
+                [attr.aria-describedby]="
+                  setupDescribedBy(
+                    participantPath(participantIndex, 'definitionIds')
+                  )
+                "
+              >
                 <legend class="section-label">Owned action definitions</legend>
                 @for (definition of actionDefinitions(); track definition.id) {
                   <label class="definition-choice">
                     <input
                       type="checkbox"
-                      [checked]="participant.definitionIds.includes(definition.id)"
+                      [checked]="
+                        participant.definitionIds.includes(definition.id)
+                      "
                       (change)="
                         toggleParticipantDefinition(
                           participantIndex,
@@ -1278,6 +1903,22 @@ interface BoardCell {
                     <span>{{ definition.label }} · {{ definition.id }}</span>
                   </label>
                 }
+                @for (
+                  diagnostic of setupDiagnosticsFor(
+                    participantPath(participantIndex, 'definitionIds')
+                  );
+                  track diagnostic.code + diagnostic.path
+                ) {
+                  <span
+                    class="diagnostic field-diagnostic"
+                    [id]="
+                      setupDiagnosticId(
+                        participantPath(participantIndex, 'definitionIds')
+                      )
+                    "
+                    >{{ diagnostic.message }}</span
+                  >
+                }
               </fieldset>
             </section>
           } @empty {
@@ -1287,7 +1928,11 @@ interface BoardCell {
             </p>
           }
 
-          @for (cell of setup.board.cells; track $index; let cellIndex = $index) {
+          @for (
+            cell of setup.board.cells;
+            track $index;
+            let cellIndex = $index
+          ) {
             <section
               class="participant-editor"
               [attr.aria-label]="'Terrain cell ' + (cellIndex + 1)"
@@ -1306,52 +1951,320 @@ interface BoardCell {
                 <label>
                   <span class="section-label">Cell ID</span>
                   <input
+                    #setupControl
                     #cellIdInput
                     class="setup-input"
+                    [attr.data-setup-path]="cellPath(cellIndex, 'id')"
+                    [attr.aria-invalid]="
+                      setupHasError(cellPath(cellIndex, 'id'))
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(cellPath(cellIndex, 'id'))
+                    "
                     [value]="cell.id"
                     (input)="updateCellId(cellIndex, cellIdInput.value)"
                   />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      cellPath(cellIndex, 'id')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="setupDiagnosticId(cellPath(cellIndex, 'id'))"
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
                 <label>
                   <span class="section-label">Position X</span>
                   <input
+                    #setupControl
                     #cellXInput
                     class="setup-input"
                     type="number"
                     min="0"
+                    [attr.data-setup-path]="cellPath(cellIndex, 'position.x')"
+                    [attr.aria-invalid]="
+                      setupHasError(cellPath(cellIndex, 'position.x'))
+                    "
+                    [attr.aria-describedby]="
+                      setupDescribedBy(cellPath(cellIndex, 'position.x'))
+                    "
                     [value]="cell.position.x"
-                    (input)="updateCellPosition(cellIndex, 'x', cellXInput.value)"
+                    (input)="
+                      updateCellPosition(cellIndex, 'x', cellXInput.value)
+                    "
                   />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      cellPath(cellIndex, 'position.x')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(cellPath(cellIndex, 'position.x'))
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
                 <label>
                   <span class="section-label">Position Y</span>
                   <input
+                    #setupControl
                     #cellYInput
                     class="setup-input"
                     type="number"
                     min="0"
-                    [value]="cell.position.y"
-                    (input)="updateCellPosition(cellIndex, 'y', cellYInput.value)"
-                  />
-                </label>
-                <label>
-                  <span class="section-label">Traversal</span>
-                  <select
-                    #passableSelect
-                    class="setup-select"
-                    [value]="cellPassable(cell) ? 'passable' : 'blocked'"
-                    (change)="
-                      updateCellPassable(
-                        cellIndex,
-                        passableSelect.value === 'passable'
-                      )
+                    [attr.data-setup-path]="cellPath(cellIndex, 'position.y')"
+                    [attr.aria-invalid]="
+                      setupHasError(cellPath(cellIndex, 'position.y'))
                     "
-                  >
-                    <option value="passable">Passable</option>
-                    <option value="blocked">Blocked</option>
-                  </select>
+                    [attr.aria-describedby]="
+                      setupDescribedBy(cellPath(cellIndex, 'position.y'))
+                    "
+                    [value]="cell.position.y"
+                    (input)="
+                      updateCellPosition(cellIndex, 'y', cellYInput.value)
+                    "
+                  />
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      cellPath(cellIndex, 'position.y')
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(cellPath(cellIndex, 'position.y'))
+                      "
+                      >{{ diagnostic.message }}</span
+                    >
+                  }
                 </label>
               </div>
+              <div class="button-row" aria-label="Add cell capability">
+                @for (kind of cellCapabilityKinds; track kind) {
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="addCellCapability(cellIndex, kind)"
+                  >
+                    Add {{ kind }}
+                  </button>
+                }
+              </div>
+              @for (
+                capability of cell.capabilities;
+                track $index;
+                let capabilityIndex = $index
+              ) {
+                <fieldset
+                  #setupControl
+                  class="definition-choices capability-editor"
+                  [attr.data-setup-path]="
+                    cellCapabilityPath(cellIndex, capabilityIndex)
+                  "
+                  [attr.aria-invalid]="
+                    setupHasError(
+                      cellCapabilityPath(cellIndex, capabilityIndex)
+                    )
+                  "
+                  [attr.aria-describedby]="
+                    setupDescribedBy(
+                      cellCapabilityPath(cellIndex, capabilityIndex)
+                    )
+                  "
+                >
+                  <legend class="section-label">
+                    {{ capability.value.kind }} capability
+                    {{ capabilityIndex + 1 }}
+                  </legend>
+                  <div class="setup-grid">
+                    <label>
+                      <span class="section-label">Capability ID</span>
+                      <input
+                        #cellCapabilityIdInput
+                        class="setup-input"
+                        [value]="capability.id"
+                        (input)="
+                          updateCellCapabilityText(
+                            cellIndex,
+                            capabilityIndex,
+                            'id',
+                            cellCapabilityIdInput.value
+                          )
+                        "
+                      />
+                    </label>
+                    <label>
+                      <span class="section-label">Version</span>
+                      <input
+                        #cellCapabilityVersionInput
+                        class="setup-input"
+                        type="number"
+                        min="1"
+                        [value]="capability.version"
+                        (input)="
+                          updateCellCapabilityNumber(
+                            cellIndex,
+                            capabilityIndex,
+                            'version',
+                            cellCapabilityVersionInput.value
+                          )
+                        "
+                      />
+                    </label>
+                    <label>
+                      <span class="section-label"
+                        >Definition ID (optional)</span
+                      >
+                      <input
+                        #cellDefinitionIdInput
+                        class="setup-input"
+                        [value]="capability.definitionId ?? ''"
+                        (input)="
+                          updateCellCapabilityText(
+                            cellIndex,
+                            capabilityIndex,
+                            'definitionId',
+                            cellDefinitionIdInput.value
+                          )
+                        "
+                      />
+                    </label>
+                    @switch (capability.value.kind) {
+                      @case ('traversal') {
+                        <label>
+                          <span class="section-label">Passable</span>
+                          <select
+                            #cellPassableSelect
+                            class="setup-select"
+                            [value]="
+                              capability.value.passable ? 'true' : 'false'
+                            "
+                            (change)="
+                              updateCellCapabilityText(
+                                cellIndex,
+                                capabilityIndex,
+                                'booleanValue',
+                                cellPassableSelect.value
+                              )
+                            "
+                          >
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span class="section-label">Movement cost</span>
+                          <input
+                            #movementCostInput
+                            class="setup-input"
+                            type="number"
+                            min="1"
+                            [value]="capability.value.movementCost"
+                            (input)="
+                              updateCellCapabilityNumber(
+                                cellIndex,
+                                capabilityIndex,
+                                'value',
+                                movementCostInput.value
+                              )
+                            "
+                          />
+                        </label>
+                      }
+                      @case ('flag') {
+                        <label>
+                          <span class="section-label">Value</span>
+                          <select
+                            #cellFlagSelect
+                            class="setup-select"
+                            [value]="capability.value.value ? 'true' : 'false'"
+                            (change)="
+                              updateCellCapabilityText(
+                                cellIndex,
+                                capabilityIndex,
+                                'booleanValue',
+                                cellFlagSelect.value
+                              )
+                            "
+                          >
+                            <option value="true">True</option>
+                            <option value="false">False</option>
+                          </select>
+                        </label>
+                      }
+                      @case ('integer') {
+                        <label>
+                          <span class="section-label">Value</span>
+                          <input
+                            #cellIntegerInput
+                            class="setup-input"
+                            type="number"
+                            [value]="capability.value.value"
+                            (input)="
+                              updateCellCapabilityNumber(
+                                cellIndex,
+                                capabilityIndex,
+                                'value',
+                                cellIntegerInput.value
+                              )
+                            "
+                          />
+                        </label>
+                      }
+                      @case ('identifier') {
+                        <label>
+                          <span class="section-label">Value ID</span>
+                          <input
+                            #cellValueIdInput
+                            class="setup-input"
+                            [value]="capability.value.valueId"
+                            (input)="
+                              updateCellCapabilityText(
+                                cellIndex,
+                                capabilityIndex,
+                                'valueId',
+                                cellValueIdInput.value
+                              )
+                            "
+                          />
+                        </label>
+                      }
+                    }
+                  </div>
+                  @for (
+                    diagnostic of setupDiagnosticsFor(
+                      cellCapabilityPath(cellIndex, capabilityIndex)
+                    );
+                    track diagnostic.code + diagnostic.path
+                  ) {
+                    <span
+                      class="diagnostic field-diagnostic"
+                      [id]="
+                        setupDiagnosticId(
+                          cellCapabilityPath(cellIndex, capabilityIndex)
+                        )
+                      "
+                      >{{ diagnostic.path }} · {{ diagnostic.message }}</span
+                    >
+                  }
+                  <button
+                    class="secondary"
+                    type="button"
+                    (click)="removeCellCapability(cellIndex, capabilityIndex)"
+                  >
+                    Remove capability
+                  </button>
+                </fieldset>
+              }
             </section>
           }
 
@@ -1359,9 +2272,13 @@ interface BoardCell {
             >Starting actor</label
           >
           <select
+            #setupControl
             #currentActorSelect
             id="current-actor"
             class="setup-select"
+            data-setup-path="$.turn.currentActorId"
+            [attr.aria-invalid]="setupHasError('$.turn.currentActorId')"
+            [attr.aria-describedby]="setupDescribedBy('$.turn.currentActorId')"
             [value]="setup.turn.currentActorId"
             (change)="setCurrentActor(currentActorSelect.value)"
           >
@@ -1371,11 +2288,34 @@ interface BoardCell {
               </option>
             }
           </select>
+          @for (
+            diagnostic of setupDiagnosticsFor('$.turn.currentActorId');
+            track diagnostic.code + diagnostic.path
+          ) {
+            <span
+              class="diagnostic field-diagnostic"
+              [id]="setupDiagnosticId('$.turn.currentActorId')"
+              >{{ diagnostic.message }}</span
+            >
+          }
           <p class="muted">
             Initiative follows the participant order shown above. Actions,
             targets, reactions, rolls, expected events, and winners are not part
             of setup.
           </p>
+          @for (
+            diagnostic of setupDiagnosticsFor('$.turn.initiativeOrder');
+            track diagnostic.code + diagnostic.path
+          ) {
+            <span
+              #setupControl
+              class="diagnostic field-diagnostic"
+              tabindex="-1"
+              data-setup-path="$.turn.initiativeOrder"
+              [id]="setupDiagnosticId('$.turn.initiativeOrder')"
+              >{{ diagnostic.message }}</span
+            >
+          }
 
           @for (
             diagnostic of setupDiagnostics();
@@ -1568,11 +2508,30 @@ interface BoardCell {
   `,
 })
 export class RulebenchWorkspaceFeatureComponent implements OnInit {
+  protected readonly participantCapabilityOwners = [
+    'vitality',
+    'stat',
+    'defense',
+    'resource',
+    'modifier',
+  ] as const;
+  protected readonly cellCapabilityKinds = [
+    'traversal',
+    'flag',
+    'integer',
+    'identifier',
+  ] as const;
   protected readonly store = createBrowserRulesetWorkspaceStore();
   protected readonly openDialogName = signal<DialogName>(null);
   protected readonly selectedActionId = signal<string | null>(null);
-  protected readonly selectedTargetId = signal<string | null>(null);
+  protected readonly selectedOptions = signal<
+    readonly AuthorityOptionSelection[]
+  >([]);
   protected readonly setupDraft = signal<EncounterSetupRequestDto | null>(null);
+  protected readonly setupDocumentName = signal<string | null>(null);
+  protected readonly setupImportError = signal<string | null>(null);
+
+  private readonly textFileInput = browserTextFileInput();
 
   private readonly rulesetRootInput =
     viewChild<ElementRef<HTMLInputElement>>('rulesetRootInput');
@@ -1582,10 +2541,13 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     viewChild<WorkbenchPanelComponent>('actionPanel');
   private readonly outcomePanel =
     viewChild<WorkbenchPanelComponent>('outcomePanel');
+  private readonly turnPanel = viewChild<WorkbenchPanelComponent>('turnPanel');
   private readonly reactionPanel =
     viewChild<ElementRef<HTMLElement>>('reactionPanel');
   private readonly gridCells =
     viewChildren<ElementRef<HTMLButtonElement>>('gridCell');
+  private readonly setupControls =
+    viewChildren<ElementRef<HTMLElement>>('setupControl');
 
   protected readonly selectedAction = computed<GameplayActionView | null>(
     () => {
@@ -1614,8 +2576,11 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   );
 
   protected readonly boardCells = computed<readonly BoardCell[]>(() => {
-    const entities = this.store.view()?.gameplay?.entities ?? [];
-    const targetIds = new Set(this.selectedAction()?.candidateIds ?? []);
+    const gameplay = this.store.view()?.gameplay;
+    const entities = gameplay?.entities ?? [];
+    const action = this.selectedAction();
+    const participantIds = new Set(action?.candidateIds ?? []);
+    const cellIds = new Set(action?.cellIds ?? []);
     const cells: BoardCell[] = [];
     for (let y = 0; y < this.boardHeight(); y += 1) {
       for (let x = 0; x < this.boardWidth(); x += 1) {
@@ -1623,11 +2588,21 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
           entities.find(
             (candidate) => candidate.x === x && candidate.y === y,
           ) ?? null;
+        const authoredCell = gameplay?.board.cells.find(
+          (candidate) => candidate.x === x && candidate.y === y,
+        );
+        const selection =
+          entity !== null && participantIds.has(entity.id)
+            ? { kind: 'participant' as const, id: entity.id }
+            : authoredCell !== undefined && cellIds.has(authoredCell.id)
+              ? { kind: 'cell' as const, id: authoredCell.id }
+              : null;
         cells.push({
           x,
           y,
           entity,
-          targetable: entity !== null && targetIds.has(entity.id),
+          targetable: selection !== null,
+          selection,
         });
       }
     }
@@ -1653,10 +2628,24 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     ),
   );
 
+  protected readonly supportedRandomSources = computed<
+    readonly EncounterRandomSourceDto[]
+  >(() => {
+    const view = this.store.view();
+    if (view === null) return [];
+    return view.supportedRandomSources.map((source) => ({ ...source }));
+  });
+
   protected readonly setupDiagnostics = computed(() =>
     (this.store.view()?.diagnostics ?? []).filter(
       (diagnostic) => diagnostic.stage === 'setup',
     ),
+  );
+
+  protected readonly selectedOptionSummary = computed(() =>
+    this.selectedOptions()
+      .map((selection) => `${selection.kind} ${selection.id}`)
+      .join(', '),
   );
 
   protected readonly interactionDiagnostics = computed(() => {
@@ -1744,6 +2733,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       const panel = this.outcomePanel();
       if (diagnostics.length > 0 && panel !== undefined) panel.focus();
     });
+    effect(() => {
+      const outcome = this.store.view()?.gameplay?.outcome;
+      const panel = this.turnPanel();
+      if (outcome?.status === 'completed' && panel !== undefined) panel.focus();
+    });
+    effect(() => {
+      const diagnostics = this.setupDiagnostics();
+      if (this.openDialogName() === 'encounter' && diagnostics.length > 0) {
+        this.focusFirstSetupDiagnostic();
+      }
+    });
   }
 
   public ngOnInit(): void {
@@ -1813,6 +2813,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected prepareEncounterDraft(): void {
     const view = this.store.view();
+    this.setupDocumentName.set(null);
+    this.setupImportError.set(null);
     if (
       view?.activeArtifactId === null ||
       view?.activeArtifactId === undefined
@@ -1833,6 +2835,38 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       },
       randomSource: view.hostRandomSource,
     });
+  }
+
+  protected async loadSetupDocument(files: FileList | null): Promise<void> {
+    const file = files?.item(0);
+    if (file === null || file === undefined) return;
+    try {
+      const loaded = await this.textFileInput.readText(file);
+      const parsed: unknown = JSON.parse(loaded.text);
+      const setup = decodeEncounterSetupDocument(parsed);
+      this.setupDraft.set(setup);
+      this.setupDocumentName.set(loaded.name);
+      this.setupImportError.set(null);
+    } catch (error: unknown) {
+      this.setupDocumentName.set(null);
+      this.setupImportError.set(errorMessage(error));
+    }
+  }
+
+  protected randomSourceKey(source: EncounterRandomSourceDto): string {
+    return `${source.policyId}@${source.policyVersion}:${source.sourceId}@${source.sourceVersion}`;
+  }
+
+  protected randomSourceLabel(source: EncounterRandomSourceDto): string {
+    return `${source.policyId}@${source.policyVersion} · ${source.sourceId}@${source.sourceVersion}`;
+  }
+
+  protected selectRandomSource(key: string): void {
+    const source = this.supportedRandomSources().find(
+      (candidate) => this.randomSourceKey(candidate) === key,
+    );
+    if (source === undefined) return;
+    this.updateSetup((setup) => ({ ...setup, randomSource: { ...source } }));
   }
 
   protected updateBoardExtent(field: 'width' | 'height', value: string): void {
@@ -1859,16 +2893,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         teamId: `team-${participantNumber}`,
         position: { x: participantNumber - 1, y: 0 },
         definitionIds: [],
-        capabilities: [
-          { owner: 'vitality', value: { current: 10, max: 10 } },
-          { owner: 'stat', id: 'power', value: 0 },
-          { owner: 'defense', id: 'guard', value: 10 },
-          {
-            owner: 'resource',
-            id: 'focus',
-            value: { current: 2, max: 2 },
-          },
-        ],
+        capabilities: [{ owner: 'vitality', value: { current: 10, max: 10 } }],
       };
       const participants = [...setup.participants, participant];
       const initiativeOrder = participants.map((entry) => entry.id);
@@ -1970,50 +2995,83 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }));
   }
 
-  protected capabilityValue(
-    participant: EncounterParticipantSetupDto,
+  protected addParticipantCapability(
+    participantIndex: number,
     owner: EncounterInitialCapabilityDto['owner'],
-  ): number {
-    const capability = participant.capabilities.find(
-      (entry) => entry.owner === owner,
+  ): void {
+    const capability = initialParticipantCapability(owner);
+    this.updateParticipant(participantIndex, (participant) => ({
+      ...participant,
+      capabilities: [...participant.capabilities, capability],
+    }));
+  }
+
+  protected removeParticipantCapability(
+    participantIndex: number,
+    capabilityIndex: number,
+  ): void {
+    this.updateParticipant(participantIndex, (participant) => ({
+      ...participant,
+      capabilities: participant.capabilities.filter(
+        (_capability, index) => index !== capabilityIndex,
+      ),
+    }));
+  }
+
+  protected updateParticipantCapabilityText(
+    participantIndex: number,
+    capabilityIndex: number,
+    field: 'id' | 'stackingGroup',
+    value: string,
+  ): void {
+    this.updateParticipantCapability(
+      participantIndex,
+      capabilityIndex,
+      (capability) => {
+        if (field === 'id' && capability.owner !== 'vitality') {
+          return { ...capability, id: value };
+        }
+        if (field === 'stackingGroup' && capability.owner === 'modifier') {
+          return { ...capability, stackingGroup: value };
+        }
+        return capability;
+      },
     );
-    if (capability === undefined) return 0;
-    return typeof capability.value === 'number'
-      ? capability.value
-      : capability.value.current;
   }
 
-  protected updateNumberCapability(
-    index: number,
-    owner: 'stat' | 'defense',
+  protected updateParticipantCapabilityNumber(
+    participantIndex: number,
+    capabilityIndex: number,
+    field: 'current' | 'max' | 'value' | 'remainingTurns',
     value: string,
   ): void {
-    this.updateCapability(index, owner, (capability) => {
-      if (capability.owner === 'stat') {
-        return { ...capability, value: formSignedInteger(value) };
-      }
-      if (capability.owner === 'defense') {
-        return { ...capability, value: formSignedInteger(value) };
-      }
-      return capability;
-    });
-  }
-
-  protected updateBoundedCapability(
-    index: number,
-    owner: 'vitality' | 'resource',
-    value: string,
-  ): void {
-    const next = formInteger(value);
-    this.updateCapability(index, owner, (capability) => {
-      if (capability.owner === 'vitality') {
-        return { ...capability, value: { current: next, max: next } };
-      }
-      if (capability.owner === 'resource') {
-        return { ...capability, value: { current: next, max: next } };
-      }
-      return capability;
-    });
+    this.updateParticipantCapability(
+      participantIndex,
+      capabilityIndex,
+      (capability) => {
+        if (
+          (capability.owner === 'vitality' ||
+            capability.owner === 'resource') &&
+          (field === 'current' || field === 'max')
+        ) {
+          return {
+            ...capability,
+            value: { ...capability.value, [field]: formInteger(value) },
+          };
+        }
+        if (
+          capability.owner !== 'vitality' &&
+          capability.owner !== 'resource' &&
+          field === 'value'
+        ) {
+          return { ...capability, value: formSignedInteger(value) };
+        }
+        if (capability.owner === 'modifier' && field === 'remainingTurns') {
+          return { ...capability, remainingTurns: formInteger(value) };
+        }
+        return capability;
+      },
+    );
   }
 
   protected addTerrainCell(): void {
@@ -2028,18 +3086,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
             {
               id: `terrain-${cellNumber}`,
               position: { x: 0, y: 0 },
-              capabilities: [
-                {
-                  id: 'capability.traversal',
-                  version: 1,
-                  definitionId: null,
-                  value: {
-                    kind: 'traversal',
-                    passable: true,
-                    movementCost: 1,
-                  },
-                },
-              ],
+              capabilities: [],
             },
           ],
         },
@@ -2074,29 +3121,86 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }));
   }
 
-  protected cellPassable(
-    cell: EncounterSetupRequestDto['board']['cells'][number],
-  ): boolean {
-    const traversal = cell.capabilities.find(
-      (capability) => capability.value.kind === 'traversal',
-    );
-    return traversal?.value.kind === 'traversal'
-      ? traversal.value.passable
-      : true;
+  protected addCellCapability(
+    cellIndex: number,
+    kind: EncounterCellCapabilityDto['value']['kind'],
+  ): void {
+    const capability = initialCellCapability(kind);
+    this.updateCell(cellIndex, (cell) => ({
+      ...cell,
+      capabilities: [...cell.capabilities, capability],
+    }));
   }
 
-  protected updateCellPassable(index: number, passable: boolean): void {
-    this.updateCell(index, (cell) => ({
+  protected removeCellCapability(
+    cellIndex: number,
+    capabilityIndex: number,
+  ): void {
+    this.updateCell(cellIndex, (cell) => ({
       ...cell,
-      capabilities: cell.capabilities.map((capability) =>
-        capability.value.kind === 'traversal'
-          ? {
-              ...capability,
-              value: { ...capability.value, passable },
-            }
-          : capability,
+      capabilities: cell.capabilities.filter(
+        (_capability, index) => index !== capabilityIndex,
       ),
     }));
+  }
+
+  protected updateCellCapabilityText(
+    cellIndex: number,
+    capabilityIndex: number,
+    field: 'id' | 'definitionId' | 'booleanValue' | 'valueId',
+    value: string,
+  ): void {
+    this.updateCellCapability(cellIndex, capabilityIndex, (capability) => {
+      if (field === 'id') return { ...capability, id: value };
+      if (field === 'definitionId') {
+        return { ...capability, definitionId: value.trim() || null };
+      }
+      if (field === 'booleanValue' && capability.value.kind === 'traversal') {
+        return {
+          ...capability,
+          value: { ...capability.value, passable: value === 'true' },
+        };
+      }
+      if (field === 'booleanValue' && capability.value.kind === 'flag') {
+        return {
+          ...capability,
+          value: { ...capability.value, value: value === 'true' },
+        };
+      }
+      if (field === 'valueId' && capability.value.kind === 'identifier') {
+        return {
+          ...capability,
+          value: { ...capability.value, valueId: value },
+        };
+      }
+      return capability;
+    });
+  }
+
+  protected updateCellCapabilityNumber(
+    cellIndex: number,
+    capabilityIndex: number,
+    field: 'version' | 'value',
+    value: string,
+  ): void {
+    this.updateCellCapability(cellIndex, capabilityIndex, (capability) => {
+      if (field === 'version') {
+        return { ...capability, version: formInteger(value) };
+      }
+      if (capability.value.kind === 'traversal') {
+        return {
+          ...capability,
+          value: { ...capability.value, movementCost: formInteger(value) },
+        };
+      }
+      if (capability.value.kind === 'integer') {
+        return {
+          ...capability,
+          value: { ...capability.value, value: formSignedInteger(value) },
+        };
+      }
+      return capability;
+    });
   }
 
   protected setCurrentActor(currentActorId: string): void {
@@ -2106,15 +3210,71 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }));
   }
 
+  protected participantPath(index: number, suffix: string): string {
+    return `$.participants[${index}].${suffix}`;
+  }
+
+  protected capabilityPath(
+    participantIndex: number,
+    capabilityIndex: number,
+  ): string {
+    return `$.participants[${participantIndex}].capabilities[${capabilityIndex}]`;
+  }
+
+  protected cellPath(index: number, suffix: string): string {
+    return `$.board.cells[${index}].${suffix}`;
+  }
+
+  protected cellCapabilityPath(
+    cellIndex: number,
+    capabilityIndex: number,
+  ): string {
+    return `$.board.cells[${cellIndex}].capabilities[${capabilityIndex}]`;
+  }
+
+  protected setupDiagnosticsFor(path: string): readonly RulesetDiagnosticDto[] {
+    return this.setupDiagnostics().filter((diagnostic) =>
+      diagnosticMatchesSetupPath(diagnostic.path, path),
+    );
+  }
+
+  protected setupHasError(path: string): boolean {
+    return this.setupDiagnosticsFor(path).length > 0;
+  }
+
+  protected setupHasExactError(path: string): boolean {
+    return this.setupDiagnostics().some(
+      (diagnostic) => diagnostic.path === path,
+    );
+  }
+
+  protected setupDescribedBy(path: string): string | null {
+    return this.setupHasError(path) ? this.setupDiagnosticId(path) : null;
+  }
+
+  protected setupExactDescribedBy(path: string): string | null {
+    return this.setupHasExactError(path) ? this.setupDiagnosticId(path) : null;
+  }
+
+  protected setupDiagnosticId(path: string): string {
+    return `setup-error-${path.replaceAll(/[^a-zA-Z0-9]+/g, '-')}`;
+  }
+
   protected startEncounter(): void {
     const setup = this.setupDraft();
     if (setup === null) return;
     void this.store.startEncounter(setup).then((started) => {
       if (started) {
         this.selectedActionId.set(null);
-        this.selectedTargetId.set(null);
+        this.selectedOptions.set([]);
         this.closeDialog();
-        this.boardPanel()?.focus();
+        if (this.store.view()?.gameplay?.outcome.status === 'completed') {
+          this.turnPanel()?.focus();
+        } else {
+          this.boardPanel()?.focus();
+        }
+      } else {
+        this.focusFirstSetupDiagnostic();
       }
     });
   }
@@ -2123,6 +3283,26 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     update: (setup: EncounterSetupRequestDto) => EncounterSetupRequestDto,
   ): void {
     this.setupDraft.update((setup) => (setup === null ? null : update(setup)));
+  }
+
+  private focusFirstSetupDiagnostic(): void {
+    const diagnostic = this.setupDiagnostics()[0];
+    if (diagnostic === undefined) return;
+    const candidates = this.setupControls()
+      .map((control) => control.nativeElement)
+      .filter((control) => {
+        const path = control.dataset['setupPath'];
+        return (
+          path !== undefined &&
+          diagnosticMatchesSetupPath(diagnostic.path, path)
+        );
+      })
+      .sort((left, right) => {
+        const leftLength = left.dataset['setupPath']?.length ?? 0;
+        const rightLength = right.dataset['setupPath']?.length ?? 0;
+        return rightLength - leftLength;
+      });
+    candidates[0]?.focus();
   }
 
   private updateParticipant(
@@ -2139,17 +3319,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }));
   }
 
-  private updateCapability(
+  private updateParticipantCapability(
     participantIndex: number,
-    owner: EncounterInitialCapabilityDto['owner'],
+    capabilityIndex: number,
     update: (
       capability: EncounterInitialCapabilityDto,
     ) => EncounterInitialCapabilityDto,
   ): void {
     this.updateParticipant(participantIndex, (participant) => ({
       ...participant,
-      capabilities: participant.capabilities.map((capability) =>
-        capability.owner === owner ? update(capability) : capability,
+      capabilities: participant.capabilities.map((capability, index) =>
+        capabilityIndex === index ? update(capability) : capability,
       ),
     }));
   }
@@ -2171,6 +3351,21 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }));
   }
 
+  private updateCellCapability(
+    cellIndex: number,
+    capabilityIndex: number,
+    update: (
+      capability: EncounterCellCapabilityDto,
+    ) => EncounterCellCapabilityDto,
+  ): void {
+    this.updateCell(cellIndex, (cell) => ({
+      ...cell,
+      capabilities: cell.capabilities.map((capability, index) =>
+        capabilityIndex === index ? update(capability) : capability,
+      ),
+    }));
+  }
+
   protected restoreCheckpoint(): void {
     void this.store.restoreCheckpoint();
   }
@@ -2181,34 +3376,94 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected selectAction(action: GameplayActionView): void {
     this.selectedActionId.set(action.id);
-    this.selectedTargetId.set(null);
+    this.selectedOptions.set([]);
   }
 
   protected chooseGridCell(cell: BoardCell): void {
-    if (!cell.targetable || cell.entity === null) return;
-    this.selectedTargetId.set(cell.entity.id);
+    const action = this.selectedAction();
+    if (!cell.targetable || cell.selection === null || action === null) return;
+    this.toggleOption(
+      cell.selection.kind,
+      cell.selection.id,
+      action.maximumTargets,
+    );
   }
 
   protected executeAction(): void {
     const gameplay = this.store.view()?.gameplay;
     const actionId = this.selectedActionId();
-    const targetId = this.selectedTargetId();
+    const targetIds = authorityTargetIds(this.selectedOptions());
     if (
       gameplay === null ||
       gameplay === undefined ||
       actionId === null ||
-      (targetId === null && this.selectedAction()?.maximumTargets !== 0)
+      (targetIds.length === 0 && this.selectedAction()?.maximumTargets !== 0)
     ) {
       return;
     }
     this.selectedActionId.set(null);
-    this.selectedTargetId.set(null);
+    this.selectedOptions.set([]);
     void this.store.command({
       expectedRevision: gameplay.stateRevision,
       actionId,
       actorId: gameplay.actorId,
-      targetIds: targetId === null ? [] : [targetId],
+      targetIds: [...targetIds],
     });
+  }
+
+  protected executeTurnControl(kind: string): void {
+    const gameplay = this.store.view()?.gameplay;
+    if (gameplay === null || gameplay === undefined) return;
+    this.selectedActionId.set(null);
+    this.selectedOptions.set([]);
+    void this.store.control({
+      expectedRevision: gameplay.stateRevision,
+      actorId: gameplay.actorId,
+      kind,
+    });
+  }
+
+  protected actionOptionCount(action: GameplayActionView): number {
+    return (
+      action.candidateIds.length + action.cellIds.length + action.areaIds.length
+    );
+  }
+
+  protected isSelectionSelected(
+    selection: AuthorityOptionSelection | null,
+  ): boolean {
+    return (
+      selection !== null && this.isOptionSelected(selection.kind, selection.id)
+    );
+  }
+
+  protected isOptionSelected(kind: AuthorityOptionKind, id: string): boolean {
+    return this.selectedOptions().some(
+      (selection) => selection.kind === kind && selection.id === id,
+    );
+  }
+
+  protected optionDisabled(
+    kind: AuthorityOptionKind,
+    id: string,
+    maximumTargets: number,
+  ): boolean {
+    return (
+      this.store.busy() ||
+      (!this.isOptionSelected(kind, id) &&
+        maximumTargets > 1 &&
+        this.selectedOptions().length >= maximumTargets)
+    );
+  }
+
+  protected toggleOption(
+    kind: AuthorityOptionKind,
+    id: string,
+    maximumTargets: number,
+  ): void {
+    this.selectedOptions.update((current) =>
+      toggleAuthorityOption(current, { kind, id }, maximumTargets),
+    );
   }
 
   protected resolveReaction(reactionId: string, optionId: string | null): void {
@@ -2273,4 +3528,64 @@ function formInteger(value: string): number {
 function formSignedInteger(value: string): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : 0;
+}
+
+function initialParticipantCapability(
+  owner: EncounterInitialCapabilityDto['owner'],
+): EncounterInitialCapabilityDto {
+  if (owner === 'vitality') {
+    return { owner, value: { current: 10, max: 10 } };
+  }
+  if (owner === 'resource') {
+    return { owner, id: 'resource-id', value: { current: 0, max: 0 } };
+  }
+  if (owner === 'modifier') {
+    return {
+      owner,
+      stackingGroup: 'modifier-group',
+      id: 'modifier-id',
+      value: 0,
+      remainingTurns: 1,
+    };
+  }
+  return { owner, id: `${owner}-id`, value: 0 };
+}
+
+function initialCellCapability(
+  kind: EncounterCellCapabilityDto['value']['kind'],
+): EncounterCellCapabilityDto {
+  const shared = {
+    id: `capability.${kind}`,
+    version: 1,
+    definitionId: null,
+  };
+  if (kind === 'traversal') {
+    return {
+      ...shared,
+      value: { kind, passable: true, movementCost: 1 },
+    };
+  }
+  if (kind === 'flag') {
+    return { ...shared, value: { kind, value: false } };
+  }
+  if (kind === 'integer') {
+    return { ...shared, value: { kind, value: 0 } };
+  }
+  return { ...shared, value: { kind, valueId: 'value-id' } };
+}
+
+function diagnosticMatchesSetupPath(
+  diagnosticPath: string,
+  controlPath: string,
+): boolean {
+  return (
+    diagnosticPath === controlPath ||
+    diagnosticPath.startsWith(`${controlPath}.`) ||
+    diagnosticPath.startsWith(`${controlPath}[`)
+  );
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return 'The selected file was not valid JSON setup data.';
 }
