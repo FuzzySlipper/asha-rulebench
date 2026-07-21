@@ -9,10 +9,10 @@ version = "0.1.0"
 
 [workspace.dependencies]
 getrandom = "0.3"
-rpg-compiler = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "6a7a2af41ab5c28acb38c399f1adb8df13c30839" }
-rpg-core = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "6a7a2af41ab5c28acb38c399f1adb8df13c30839" }
-rpg-ir = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "6a7a2af41ab5c28acb38c399f1adb8df13c30839" }
-rpg-runtime = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "6a7a2af41ab5c28acb38c399f1adb8df13c30839" }
+rpg-compiler = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "639f1b1788425c3d1be788129e96b762e41ceb9b" }
+rpg-core = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "639f1b1788425c3d1be788129e96b762e41ceb9b" }
+rpg-ir = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "639f1b1788425c3d1be788129e96b762e41ceb9b" }
+rpg-runtime = { git = "https://github.com/FuzzySlipper/asha-rpg.git", rev = "639f1b1788425c3d1be788129e96b762e41ceb9b" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tiny_http = "0.12"
