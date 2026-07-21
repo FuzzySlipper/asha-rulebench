@@ -1167,7 +1167,7 @@ impl PlayHost {
                 vec![PlayDiagnosticDto {
                     stage: "activation".to_owned(),
                     severity: "error".to_owned(),
-                    code: "RULESET_ACTIVATION_CANDIDATE_REQUIRED".to_owned(),
+                    code: "PLAY_BUNDLE_ACTIVATION_CANDIDATE_REQUIRED".to_owned(),
                     path: "$.candidateArtifact".to_owned(),
                     message: "compile an accepted artifact before activation".to_owned(),
                     package_id: None,
@@ -3201,6 +3201,10 @@ mod tests {
             PlayBundleLifecycleStatus::NoActivePlayBundle
         );
         assert_eq!(activation.activation_revision, 0);
+        assert_eq!(
+            activation.diagnostics[0].code,
+            "PLAY_BUNDLE_ACTIVATION_CANDIDATE_REQUIRED"
+        );
     }
 
     #[test]

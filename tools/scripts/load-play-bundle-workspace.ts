@@ -188,7 +188,16 @@ export async function loadPlayBundleWorkspace(
         resolved.value,
       );
     }
-    const discovered = discoverAuthoringValues(moduleNamespace);
+    const discovery = discoverAuthoringValues(moduleNamespace);
+    if (!discovery.ok) {
+      return failure(
+        'RULESET_ROOT_EXPORTED_IDENTITY_DUPLICATE',
+        '$.rulesetRoot',
+        `Distinct exported ${discovery.kind} declarations share identity ${discovery.identity}`,
+        resolved.value,
+      );
+    }
+    const discovered = discovery.value;
     if (discovered.rulesets.length !== 1) {
       return failure(
         'RULESET_ROOT_RULESET_COUNT_INVALID',
@@ -301,31 +310,87 @@ export async function loadPlayBundleWorkspace(
 
 function discoverAuthoringValues(
   moduleNamespace: Readonly<Record<string, unknown>>,
-): {
-  readonly rulesets: readonly Ruleset[];
-  readonly contentPacks: readonly ContentPackSource[];
-  readonly playBundles: readonly PlayBundleManifest[];
-  readonly scenarios: readonly ScenarioTemplate[];
-} {
+):
+  | {
+      readonly ok: true;
+      readonly value: {
+        readonly rulesets: readonly Ruleset[];
+        readonly contentPacks: readonly ContentPackSource[];
+        readonly playBundles: readonly PlayBundleManifest[];
+        readonly scenarios: readonly ScenarioTemplate[];
+      };
+    }
+  | {
+      readonly ok: false;
+      readonly kind:
+        | 'Ruleset'
+        | 'Content Pack'
+        | 'PlayBundle'
+        | 'ScenarioTemplate';
+      readonly identity: string;
+    } {
   const values = Object.values(moduleNamespace);
+  const rulesets = values.filter(isRuleset);
+  const contentPacks = values.filter(isContentPackSource);
+  const playBundles = values.filter(isPlayBundleManifest);
+  const scenarios = values.filter(isScenarioTemplate);
+
+  const duplicateRuleset = duplicateIdentity(
+    rulesets,
+    (value) => value.identity,
+  );
+  if (duplicateRuleset !== null) {
+    return { ok: false, kind: 'Ruleset', identity: duplicateRuleset };
+  }
+  const duplicateContentPack = duplicateIdentity(
+    contentPacks,
+    (value) => value.manifest.identity,
+  );
+  if (duplicateContentPack !== null) {
+    return { ok: false, kind: 'Content Pack', identity: duplicateContentPack };
+  }
+  const duplicatePlayBundle = duplicateIdentity(
+    playBundles,
+    (value) => value.identity,
+  );
+  if (duplicatePlayBundle !== null) {
+    return { ok: false, kind: 'PlayBundle', identity: duplicatePlayBundle };
+  }
+  const duplicateScenario = duplicateIdentity(
+    scenarios,
+    (value) => value.identity,
+  );
+  if (duplicateScenario !== null) {
+    return { ok: false, kind: 'ScenarioTemplate', identity: duplicateScenario };
+  }
+
   return {
-    rulesets: uniqueByIdentity(
-      values.filter(isRuleset),
-      (value) => value.identity,
-    ),
-    contentPacks: uniqueByIdentity(
-      values.filter(isContentPackSource),
-      (value) => value.manifest.identity,
-    ),
-    playBundles: uniqueByIdentity(
-      values.filter(isPlayBundleManifest),
-      (value) => value.identity,
-    ),
-    scenarios: uniqueByIdentity(
-      values.filter(isScenarioTemplate),
-      (value) => value.identity,
-    ),
+    ok: true,
+    value: {
+      rulesets: uniqueByIdentity(rulesets, (value) => value.identity),
+      contentPacks: uniqueByIdentity(
+        contentPacks,
+        (value) => value.manifest.identity,
+      ),
+      playBundles: uniqueByIdentity(playBundles, (value) => value.identity),
+      scenarios: uniqueByIdentity(scenarios, (value) => value.identity),
+    },
   };
+}
+
+function duplicateIdentity<Value>(
+  values: readonly Value[],
+  identity: (value: Value) => { readonly id: string; readonly version: string },
+): string | null {
+  const discovered = new Map<string, Value>();
+  for (const value of values) {
+    const current = identity(value);
+    const key = `${current.id}@${current.version}`;
+    const previous = discovered.get(key);
+    if (previous !== undefined && previous !== value) return key;
+    discovered.set(key, value);
+  }
+  return null;
 }
 
 function uniqueByIdentity<Value>(

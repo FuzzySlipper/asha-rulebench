@@ -93,4 +93,25 @@ describe('canonical Ruleset root loader', () => {
       );
     }
   });
+
+  it.each([
+    ['Ruleset', 'test-fixtures/rulesets/duplicate-ruleset'],
+    ['PlayBundle', 'test-fixtures/rulesets/duplicate-play-bundle'],
+  ])(
+    'rejects distinct exported %s declarations with one identity',
+    async (kind, rulesetRoot) => {
+      const result = await loadPlayBundleWorkspace(
+        { operation: 'inspect', rulesetRoot },
+        gatewayRoot,
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.diagnostics[0]).toMatchObject({
+        code: 'RULESET_ROOT_EXPORTED_IDENTITY_DUPLICATE',
+        path: '$.rulesetRoot',
+      });
+      expect(result.diagnostics[0]?.message).toContain(`exported ${kind}`);
+    },
+  );
 });
