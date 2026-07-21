@@ -6,7 +6,7 @@ use std::{
 };
 
 use rpg_compiler::{
-    compile_prepared_ruleset_json, load_compiled_ruleset_artifact_json, CompiledRulesetBundle,
+    compile_prepared_play_bundle_json, load_compiled_play_bundle_json, CompiledPlayBundle,
     RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity, RpgDiagnosticStage,
 };
 use rpg_core::{
@@ -15,18 +15,18 @@ use rpg_core::{
     RpgTeamId, RpgTraceStep,
 };
 use rpg_ir::{
-    CompiledRulesetArtifact, MaterializedRulesetDefinitionKind, MaterializedRulesetVisibility,
-    RulesetConflictPolicy, RulesetDependencyRelationship, RulesetExtensionPolicy,
-    RulesetImpactPlane, RulesetRelationshipKind,
+    CompiledPlayBundleArtifact, ContentConflictPolicy, ContentExtensionPolicy, ContentImpactPlane,
+    ContentPackDependencyRelationship, ContentRelationshipKind, MaterializedContentDefinitionKind,
+    MaterializedContentVisibility,
 };
 use rpg_runtime::{
     RpgActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure, RpgBoardSetup,
     RpgCellCapabilitySetup, RpgCellCapabilityValue, RpgCellSetup, RpgCheckpointPhase,
-    RpgCommandOutcome, RpgEncounterOutcomeView, RpgEncounterSetup, RpgInitialCapability,
-    RpgParticipantSetup, RpgRandomSource, RpgRandomSourceBinding, RpgRandomSourceFailure,
-    RpgReactionProposal, RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation,
-    RpgReplayPhase, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl,
-    RpgTurnControlProposal, RpgTurnControlReceipt, RpgTurnInitialization,
+    RpgCommandOutcome, RpgEncounterOutcomeView, RpgInitialCapability, RpgParticipantSetup,
+    RpgRandomSource, RpgRandomSourceBinding, RpgRandomSourceFailure, RpgReactionProposal,
+    RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation, RpgReplayPhase,
+    RpgScenario, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal,
+    RpgTurnControlReceipt, RpgTurnInitialization,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -35,8 +35,8 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum RulesetLifecycleStatus {
-    NoActiveRuleset,
+pub enum PlayBundleLifecycleStatus {
+    NoActivePlayBundle,
     CompiledCandidate,
     Active,
 }
@@ -44,7 +44,7 @@ pub enum RulesetLifecycleStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetDiagnosticDto {
+pub struct PlayDiagnosticDto {
     pub stage: String,
     pub severity: String,
     pub code: String,
@@ -52,7 +52,7 @@ pub struct RulesetDiagnosticDto {
     pub message: String,
     pub package_id: Option<String>,
     pub definition_id: Option<String>,
-    pub source: Option<RulesetDiagnosticSourceDto>,
+    pub source: Option<PlayDiagnosticSourceDto>,
     pub graph_path: Option<Vec<String>>,
     pub expected: Option<String>,
     pub actual: Option<String>,
@@ -61,7 +61,7 @@ pub struct RulesetDiagnosticDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetDiagnosticSourceDto {
+pub struct PlayDiagnosticSourceDto {
     pub module: String,
     pub declaration: String,
 }
@@ -69,7 +69,7 @@ pub struct RulesetDiagnosticSourceDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetIdentityDto {
+pub struct VersionedIdentityDto {
     pub id: String,
     pub version: String,
 }
@@ -77,7 +77,7 @@ pub struct RulesetIdentityDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetSourcePackageDto {
+pub struct ContentPackSummaryDto {
     pub id: String,
     pub version: String,
     pub source_fingerprint: String,
@@ -86,7 +86,7 @@ pub struct RulesetSourcePackageDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetLockEntryDto {
+pub struct ContentPackLockEntryDto {
     pub requester: String,
     pub package_id: String,
     pub requested_version: String,
@@ -99,7 +99,7 @@ pub struct RulesetLockEntryDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetRequirementDto {
+pub struct VersionedRequirementDto {
     pub id: String,
     pub version: u32,
 }
@@ -107,7 +107,7 @@ pub struct RulesetRequirementDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetDefinitionDto {
+pub struct ContentDefinitionDto {
     pub id: String,
     pub fingerprint: String,
     pub label: Option<String>,
@@ -124,7 +124,7 @@ pub struct RulesetDefinitionDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetRelationshipDto {
+pub struct ContentRelationshipDto {
     pub kind: String,
     pub source: String,
     pub target: String,
@@ -134,7 +134,7 @@ pub struct RulesetRelationshipDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetFingerprintDto {
+pub struct PlayBundleFingerprintDto {
     pub source: String,
     pub semantic: String,
     pub presentation: String,
@@ -143,7 +143,7 @@ pub struct RulesetFingerprintDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetPatchChangeDto {
+pub struct ContentPatchChangeDto {
     pub plane: String,
     pub path: String,
     pub before: String,
@@ -154,7 +154,7 @@ pub struct RulesetPatchChangeDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetMixinProvenanceDto {
+pub struct ContentMixinProvenanceDto {
     pub identity: String,
     pub fingerprint: String,
     pub parameters: Vec<String>,
@@ -164,21 +164,21 @@ pub struct RulesetMixinProvenanceDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetDerivationProvenanceDto {
+pub struct ContentDerivationProvenanceDto {
     pub definition_id: String,
     pub owner: String,
     pub base: String,
     pub base_fingerprint: String,
-    pub mixins: Vec<RulesetMixinProvenanceDto>,
+    pub mixins: Vec<ContentMixinProvenanceDto>,
     pub local_patch_fingerprint: String,
     pub materialized_fingerprint: String,
-    pub changes: Vec<RulesetPatchChangeDto>,
+    pub changes: Vec<ContentPatchChangeDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetOverlayProvenanceDto {
+pub struct ContentOverlayProvenanceDto {
     pub overlay: String,
     pub target: String,
     pub expected_fingerprint: String,
@@ -188,36 +188,39 @@ pub struct RulesetOverlayProvenanceDto {
     pub conflict_policy: String,
     pub patch_fingerprint: String,
     pub order: usize,
-    pub changes: Vec<RulesetPatchChangeDto>,
+    pub changes: Vec<ContentPatchChangeDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetArtifactSummaryDto {
-    pub schema: RulesetIdentityDto,
+pub struct PlayBundleArtifactSummaryDto {
+    pub schema: VersionedIdentityDto,
     pub artifact_id: String,
-    pub composition: RulesetIdentityDto,
-    pub language: RulesetIdentityDto,
-    pub source_packages: Vec<RulesetSourcePackageDto>,
-    pub dependency_lock: Vec<RulesetLockEntryDto>,
-    pub required_operations: Vec<RulesetRequirementDto>,
-    pub required_capabilities: Vec<RulesetRequirementDto>,
+    pub play_bundle: VersionedIdentityDto,
+    pub ruleset: VersionedIdentityDto,
+    pub language: VersionedIdentityDto,
+    pub content_packs: Vec<ContentPackSummaryDto>,
+    pub dependency_lock: Vec<ContentPackLockEntryDto>,
+    pub required_operations: Vec<VersionedRequirementDto>,
+    pub required_capabilities: Vec<VersionedRequirementDto>,
+    pub required_values: Vec<String>,
+    pub required_numeric_domains: Vec<String>,
     pub exported_roots: Vec<String>,
-    pub definitions: Vec<RulesetDefinitionDto>,
+    pub definitions: Vec<ContentDefinitionDto>,
     pub policy_binding_ids: Vec<String>,
-    pub relationships: Vec<RulesetRelationshipDto>,
+    pub relationships: Vec<ContentRelationshipDto>,
     pub derivation_slots: usize,
     pub overlay_slots: usize,
-    pub derivations: Vec<RulesetDerivationProvenanceDto>,
-    pub overlays: Vec<RulesetOverlayProvenanceDto>,
-    pub fingerprints: RulesetFingerprintDto,
+    pub derivations: Vec<ContentDerivationProvenanceDto>,
+    pub overlays: Vec<ContentOverlayProvenanceDto>,
+    pub fingerprints: PlayBundleFingerprintDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetUpgradeFieldDto {
+pub struct PlayBundleUpgradeFieldDto {
     pub plane: String,
     pub path: String,
     pub before: String,
@@ -227,28 +230,28 @@ pub struct RulesetUpgradeFieldDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetUpgradeDefinitionDto {
+pub struct PlayBundleUpgradeDefinitionDto {
     pub definition_id: String,
     pub change: String,
     pub descendant: bool,
     pub causes: Vec<String>,
-    pub fields: Vec<RulesetUpgradeFieldDto>,
+    pub fields: Vec<PlayBundleUpgradeFieldDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetUpgradeImpactDto {
+pub struct PlayBundleUpgradeImpactDto {
     pub from_artifact_id: String,
     pub to_artifact_id: String,
     pub source_changes: Vec<String>,
-    pub definitions: Vec<RulesetUpgradeDefinitionDto>,
+    pub definitions: Vec<PlayBundleUpgradeDefinitionDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterSchemaDto {
+pub struct ScenarioSchemaDto {
     pub id: String,
     pub version: u32,
 }
@@ -256,7 +259,7 @@ pub struct EncounterSchemaDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterPositionDto {
+pub struct ScenarioPositionDto {
     pub x: u32,
     pub y: u32,
 }
@@ -264,7 +267,7 @@ pub struct EncounterPositionDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterBoundedValueDto {
+pub struct ScenarioBoundedValueDto {
     pub current: i32,
     pub max: i32,
 }
@@ -277,7 +280,7 @@ pub struct EncounterBoundedValueDto {
     deny_unknown_fields
 )]
 #[ts(tag = "kind", rename_all = "camelCase")]
-pub enum EncounterCellCapabilityValueDto {
+pub enum ScenarioCellCapabilityValueDto {
     Traversal { passable: bool, movement_cost: u32 },
     Flag { value: bool },
     Integer { value: i32 },
@@ -287,29 +290,29 @@ pub enum EncounterCellCapabilityValueDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterCellCapabilityDto {
+pub struct ScenarioCellCapabilityDto {
     pub id: String,
     pub version: u32,
     pub definition_id: Option<String>,
-    pub value: EncounterCellCapabilityValueDto,
+    pub value: ScenarioCellCapabilityValueDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterCellDto {
+pub struct ScenarioCellDto {
     pub id: String,
-    pub position: EncounterPositionDto,
-    pub capabilities: Vec<EncounterCellCapabilityDto>,
+    pub position: ScenarioPositionDto,
+    pub capabilities: Vec<ScenarioCellCapabilityDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterBoardDto {
+pub struct ScenarioBoardDto {
     pub width: u32,
     pub height: u32,
-    pub cells: Vec<EncounterCellDto>,
+    pub cells: Vec<ScenarioCellDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -320,9 +323,9 @@ pub struct EncounterBoardDto {
     deny_unknown_fields
 )]
 #[ts(tag = "owner", rename_all = "camelCase")]
-pub enum EncounterInitialCapabilityDto {
+pub enum ScenarioInitialCapabilityDto {
     Vitality {
-        value: EncounterBoundedValueDto,
+        value: ScenarioBoundedValueDto,
     },
     Stat {
         id: String,
@@ -334,7 +337,7 @@ pub enum EncounterInitialCapabilityDto {
     },
     Resource {
         id: String,
-        value: EncounterBoundedValueDto,
+        value: ScenarioBoundedValueDto,
     },
     Modifier {
         stacking_group: String,
@@ -347,19 +350,19 @@ pub enum EncounterInitialCapabilityDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterParticipantSetupDto {
+pub struct ScenarioParticipantDto {
     pub id: String,
     pub label: String,
     pub team_id: String,
-    pub position: EncounterPositionDto,
+    pub position: ScenarioPositionDto,
     pub definition_ids: Vec<String>,
-    pub capabilities: Vec<EncounterInitialCapabilityDto>,
+    pub capabilities: Vec<ScenarioInitialCapabilityDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterTurnDto {
+pub struct ScenarioTurnDto {
     pub initiative_order: Vec<String>,
     pub current_actor_id: String,
     pub round: u32,
@@ -369,7 +372,7 @@ pub struct EncounterTurnDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterRandomSourceDto {
+pub struct ScenarioRandomSourceDto {
     pub policy_id: String,
     pub policy_version: u32,
     pub source_id: String,
@@ -379,13 +382,13 @@ pub struct EncounterRandomSourceDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct EncounterSetupRequestDto {
-    pub schema: EncounterSchemaDto,
-    pub artifact_id: String,
-    pub board: EncounterBoardDto,
-    pub participants: Vec<EncounterParticipantSetupDto>,
-    pub turn: EncounterTurnDto,
-    pub random_source: EncounterRandomSourceDto,
+pub struct ScenarioSetupRequestDto {
+    pub schema: ScenarioSchemaDto,
+    pub play_bundle_id: String,
+    pub board: ScenarioBoardDto,
+    pub participants: Vec<ScenarioParticipantDto>,
+    pub turn: ScenarioTurnDto,
+    pub random_source: ScenarioRandomSourceDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -654,13 +657,13 @@ pub struct GameplayArchiveDto {
     pub event_schema_version: u32,
     pub artifact_id: String,
     pub artifact_schema: String,
-    pub composition: String,
-    pub language: String,
+    pub play_bundle: String,
+    pub ruleset: String,
     pub operation_schemas: Vec<String>,
     pub capability_schemas: Vec<String>,
-    pub source_packages: Vec<String>,
+    pub content_packs: Vec<String>,
     pub dependency_lock: Vec<String>,
-    pub fingerprints: RulesetFingerprintDto,
+    pub fingerprints: PlayBundleFingerprintDto,
     pub definition_fingerprints: Vec<String>,
     pub state_revision: String,
     pub accepted_random_position: String,
@@ -680,9 +683,9 @@ pub struct GameplaySessionDto {
     pub actor_id: String,
     pub state_revision: u32,
     pub accepted_random_values: String,
-    pub random_source: EncounterRandomSourceDto,
-    pub board: EncounterBoardDto,
-    pub turn: EncounterTurnDto,
+    pub random_source: ScenarioRandomSourceDto,
+    pub board: ScenarioBoardDto,
+    pub turn: ScenarioTurnDto,
     pub actions: Vec<GameplayAuthorityActionDto>,
     pub controls: Vec<GameplayTurnControlDto>,
     pub entities: Vec<GameplayEntityDto>,
@@ -696,32 +699,97 @@ pub struct GameplaySessionDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetWorkspaceResponseDto {
+pub struct PlayWorkspaceResponseDto {
     pub ok: bool,
-    pub status: RulesetLifecycleStatus,
-    pub active_artifact: Option<RulesetArtifactSummaryDto>,
-    pub candidate_artifact: Option<RulesetArtifactSummaryDto>,
-    pub upgrade_impact: Option<RulesetUpgradeImpactDto>,
+    pub status: PlayBundleLifecycleStatus,
+    pub active_artifact: Option<PlayBundleArtifactSummaryDto>,
+    pub candidate_artifact: Option<PlayBundleArtifactSummaryDto>,
+    pub upgrade_impact: Option<PlayBundleUpgradeImpactDto>,
     pub activation_revision: u32,
-    pub host_random_source: EncounterRandomSourceDto,
-    pub supported_random_sources: Vec<EncounterRandomSourceDto>,
-    pub encounter_setup_required: bool,
+    pub host_random_source: ScenarioRandomSourceDto,
+    pub supported_random_sources: Vec<ScenarioRandomSourceDto>,
+    pub scenario_setup_required: bool,
     pub gameplay_available: bool,
     pub gameplay: Option<GameplaySessionDto>,
-    pub diagnostics: Vec<RulesetDiagnosticDto>,
+    pub diagnostics: Vec<PlayDiagnosticDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetCompileRequestDto {
+pub struct ConfiguredRulesetLocationDto {
+    pub id: String,
+    pub label: String,
     pub ruleset_root: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct PreparedRulesetCompileRequestDto {
+pub struct RulesetLocationConfigDto {
+    pub schema_version: u32,
+    pub rulesets: Vec<ConfiguredRulesetLocationDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetCatalogRequestDto {
+    pub ruleset_root: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetCatalogContentPackDto {
+    pub id: String,
+    pub version: String,
+    pub label: String,
+    pub requirements: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetCatalogPlayBundleDto {
+    pub id: String,
+    pub version: String,
+    pub content_pack_ids: Vec<String>,
+    pub compatible: bool,
+    pub diagnostics: Vec<PlayDiagnosticDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetCatalogDto {
+    pub ruleset_root: String,
+    pub ruleset: VersionedIdentityDto,
+    pub content_packs: Vec<RulesetCatalogContentPackDto>,
+    pub play_bundles: Vec<RulesetCatalogPlayBundleDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetCatalogResponseDto {
+    pub ok: bool,
+    pub catalog: Option<RulesetCatalogDto>,
+    pub diagnostics: Vec<PlayDiagnosticDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct PlayBundleCompileRequestDto {
+    pub ruleset_root: String,
+    pub content_pack_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct PreparedPlayBundleCompileRequestDto {
     pub prepared_source: String,
 }
 
@@ -774,7 +842,7 @@ impl RpgRandomSource for SystemGameplayRandomSource {
     fn draw(&mut self, request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
         if request.sides == 0 {
             return Err(random_source_failure(
-                "RULESET_RANDOM_REQUEST_SIDES_INVALID",
+                "SESSION_RANDOM_REQUEST_SIDES_INVALID",
                 &request.path,
                 "authority requested a die with zero sides",
             ));
@@ -812,21 +880,21 @@ impl RpgRandomSource for ScriptedGameplayRandomSource {
     fn draw(&mut self, request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
         if request.sides == 0 {
             return Err(random_source_failure(
-                "RULESET_RANDOM_REQUEST_SIDES_INVALID",
+                "SESSION_RANDOM_REQUEST_SIDES_INVALID",
                 &request.path,
                 "authority requested a die with zero sides",
             ));
         }
         let count = usize::try_from(request.count).map_err(|_| {
             random_source_failure(
-                "RULESET_RANDOM_REQUEST_COUNT_INVALID",
+                "SESSION_RANDOM_REQUEST_COUNT_INVALID",
                 &request.path,
                 "authority random request count exceeds this host's address space",
             )
         })?;
         if self.values.len() < count {
             return Err(random_source_failure(
-                "RULESET_RANDOM_TAPE_EXHAUSTED",
+                "SESSION_RANDOM_TAPE_EXHAUSTED",
                 &request.path,
                 format!(
                     "authority requested {}d{}, but the configured roll tape has {} value(s) remaining",
@@ -843,7 +911,7 @@ impl RpgRandomSource for ScriptedGameplayRandomSource {
             .find(|(_, value)| **value == 0 || **value > request.sides)
         {
             return Err(random_source_failure(
-                "RULESET_RANDOM_TAPE_VALUE_INVALID",
+                "SESSION_RANDOM_TAPE_VALUE_INVALID",
                 &request.path,
                 format!(
                     "roll tape value {} at request offset {} is outside 1..={} for {}",
@@ -864,7 +932,7 @@ fn system_die_value(sides: u32, path: &str) -> Result<u32, RpgRandomSourceFailur
         let mut bytes = [0_u8; 4];
         getrandom::fill(&mut bytes).map_err(|error| {
             random_source_failure(
-                "RULESET_SYSTEM_RANDOM_UNAVAILABLE",
+                "SESSION_SYSTEM_RANDOM_UNAVAILABLE",
                 path,
                 format!("system random source failed: {error}"),
             )
@@ -900,8 +968,8 @@ fn random_source_binding(source_id: &str) -> RpgRandomSourceBinding {
 }
 
 #[derive(Debug)]
-struct ActiveRuleset {
-    bundle: CompiledRulesetBundle,
+struct ActivePlayBundle {
+    bundle: CompiledPlayBundle,
     encounter: Option<ActiveEncounter>,
 }
 
@@ -919,8 +987,8 @@ struct ActiveEncounter {
 
 #[derive(Debug)]
 struct ActivationSlots {
-    candidate: Option<CompiledRulesetBundle>,
-    active: Option<ActiveRuleset>,
+    candidate: Option<CompiledPlayBundle>,
+    active: Option<ActivePlayBundle>,
     activation_revision: u32,
     random_source_binding: RpgRandomSourceBinding,
 }
@@ -937,7 +1005,7 @@ impl Default for ActivationSlots {
 }
 
 impl ActivationSlots {
-    fn stage(&mut self, candidate: CompiledRulesetBundle) {
+    fn stage(&mut self, candidate: CompiledPlayBundle) {
         self.candidate = Some(candidate);
     }
 
@@ -949,7 +1017,7 @@ impl ActivationSlots {
         let Some(candidate) = self.candidate.take() else {
             return false;
         };
-        self.active = Some(ActiveRuleset {
+        self.active = Some(ActivePlayBundle {
             bundle: candidate,
             encounter: None,
         });
@@ -957,13 +1025,13 @@ impl ActivationSlots {
         true
     }
 
-    fn status(&self) -> RulesetLifecycleStatus {
+    fn status(&self) -> PlayBundleLifecycleStatus {
         if self.candidate.is_some() {
-            RulesetLifecycleStatus::CompiledCandidate
+            PlayBundleLifecycleStatus::CompiledCandidate
         } else if self.active.is_some() {
-            RulesetLifecycleStatus::Active
+            PlayBundleLifecycleStatus::Active
         } else {
-            RulesetLifecycleStatus::NoActiveRuleset
+            PlayBundleLifecycleStatus::NoActivePlayBundle
         }
     }
 }
@@ -981,18 +1049,18 @@ impl ActiveEncounter {
     }
 }
 
-pub struct RulesetHost {
+pub struct PlayHost {
     slots: Mutex<ActivationSlots>,
     random_source: Mutex<Box<dyn RpgRandomSource>>,
 }
 
-impl Default for RulesetHost {
+impl Default for PlayHost {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl RulesetHost {
+impl PlayHost {
     pub fn new() -> Self {
         Self::with_random_source(SystemGameplayRandomSource::default())
     }
@@ -1008,13 +1076,13 @@ impl RulesetHost {
         }
     }
 
-    pub fn status(&self) -> RulesetWorkspaceResponseDto {
+    pub fn status(&self) -> PlayWorkspaceResponseDto {
         let slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         response_from_slots(true, &slots, Vec::new())
     }
 
-    pub fn compile_candidate(&self, prepared_source: &str) -> RulesetWorkspaceResponseDto {
-        let compilation = compile_prepared_ruleset_json(prepared_source.as_bytes());
+    pub fn compile_candidate(&self, prepared_source: &str) -> PlayWorkspaceResponseDto {
+        let compilation = compile_prepared_play_bundle_json(prepared_source.as_bytes());
         match compilation {
             Ok(bundle) => match close_portable_artifact(bundle) {
                 Ok(loaded) => {
@@ -1036,14 +1104,14 @@ impl RulesetHost {
         }
     }
 
-    pub fn activate_candidate(&self) -> RulesetWorkspaceResponseDto {
+    pub fn activate_candidate(&self) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         match slots.activate() {
             true => response_from_slots(true, &slots, Vec::new()),
             false => response_from_slots(
                 false,
                 &slots,
-                vec![RulesetDiagnosticDto {
+                vec![PlayDiagnosticDto {
                     stage: "activation".to_owned(),
                     severity: "error".to_owned(),
                     code: "RULESET_ACTIVATION_CANDIDATE_REQUIRED".to_owned(),
@@ -1060,10 +1128,7 @@ impl RulesetHost {
         }
     }
 
-    pub fn start_encounter(
-        &self,
-        request: EncounterSetupRequestDto,
-    ) -> RulesetWorkspaceResponseDto {
+    pub fn start_encounter(&self, request: ScenarioSetupRequestDto) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(bundle) = slots.active.as_ref().map(|active| active.bundle.clone()) else {
             return response_from_slots(
@@ -1072,12 +1137,12 @@ impl RulesetHost {
                 vec![host_diagnostic_at_stage(
                     "setup",
                     "RPG_SETUP_ACTIVE_ARTIFACT_REQUIRED",
-                    "$.artifactId",
-                    "activate a compiled artifact before creating an encounter",
+                    "$.playBundleId",
+                    "activate a compiled PlayBundle before creating a Scenario",
                 )],
             );
         };
-        let setup = encounter_setup(request);
+        let setup = scenario(request);
         if setup.random_source != slots.random_source_binding {
             return response_from_slots(
                 false,
@@ -1090,7 +1155,7 @@ impl RulesetHost {
                 )],
             );
         }
-        let session = match RpgAuthoritySession::from_setup(bundle, setup) {
+        let session = match RpgAuthoritySession::from_scenario(bundle, setup) {
             Ok(session) => session,
             Err(failure) => {
                 return response_from_slots(false, &slots, diagnostics_from_setup_failure(failure));
@@ -1132,10 +1197,7 @@ impl RulesetHost {
         response_from_slots(true, &slots, Vec::new())
     }
 
-    pub fn execute_command(
-        &self,
-        request: GameplayCommandRequestDto,
-    ) -> RulesetWorkspaceResponseDto {
+    pub fn execute_command(&self, request: GameplayCommandRequestDto) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(active) = slots
             .active
@@ -1189,7 +1251,7 @@ impl RulesetHost {
     pub fn resolve_reaction(
         &self,
         request: GameplayReactionRequestDto,
-    ) -> RulesetWorkspaceResponseDto {
+    ) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(active) = slots
             .active
@@ -1242,7 +1304,7 @@ impl RulesetHost {
     pub fn execute_turn_control(
         &self,
         request: GameplayTurnControlRequestDto,
-    ) -> RulesetWorkspaceResponseDto {
+    ) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(active) = slots
             .active
@@ -1300,7 +1362,7 @@ impl RulesetHost {
         )
     }
 
-    pub fn restore_latest_checkpoint(&self) -> RulesetWorkspaceResponseDto {
+    pub fn restore_latest_checkpoint(&self) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(active) = slots
             .active
@@ -1334,7 +1396,7 @@ impl RulesetHost {
         }
     }
 
-    pub fn replay_archive(&self) -> RulesetWorkspaceResponseDto {
+    pub fn replay_archive(&self) -> PlayWorkspaceResponseDto {
         let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
         let Some(active) = slots
             .active
@@ -1391,10 +1453,10 @@ impl RulesetHost {
 }
 
 fn close_portable_artifact(
-    bundle: CompiledRulesetBundle,
-) -> Result<CompiledRulesetBundle, Vec<RulesetDiagnosticDto>> {
+    bundle: CompiledPlayBundle,
+) -> Result<CompiledPlayBundle, Vec<PlayDiagnosticDto>> {
     let encoded = serde_json::to_vec(bundle.artifact()).map_err(|error| {
-        vec![RulesetDiagnosticDto {
+        vec![PlayDiagnosticDto {
             stage: "artifact".to_owned(),
             severity: "error".to_owned(),
             code: "RULESET_ARTIFACT_ENCODING_FAILED".to_owned(),
@@ -1408,14 +1470,14 @@ fn close_portable_artifact(
             actual: None,
         }]
     })?;
-    load_compiled_ruleset_artifact_json(&encoded).map_err(diagnostics_from_failure)
+    load_compiled_play_bundle_json(&encoded).map_err(diagnostics_from_failure)
 }
 
 fn response_from_slots(
     ok: bool,
     slots: &ActivationSlots,
-    diagnostics: Vec<RulesetDiagnosticDto>,
-) -> RulesetWorkspaceResponseDto {
+    diagnostics: Vec<PlayDiagnosticDto>,
+) -> PlayWorkspaceResponseDto {
     let upgrade_impact = match (&slots.active, &slots.candidate) {
         (Some(active), Some(candidate)) => Some(upgrade_impact(
             active.bundle.artifact(),
@@ -1423,7 +1485,7 @@ fn response_from_slots(
         )),
         _ => None,
     };
-    RulesetWorkspaceResponseDto {
+    PlayWorkspaceResponseDto {
         ok,
         status: slots.status(),
         active_artifact: slots
@@ -1438,7 +1500,7 @@ fn response_from_slots(
         activation_revision: slots.activation_revision,
         host_random_source: encounter_random_source(&slots.random_source_binding),
         supported_random_sources: vec![encounter_random_source(&slots.random_source_binding)],
-        encounter_setup_required: slots
+        scenario_setup_required: slots
             .active
             .as_ref()
             .is_some_and(|active| active.encounter.is_none()),
@@ -1456,16 +1518,16 @@ fn response_from_slots(
 }
 
 fn upgrade_impact(
-    active: &CompiledRulesetArtifact,
-    candidate: &CompiledRulesetArtifact,
-) -> RulesetUpgradeImpactDto {
+    active: &CompiledPlayBundleArtifact,
+    candidate: &CompiledPlayBundleArtifact,
+) -> PlayBundleUpgradeImpactDto {
     let active_sources = active
-        .source_packages
+        .content_packs
         .iter()
         .map(|source| (source.id.as_str(), source))
         .collect::<BTreeMap<_, _>>();
     let candidate_sources = candidate
-        .source_packages
+        .content_packs
         .iter()
         .map(|source| (source.id.as_str(), source))
         .collect::<BTreeMap<_, _>>();
@@ -1551,7 +1613,7 @@ fn upgrade_impact(
             (Some(_), Some(_)) => "changed",
             (None, None) => continue,
         };
-        definitions.push(RulesetUpgradeDefinitionDto {
+        definitions.push(PlayBundleUpgradeDefinitionDto {
             definition_id: definition_id.to_owned(),
             change: change.to_owned(),
             descendant: is_derived_definition(active, definition_id)
@@ -1561,7 +1623,7 @@ fn upgrade_impact(
         });
     }
 
-    RulesetUpgradeImpactDto {
+    PlayBundleUpgradeImpactDto {
         from_artifact_id: active.artifact_id.clone(),
         to_artifact_id: candidate.artifact_id.clone(),
         source_changes,
@@ -1569,7 +1631,7 @@ fn upgrade_impact(
     }
 }
 
-fn is_derived_definition(artifact: &CompiledRulesetArtifact, definition_id: &str) -> bool {
+fn is_derived_definition(artifact: &CompiledPlayBundleArtifact, definition_id: &str) -> bool {
     artifact
         .derivation_provenance
         .iter()
@@ -1577,11 +1639,11 @@ fn is_derived_definition(artifact: &CompiledRulesetArtifact, definition_id: &str
 }
 
 fn upgrade_causes(
-    active: &CompiledRulesetArtifact,
-    candidate: &CompiledRulesetArtifact,
+    active: &CompiledPlayBundleArtifact,
+    candidate: &CompiledPlayBundleArtifact,
     definition_id: &str,
-    before: Option<&rpg_ir::MaterializedRulesetDefinition>,
-    after: Option<&rpg_ir::MaterializedRulesetDefinition>,
+    before: Option<&rpg_ir::MaterializedContentDefinition>,
+    after: Option<&rpg_ir::MaterializedContentDefinition>,
 ) -> Vec<String> {
     let mut causes = Vec::new();
     if before.map(|definition| {
@@ -1638,7 +1700,7 @@ fn upgrade_causes(
         .filter(|provenance| provenance.target_definition_id == definition_id)
         .collect::<Vec<_>>();
     if active_overlays != candidate_overlays {
-        causes.push("composition-ordered overlay provenance changed".to_owned());
+        causes.push("PlayBundle-ordered overlay provenance changed".to_owned());
     }
     if causes.is_empty() {
         causes.push("materialized definition fields changed".to_owned());
@@ -1651,7 +1713,7 @@ fn diff_json_values(
     path: &str,
     before: Option<&Value>,
     after: Option<&Value>,
-    fields: &mut Vec<RulesetUpgradeFieldDto>,
+    fields: &mut Vec<PlayBundleUpgradeFieldDto>,
 ) {
     if before == after {
         return;
@@ -1680,7 +1742,7 @@ fn diff_json_values(
                 );
             }
         }
-        _ => fields.push(RulesetUpgradeFieldDto {
+        _ => fields.push(PlayBundleUpgradeFieldDto {
             plane: plane.to_owned(),
             path: path.to_owned(),
             before: before
@@ -1704,13 +1766,13 @@ fn json_field_path(parent: &str, field: &str) -> String {
     }
 }
 
-fn encounter_setup(request: EncounterSetupRequestDto) -> RpgEncounterSetup {
-    RpgEncounterSetup {
+fn scenario(request: ScenarioSetupRequestDto) -> RpgScenario {
+    RpgScenario {
         schema: RpgSchemaIdentity {
             id: request.schema.id,
             version: request.schema.version,
         },
-        artifact_id: request.artifact_id,
+        play_bundle_id: request.play_bundle_id,
         board: RpgBoardSetup {
             width: request.board.width,
             height: request.board.height,
@@ -1729,20 +1791,20 @@ fn encounter_setup(request: EncounterSetupRequestDto) -> RpgEncounterSetup {
                             version: capability.version,
                             definition_id: capability.definition_id,
                             value: match capability.value {
-                                EncounterCellCapabilityValueDto::Traversal {
+                                ScenarioCellCapabilityValueDto::Traversal {
                                     passable,
                                     movement_cost,
                                 } => RpgCellCapabilityValue::Traversal {
                                     passable,
                                     movement_cost,
                                 },
-                                EncounterCellCapabilityValueDto::Flag { value } => {
+                                ScenarioCellCapabilityValueDto::Flag { value } => {
                                     RpgCellCapabilityValue::Flag { value }
                                 }
-                                EncounterCellCapabilityValueDto::Integer { value } => {
+                                ScenarioCellCapabilityValueDto::Integer { value } => {
                                     RpgCellCapabilityValue::Integer { value }
                                 }
-                                EncounterCellCapabilityValueDto::Identifier { value_id } => {
+                                ScenarioCellCapabilityValueDto::Identifier { value_id } => {
                                     RpgCellCapabilityValue::Identifier { value_id }
                                 }
                             },
@@ -1782,29 +1844,29 @@ fn encounter_setup(request: EncounterSetupRequestDto) -> RpgEncounterSetup {
     }
 }
 
-fn grid_position(position: EncounterPositionDto) -> GridPosition {
+fn grid_position(position: ScenarioPositionDto) -> GridPosition {
     GridPosition {
         x: position.x,
         y: position.y,
     }
 }
 
-fn initial_capability(capability: EncounterInitialCapabilityDto) -> RpgInitialCapability {
+fn initial_capability(capability: ScenarioInitialCapabilityDto) -> RpgInitialCapability {
     match capability {
-        EncounterInitialCapabilityDto::Vitality { value } => RpgInitialCapability::Vitality {
+        ScenarioInitialCapabilityDto::Vitality { value } => RpgInitialCapability::Vitality {
             value: bounded_value(value),
         },
-        EncounterInitialCapabilityDto::Stat { id, value } => {
+        ScenarioInitialCapabilityDto::Stat { id, value } => {
             RpgInitialCapability::Stat { id, value }
         }
-        EncounterInitialCapabilityDto::Defense { id, value } => {
+        ScenarioInitialCapabilityDto::Defense { id, value } => {
             RpgInitialCapability::Defense { id, value }
         }
-        EncounterInitialCapabilityDto::Resource { id, value } => RpgInitialCapability::Resource {
+        ScenarioInitialCapabilityDto::Resource { id, value } => RpgInitialCapability::Resource {
             id,
             value: bounded_value(value),
         },
-        EncounterInitialCapabilityDto::Modifier {
+        ScenarioInitialCapabilityDto::Modifier {
             stacking_group,
             id,
             value,
@@ -1818,15 +1880,15 @@ fn initial_capability(capability: EncounterInitialCapabilityDto) -> RpgInitialCa
     }
 }
 
-fn bounded_value(value: EncounterBoundedValueDto) -> BoundedValue {
+fn bounded_value(value: ScenarioBoundedValueDto) -> BoundedValue {
     BoundedValue {
         current: value.current,
         max: value.max,
     }
 }
 
-fn encounter_random_source(binding: &RpgRandomSourceBinding) -> EncounterRandomSourceDto {
-    EncounterRandomSourceDto {
+fn encounter_random_source(binding: &RpgRandomSourceBinding) -> ScenarioRandomSourceDto {
+    ScenarioRandomSourceDto {
         policy_id: binding.policy_id.clone(),
         policy_version: binding.policy_version,
         source_id: binding.source_id.clone(),
@@ -1834,23 +1896,23 @@ fn encounter_random_source(binding: &RpgRandomSourceBinding) -> EncounterRandomS
     }
 }
 
-fn encounter_board(board: &RpgBoardSetup) -> EncounterBoardDto {
-    EncounterBoardDto {
+fn encounter_board(board: &RpgBoardSetup) -> ScenarioBoardDto {
+    ScenarioBoardDto {
         width: board.width,
         height: board.height,
         cells: board
             .cells
             .iter()
-            .map(|cell| EncounterCellDto {
+            .map(|cell| ScenarioCellDto {
                 id: cell.id.clone(),
-                position: EncounterPositionDto {
+                position: ScenarioPositionDto {
                     x: cell.position.x,
                     y: cell.position.y,
                 },
                 capabilities: cell
                     .capabilities
                     .iter()
-                    .map(|capability| EncounterCellCapabilityDto {
+                    .map(|capability| ScenarioCellCapabilityDto {
                         id: capability.id.clone(),
                         version: capability.version,
                         definition_id: capability.definition_id.clone(),
@@ -1858,18 +1920,18 @@ fn encounter_board(board: &RpgBoardSetup) -> EncounterBoardDto {
                             RpgCellCapabilityValue::Traversal {
                                 passable,
                                 movement_cost,
-                            } => EncounterCellCapabilityValueDto::Traversal {
+                            } => ScenarioCellCapabilityValueDto::Traversal {
                                 passable: *passable,
                                 movement_cost: *movement_cost,
                             },
                             RpgCellCapabilityValue::Flag { value } => {
-                                EncounterCellCapabilityValueDto::Flag { value: *value }
+                                ScenarioCellCapabilityValueDto::Flag { value: *value }
                             }
                             RpgCellCapabilityValue::Integer { value } => {
-                                EncounterCellCapabilityValueDto::Integer { value: *value }
+                                ScenarioCellCapabilityValueDto::Integer { value: *value }
                             }
                             RpgCellCapabilityValue::Identifier { value_id } => {
-                                EncounterCellCapabilityValueDto::Identifier {
+                                ScenarioCellCapabilityValueDto::Identifier {
                                     value_id: value_id.clone(),
                                 }
                             }
@@ -1881,8 +1943,8 @@ fn encounter_board(board: &RpgBoardSetup) -> EncounterBoardDto {
     }
 }
 
-fn encounter_turn(turn: &rpg_runtime::RpgTurnState) -> EncounterTurnDto {
-    EncounterTurnDto {
+fn encounter_turn(turn: &rpg_runtime::RpgTurnState) -> ScenarioTurnDto {
+    ScenarioTurnDto {
         initiative_order: turn.initiative_order.clone(),
         current_actor_id: turn.current_actor_id.clone(),
         round: dto_revision(turn.round),
@@ -1923,8 +1985,8 @@ fn gameplay_archive(active: &ActiveEncounter) -> GameplayArchiveDto {
             "{}@{}",
             binding.artifact_schema.identity, binding.artifact_schema.major
         ),
-        composition: format!("{}@{}", binding.composition.id, binding.composition.version),
-        language: format!("{}@{}", binding.language.id, binding.language.version),
+        play_bundle: format!("{}@{}", binding.play_bundle.id, binding.play_bundle.version),
+        ruleset: format!("{}@{}", binding.ruleset.id, binding.ruleset.version),
         operation_schemas: checkpoint
             .schemas
             .operations
@@ -1937,8 +1999,8 @@ fn gameplay_archive(active: &ActiveEncounter) -> GameplayArchiveDto {
             .iter()
             .map(|requirement| format!("{}@{}", requirement.id, requirement.version))
             .collect(),
-        source_packages: binding
-            .source_packages
+        content_packs: binding
+            .content_packs
             .iter()
             .map(|package| {
                 format!(
@@ -1963,7 +2025,7 @@ fn gameplay_archive(active: &ActiveEncounter) -> GameplayArchiveDto {
                 )
             })
             .collect(),
-        fingerprints: RulesetFingerprintDto {
+        fingerprints: PlayBundleFingerprintDto {
             source: binding.fingerprints.source.clone(),
             semantic: binding.fingerprints.semantic.clone(),
             presentation: binding.fingerprints.presentation.clone(),
@@ -2513,7 +2575,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
     }
 }
 
-fn host_diagnostic(code: &str, path: &str, message: &str) -> RulesetDiagnosticDto {
+fn host_diagnostic(code: &str, path: &str, message: &str) -> PlayDiagnosticDto {
     host_diagnostic_at_stage("gameplay", code, path, message)
 }
 
@@ -2522,8 +2584,8 @@ fn host_diagnostic_at_stage(
     code: &str,
     path: &str,
     message: &str,
-) -> RulesetDiagnosticDto {
-    RulesetDiagnosticDto {
+) -> PlayDiagnosticDto {
+    PlayDiagnosticDto {
         stage: stage.to_owned(),
         severity: "error".to_owned(),
         code: code.to_owned(),
@@ -2538,13 +2600,13 @@ fn host_diagnostic_at_stage(
     }
 }
 
-fn random_source_diagnostic(failure: RpgRandomSourceFailure) -> RulesetDiagnosticDto {
+fn random_source_diagnostic(failure: RpgRandomSourceFailure) -> PlayDiagnosticDto {
     host_diagnostic(&failure.code, &failure.path, &failure.message)
 }
 
 fn diagnostics_from_automatic_failure(
     failure: RpgAutomaticCommandFailure,
-) -> Vec<RulesetDiagnosticDto> {
+) -> Vec<PlayDiagnosticDto> {
     match failure {
         RpgAutomaticCommandFailure::RandomSource(failure) => {
             vec![random_source_diagnostic(failure)]
@@ -2554,8 +2616,8 @@ fn diagnostics_from_automatic_failure(
 }
 
 fn diagnostics_from_setup_failure(
-    failure: rpg_runtime::RpgEncounterSetupFailure,
-) -> Vec<RulesetDiagnosticDto> {
+    failure: rpg_runtime::RpgScenarioFailure,
+) -> Vec<PlayDiagnosticDto> {
     failure
         .diagnostics
         .into_iter()
@@ -2570,11 +2632,11 @@ fn diagnostics_from_setup_failure(
         .collect()
 }
 
-fn diagnostics_from_replay_failure(failure: RpgReplayFailure) -> Vec<RulesetDiagnosticDto> {
+fn diagnostics_from_replay_failure(failure: RpgReplayFailure) -> Vec<PlayDiagnosticDto> {
     failure
         .diagnostics
         .into_iter()
-        .map(|diagnostic| RulesetDiagnosticDto {
+        .map(|diagnostic| PlayDiagnosticDto {
             stage: "replay".to_owned(),
             severity: "error".to_owned(),
             code: diagnostic.code,
@@ -2590,7 +2652,7 @@ fn diagnostics_from_replay_failure(failure: RpgReplayFailure) -> Vec<RulesetDiag
         .collect()
 }
 
-fn diagnostics_from_failure(failure: RpgCompileFailure) -> Vec<RulesetDiagnosticDto> {
+fn diagnostics_from_failure(failure: RpgCompileFailure) -> Vec<PlayDiagnosticDto> {
     failure
         .diagnostics
         .into_iter()
@@ -2598,8 +2660,8 @@ fn diagnostics_from_failure(failure: RpgCompileFailure) -> Vec<RulesetDiagnostic
         .collect()
 }
 
-fn diagnostic_dto(diagnostic: RpgDiagnostic) -> RulesetDiagnosticDto {
-    RulesetDiagnosticDto {
+fn diagnostic_dto(diagnostic: RpgDiagnostic) -> PlayDiagnosticDto {
+    PlayDiagnosticDto {
         stage: diagnostic_stage(diagnostic.stage).to_owned(),
         severity: diagnostic_severity(diagnostic.severity).to_owned(),
         code: diagnostic.code,
@@ -2631,25 +2693,29 @@ fn diagnostic_severity(severity: RpgDiagnosticSeverity) -> &'static str {
     }
 }
 
-fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummaryDto {
-    RulesetArtifactSummaryDto {
-        schema: RulesetIdentityDto {
+fn artifact_summary(artifact: &CompiledPlayBundleArtifact) -> PlayBundleArtifactSummaryDto {
+    PlayBundleArtifactSummaryDto {
+        schema: VersionedIdentityDto {
             id: artifact.artifact_schema.identity.clone(),
             version: artifact.artifact_schema.major.to_string(),
         },
         artifact_id: artifact.artifact_id.clone(),
-        composition: RulesetIdentityDto {
-            id: artifact.composition_identity.id.clone(),
-            version: artifact.composition_identity.version.clone(),
+        play_bundle: VersionedIdentityDto {
+            id: artifact.play_bundle_identity.id.clone(),
+            version: artifact.play_bundle_identity.version.clone(),
         },
-        language: RulesetIdentityDto {
-            id: artifact.language_identity.id.clone(),
-            version: artifact.language_identity.version.clone(),
+        ruleset: VersionedIdentityDto {
+            id: artifact.ruleset.identity.id.clone(),
+            version: artifact.ruleset.identity.version.clone(),
         },
-        source_packages: artifact
-            .source_packages
+        language: VersionedIdentityDto {
+            id: artifact.ruleset.language.id.clone(),
+            version: artifact.ruleset.language.version.clone(),
+        },
+        content_packs: artifact
+            .content_packs
             .iter()
-            .map(|source| RulesetSourcePackageDto {
+            .map(|source| ContentPackSummaryDto {
                 id: source.id.clone(),
                 version: source.version.clone(),
                 source_fingerprint: source.source_fingerprint.clone(),
@@ -2658,7 +2724,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
         dependency_lock: artifact
             .dependency_lock
             .iter()
-            .map(|entry| RulesetLockEntryDto {
+            .map(|entry| ContentPackLockEntryDto {
                 requester: entry.requester.clone(),
                 package_id: entry.package_id.clone(),
                 requested_version: entry.requested_version.clone(),
@@ -2669,26 +2735,35 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
             })
             .collect(),
         required_operations: artifact
-            .required_operations
+            .content_requirements
+            .operations
             .iter()
-            .map(|entry| RulesetRequirementDto {
+            .map(|entry| VersionedRequirementDto {
                 id: entry.id.clone(),
                 version: entry.version,
             })
             .collect(),
         required_capabilities: artifact
-            .required_capabilities
+            .content_requirements
+            .capabilities
             .iter()
-            .map(|entry| RulesetRequirementDto {
+            .map(|entry| VersionedRequirementDto {
                 id: entry.id.clone(),
                 version: entry.version,
             })
             .collect(),
+        required_values: artifact
+            .content_requirements
+            .values
+            .iter()
+            .map(|value| format!("{:?}:{}", value.kind, value.id))
+            .collect(),
+        required_numeric_domains: artifact.content_requirements.numeric_domains.clone(),
         exported_roots: artifact.exported_roots.clone(),
         definitions: artifact
             .materialized_definitions
             .iter()
-            .map(|definition| RulesetDefinitionDto {
+            .map(|definition| ContentDefinitionDto {
                 id: definition.id.clone(),
                 fingerprint: definition.fingerprint.clone(),
                 label: definition
@@ -2714,7 +2789,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
         relationships: artifact
             .relationships
             .iter()
-            .map(|relationship| RulesetRelationshipDto {
+            .map(|relationship| ContentRelationshipDto {
                 kind: relationship_kind(relationship.kind).to_owned(),
                 source: relationship.source.clone(),
                 target: relationship.target.clone(),
@@ -2726,7 +2801,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
         derivations: artifact
             .derivation_provenance
             .iter()
-            .map(|provenance| RulesetDerivationProvenanceDto {
+            .map(|provenance| ContentDerivationProvenanceDto {
                 definition_id: provenance.definition_id.clone(),
                 owner: format!("{}@{}", provenance.package_id, provenance.package_version),
                 base: format!(
@@ -2739,7 +2814,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
                 mixins: provenance
                     .mixins
                     .iter()
-                    .map(|mixin| RulesetMixinProvenanceDto {
+                    .map(|mixin| ContentMixinProvenanceDto {
                         identity: format!(
                             "{}@{}#{}",
                             mixin.package_id, mixin.package_version, mixin.definition_id
@@ -2761,7 +2836,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
         overlays: artifact
             .overlay_provenance
             .iter()
-            .map(|provenance| RulesetOverlayProvenanceDto {
+            .map(|provenance| ContentOverlayProvenanceDto {
                 overlay: format!(
                     "{}@{}",
                     provenance.overlay_package_id, provenance.overlay_package_version
@@ -2782,7 +2857,7 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
                 changes: provenance.changes.iter().map(patch_change).collect(),
             })
             .collect(),
-        fingerprints: RulesetFingerprintDto {
+        fingerprints: PlayBundleFingerprintDto {
             source: artifact.fingerprints.source.clone(),
             semantic: artifact.fingerprints.semantic.clone(),
             presentation: artifact.fingerprints.presentation.clone(),
@@ -2790,8 +2865,8 @@ fn artifact_summary(artifact: &CompiledRulesetArtifact) -> RulesetArtifactSummar
     }
 }
 
-fn patch_change(change: &rpg_ir::RulesetPatchChangeProvenance) -> RulesetPatchChangeDto {
-    RulesetPatchChangeDto {
+fn patch_change(change: &rpg_ir::ContentPatchChangeProvenance) -> ContentPatchChangeDto {
+    ContentPatchChangeDto {
         plane: impact_plane(change.plane).to_owned(),
         path: change.path.clone(),
         before: json_value(&change.before),
@@ -2804,95 +2879,95 @@ fn json_value(value: &serde_json::Value) -> String {
     serde_json::to_string(value).unwrap_or_else(|_| "<unencodable>".to_owned())
 }
 
-fn impact_plane(plane: RulesetImpactPlane) -> &'static str {
+fn impact_plane(plane: ContentImpactPlane) -> &'static str {
     match plane {
-        RulesetImpactPlane::Semantic => "semantic",
-        RulesetImpactPlane::Presentation => "presentation",
-        RulesetImpactPlane::Both => "both",
+        ContentImpactPlane::Semantic => "semantic",
+        ContentImpactPlane::Presentation => "presentation",
+        ContentImpactPlane::Both => "both",
     }
 }
 
-fn conflict_policy(policy: RulesetConflictPolicy) -> &'static str {
+fn conflict_policy(policy: ContentConflictPolicy) -> &'static str {
     match policy {
-        RulesetConflictPolicy::Reject => "reject",
-        RulesetConflictPolicy::Replace => "replace",
+        ContentConflictPolicy::Reject => "reject",
+        ContentConflictPolicy::Replace => "replace",
     }
 }
 
-fn dependency_relationship(relationship: RulesetDependencyRelationship) -> &'static str {
+fn dependency_relationship(relationship: ContentPackDependencyRelationship) -> &'static str {
     match relationship {
-        RulesetDependencyRelationship::DependsOn => "dependsOn",
-        RulesetDependencyRelationship::Contributes => "contributes",
-        RulesetDependencyRelationship::Patches => "patches",
+        ContentPackDependencyRelationship::DependsOn => "dependsOn",
+        ContentPackDependencyRelationship::Contributes => "contributes",
+        ContentPackDependencyRelationship::Patches => "patches",
     }
 }
 
-fn definition_kind(kind: MaterializedRulesetDefinitionKind) -> &'static str {
+fn definition_kind(kind: MaterializedContentDefinitionKind) -> &'static str {
     match kind {
-        MaterializedRulesetDefinitionKind::Action => "action",
-        MaterializedRulesetDefinitionKind::Support => "support",
+        MaterializedContentDefinitionKind::Action => "action",
+        MaterializedContentDefinitionKind::Support => "support",
     }
 }
 
-fn definition_visibility(visibility: MaterializedRulesetVisibility) -> &'static str {
+fn definition_visibility(visibility: MaterializedContentVisibility) -> &'static str {
     match visibility {
-        MaterializedRulesetVisibility::Exported => "exported",
-        MaterializedRulesetVisibility::Support => "support",
+        MaterializedContentVisibility::Exported => "exported",
+        MaterializedContentVisibility::Support => "support",
     }
 }
 
-fn extension_policy(policy: RulesetExtensionPolicy) -> &'static str {
+fn extension_policy(policy: ContentExtensionPolicy) -> &'static str {
     match policy {
-        RulesetExtensionPolicy::Sealed => "sealed",
-        RulesetExtensionPolicy::Derivable => "derivable",
-        RulesetExtensionPolicy::Patchable => "patchable",
-        RulesetExtensionPolicy::Configurable => "configurable",
+        ContentExtensionPolicy::Sealed => "sealed",
+        ContentExtensionPolicy::Derivable => "derivable",
+        ContentExtensionPolicy::Patchable => "patchable",
+        ContentExtensionPolicy::Configurable => "configurable",
     }
 }
 
-fn relationship_kind(kind: RulesetRelationshipKind) -> &'static str {
+fn relationship_kind(kind: ContentRelationshipKind) -> &'static str {
     match kind {
-        RulesetRelationshipKind::DependsOn => "dependsOn",
-        RulesetRelationshipKind::Contributes => "contributes",
-        RulesetRelationshipKind::DerivesFrom => "derivesFrom",
-        RulesetRelationshipKind::Patches => "patches",
-        RulesetRelationshipKind::Configures => "configures",
-        RulesetRelationshipKind::Exports => "exports",
+        ContentRelationshipKind::DependsOn => "dependsOn",
+        ContentRelationshipKind::Contributes => "contributes",
+        ContentRelationshipKind::DerivesFrom => "derivesFrom",
+        ContentRelationshipKind::Patches => "patches",
+        ContentRelationshipKind::Configures => "configures",
+        ContentRelationshipKind::Exports => "exports",
     }
 }
 
 pub fn generated_protocol() -> String {
     let declarations = [
-        RulesetLifecycleStatus::decl(),
-        RulesetDiagnosticDto::decl(),
-        RulesetDiagnosticSourceDto::decl(),
-        RulesetIdentityDto::decl(),
-        RulesetSourcePackageDto::decl(),
-        RulesetLockEntryDto::decl(),
-        RulesetRequirementDto::decl(),
-        RulesetDefinitionDto::decl(),
-        RulesetRelationshipDto::decl(),
-        RulesetFingerprintDto::decl(),
-        RulesetPatchChangeDto::decl(),
-        RulesetMixinProvenanceDto::decl(),
-        RulesetDerivationProvenanceDto::decl(),
-        RulesetOverlayProvenanceDto::decl(),
-        RulesetArtifactSummaryDto::decl(),
-        RulesetUpgradeFieldDto::decl(),
-        RulesetUpgradeDefinitionDto::decl(),
-        RulesetUpgradeImpactDto::decl(),
-        EncounterSchemaDto::decl(),
-        EncounterPositionDto::decl(),
-        EncounterBoundedValueDto::decl(),
-        EncounterCellCapabilityValueDto::decl(),
-        EncounterCellCapabilityDto::decl(),
-        EncounterCellDto::decl(),
-        EncounterBoardDto::decl(),
-        EncounterInitialCapabilityDto::decl(),
-        EncounterParticipantSetupDto::decl(),
-        EncounterTurnDto::decl(),
-        EncounterRandomSourceDto::decl(),
-        EncounterSetupRequestDto::decl(),
+        PlayBundleLifecycleStatus::decl(),
+        PlayDiagnosticDto::decl(),
+        PlayDiagnosticSourceDto::decl(),
+        VersionedIdentityDto::decl(),
+        ContentPackSummaryDto::decl(),
+        ContentPackLockEntryDto::decl(),
+        VersionedRequirementDto::decl(),
+        ContentDefinitionDto::decl(),
+        ContentRelationshipDto::decl(),
+        PlayBundleFingerprintDto::decl(),
+        ContentPatchChangeDto::decl(),
+        ContentMixinProvenanceDto::decl(),
+        ContentDerivationProvenanceDto::decl(),
+        ContentOverlayProvenanceDto::decl(),
+        PlayBundleArtifactSummaryDto::decl(),
+        PlayBundleUpgradeFieldDto::decl(),
+        PlayBundleUpgradeDefinitionDto::decl(),
+        PlayBundleUpgradeImpactDto::decl(),
+        ScenarioSchemaDto::decl(),
+        ScenarioPositionDto::decl(),
+        ScenarioBoundedValueDto::decl(),
+        ScenarioCellCapabilityValueDto::decl(),
+        ScenarioCellCapabilityDto::decl(),
+        ScenarioCellDto::decl(),
+        ScenarioBoardDto::decl(),
+        ScenarioInitialCapabilityDto::decl(),
+        ScenarioParticipantDto::decl(),
+        ScenarioTurnDto::decl(),
+        ScenarioRandomSourceDto::decl(),
+        ScenarioSetupRequestDto::decl(),
         GameplayUnavailableDto::decl(),
         GameplayActionOptionsDto::decl(),
         GameplayAuthorityActionDto::decl(),
@@ -2913,9 +2988,16 @@ pub fn generated_protocol() -> String {
         GameplayReplayEntryDto::decl(),
         GameplayArchiveDto::decl(),
         GameplaySessionDto::decl(),
-        RulesetWorkspaceResponseDto::decl(),
-        RulesetCompileRequestDto::decl(),
-        PreparedRulesetCompileRequestDto::decl(),
+        PlayWorkspaceResponseDto::decl(),
+        ConfiguredRulesetLocationDto::decl(),
+        RulesetLocationConfigDto::decl(),
+        RulesetCatalogRequestDto::decl(),
+        RulesetCatalogContentPackDto::decl(),
+        RulesetCatalogPlayBundleDto::decl(),
+        RulesetCatalogDto::decl(),
+        RulesetCatalogResponseDto::decl(),
+        PlayBundleCompileRequestDto::decl(),
+        PreparedPlayBundleCompileRequestDto::decl(),
         GameplayCommandRequestDto::decl(),
         GameplayReactionRequestDto::decl(),
         GameplayTurnControlRequestDto::decl(),
@@ -2925,7 +3007,7 @@ pub fn generated_protocol() -> String {
         .map(|declaration| format!("export {declaration}"))
         .collect::<Vec<_>>();
     format!(
-        "// @generated by rulebench-ruleset-host. Do not edit.\n\n{}\n",
+        "// @generated by rulebench-play-host. Do not edit.\n\n{}\n",
         exports.join("\n\n")
     )
 }
@@ -2936,7 +3018,7 @@ mod tests {
     use rpg_runtime::RpgRandomSource;
 
     use super::{
-        RulesetHost, RulesetLifecycleStatus, ScriptedGameplayRandomSource,
+        PlayBundleLifecycleStatus, PlayHost, ScriptedGameplayRandomSource,
         SystemGameplayRandomSource,
     };
 
@@ -2951,22 +3033,28 @@ mod tests {
 
     #[test]
     fn failed_compilation_cannot_create_a_candidate_or_active_artifact() {
-        let host = RulesetHost::new();
+        let host = PlayHost::new();
 
         let compilation = host.compile_candidate(r#"{"unexpected":true}"#);
         assert!(!compilation.ok);
-        assert_eq!(compilation.status, RulesetLifecycleStatus::NoActiveRuleset);
+        assert_eq!(
+            compilation.status,
+            PlayBundleLifecycleStatus::NoActivePlayBundle
+        );
         assert!(compilation.candidate_artifact.is_none());
         assert!(compilation.active_artifact.is_none());
         assert_eq!(compilation.activation_revision, 0);
         assert_eq!(
             compilation.diagnostics[0].code,
-            "RULESET_PREPARED_DECODE_FAILED"
+            "PLAY_BUNDLE_PREPARED_DECODE_FAILED"
         );
 
         let activation = host.activate_candidate();
         assert!(!activation.ok);
-        assert_eq!(activation.status, RulesetLifecycleStatus::NoActiveRuleset);
+        assert_eq!(
+            activation.status,
+            PlayBundleLifecycleStatus::NoActivePlayBundle
+        );
         assert_eq!(activation.activation_revision, 0);
     }
 
@@ -2978,7 +3066,7 @@ mod tests {
         assert_eq!(source.remaining(), 1);
 
         let failure = source.draw(&random_request(2, 6)).unwrap_err();
-        assert_eq!(failure.code, "RULESET_RANDOM_TAPE_EXHAUSTED");
+        assert_eq!(failure.code, "SESSION_RANDOM_TAPE_EXHAUSTED");
         assert_eq!(source.remaining(), 1);
     }
 
@@ -2987,7 +3075,7 @@ mod tests {
         let mut source = ScriptedGameplayRandomSource::new([7, 3]);
 
         let failure = source.draw(&random_request(1, 6)).unwrap_err();
-        assert_eq!(failure.code, "RULESET_RANDOM_TAPE_VALUE_INVALID");
+        assert_eq!(failure.code, "SESSION_RANDOM_TAPE_VALUE_INVALID");
         assert_eq!(source.remaining(), 2);
     }
 

@@ -1,147 +1,108 @@
 # Canonical Ruleset Roots
 
-Rulebench accepts one path per compile request: `rulesetRoot`. The selected
-directory is a complete ruleset root with a fixed entry contract:
+Rulebench accepts a path to one complete Ruleset root. A production repository
+can contain several unrelated roots without intermixing their files:
 
 ```text
 <content-repository>/
-  foundations/
+  shared-rules/                    # optional, explicitly imported foundations
     d20/
-      ruleset-package.ts
   rulesets/
-    field-manual/
-      ruleset.ts
-      packages/
-        actions.ts
-        overlays.ts
-    ember-skirmish/
-      ruleset.ts
-      packages/
-        actions.ts
+    d20-fantasy/
+      src/
+        index.ts                   # canonical public entry
+        ruleset.ts                 # semantic Ruleset
+      content-packs/
+        starter/
+          src/
+            content-pack.ts
+            actions.ts
+            profiles.ts
+      play-bundles/
+        starter.ts
+      scenarios/                   # optional authored setup documents/helpers
+        starter-skirmish.ts
+    another-game/
+      src/index.ts
+      ...
 ```
 
-Every ruleset root is a direct child of `rulesets/`. Rulebench always loads
-`ruleset.ts` and always reads its named `ruleset` export. The UI and generated
-compile DTO therefore ask for only a root such as:
+The requested root is the directory containing `src/index.ts`, for example:
 
 ```text
-/home/dev/my-rules/rulesets/field-manual
+/home/dev/asha-d20-fantasy/rulesets/d20-fantasy
 ```
 
-Relative paths such as `examples/rulesets/field-manual` are resolved from the
-Rulebench checkout. Absolute paths allow a separately cloned content repository
-to use the same contract without copying its content into Rulebench.
+Unrelated Rulesets do not import each other's files. Truly shared semantic
+foundations may live in an explicitly named repository directory and are
+ordinary explicit imports; they are not a registry and Rulebench does not scan
+them.
 
-## Root declaration
+## Public entry contract
 
-The fixed export is immutable data with exactly the Asha RPG composition and
-package-source surfaces needed by `prepareRulesetCompilation`:
+`src/index.ts` exports immutable values authored with `@asha-rpg/authoring`:
 
 ```ts
-import {
-  composeRuleset,
-  defineRulesetPackage,
-  rulesetPackageSource,
-} from '@asha-rpg/authoring';
-
-const gamePackage = defineRulesetPackage({
-  // Identity, entrypoint, exported definitions, dependencies, and requirements.
-});
-
-export const ruleset = Object.freeze({
-  composition: composeRuleset({
-    // One explicit base and any explicitly added or overlaid packages.
-  }),
-  packages: Object.freeze([rulesetPackageSource(gamePackage)]),
-});
+export { myRuleset } from './ruleset.js';
+export { starterContentSource } from '../content-packs/starter/src/content-pack.js';
+export { starterPlayBundle } from '../play-bundles/starter.js';
 ```
 
-The root owns its complete composition and ruleset-specific packages. Separate
-rulesets never import each other's source files. Code that is genuinely shared
-across rulesets belongs beneath the repository's conventional `foundations/`
-directory and is imported explicitly by each root. Dependencies still appear
-in the authored package manifests and composition; the directory convention is
-only a source-authorization boundary, not a package registry or resolver.
+The complete module graph may expose other authoring helpers, but the loader
+selects only structurally branded `Ruleset`, `ContentPackSource`, and
+`PlayBundleManifest` values. It rejects duplicate identities and escaped or
+unapproved imports. There is no required aggregate export, magic filename
+beyond `src/index.ts`, side-effect registration, directory enumeration, or
+Rulebench-owned content catalog.
 
-## Loader boundary
+Inspecting a root returns:
 
-The trusted authoring subprocess creates a TypeScript program from only the
-inferred `ruleset.ts` entrypoint. TypeScript follows explicit relative imports
-under the selected root and the sibling `foundations/` directory. Imports into
-another child of `rulesets/`, arbitrary local directories, unapproved package
-names, dynamic imports, and `require` calls are rejected.
+- the one semantic Ruleset;
+- all exported Content Packs and their explicit requirements;
+- all declared PlayBundles and compatibility diagnostics.
 
-Rulebench does not scan either directory, enumerate exports, discover packages,
-or use import-side-effect registration. Only the fixed exported declaration is
-passed to Asha RPG's package resolver and materializer. The inferred entrypoint,
-authorized roots, and closed source graph contribute to package source
-fingerprints.
+Compiling additionally requires an explicit list of Content Pack IDs. That
+selection must match exactly one declared PlayBundle. The loader then calls
+Asha RPG's `preparePlayBundle`; Rust compiles and reloads the closed result.
 
-Build, missing-export, evaluation, package-resolution, graph, compatibility,
-materialization, normalization, and Rust artifact diagnostics all return
-through the same workspace response. Root-loading and TypeScript-preparation
-failures read the current Rust workspace state and add diagnostics without
-replacing an already staged candidate. If prepared input reaches Rust but fails
-Rust compilation or portable-artifact closure, Rulebench clears the staged
-candidate. Neither failure path replaces the active artifact, authority
-session, checkpoint, or replay archive.
+## Local source configuration
 
-## Loading and switching
-
-Rulebench starts with no root selected. **Ruleset → Load or switch ruleset…**
-opens a friendly configured-ruleset selector plus a custom-root input. Selecting
-a configured entry fills the exact root location; loading the candidate and
-activating it remain separate user actions. A successful compile also adds that
-explicit path to the recent-root section of the same menu. Choosing a recent
-root selects and compiles it as a new candidate; activation remains explicit.
-Invalid roots are not added to the recent list, and failed recompilation leaves
-the active artifact and session intact.
-
-The trusted local server reads `.rulebench/rulesets.json` by default. That file
-is ignored by git so machine-specific absolute paths do not leak into product
-source. Copy `.rulebench/rulesets.example.json` to start with the repository
-examples, then add independent checkouts by friendly label:
+The trusted local server reads `.rulebench/rulesets.json` by default. The file
+is ignored by git so machine paths stay local:
 
 ```json
 {
   "schemaVersion": 1,
   "rulesets": [
     {
-      "id": "my-rules",
-      "label": "My independent rules",
-      "rulesetRoot": "/home/dev/my-rules/rulesets/main"
+      "id": "d20-fantasy",
+      "label": "d20 Fantasy",
+      "rulesetRoot": "/home/dev/asha-d20-fantasy/rulesets/d20-fantasy"
     }
   ]
 }
 ```
 
-Set `RULEBENCH_RULESET_CONFIG` to use a different configuration file. The list
-is read when the local server starts, and invalid shapes fail startup instead
-of silently dropping entries. It only names source locations for the human
-selector: it cannot select a startup default, activate content, contribute to
-artifact identity, or authorize imports. Recent paths and configured paths are
-local presentation state, not a gameplay or package catalog.
+`RULEBENCH_RULESET_CONFIG` can name another file. Configuration entries are
+only friendly source locations. They cannot preselect a root, select Content
+Packs, compile, activate, contribute to artifact identity, or authorize an
+import. A custom-root input remains available for any independent checkout.
 
-The directories under `examples/rulesets` and `examples/foundations` use this
-same downstream-repository shape. They have no privileged loader path. Field
-Manual, its independently rooted 1.1 variant, and Ember Skirmish demonstrate
-root isolation, shared-foundation imports, candidate switching, and explicit
-activation.
+## Product lifecycle
 
-## Encounter setup documents
+**Play -> Choose Ruleset and Content Packs...** inspects the selected root as a
+separate step. The user then selects Content Packs, reviews whether a declared
+PlayBundle is compatible, compiles it, and explicitly activates the candidate.
+Successfully inspected paths may appear as recent locations, but selecting one
+never activates it.
 
-After activation, **Session → Create encounter…** accepts an explicitly chosen
-JSON document with the generated `asha.rpg.encounter.setup@1` shape. The file
-is decoded strictly in the browser and its artifact binding is preserved for
-Rust to validate; Rulebench does not infer a setup from the ruleset root or
-silently substitute the active artifact. A mismatched or otherwise invalid
-document leaves the active session unchanged.
+Source, graph, compatibility, materialization, normalization, Rust compilation,
+and artifact-closure diagnostics use the same product response. A failed
+inspection or compile does not replace the active PlayBundle or Session.
 
-The same dialog can author that DTO directly. Participant vitality, stats,
-defenses, resources, and turn-bounded modifiers are generic repeatable rows.
-Cell traversal, flag, integer, and identifier capabilities are likewise
-repeatable and retain their capability identity, version, and optional
-definition binding. The random-source selector contains only bindings the
-running Rust host reports as supported. Setup diagnostics remain summarized
-for inspection and also appear at the matching path-specific control with
-`aria-invalid`, `aria-describedby`, and first-error focus.
+After activation, **Session -> Create Scenario...** accepts or authors a strict
+`asha.rpg.scenario@1` setup document bound to the exact PlayBundle artifact.
+Scenario data contains the board, participants, capabilities, initiative, and
+random-source binding. It does not contain a scripted action order, target
+choices, reactions, requested roll results, expected events, or winner. Those
+decisions happen interactively against the Rust-owned Session.

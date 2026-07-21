@@ -30,7 +30,7 @@ const authoringModuleUrl = pathToFileURL(
     'content-compiler',
     'tools',
     'scripts',
-    'load-ruleset-workspace.js',
+    'load-play-bundle-workspace.js',
   ),
 );
 const { parseWorkspaceLoaderOutput } = await import(
@@ -42,15 +42,15 @@ const workspaceLoaderPath = join(
   'content-compiler',
   'tools',
   'scripts',
-  'load-ruleset-workspace.js',
+  'load-play-bundle-workspace.js',
 );
 
-const rustHostPort = await freePort();
-const rustHostUrl = `http://127.0.0.1:${rustHostPort}`;
+const playHostPort = await freePort();
+const playHostUrl = `http://127.0.0.1:${playHostPort}`;
 const gatewayPort = await freePort();
 const gatewayUrl = `http://127.0.0.1:${gatewayPort}`;
-const proxyPath = join(root, 'tmp', 'ruleset', 'proxy.json');
-await mkdir(join(root, 'tmp', 'ruleset'), { recursive: true });
+const proxyPath = join(root, 'tmp', 'play', 'proxy.json');
+await mkdir(join(root, 'tmp', 'play'), { recursive: true });
 await writeFile(
   proxyPath,
   `${JSON.stringify({
@@ -64,7 +64,7 @@ await writeFile(
   'utf8',
 );
 
-const rustHost = spawn(
+const playHost = spawn(
   'cargo',
   [
     'run',
@@ -72,20 +72,20 @@ const rustHost = spawn(
     '--manifest-path',
     'rulebench-rs/Cargo.toml',
     '-p',
-    'rulebench-ruleset-host',
+    'rulebench-play-host',
     '--bin',
-    'rulebench-ruleset-host',
+    'rulebench-play-host',
     '--',
     '--address',
-    `127.0.0.1:${rustHostPort}`,
+    `127.0.0.1:${playHostPort}`,
   ],
   { cwd: root, stdio: 'inherit', shell: false },
 );
 
-await waitForHost(`${rustHostUrl}/api/ruleset/health`, rustHost);
+await waitForHost(`${playHostUrl}/api/play/health`, playHost);
 const authoringGateway = await startAuthoringGateway(
   gatewayPort,
-  rustHostUrl,
+  playHostUrl,
   workspaceLoaderPath,
   parseWorkspaceLoaderOutput,
 );
@@ -109,18 +109,18 @@ const angular = spawn(
 const terminate = (signal) => {
   authoringGateway.close();
   angular.kill(signal);
-  rustHost.kill(signal);
+  playHost.kill(signal);
 };
 process.once('SIGINT', () => terminate('SIGINT'));
 process.once('SIGTERM', () => terminate('SIGTERM'));
-rustHost.once('exit', (code) => {
+playHost.once('exit', (code) => {
   authoringGateway.close();
   if (angular.exitCode === null) angular.kill('SIGTERM');
   if (code !== null && code !== 0) process.exitCode = code;
 });
 angular.once('exit', (code) => {
   authoringGateway.close();
-  if (rustHost.exitCode === null) rustHost.kill('SIGTERM');
+  if (playHost.exitCode === null) playHost.kill('SIGTERM');
   process.exit(code ?? 0);
 });
 
@@ -132,7 +132,7 @@ function freePort() {
       server.close(() => {
         if (address !== null && typeof address === 'object')
           resolve(address.port);
-        else reject(new Error('Could not allocate a ruleset host port'));
+        else reject(new Error('Could not allocate a play host port'));
       });
     });
     server.on('error', reject);
@@ -141,25 +141,46 @@ function freePort() {
 
 function startAuthoringGateway(
   port,
-  rustHostUrl,
+  playHostUrl,
   loaderPath,
   parseLoaderOutput,
 ) {
   const server = createHttpServer(async (request, response) => {
     try {
-      if (request.method === 'GET' && request.url === '/api/ruleset/config') {
+      if (request.method === 'GET' && request.url === '/api/rulesets/config') {
         sendJson(response, 200, rulesetLocationConfig);
         return;
       }
-      if (request.method === 'POST' && request.url === '/api/ruleset/compile') {
+      if (request.method === 'POST' && request.url === '/api/rulesets/inspect') {
+        const body = await readJsonBody(request);
+        const inspection = await prepareWorkspace(
+          loaderPath,
+          parseLoaderOutput,
+          { operation: 'inspect', rulesetRoot: body.rulesetRoot },
+        );
+        sendJson(response, inspection.ok ? 200 : 422, {
+          ok: inspection.ok,
+          catalog: inspection.ok ? inspection.catalog : null,
+          diagnostics: inspection.diagnostics.map(authoringDiagnosticDto),
+        });
+        return;
+      }
+      if (
+        request.method === 'POST' &&
+        request.url === '/api/play-bundle/compile'
+      ) {
         const body = await readJsonBody(request);
         const preparation = await prepareWorkspace(
           loaderPath,
           parseLoaderOutput,
-          body,
+          {
+            operation: 'compile',
+            rulesetRoot: body.rulesetRoot,
+            contentPackIds: body.contentPackIds,
+          },
         );
         if (!preparation.ok) {
-          const workspace = await rustWorkspace(rustHostUrl);
+          const workspace = await playWorkspace(playHostUrl);
           sendJson(response, 200, {
             ...workspace,
             ok: false,
@@ -169,7 +190,7 @@ function startAuthoringGateway(
         }
         await forwardJson(
           response,
-          `${rustHostUrl}/api/ruleset/compile`,
+          `${playHostUrl}/api/play-bundle/compile`,
           'POST',
           { preparedSource: preparation.preparedSource },
         );
@@ -181,16 +202,16 @@ function startAuthoringGateway(
           : undefined;
       await forwardJson(
         response,
-        `${rustHostUrl}${request.url ?? '/api/ruleset'}`,
+        `${playHostUrl}${request.url ?? '/api/play'}`,
         request.method === 'POST' ? 'POST' : 'GET',
         forwardedBody,
       );
     } catch (error) {
       await respondWithGatewayDiagnostic(
         response,
-        rustHostUrl,
+        playHostUrl,
         500,
-        'RULESET_AUTHORING_GATEWAY_FAILED',
+        'PLAY_AUTHORING_GATEWAY_FAILED',
         '$',
         error instanceof Error ? error.message : String(error),
       );
@@ -297,22 +318,22 @@ async function forwardJson(response, url, method, body) {
   sendJson(response, upstream.status, await upstream.json());
 }
 
-async function rustWorkspace(rustHostUrl) {
-  const response = await fetch(`${rustHostUrl}/api/ruleset`);
+async function playWorkspace(playHostUrl) {
+  const response = await fetch(`${playHostUrl}/api/play`);
   if (!response.ok)
-    throw new Error(`ruleset host status failed: ${response.status}`);
+    throw new Error(`play host status failed: ${response.status}`);
   return response.json();
 }
 
 async function respondWithGatewayDiagnostic(
   response,
-  rustHostUrl,
+  playHostUrl,
   status,
   code,
   path,
   message,
 ) {
-  const workspace = await rustWorkspace(rustHostUrl);
+  const workspace = await playWorkspace(playHostUrl);
   sendJson(response, status, {
     ...workspace,
     ok: false,
@@ -388,7 +409,7 @@ async function waitForHost(url, child) {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(
-        `ruleset host exited before startup with ${child.exitCode}`,
+        `play host exited before startup with ${child.exitCode}`,
       );
     }
     try {
@@ -400,5 +421,5 @@ async function waitForHost(url, child) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   child.kill('SIGTERM');
-  throw new Error(`ruleset host did not become ready at ${url}`);
+  throw new Error(`play host did not become ready at ${url}`);
 }

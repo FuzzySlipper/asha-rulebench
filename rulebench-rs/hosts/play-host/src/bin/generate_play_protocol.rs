@@ -9,15 +9,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .find(|argument| argument.as_str() != "--check")
         .map(PathBuf::from)
-        .ok_or("usage: generate_ruleset_protocol [--check] <output>")?;
-    let generated = rulebench_ruleset_host::generated_protocol();
+        .ok_or("usage: generate_play_protocol [--check] <output>")?;
+    let generated = rulebench_play_host::generated_protocol();
 
     if check {
         let existing = fs::read_to_string(&output)?;
         if existing != generated {
             return Err(format!("generated protocol is stale: {}", output.display()).into());
         }
-        println!("generated ruleset protocol is current");
+        println!("generated play protocol is current");
         return Ok(());
     }
 

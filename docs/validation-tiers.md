@@ -4,15 +4,15 @@
 
 `pnpm run verify:change` has a closed vocabulary:
 
-| Profile              | Checks                                                              |
-| -------------------- | ------------------------------------------------------------------- |
-| `frontend`           | structure, TypeScript authority, lint, types, unit tests, build     |
-| `content-authoring`  | TypeScript authority, prepared-artifact emission, types, unit tests |
-| `rust-owner`         | fresh ruleset-host workspace tests                                  |
-| `protocol-generated` | Rust protocol drift, types, decoder tests                           |
-| `host-transport`     | prepared artifact, Rust host, types, transport/store tests          |
-| `browser`            | types and the focused `@gate` compile/inspect/activate journey      |
-| `docs`               | executable documentation command references                         |
+| Profile              | Checks                                                          |
+| -------------------- | --------------------------------------------------------------- |
+| `frontend`           | structure, TypeScript authority, lint, types, unit tests, build |
+| `content-authoring`  | TypeScript authority, loader contract, types, unit tests        |
+| `rust-owner`         | fresh play-host workspace tests                                 |
+| `protocol-generated` | Rust protocol drift, types, decoder tests                       |
+| `host-transport`     | Rust host, types, transport/store tests                         |
+| `browser`            | types and the focused `@gate` selection/activation journey      |
+| `docs`               | executable documentation command references                     |
 
 Profiles may be repeated and their command union is deduplicated. Unknown
 profiles and arguments fail closed. Use `--dry-run` to inspect a selection.
@@ -24,24 +24,11 @@ pnpm run verify
 ```
 
 The required check runs static product validation, the pinned Rust host tests,
-generated-protocol drift, and the focused browser gate. It proves an explicit
-ruleset root is freshly built through inferred `ruleset.ts#ruleset` by the
-trusted authoring subprocess for a user-selected request, reaches Rust compilation and a closed artifact
-loader, appears in the user-facing inspection dialog, and activates atomically.
-It also proves subsequent invalid package and TypeScript build graphs display
-diagnostics while preserving the active artifact, authority session, and
-activation revision. It
-does not prove process-restart storage, migration policy, or an exhaustive
-content corpus. The focused gate drives the DOM battlefield, action palette,
-highlighted authority targets, inline reaction choice, host-supplied exact
-automatic rolls, visible accepted events, keyboard grid movement, narrow
-layout, portable checkpoint restore, deterministic Rust replay, and
-derivation/mixin/overlay graph, including visible materialization provenance,
-independent-root activation, and recent-root switching from the top menu. The
-gate also selects and decodes a setup document, renders a completed outcome,
-proves artifact-mismatch diagnostics focus their setup control while the
-session survives, authors generic capability rows, and records explicit
-end-turn controls in replay.
+generated-protocol drift, and a focused browser gate. It proves a selected
+`src/index.ts` root exposes a distinct Ruleset, Content Packs, and compatible
+PlayBundle; compilation reaches Rust's closed artifact loader; and activation
+is explicit and atomic before Scenario setup becomes available. It does not
+prove a playable content corpus, process-restart storage, or migration policy.
 
 ## Downstream posture
 

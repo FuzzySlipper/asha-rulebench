@@ -1,273 +1,205 @@
-import type { RulesetWorkspaceResponseDto } from '@asha-rulebench/protocol';
-import type { RulesetTransport } from '@asha-rulebench/transport';
-import { memoryStorage } from '@asha-rulebench/platform';
+import type {
+  PlayBundleCompileRequestDto,
+  PlayWorkspaceResponseDto,
+  RulesetCatalogResponseDto,
+} from '@asha-rulebench/protocol';
+import type { KeyValueStoragePort } from '@asha-rulebench/platform';
+import type { PlayTransport } from '@asha-rulebench/transport';
 import { describe, expect, it } from 'vitest';
 
-import { RulesetWorkspaceStore } from './store.js';
+import { PlayWorkspaceStore } from './store.js';
 
-describe('ruleset workspace store', () => {
-  it('keeps compiler diagnostics as inspected state rather than inventing authority results', async () => {
-    const rejected: RulesetWorkspaceResponseDto = {
-      ...emptyResponse(),
-      ok: false,
-      diagnostics: [
-        {
-          stage: 'references',
-          severity: 'error',
-          code: 'RULESET_EXPORTED_ROOT_MISSING',
-          path: '$.exportedRoots[0]',
-          message: 'missing root',
-          packageId: null,
-          definitionId: null,
-          source: null,
-          graphPath: null,
-          expected: null,
-          actual: null,
-        },
-      ],
-    };
-    const store = new RulesetWorkspaceStore(
-      transportReturning(rejected),
-      memoryStorage(),
-    );
+describe('play workspace store', () => {
+  it('loads configured Ruleset roots without selecting or activating one', async () => {
+    const store = new PlayWorkspaceStore(baseTransport(), memoryStorage());
 
-    await store.compile(exampleWorkspace());
-
-    expect(store.state().kind).toBe('ready');
-    expect(store.view()?.phase).toBe('empty');
-    expect(store.view()?.diagnostics[0]?.code).toBe(
-      'RULESET_EXPORTED_ROOT_MISSING',
-    );
-  });
-
-  it('classifies transport failures without discarding the previous view', async () => {
-    const transport: RulesetTransport = {
-      configuredRulesets: async () => [],
-      status: async () => emptyResponse(),
-      compile: async () => {
-        throw new Error('host offline');
-      },
-      activate: async () => emptyResponse(),
-      startEncounter: async () => emptyResponse(),
-      command: async () => emptyResponse(),
-      react: async () => emptyResponse(),
-      control: async () => emptyResponse(),
-      restoreCheckpoint: async () => emptyResponse(),
-      replay: async () => emptyResponse(),
-    };
-    const store = new RulesetWorkspaceStore(transport, memoryStorage());
     await store.refresh();
-    await store.compile(exampleWorkspace());
-
-    const state = store.state();
-    expect(state.kind).toBe('error');
-    if (state.kind !== 'error') return;
-    expect(state.message).toBe('host offline');
-    expect(state.previous?.headline).toBe('No compiled ruleset active');
-  });
-
-  it('keeps the active artifact when fresh TypeScript preparation fails', async () => {
-    const active = {
-      ...emptyResponse(),
-      status: 'active' as const,
-      activationRevision: 3,
-      activeArtifact: artifactSummary('artifact-active'),
-    };
-    let compileRequests = 0;
-    const transport: RulesetTransport = {
-      configuredRulesets: async () => [],
-      status: async () => active,
-      compile: async () => {
-        compileRequests += 1;
-        return {
-          ...active,
-          ok: false,
-          diagnostics: [
-            {
-              stage: 'graph',
-              severity: 'error',
-              code: 'RULESET_DEFINITION_REFERENCE_MISSING',
-              path: '$.packages[rulebench.field-manual@1.0.0].definitions[0]',
-              message: 'missing support definition',
-              packageId: 'rulebench.field-manual',
-              definitionId: 'rulebench.signal-flare',
-              source: {
-                module: 'packages/rulebench-field-manual.ts',
-                declaration: 'signalFlare',
-              },
-              graphPath: null,
-              expected: null,
-              actual: null,
-            },
-          ],
-        };
-      },
-      activate: async () => active,
-      startEncounter: async () => active,
-      command: async () => active,
-      react: async () => active,
-      control: async () => active,
-      restoreCheckpoint: async () => active,
-      replay: async () => active,
-    };
-    const store = new RulesetWorkspaceStore(transport, memoryStorage());
-    await store.refresh();
-    await store.compile(exampleWorkspace());
-
-    expect(compileRequests).toBe(1);
-    expect(store.view()?.phase).toBe('active');
-    expect(store.view()?.activationRevision).toBe(3);
-    expect(store.view()?.activeArtifactId).toBe('artifact-active');
-    expect(store.view()?.diagnostics[0]?.code).toBe(
-      'RULESET_DEFINITION_REFERENCE_MISSING',
-    );
-  });
-
-  it('persists successful roots in most-recent order without selecting startup content', async () => {
-    const storage = memoryStorage();
-    const store = new RulesetWorkspaceStore(
-      transportReturning(emptyResponse()),
-      storage,
-    );
-
-    expect(store.rulesetRoot()).toBe('');
-    await store.compile({ rulesetRoot: 'examples/rulesets/field-manual' });
-    await store.compile({ rulesetRoot: 'examples/rulesets/ember-skirmish' });
-    await store.compile({ rulesetRoot: 'examples/rulesets/field-manual' });
-
-    expect(store.recentRulesetRoots()).toEqual([
-      'examples/rulesets/field-manual',
-      'examples/rulesets/ember-skirmish',
-    ]);
-    const reloaded = new RulesetWorkspaceStore(
-      transportReturning(emptyResponse()),
-      storage,
-    );
-    expect(reloaded.rulesetRoot()).toBe('');
-    expect(reloaded.recentRulesetRoots()).toEqual(store.recentRulesetRoots());
-  });
-
-  it('does not add rejected roots to the switch menu', async () => {
-    const rejected = { ...emptyResponse(), ok: false };
-    const store = new RulesetWorkspaceStore(
-      transportReturning(rejected),
-      memoryStorage(),
-    );
-
-    await store.compile({ rulesetRoot: 'examples/rulesets/invalid-build' });
-
-    expect(store.rulesetRoot()).toBe('examples/rulesets/invalid-build');
-    expect(store.recentRulesetRoots()).toEqual([]);
-  });
-
-  it('loads configured source locations without selecting startup content', async () => {
-    const transport: RulesetTransport = {
-      ...transportReturning(emptyResponse()),
-      configuredRulesets: async () => [
-        {
-          id: 'field-manual',
-          label: 'Field Manual',
-          rulesetRoot: 'examples/rulesets/field-manual',
-        },
-      ],
-    };
-    const store = new RulesetWorkspaceStore(transport, memoryStorage());
-
     await store.refreshConfiguredRulesets();
 
+    expect(store.view()?.headline).toBe('No PlayBundle active');
+    expect(store.rulesetRoot()).toBe('');
     expect(store.configuredRulesets()).toEqual([
       {
-        id: 'field-manual',
-        label: 'Field Manual',
-        rulesetRoot: 'examples/rulesets/field-manual',
+        id: 'minimal',
+        label: 'Minimal',
+        rulesetRoot: 'test-fixtures/rulesets/minimal',
       },
     ]);
-    expect(store.rulesetRoot()).toBe('');
-    expect(store.rulesetConfigurationError()).toBeNull();
   });
 
-  it('keeps a configuration failure separate from host workspace state', async () => {
-    const transport: RulesetTransport = {
-      ...transportReturning(emptyResponse()),
-      configuredRulesets: async () => {
-        throw new Error('invalid local ruleset config');
+  it('inspects Ruleset contents before any Content Pack selection is made', async () => {
+    const store = new PlayWorkspaceStore(baseTransport(), memoryStorage());
+    store.selectRulesetRoot('test-fixtures/rulesets/minimal');
+
+    expect(await store.inspectSelectedRuleset()).toBe(true);
+
+    expect(store.rulesetCatalog()?.ruleset.id).toBe('rulebench.minimal');
+    expect(store.selectedContentPackIds()).toEqual([]);
+    expect(store.view()).toBeNull();
+  });
+
+  it('compiles the explicit Content Pack selection and remembers only accepted roots', async () => {
+    const requests: PlayBundleCompileRequestDto[] = [];
+    const storage = memoryStorage();
+    const store = new PlayWorkspaceStore(
+      baseTransport({
+        compile: async (request) => {
+          requests.push(request);
+          return candidateResponse();
+        },
+      }),
+      storage,
+    );
+    store.selectRulesetRoot('test-fixtures/rulesets/minimal');
+    await store.inspectSelectedRuleset();
+    store.setContentPackSelected('rulebench.minimal.content', true);
+
+    await store.compileSelectedPlayBundle();
+
+    expect(requests).toEqual([
+      {
+        rulesetRoot: 'test-fixtures/rulesets/minimal',
+        contentPackIds: ['rulebench.minimal.content'],
       },
-    };
-    const store = new RulesetWorkspaceStore(transport, memoryStorage());
+    ]);
+    expect(store.view()?.phase).toBe('candidate');
+    expect(store.recentRulesetRoots()).toEqual([
+      'test-fixtures/rulesets/minimal',
+    ]);
+    expect(storage.getItem('asha-rulebench.recent-ruleset-roots.v1')).toBe(
+      '["test-fixtures/rulesets/minimal"]',
+    );
+  });
+
+  it('keeps catalog diagnostics separate from an existing active PlayBundle view', async () => {
+    const store = new PlayWorkspaceStore(
+      baseTransport({
+        status: async () => activeResponse(),
+        inspectRuleset: async () => ({
+          ok: false,
+          catalog: null,
+          diagnostics: [diagnostic('RULESET_ROOT_ENTRY_NOT_FOUND')],
+        }),
+      }),
+      memoryStorage(),
+    );
     await store.refresh();
+    store.selectRulesetRoot('/missing/rulesets/game');
 
-    await store.refreshConfiguredRulesets();
+    expect(await store.inspectSelectedRuleset()).toBe(false);
 
-    expect(store.view()?.headline).toBe('No compiled ruleset active');
-    expect(store.configuredRulesets()).toEqual([]);
-    expect(store.rulesetConfigurationError()).toBe(
-      'invalid local ruleset config',
+    expect(store.view()?.phase).toBe('active');
+    expect(store.catalogDiagnostics()[0]?.code).toBe(
+      'RULESET_ROOT_ENTRY_NOT_FOUND',
     );
   });
 });
 
-function transportReturning(
-  response: RulesetWorkspaceResponseDto,
-): RulesetTransport {
-  return {
-    configuredRulesets: async () => [],
-    status: async () => response,
-    compile: async () => response,
-    activate: async () => response,
-    startEncounter: async () => response,
-    command: async () => response,
-    react: async () => response,
-    control: async () => response,
-    restoreCheckpoint: async () => response,
-    replay: async () => response,
+function baseTransport(overrides: Partial<PlayTransport> = {}): PlayTransport {
+  const transport: PlayTransport = {
+    rulesetLocations: async () => ({
+      schemaVersion: 1,
+      rulesets: [
+        {
+          id: 'minimal',
+          label: 'Minimal',
+          rulesetRoot: 'test-fixtures/rulesets/minimal',
+        },
+      ],
+    }),
+    inspectRuleset: async () => catalogResponse(),
+    status: async () => emptyResponse(),
+    compile: async () => candidateResponse(),
+    activatePlayBundle: async () => activeResponse(),
+    startScenario: async () => activeResponse(),
+    command: async () => activeResponse(),
+    react: async () => activeResponse(),
+    control: async () => activeResponse(),
+    restoreCheckpoint: async () => activeResponse(),
+    replay: async () => activeResponse(),
   };
+  return { ...transport, ...overrides };
 }
 
-function exampleWorkspace() {
-  return {
-    rulesetRoot: 'examples/rulesets/field-manual',
-  };
-}
-
-function emptyResponse(): RulesetWorkspaceResponseDto {
+function catalogResponse(): RulesetCatalogResponseDto {
   return {
     ok: true,
-    status: 'noActiveRuleset',
+    catalog: {
+      rulesetRoot: 'test-fixtures/rulesets/minimal',
+      ruleset: { id: 'rulebench.minimal', version: '1.0.0' },
+      contentPacks: [
+        {
+          id: 'rulebench.minimal.content',
+          version: '1.0.0',
+          label: 'Minimal Content',
+          requirements: [],
+        },
+      ],
+      playBundles: [
+        {
+          id: 'rulebench.minimal.play',
+          version: '1.0.0',
+          contentPackIds: ['rulebench.minimal.content'],
+          compatible: true,
+          diagnostics: [],
+        },
+      ],
+    },
+    diagnostics: [],
+  };
+}
+
+function emptyResponse(): PlayWorkspaceResponseDto {
+  return response('noActivePlayBundle', null);
+}
+
+function candidateResponse(): PlayWorkspaceResponseDto {
+  return response('compiledCandidate', artifact());
+}
+
+function activeResponse(): PlayWorkspaceResponseDto {
+  const value = response('active', null);
+  return {
+    ...value,
+    activeArtifact: artifact(),
+    activationRevision: 1,
+    scenarioSetupRequired: true,
+  };
+}
+
+function response(
+  status: PlayWorkspaceResponseDto['status'],
+  candidateArtifact: PlayWorkspaceResponseDto['candidateArtifact'],
+): PlayWorkspaceResponseDto {
+  return {
+    ok: true,
+    status,
     activeArtifact: null,
-    candidateArtifact: null,
+    candidateArtifact,
     upgradeImpact: null,
     activationRevision: 0,
-    hostRandomSource: {
-      policyId: 'rulebench.automatic-random',
-      policyVersion: 1,
-      sourceId: 'rulebench.system-random',
-      sourceVersion: 1,
-    },
-    supportedRandomSources: [
-      {
-        policyId: 'rulebench.automatic-random',
-        policyVersion: 1,
-        sourceId: 'rulebench.system-random',
-        sourceVersion: 1,
-      },
-    ],
-    encounterSetupRequired: false,
+    hostRandomSource: randomSource(),
+    supportedRandomSources: [randomSource()],
+    scenarioSetupRequired: false,
     gameplayAvailable: false,
     gameplay: null,
     diagnostics: [],
   };
 }
 
-function artifactSummary(artifactId: string) {
+function artifact(): NonNullable<PlayWorkspaceResponseDto['activeArtifact']> {
   return {
-    schema: { id: 'asha.rpg.ruleset.compiled', version: '1' },
-    artifactId,
-    composition: { id: 'rulebench.fresh-start', version: '1.0.0' },
+    schema: { id: 'asha.rpg.play-bundle.compiled', version: '1' },
+    artifactId: 'rulebench.minimal.play@1.0.0:fnv1a64:artifact',
+    playBundle: { id: 'rulebench.minimal.play', version: '1.0.0' },
+    ruleset: { id: 'rulebench.minimal', version: '1.0.0' },
     language: { id: 'asha-rpg', version: '1.0.0' },
-    sourcePackages: [],
+    contentPacks: [],
     dependencyLock: [],
     requiredOperations: [],
     requiredCapabilities: [],
+    requiredValues: [],
+    requiredNumericDomains: [],
     exportedRoots: [],
     definitions: [],
     policyBindingIds: [],
@@ -277,9 +209,42 @@ function artifactSummary(artifactId: string) {
     derivations: [],
     overlays: [],
     fingerprints: {
-      source: 'fnv1a64:0000000000000000',
-      semantic: 'fnv1a64:0000000000000000',
-      presentation: 'fnv1a64:0000000000000000',
+      source: 'source',
+      semantic: 'semantic',
+      presentation: 'presentation',
     },
+  };
+}
+
+function diagnostic(code: string) {
+  return {
+    stage: 'source',
+    severity: 'error',
+    code,
+    path: '$.rulesetRoot',
+    message: 'missing',
+    packageId: null,
+    definitionId: null,
+    source: null,
+    graphPath: null,
+    expected: null,
+    actual: null,
+  };
+}
+
+function randomSource() {
+  return {
+    policyId: 'rulebench.automatic-random',
+    policyVersion: 1,
+    sourceId: 'rulebench.system-random',
+    sourceVersion: 1,
+  };
+}
+
+function memoryStorage(): KeyValueStoragePort {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
   };
 }

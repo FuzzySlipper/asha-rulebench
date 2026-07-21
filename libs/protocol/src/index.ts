@@ -1,2 +1,2 @@
-export * from './generated/ruleset-protocol.js';
-export * from './lib/decode-ruleset-response.js';
+export * from './generated/play-protocol.js';
+export * from './lib/decode-play-response.js';

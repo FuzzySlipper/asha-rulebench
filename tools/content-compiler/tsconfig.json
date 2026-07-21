@@ -10,8 +10,8 @@
     "types": ["node"]
   },
   "include": [
-    "../scripts/emit-prepared-ruleset.ts",
-    "../scripts/load-ruleset-workspace.ts",
+    "../scripts/emit-prepared-play-bundle.ts",
+    "../scripts/load-play-bundle-workspace.ts",
     "../../libs/content-authoring/src/**/*.ts"
   ],
   "exclude": ["../../libs/content-authoring/src/**/*.spec.ts"]

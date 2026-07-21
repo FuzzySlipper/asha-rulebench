@@ -1,7 +1,7 @@
 import { computed, signal } from '@angular/core';
 import {
-  rulesetWorkspaceView,
-  type RulesetWorkspaceView,
+  playWorkspaceView,
+  type PlayWorkspaceView,
 } from '@asha-rulebench/domain';
 import {
   browserJsonHttp,
@@ -9,17 +9,18 @@ import {
   type KeyValueStoragePort,
 } from '@asha-rulebench/platform';
 import type {
-  EncounterSetupRequestDto,
+  ScenarioSetupRequestDto,
   GameplayCommandRequestDto,
   GameplayReactionRequestDto,
   GameplayTurnControlRequestDto,
-  RulesetCompileRequestDto,
-  RulesetWorkspaceResponseDto,
+  PlayDiagnosticDto,
+  PlayWorkspaceResponseDto,
+  RulesetCatalogDto,
+  ConfiguredRulesetLocationDto,
 } from '@asha-rulebench/protocol';
 import {
-  createRulesetTransport,
-  type ConfiguredRulesetLocation,
-  type RulesetTransport,
+  createPlayTransport,
+  type PlayTransport,
 } from '@asha-rulebench/transport';
 
 export type AsyncState<Value> =
@@ -35,31 +36,48 @@ export type AsyncState<Value> =
 const RECENT_RULESET_ROOTS_KEY = 'asha-rulebench.recent-ruleset-roots.v1';
 const RECENT_RULESET_ROOT_LIMIT = 8;
 
-export class RulesetWorkspaceStore {
-  private readonly mutableState = signal<AsyncState<RulesetWorkspaceView>>({
+export class PlayWorkspaceStore {
+  private readonly mutableState = signal<AsyncState<PlayWorkspaceView>>({
     kind: 'idle',
   });
   private readonly mutableRulesetRoot = signal('');
   private readonly mutableRecentRulesetRoots = signal<readonly string[]>([]);
   private readonly mutableConfiguredRulesets = signal<
-    readonly ConfiguredRulesetLocation[]
+    readonly ConfiguredRulesetLocationDto[]
   >([]);
+  private readonly mutableRulesetCatalog = signal<RulesetCatalogDto | null>(
+    null,
+  );
+  private readonly mutableSelectedContentPackIds = signal<readonly string[]>(
+    [],
+  );
+  private readonly mutableCatalogDiagnostics = signal<
+    readonly PlayDiagnosticDto[]
+  >([]);
+  private readonly mutableCatalogBusy = signal(false);
   private readonly mutableRulesetConfigurationError = signal<string | null>(
     null,
   );
   public readonly state = this.mutableState.asReadonly();
   public readonly view = computed(() => currentView(this.mutableState()));
-  public readonly busy = computed(() => this.mutableState().kind === 'loading');
+  public readonly busy = computed(
+    () => this.mutableState().kind === 'loading' || this.mutableCatalogBusy(),
+  );
   public readonly rulesetRoot = this.mutableRulesetRoot.asReadonly();
   public readonly recentRulesetRoots =
     this.mutableRecentRulesetRoots.asReadonly();
   public readonly configuredRulesets =
     this.mutableConfiguredRulesets.asReadonly();
+  public readonly rulesetCatalog = this.mutableRulesetCatalog.asReadonly();
+  public readonly selectedContentPackIds =
+    this.mutableSelectedContentPackIds.asReadonly();
+  public readonly catalogDiagnostics =
+    this.mutableCatalogDiagnostics.asReadonly();
   public readonly rulesetConfigurationError =
     this.mutableRulesetConfigurationError.asReadonly();
 
   public constructor(
-    private readonly transport: RulesetTransport,
+    private readonly transport: PlayTransport,
     private readonly storage: KeyValueStoragePort,
   ) {
     this.mutableRecentRulesetRoots.set(readRecentRulesetRoots(storage));
@@ -71,8 +89,8 @@ export class RulesetWorkspaceStore {
 
   public async refreshConfiguredRulesets(): Promise<void> {
     try {
-      const configuredRulesets = await this.transport.configuredRulesets();
-      this.mutableConfiguredRulesets.set(configuredRulesets);
+      const configuration = await this.transport.rulesetLocations();
+      this.mutableConfiguredRulesets.set(configuration.rulesets);
       this.mutableRulesetConfigurationError.set(null);
     } catch (error: unknown) {
       this.mutableConfiguredRulesets.set([]);
@@ -84,27 +102,72 @@ export class RulesetWorkspaceStore {
     }
   }
 
-  public async compile(request: RulesetCompileRequestDto): Promise<void> {
-    const rulesetRoot = request.rulesetRoot.trim();
-    this.mutableRulesetRoot.set(rulesetRoot);
+  public async inspectSelectedRuleset(): Promise<boolean> {
+    const rulesetRoot = this.mutableRulesetRoot().trim();
+    if (rulesetRoot.length === 0) return false;
+    this.mutableCatalogBusy.set(true);
+    try {
+      const response = await this.transport.inspectRuleset({ rulesetRoot });
+      this.mutableRulesetCatalog.set(response.catalog);
+      this.mutableCatalogDiagnostics.set(response.diagnostics);
+      this.mutableSelectedContentPackIds.set([]);
+      return response.ok && response.catalog !== null;
+    } catch (error: unknown) {
+      this.mutableRulesetCatalog.set(null);
+      this.mutableSelectedContentPackIds.set([]);
+      this.mutableCatalogDiagnostics.set([
+        clientDiagnostic(
+          'RULESET_CATALOG_REQUEST_FAILED',
+          '$.rulesetRoot',
+          error instanceof Error
+            ? error.message
+            : 'Unknown Ruleset catalog failure',
+        ),
+      ]);
+      return false;
+    } finally {
+      this.mutableCatalogBusy.set(false);
+    }
+  }
+
+  public async compileSelectedPlayBundle(): Promise<void> {
+    const rulesetRoot = this.mutableRulesetRoot().trim();
+    const contentPackIds = [...this.mutableSelectedContentPackIds()];
     const response = await this.run(() =>
-      this.transport.compile({ rulesetRoot }),
+      this.transport.compile({ rulesetRoot, contentPackIds }),
     );
     if (response?.ok === true) this.rememberRulesetRoot(rulesetRoot);
   }
 
   public selectRulesetRoot(rulesetRoot: string): void {
     this.mutableRulesetRoot.set(rulesetRoot);
+    this.mutableRulesetCatalog.set(null);
+    this.mutableSelectedContentPackIds.set([]);
+    this.mutableCatalogDiagnostics.set([]);
   }
 
-  public async activate(): Promise<void> {
-    await this.run(() => this.transport.activate());
+  public setContentPackSelected(
+    contentPackId: string,
+    selected: boolean,
+  ): void {
+    this.mutableSelectedContentPackIds.update((current) => {
+      if (selected) {
+        return current.includes(contentPackId)
+          ? current
+          : [...current, contentPackId].sort((left, right) =>
+              left.localeCompare(right),
+            );
+      }
+      return current.filter((value) => value !== contentPackId);
+    });
   }
 
-  public async startEncounter(
-    setup: EncounterSetupRequestDto,
-  ): Promise<boolean> {
-    const response = await this.run(() => this.transport.startEncounter(setup));
+  public async activatePlayBundle(): Promise<void> {
+    await this.run(() => this.transport.activatePlayBundle());
+  }
+
+  public async startScenario(setup: ScenarioSetupRequestDto): Promise<boolean> {
+    const response = await this.run(() => this.transport.startScenario(setup));
     return response?.ok === true;
   }
 
@@ -129,15 +192,15 @@ export class RulesetWorkspaceStore {
   }
 
   private async run(
-    request: () => ReturnType<RulesetTransport['status']>,
-  ): Promise<RulesetWorkspaceResponseDto | null> {
+    request: () => ReturnType<PlayTransport['status']>,
+  ): Promise<PlayWorkspaceResponseDto | null> {
     const previous = currentView(this.mutableState());
     this.mutableState.set({ kind: 'loading', previous });
     try {
       const response = await request();
       this.mutableState.set({
         kind: 'ready',
-        value: rulesetWorkspaceView(response),
+        value: playWorkspaceView(response),
       });
       return response;
     } catch (error: unknown) {
@@ -146,7 +209,7 @@ export class RulesetWorkspaceStore {
         message:
           error instanceof Error
             ? error.message
-            : 'Unknown ruleset transport failure',
+            : 'Unknown play transport failure',
         previous,
       });
       return null;
@@ -166,16 +229,36 @@ export class RulesetWorkspaceStore {
   }
 }
 
-export function createBrowserRulesetWorkspaceStore(): RulesetWorkspaceStore {
-  return new RulesetWorkspaceStore(
-    createRulesetTransport(browserJsonHttp()),
+function clientDiagnostic(
+  code: string,
+  path: string,
+  message: string,
+): PlayDiagnosticDto {
+  return {
+    stage: 'source',
+    severity: 'error',
+    code,
+    path,
+    message,
+    packageId: null,
+    definitionId: null,
+    source: null,
+    graphPath: null,
+    expected: null,
+    actual: null,
+  };
+}
+
+export function createBrowserPlayWorkspaceStore(): PlayWorkspaceStore {
+  return new PlayWorkspaceStore(
+    createPlayTransport(browserJsonHttp()),
     browserStorage(),
   );
 }
 
 function currentView(
-  state: AsyncState<RulesetWorkspaceView>,
-): RulesetWorkspaceView | null {
+  state: AsyncState<PlayWorkspaceView>,
+): PlayWorkspaceView | null {
   if (state.kind === 'ready') return state.value;
   if (state.kind === 'loading' || state.kind === 'error') return state.previous;
   return null;

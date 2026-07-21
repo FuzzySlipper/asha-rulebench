@@ -22,18 +22,18 @@ import type {
   GameplayEntityView,
 } from '@asha-rulebench/domain';
 import type {
-  EncounterCellCapabilityDto,
-  EncounterInitialCapabilityDto,
-  EncounterParticipantSetupDto,
-  EncounterRandomSourceDto,
-  EncounterSetupRequestDto,
-  RulesetDiagnosticDto,
+  ScenarioCellCapabilityDto,
+  ScenarioInitialCapabilityDto,
+  ScenarioParticipantDto,
+  ScenarioRandomSourceDto,
+  ScenarioSetupRequestDto,
+  PlayDiagnosticDto,
 } from '@asha-rulebench/protocol';
-import { decodeEncounterSetupDocument } from '@asha-rulebench/protocol';
+import { decodeScenarioDocument } from '@asha-rulebench/protocol';
 import { browserTextFileInput } from '@asha-rulebench/platform';
-import { createBrowserRulesetWorkspaceStore } from '@asha-rulebench/store';
+import { createBrowserPlayWorkspaceStore } from '@asha-rulebench/store';
 
-type DialogName = 'ruleset' | 'encounter' | 'artifact' | 'replay' | null;
+type DialogName = 'playBundle' | 'scenario' | 'artifact' | 'replay' | null;
 
 interface BoardCell {
   readonly x: number;
@@ -96,8 +96,7 @@ export function authorityTargetIds(
   `,
 })
 class SetupDiagnosticsComponent {
-  public readonly diagnostics =
-    input.required<readonly RulesetDiagnosticDto[]>();
+  public readonly diagnostics = input.required<readonly PlayDiagnosticDto[]>();
   public readonly messageId = input.required<string>();
   public readonly showPath = input(false);
 }
@@ -416,6 +415,25 @@ class SetupDiagnosticsComponent {
         padding-top: 0.6rem;
       }
 
+      .choice-row,
+      .compatibility-result {
+        border: 1px solid var(--arb-border);
+        display: grid;
+        gap: 0.45rem;
+        padding: 0.7rem;
+      }
+
+      .choice-row {
+        align-items: start;
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .choice-row > span,
+      .compatibility-result {
+        display: grid;
+        gap: 0.25rem;
+      }
+
       .ruleset-input,
       .ruleset-select,
       .setup-input,
@@ -625,20 +643,20 @@ class SetupDiagnosticsComponent {
                 </div>
               } @else {
                 <div class="empty-state">
-                  <strong>No active encounter</strong>
+                  <strong>No active session</strong>
                   <p>{{ view.summary }}</p>
                   <button
                     type="button"
                     (click)="
                       openDialog(
-                        view.encounterSetupRequired ? 'encounter' : 'ruleset'
+                        view.scenarioSetupRequired ? 'scenario' : 'playBundle'
                       )
                     "
                   >
                     {{
-                      view.encounterSetupRequired
-                        ? 'Create encounter'
-                        : 'Open ruleset setup'
+                      view.scenarioSetupRequired
+                        ? 'Create Scenario'
+                        : 'Choose play content'
                     }}
                   </button>
                 </div>
@@ -653,10 +671,7 @@ class SetupDiagnosticsComponent {
           >
             <div class="panel-body">
               @if (view.gameplay; as gameplay) {
-                <ul
-                  class="participant-list"
-                  aria-label="Encounter participants"
-                >
+                <ul class="participant-list" aria-label="Session participants">
                   @for (entity of gameplay.entities; track entity.id) {
                     <li
                       class="participant"
@@ -692,8 +707,7 @@ class SetupDiagnosticsComponent {
                 </ul>
               } @else {
                 <p class="muted">
-                  Participants appear after an explicit encounter setup is
-                  accepted.
+                  Participants appear after an explicit Scenario is accepted.
                 </p>
               }
             </div>
@@ -710,7 +724,7 @@ class SetupDiagnosticsComponent {
                 <p class="section-label">{{ view.statusLabel }}</p>
                 @if (view.gameplay; as gameplay) {
                   @if (gameplay.outcome.status === 'completed') {
-                    <strong>Encounter complete</strong>
+                    <strong>Battle complete</strong>
                     <span
                       >Winning team{{
                         gameplay.outcome.winningTeamIds.length === 1 ? '' : 's'
@@ -726,7 +740,7 @@ class SetupDiagnosticsComponent {
                       {{ gameplay.stateRevision }}</span
                     >
                     <span class="muted"
-                      >Start a new encounter from the Session menu to continue
+                      >Start a new Scenario from the Session menu to continue
                       experimenting.</span
                     >
                   } @else {
@@ -807,7 +821,7 @@ class SetupDiagnosticsComponent {
                 } @else {
                   @if (gameplay.outcome.status === 'completed') {
                     <div class="empty-state" tabindex="-1">
-                      <strong>Encounter complete</strong>
+                      <strong>Battle complete</strong>
                       <p>
                         Winning team{{
                           gameplay.outcome.winningTeamIds.length === 1
@@ -1003,8 +1017,8 @@ class SetupDiagnosticsComponent {
                 }
               } @else {
                 <p class="muted">
-                  The action palette opens when a ruleset owns an active
-                  session.
+                  The action palette opens when a PlayBundle and Scenario own an
+                  active session.
                 </p>
               }
             </div>
@@ -1066,7 +1080,7 @@ class SetupDiagnosticsComponent {
                 }
               }
               @if (view.gameplay; as gameplay) {
-                <ul class="event-list" aria-label="Encounter history">
+                <ul class="event-list" aria-label="Combat history">
                   @for (entry of gameplay.log; track entry.sequence) {
                     <li>
                       <strong
@@ -1111,10 +1125,10 @@ class SetupDiagnosticsComponent {
     </main>
 
     <arb-application-dialog
-      dialogId="ruleset-dialog"
-      dialogTitle="Ruleset setup"
-      dialogDescription="Choose a configured ruleset or custom root, inspect diagnostics, and activate an accepted artifact."
-      [open]="openDialogName() === 'ruleset'"
+      dialogId="play-bundle-dialog"
+      dialogTitle="Choose play content"
+      dialogDescription="Select one semantic Ruleset and its compatible authored Content Packs, then compile and activate their declared PlayBundle."
+      [open]="openDialogName() === 'playBundle'"
       (closeRequested)="closeDialog()"
     >
       <div class="dialog-body">
@@ -1155,29 +1169,133 @@ class SetupDiagnosticsComponent {
             id="ruleset-root"
             class="ruleset-input"
             [disabled]="store.busy()"
-            placeholder="rulesets/field-manual"
+            placeholder="rulesets/my-ruleset"
             [value]="store.rulesetRoot()"
             (input)="store.selectRulesetRoot(rulesetRootInput.value)"
           />
           <p class="muted">
-            Rulebench infers <code>ruleset.ts#ruleset</code> inside the selected
-            root and compiles only its closed package graph.
+            Rulebench infers <code>src/index.ts</code> from this canonical
+            Ruleset root and discovers its immutable Ruleset, Content Packs, and
+            declared PlayBundles.
           </p>
-          <div class="button-row" aria-label="Ruleset lifecycle controls">
+          <button
+            class="secondary"
+            type="button"
+            [disabled]="store.busy() || !rootSelectionComplete()"
+            (click)="inspectRuleset()"
+          >
+            Inspect Ruleset contents
+          </button>
+
+          @if (store.rulesetCatalog(); as catalog) {
+            <dl class="facts">
+              <div>
+                <dt>Ruleset</dt>
+                <dd>
+                  {{ catalog.ruleset.id }}&#64;{{ catalog.ruleset.version }}
+                </dd>
+              </div>
+              <div>
+                <dt>Root</dt>
+                <dd>{{ catalog.rulesetRoot }}</dd>
+              </div>
+            </dl>
+            <fieldset>
+              <legend>Content Packs</legend>
+              @for (contentPack of catalog.contentPacks; track contentPack.id) {
+                <label class="choice-row">
+                  <input
+                    #contentPackCheckbox
+                    type="checkbox"
+                    [disabled]="store.busy()"
+                    [checked]="
+                      store.selectedContentPackIds().includes(contentPack.id)
+                    "
+                    (change)="
+                      setContentPackSelected(
+                        contentPack.id,
+                        contentPackCheckbox.checked
+                      )
+                    "
+                  />
+                  <span>
+                    <strong>{{ contentPack.label }}</strong>
+                    <code
+                      >{{ contentPack.id }}&#64;{{ contentPack.version }}</code
+                    >
+                    <small>
+                      Requires {{ contentPack.requirements.length }} declared
+                      operation, capability, value, and numeric-domain
+                      provisions.
+                    </small>
+                  </span>
+                </label>
+              }
+            </fieldset>
+
+            @if (selectedCatalogPlayBundle(); as selectedBundle) {
+              <div
+                class="compatibility-result"
+                [class.diagnostic]="!selectedBundle.compatible"
+                [attr.role]="selectedBundle.compatible ? 'status' : 'alert'"
+              >
+                <strong>
+                  {{
+                    selectedBundle.compatible
+                      ? 'Compatible PlayBundle'
+                      : 'Content requirements are not satisfied'
+                  }}
+                </strong>
+                <span>
+                  {{ selectedBundle.id }}&#64;{{ selectedBundle.version }}
+                </span>
+                @for (
+                  diagnostic of selectedBundle.diagnostics;
+                  track diagnostic.code + diagnostic.path
+                ) {
+                  <span>{{ diagnostic.code }} · {{ diagnostic.message }}</span>
+                }
+              </div>
+            } @else if (store.selectedContentPackIds().length > 0) {
+              <div class="diagnostic" role="alert">
+                <strong>No declared PlayBundle matches this selection</strong>
+                <span
+                  >Choose a Content Pack combination published by the Ruleset
+                  root.</span
+                >
+              </div>
+            }
+          }
+
+          @for (
+            diagnostic of store.catalogDiagnostics();
+            track diagnostic.code + diagnostic.path
+          ) {
+            <div class="diagnostic" role="alert">
+              <strong>{{ diagnostic.code }}</strong>
+              <span>{{ diagnostic.path }} · {{ diagnostic.message }}</span>
+            </div>
+          }
+
+          <div class="button-row" aria-label="PlayBundle lifecycle controls">
             <button
               type="button"
-              [disabled]="store.busy() || !rootSelectionComplete()"
-              (click)="compileRuleset()"
+              [disabled]="
+                store.busy() ||
+                selectedCatalogPlayBundle() === null ||
+                !selectedCatalogPlayBundle()?.compatible
+              "
+              (click)="compilePlayBundle()"
             >
-              Load ruleset candidate
+              Compile selected PlayBundle
             </button>
             <button
               class="secondary"
               type="button"
               [disabled]="store.busy() || view.phase !== 'candidate'"
-              (click)="activateRuleset()"
+              (click)="activatePlayBundle()"
             >
-              Activate accepted artifact
+              Activate compiled PlayBundle
             </button>
           </div>
           <dl class="facts">
@@ -1186,7 +1304,7 @@ class SetupDiagnosticsComponent {
               <dd>{{ view.phase }}</dd>
             </div>
             <div>
-              <dt>Active artifact</dt>
+              <dt>Active PlayBundle artifact</dt>
               <dd>{{ view.activeArtifactId ?? 'none' }}</dd>
             </div>
             <div>
@@ -1208,10 +1326,10 @@ class SetupDiagnosticsComponent {
     </arb-application-dialog>
 
     <arb-application-dialog
-      dialogId="encounter-dialog"
-      dialogTitle="Encounter setup"
-      dialogDescription="Build an explicit artifact-pinned board and participant roster. Rust validates the complete setup before replacing any session."
-      [open]="openDialogName() === 'encounter'"
+      dialogId="scenario-dialog"
+      dialogTitle="Scenario setup"
+      dialogDescription="Create or load setup-only data pinned to the active PlayBundle. Rust validates the complete Scenario before replacing any session."
+      [open]="openDialogName() === 'scenario'"
       (closeRequested)="closeDialog()"
     >
       <div class="dialog-body">
@@ -1247,15 +1365,15 @@ class SetupDiagnosticsComponent {
           <div
             #setupControl
             tabindex="-1"
-            data-setup-path="$.artifactId"
-            [attr.aria-invalid]="setupHasError('$.artifactId')"
-            [attr.aria-describedby]="setupDescribedBy('$.artifactId')"
+            data-setup-path="$.playBundleId"
+            [attr.aria-invalid]="setupHasError('$.playBundleId')"
+            [attr.aria-describedby]="setupDescribedBy('$.playBundleId')"
           >
-            <p class="section-label">Artifact binding</p>
-            <code>{{ setup.artifactId }}</code>
+            <p class="section-label">PlayBundle binding</p>
+            <code>{{ setup.playBundleId }}</code>
             <arb-setup-diagnostics
-              [diagnostics]="setupDiagnosticsFor('$.artifactId')"
-              [messageId]="setupDiagnosticId('$.artifactId')"
+              [diagnostics]="setupDiagnosticsFor('$.playBundleId')"
+              [messageId]="setupDiagnosticId('$.playBundleId')"
             />
           </div>
           <div class="setup-grid">
@@ -3006,16 +3124,16 @@ class SetupDiagnosticsComponent {
             <button
               type="button"
               [disabled]="store.busy() || setup.participants.length === 0"
-              (click)="startEncounter()"
+              (click)="startScenario()"
             >
-              Validate and start encounter
+              Validate and start Scenario
             </button>
             <button class="secondary" type="button" (click)="closeDialog()">
               Cancel
             </button>
           </div>
         } @else {
-          <p>Activate an accepted artifact before creating an encounter.</p>
+          <p>Activate a compiled PlayBundle before creating a Scenario.</p>
         }
       </div>
     </arb-application-dialog>
@@ -3039,8 +3157,12 @@ class SetupDiagnosticsComponent {
               <dd>{{ artifact.schema }}</dd>
             </div>
             <div>
-              <dt>Composition</dt>
-              <dd>{{ artifact.composition }}</dd>
+              <dt>PlayBundle</dt>
+              <dd>{{ artifact.playBundle }}</dd>
+            </div>
+            <div>
+              <dt>Ruleset</dt>
+              <dd>{{ artifact.ruleset }}</dd>
             </div>
             <div>
               <dt>Language</dt>
@@ -3059,9 +3181,9 @@ class SetupDiagnosticsComponent {
               </li>
             }
           </ul>
-          <p class="section-label">Exact package sources</p>
+          <p class="section-label">Exact Content Packs</p>
           <ul class="detail-list">
-            @for (source of artifact.sources; track source.identity) {
+            @for (source of artifact.contentPacks; track source.identity) {
               <li>
                 <strong>{{ source.identity }}</strong
                 ><code>{{ source.fingerprint }}</code>
@@ -3196,13 +3318,13 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     'integer',
     'identifier',
   ] as const;
-  protected readonly store = createBrowserRulesetWorkspaceStore();
+  protected readonly store = createBrowserPlayWorkspaceStore();
   protected readonly openDialogName = signal<DialogName>(null);
   protected readonly selectedActionId = signal<string | null>(null);
   protected readonly selectedOptions = signal<
     readonly AuthorityOptionSelection[]
   >([]);
-  protected readonly setupDraft = signal<EncounterSetupRequestDto | null>(null);
+  protected readonly setupDraft = signal<ScenarioSetupRequestDto | null>(null);
   protected readonly setupDocumentName = signal<string | null>(null);
   protected readonly setupImportError = signal<string | null>(null);
 
@@ -3297,6 +3419,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     );
   });
 
+  protected readonly selectedCatalogPlayBundle = computed(() => {
+    const catalog = this.store.rulesetCatalog();
+    if (catalog === null) return null;
+    const selected = this.store.selectedContentPackIds();
+    return (
+      catalog.playBundles.find((bundle) =>
+        sameStringSet(bundle.contentPackIds, selected),
+      ) ?? null
+    );
+  });
+
   protected readonly actionDefinitions = computed(() =>
     (this.store.view()?.artifact?.definitions ?? []).filter((definition) =>
       definition.contract.startsWith('action'),
@@ -3304,7 +3437,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   );
 
   protected readonly supportedRandomSources = computed<
-    readonly EncounterRandomSourceDto[]
+    readonly ScenarioRandomSourceDto[]
   >(() => {
     const view = this.store.view();
     if (view === null) return [];
@@ -3336,12 +3469,12 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly menuGroups = computed<readonly ApplicationMenuGroup[]>(
     () => [
       {
-        id: 'ruleset',
-        label: 'Ruleset',
+        id: 'play-bundle',
+        label: 'Play',
         items: [
           {
-            id: 'load-ruleset-root',
-            label: 'Load or switch ruleset…',
+            id: 'choose-play-bundle',
+            label: 'Choose Ruleset and Content Packs…',
             disabled: this.store.busy(),
           },
           ...this.store.recentRulesetRoots().map((rulesetRoot, index) => ({
@@ -3361,10 +3494,10 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         label: 'Session',
         items: [
           {
-            id: 'setup-encounter',
+            id: 'setup-scenario',
             label: this.store.view()?.gameplayAvailable
-              ? 'Start new encounter…'
-              : 'Create encounter…',
+              ? 'Start new Scenario…'
+              : 'Create Scenario…',
             disabled:
               this.store.busy() || this.store.view()?.phase !== 'active',
           },
@@ -3415,7 +3548,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     });
     effect(() => {
       const diagnostics = this.setupDiagnostics();
-      if (this.openDialogName() === 'encounter' && diagnostics.length > 0) {
+      if (this.openDialogName() === 'scenario' && diagnostics.length > 0) {
         this.focusFirstSetupDiagnostic();
       }
     });
@@ -3427,8 +3560,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected handleMenuItem(item: ApplicationMenuItem): void {
-    if (item.id === 'load-ruleset-root') {
-      this.openDialog('ruleset');
+    if (item.id === 'choose-play-bundle') {
+      this.openDialog('playBundle');
       return;
     }
     if (item.id === 'inspect-artifact') {
@@ -3439,9 +3572,9 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       this.openDialog('replay');
       return;
     }
-    if (item.id === 'setup-encounter') {
-      this.prepareEncounterDraft();
-      this.openDialog('encounter');
+    if (item.id === 'setup-scenario') {
+      this.prepareScenarioDraft();
+      this.openDialog('scenario');
       return;
     }
     if (item.id === 'focus-battlefield') {
@@ -3453,8 +3586,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     const rulesetRoot = this.store.recentRulesetRoots()[recentIndex];
     if (rulesetRoot === undefined) return;
     this.store.selectRulesetRoot(rulesetRoot);
-    this.openDialog('ruleset');
-    void this.store.compile({ rulesetRoot });
+    this.openDialog('playBundle');
+    void this.store.inspectSelectedRuleset();
   }
 
   protected openDialog(dialog: Exclude<DialogName, null>): void {
@@ -3465,9 +3598,12 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     this.openDialogName.set(null);
   }
 
-  protected compileRuleset(): void {
-    const rulesetRoot = this.store.rulesetRoot().trim();
-    void this.store.compile({ rulesetRoot });
+  protected inspectRuleset(): void {
+    void this.store.inspectSelectedRuleset();
+  }
+
+  protected compilePlayBundle(): void {
+    void this.store.compileSelectedPlayBundle();
   }
 
   protected selectConfiguredRuleset(locationId: string): void {
@@ -3475,18 +3611,26 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       .configuredRulesets()
       .find((candidate) => candidate.id === locationId);
     this.store.selectRulesetRoot(location?.rulesetRoot ?? '');
+    if (location !== undefined) void this.store.inspectSelectedRuleset();
   }
 
-  protected activateRuleset(): void {
-    void this.store.activate().then(() => {
+  protected setContentPackSelected(
+    contentPackId: string,
+    selected: boolean,
+  ): void {
+    this.store.setContentPackSelected(contentPackId, selected);
+  }
+
+  protected activatePlayBundle(): void {
+    void this.store.activatePlayBundle().then(() => {
       if (this.store.view()?.phase === 'active') {
-        this.prepareEncounterDraft();
-        this.openDialog('encounter');
+        this.prepareScenarioDraft();
+        this.openDialog('scenario');
       }
     });
   }
 
-  protected prepareEncounterDraft(): void {
+  protected prepareScenarioDraft(): void {
     const view = this.store.view();
     this.setupDocumentName.set(null);
     this.setupImportError.set(null);
@@ -3498,8 +3642,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       return;
     }
     this.setupDraft.set({
-      schema: { id: 'asha.rpg.encounter.setup', version: 1 },
-      artifactId: view.activeArtifactId,
+      schema: { id: 'asha.rpg.scenario', version: 1 },
+      playBundleId: view.activeArtifactId,
       board: { width: 5, height: 3, cells: [] },
       participants: [],
       turn: {
@@ -3518,7 +3662,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     try {
       const loaded = await this.textFileInput.readText(file);
       const parsed: unknown = JSON.parse(loaded.text);
-      const setup = decodeEncounterSetupDocument(parsed);
+      const setup = decodeScenarioDocument(parsed);
       this.setupDraft.set(setup);
       this.setupDocumentName.set(loaded.name);
       this.setupImportError.set(null);
@@ -3528,11 +3672,11 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }
   }
 
-  protected randomSourceKey(source: EncounterRandomSourceDto): string {
+  protected randomSourceKey(source: ScenarioRandomSourceDto): string {
     return `${source.policyId}@${source.policyVersion}:${source.sourceId}@${source.sourceVersion}`;
   }
 
-  protected randomSourceLabel(source: EncounterRandomSourceDto): string {
+  protected randomSourceLabel(source: ScenarioRandomSourceDto): string {
     return `${source.policyId}@${source.policyVersion} · ${source.sourceId}@${source.sourceVersion}`;
   }
 
@@ -3562,7 +3706,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     this.updateSetup((setup) => {
       const participantNumber = setup.participants.length + 1;
       const id = `participant-${participantNumber}`;
-      const participant: EncounterParticipantSetupDto = {
+      const participant: ScenarioParticipantDto = {
         id,
         label: `Participant ${participantNumber}`,
         teamId: `team-${participantNumber}`,
@@ -3672,7 +3816,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected addParticipantCapability(
     participantIndex: number,
-    owner: EncounterInitialCapabilityDto['owner'],
+    owner: ScenarioInitialCapabilityDto['owner'],
   ): void {
     const capability = initialParticipantCapability(owner);
     this.updateParticipant(participantIndex, (participant) => ({
@@ -3798,7 +3942,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected addCellCapability(
     cellIndex: number,
-    kind: EncounterCellCapabilityDto['value']['kind'],
+    kind: ScenarioCellCapabilityDto['value']['kind'],
   ): void {
     const capability = initialCellCapability(kind);
     this.updateCell(cellIndex, (cell) => ({
@@ -3897,7 +4041,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected participantVitalityCount(
-    participant: EncounterParticipantSetupDto,
+    participant: ScenarioParticipantDto,
   ): number {
     return participant.capabilities.filter(
       (capability) => capability.owner === 'vitality',
@@ -3905,7 +4049,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected isDuplicateVitalityCapability(
-    participant: EncounterParticipantSetupDto,
+    participant: ScenarioParticipantDto,
     capabilityIndex: number,
   ): boolean {
     const capability = participant.capabilities[capabilityIndex];
@@ -3935,7 +4079,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected isDuplicateTraversalCapability(
-    cell: EncounterSetupRequestDto['board']['cells'][number],
+    cell: ScenarioSetupRequestDto['board']['cells'][number],
     capabilityIndex: number,
   ): boolean {
     const capability = cell.capabilities[capabilityIndex];
@@ -3953,7 +4097,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return `${this.cellCapabilityPath(cellIndex, capabilityIndex)}.${suffix}`;
   }
 
-  protected setupDiagnosticsFor(path: string): readonly RulesetDiagnosticDto[] {
+  protected setupDiagnosticsFor(path: string): readonly PlayDiagnosticDto[] {
     return this.setupDiagnostics().filter((diagnostic) =>
       diagnosticMatchesSetupPath(diagnostic.path, path),
     );
@@ -3965,7 +4109,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected setupExactDiagnosticsFor(
     path: string,
-  ): readonly RulesetDiagnosticDto[] {
+  ): readonly PlayDiagnosticDto[] {
     return this.setupDiagnostics().filter(
       (diagnostic) => diagnostic.path === path,
     );
@@ -3987,10 +4131,10 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return `setup-error-${path.replaceAll(/[^a-zA-Z0-9]+/g, '-')}`;
   }
 
-  protected startEncounter(): void {
+  protected startScenario(): void {
     const setup = this.setupDraft();
     if (setup === null) return;
-    void this.store.startEncounter(setup).then((started) => {
+    void this.store.startScenario(setup).then((started) => {
       if (started) {
         this.selectedActionId.set(null);
         this.selectedOptions.set([]);
@@ -4007,7 +4151,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   private updateSetup(
-    update: (setup: EncounterSetupRequestDto) => EncounterSetupRequestDto,
+    update: (setup: ScenarioSetupRequestDto) => ScenarioSetupRequestDto,
   ): void {
     this.setupDraft.update((setup) => (setup === null ? null : update(setup)));
   }
@@ -4055,9 +4199,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   private updateParticipant(
     index: number,
-    update: (
-      participant: EncounterParticipantSetupDto,
-    ) => EncounterParticipantSetupDto,
+    update: (participant: ScenarioParticipantDto) => ScenarioParticipantDto,
   ): void {
     this.updateSetup((setup) => ({
       ...setup,
@@ -4071,8 +4213,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     participantIndex: number,
     capabilityIndex: number,
     update: (
-      capability: EncounterInitialCapabilityDto,
-    ) => EncounterInitialCapabilityDto,
+      capability: ScenarioInitialCapabilityDto,
+    ) => ScenarioInitialCapabilityDto,
   ): void {
     this.updateParticipant(participantIndex, (participant) => ({
       ...participant,
@@ -4085,8 +4227,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   private updateCell(
     index: number,
     update: (
-      cell: EncounterSetupRequestDto['board']['cells'][number],
-    ) => EncounterSetupRequestDto['board']['cells'][number],
+      cell: ScenarioSetupRequestDto['board']['cells'][number],
+    ) => ScenarioSetupRequestDto['board']['cells'][number],
   ): void {
     this.updateSetup((setup) => ({
       ...setup,
@@ -4103,8 +4245,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     cellIndex: number,
     capabilityIndex: number,
     update: (
-      capability: EncounterCellCapabilityDto,
-    ) => EncounterCellCapabilityDto,
+      capability: ScenarioCellCapabilityDto,
+    ) => ScenarioCellCapabilityDto,
   ): void {
     this.updateCell(cellIndex, (cell) => ({
       ...cell,
@@ -4268,6 +4410,22 @@ function recentRulesetRootIndex(itemId: string): number | null {
   return Number.isSafeInteger(index) && index >= 0 ? index : null;
 }
 
+function sameStringSet(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  if (left.length !== right.length) return false;
+  const normalizedLeft = [...left].sort((first, second) =>
+    first.localeCompare(second),
+  );
+  const normalizedRight = [...right].sort((first, second) =>
+    first.localeCompare(second),
+  );
+  return normalizedLeft.every(
+    (value, index) => value === normalizedRight[index],
+  );
+}
+
 function formInteger(value: string): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
@@ -4279,8 +4437,8 @@ function formSignedInteger(value: string): number {
 }
 
 function initialParticipantCapability(
-  owner: EncounterInitialCapabilityDto['owner'],
-): EncounterInitialCapabilityDto {
+  owner: ScenarioInitialCapabilityDto['owner'],
+): ScenarioInitialCapabilityDto {
   if (owner === 'vitality') {
     return { owner, value: { current: 10, max: 10 } };
   }
@@ -4300,8 +4458,8 @@ function initialParticipantCapability(
 }
 
 function initialCellCapability(
-  kind: EncounterCellCapabilityDto['value']['kind'],
-): EncounterCellCapabilityDto {
+  kind: ScenarioCellCapabilityDto['value']['kind'],
+): ScenarioCellCapabilityDto {
   const shared = {
     id: `capability.${kind}`,
     version: 1,

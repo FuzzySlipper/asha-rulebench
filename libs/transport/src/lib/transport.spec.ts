@@ -1,10 +1,10 @@
-import type { RulesetWorkspaceResponseDto } from '@asha-rulebench/protocol';
+import type { PlayWorkspaceResponseDto } from '@asha-rulebench/protocol';
 import { describe, expect, it } from 'vitest';
 
-import { createRulesetTransport, type JsonHttpClient } from './transport.js';
+import { createPlayTransport, type JsonHttpClient } from './transport.js';
 
-describe('ruleset transport', () => {
-  it('sends intents and reactions without browser-authored random evidence', async () => {
+describe('play transport', () => {
+  it('keeps Ruleset discovery, PlayBundle activation, Scenario, and Session routes distinct', async () => {
     const requests: {
       readonly method: 'GET' | 'POST';
       readonly path: string;
@@ -13,21 +13,28 @@ describe('ruleset transport', () => {
     const http: JsonHttpClient = {
       request: async (method, path, body) => {
         requests.push({ method, path, body });
-        if (path === '/api/ruleset/config') {
+        if (path === '/api/rulesets/config') {
           return { schemaVersion: 1, rulesets: [] };
+        }
+        if (path === '/api/rulesets/inspect') {
+          return { ok: true, catalog: null, diagnostics: [] };
         }
         return emptyResponse();
       },
     };
+    const transport = createPlayTransport(http);
+    const root = 'test-fixtures/rulesets/minimal';
 
-    const transport = createRulesetTransport(http);
-    await transport.configuredRulesets();
+    await transport.rulesetLocations();
+    await transport.inspectRuleset({ rulesetRoot: root });
     await transport.compile({
-      rulesetRoot: 'examples/rulesets/field-manual',
+      rulesetRoot: root,
+      contentPackIds: ['rulebench.minimal.content'],
     });
-    await transport.startEncounter({
-      schema: { id: 'asha.rpg.encounter.setup', version: 1 },
-      artifactId: 'artifact-1',
+    await transport.activatePlayBundle();
+    await transport.startScenario({
+      schema: { id: 'asha.rpg.scenario', version: 1 },
+      playBundleId: 'artifact-1',
       board: { width: 5, height: 3, cells: [] },
       participants: [],
       turn: {
@@ -36,12 +43,7 @@ describe('ruleset transport', () => {
         round: 1,
         turn: 1,
       },
-      randomSource: {
-        policyId: 'rulebench.automatic-random',
-        policyVersion: 1,
-        sourceId: 'rulebench.system-random',
-        sourceVersion: 1,
-      },
+      randomSource: automaticRandomSource(),
     });
     await transport.command({
       expectedRevision: 2,
@@ -49,158 +51,72 @@ describe('ruleset transport', () => {
       actorId: 'hero',
       targetIds: ['raider'],
     });
-    await transport.react({
-      expectedRevision: 2,
-      reactionId: 'reaction.raise-ward',
-      optionId: 'raise-ward',
-    });
-    await transport.control({
-      expectedRevision: 3,
-      actorId: 'raider',
-      kind: 'endTurn',
-    });
-    await transport.restoreCheckpoint();
-    await transport.replay();
 
-    expect(requests).toEqual([
-      {
-        method: 'GET',
-        path: '/api/ruleset/config',
-        body: undefined,
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/compile',
-        body: {
-          rulesetRoot: 'examples/rulesets/field-manual',
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/encounter',
-        body: {
-          schema: { id: 'asha.rpg.encounter.setup', version: 1 },
-          artifactId: 'artifact-1',
-          board: { width: 5, height: 3, cells: [] },
-          participants: [],
-          turn: {
-            initiativeOrder: [],
-            currentActorId: '',
-            round: 1,
-            turn: 1,
-          },
-          randomSource: {
-            policyId: 'rulebench.automatic-random',
-            policyVersion: 1,
-            sourceId: 'rulebench.system-random',
-            sourceVersion: 1,
-          },
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/command',
-        body: {
-          expectedRevision: 2,
-          actionId: 'action.arc-lash',
-          actorId: 'hero',
-          targetIds: ['raider'],
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/reaction',
-        body: {
-          expectedRevision: 2,
-          reactionId: 'reaction.raise-ward',
-          optionId: 'raise-ward',
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/control',
-        body: {
-          expectedRevision: 3,
-          actorId: 'raider',
-          kind: 'endTurn',
-        },
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/checkpoint/restore',
-        body: undefined,
-      },
-      {
-        method: 'POST',
-        path: '/api/ruleset/replay',
-        body: undefined,
-      },
+    expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
+      'GET /api/rulesets/config',
+      'POST /api/rulesets/inspect',
+      'POST /api/play-bundle/compile',
+      'POST /api/play-bundle/activate',
+      'POST /api/scenario/start',
+      'POST /api/session/command',
     ]);
+    expect(requests.at(-1)?.body).toEqual({
+      expectedRevision: 2,
+      actionId: 'action.arc-lash',
+      actorId: 'hero',
+      targetIds: ['raider'],
+    });
   });
 
-  it('strictly decodes configured source locations', async () => {
+  it('strictly decodes configured Ruleset locations without a product default', async () => {
     const http: JsonHttpClient = {
       request: async () => ({
         schemaVersion: 1,
         rulesets: [
           {
-            id: 'field-manual',
-            label: 'Field Manual',
-            rulesetRoot: 'examples/rulesets/field-manual',
+            id: 'd20-fantasy',
+            label: 'd20 Fantasy',
+            rulesetRoot: '/rules/rulesets/d20-fantasy',
           },
         ],
       }),
     };
 
-    await expect(
-      createRulesetTransport(http).configuredRulesets(),
-    ).resolves.toEqual([
+    await expect(createPlayTransport(http).rulesetLocations()).resolves.toEqual(
       {
-        id: 'field-manual',
-        label: 'Field Manual',
-        rulesetRoot: 'examples/rulesets/field-manual',
-      },
-    ]);
-  });
-
-  it('rejects an extended ruleset location response', async () => {
-    const http: JsonHttpClient = {
-      request: async () => ({
         schemaVersion: 1,
-        rulesets: [],
-        defaultRuleset: 'field-manual',
-      }),
-    };
-
-    await expect(
-      createRulesetTransport(http).configuredRulesets(),
-    ).rejects.toThrow('unexpected defaultRuleset');
+        rulesets: [
+          {
+            id: 'd20-fantasy',
+            label: 'd20 Fantasy',
+            rulesetRoot: '/rules/rulesets/d20-fantasy',
+          },
+        ],
+      },
+    );
   });
 });
 
-function emptyResponse(): RulesetWorkspaceResponseDto {
+function automaticRandomSource() {
+  return {
+    policyId: 'rulebench.automatic-random',
+    policyVersion: 1,
+    sourceId: 'rulebench.system-random',
+    sourceVersion: 1,
+  };
+}
+
+function emptyResponse(): PlayWorkspaceResponseDto {
   return {
     ok: true,
-    status: 'noActiveRuleset',
+    status: 'noActivePlayBundle',
     activeArtifact: null,
     candidateArtifact: null,
     upgradeImpact: null,
     activationRevision: 0,
-    hostRandomSource: {
-      policyId: 'rulebench.automatic-random',
-      policyVersion: 1,
-      sourceId: 'rulebench.system-random',
-      sourceVersion: 1,
-    },
-    supportedRandomSources: [
-      {
-        policyId: 'rulebench.automatic-random',
-        policyVersion: 1,
-        sourceId: 'rulebench.system-random',
-        sourceVersion: 1,
-      },
-    ],
-    encounterSetupRequired: false,
+    hostRandomSource: automaticRandomSource(),
+    supportedRandomSources: [automaticRandomSource()],
+    scenarioSetupRequired: false,
     gameplayAvailable: false,
     gameplay: null,
     diagnostics: [],

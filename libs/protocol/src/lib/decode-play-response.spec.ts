@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  decodeEncounterSetupDocument,
-  decodeRulesetWorkspaceResponse,
-  RulesetProtocolDecodeError,
-} from './decode-ruleset-response.js';
+  decodeScenarioDocument,
+  decodePlayWorkspaceResponse,
+  PlayProtocolDecodeError,
+} from './decode-play-response.js';
 
 const emptyResponse = {
   ok: true,
-  status: 'noActiveRuleset',
+  status: 'noActivePlayBundle',
   activeArtifact: null,
   candidateArtifact: null,
   upgradeImpact: null,
@@ -27,28 +27,26 @@ const emptyResponse = {
       sourceVersion: 1,
     },
   ],
-  encounterSetupRequired: false,
+  scenarioSetupRequired: false,
   gameplayAvailable: false,
   gameplay: null,
   diagnostics: [],
 };
 
-describe('ruleset protocol decoder', () => {
+describe('play protocol decoder', () => {
   it('accepts the generated empty lifecycle response', () => {
-    expect(decodeRulesetWorkspaceResponse(emptyResponse)).toEqual(
-      emptyResponse,
-    );
+    expect(decodePlayWorkspaceResponse(emptyResponse)).toEqual(emptyResponse);
   });
 
   it('fails closed for unknown protocol fields and unsafe revision values', () => {
     expect(() =>
-      decodeRulesetWorkspaceResponse({
+      decodePlayWorkspaceResponse({
         ...emptyResponse,
         hiddenRuntimeState: {},
       }),
-    ).toThrow(RulesetProtocolDecodeError);
+    ).toThrow(PlayProtocolDecodeError);
     expect(() =>
-      decodeRulesetWorkspaceResponse({
+      decodePlayWorkspaceResponse({
         ...emptyResponse,
         activationRevision: -1,
       }),
@@ -63,7 +61,7 @@ describe('ruleset protocol decoder', () => {
         {
           stage: 'graph',
           severity: 'error',
-          code: 'RULESET_DEFINITION_REFERENCE_MISSING',
+          code: 'CONTENT_DEFINITION_REFERENCE_MISSING',
           path: '$.definitions[0].references[0]',
           message: 'missing support',
           packageId: 'rulebench.field-manual',
@@ -79,7 +77,7 @@ describe('ruleset protocol decoder', () => {
       ],
     };
 
-    expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
+    expect(decodePlayWorkspaceResponse(response)).toEqual(response);
   });
 
   it('decodes an exact pre-activation upgrade impact report', () => {
@@ -108,7 +106,7 @@ describe('ruleset protocol decoder', () => {
       },
     };
 
-    expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
+    expect(decodePlayWorkspaceResponse(response)).toEqual(response);
   });
 
   it('strictly decodes the portable checkpoint and replay archive', () => {
@@ -164,12 +162,12 @@ describe('ruleset protocol decoder', () => {
           replaySchemaVersion: 1,
           eventSchemaVersion: 1,
           artifactId: 'artifact-1',
-          artifactSchema: 'asha.rpg.ruleset.compiled@1',
-          composition: 'rules@1.0.0',
-          language: 'asha-rpg@1.0.0',
+          artifactSchema: 'asha.rpg.play-bundle.compiled@1',
+          playBundle: 'rules@1.0.0',
+          ruleset: 'asha.d20@1.0.0',
           operationSchemas: ['operation.damage@1'],
           capabilitySchemas: ['capability.vitality@1'],
-          sourcePackages: ['rules@1.0.0 · source'],
+          contentPacks: ['rules@1.0.0 · source'],
           dependencyLock: [],
           fingerprints: {
             source: 'source',
@@ -209,25 +207,25 @@ describe('ruleset protocol decoder', () => {
       },
     };
 
-    expect(decodeRulesetWorkspaceResponse(response)).toEqual(response);
+    expect(decodePlayWorkspaceResponse(response)).toEqual(response);
     expect(() =>
-      decodeRulesetWorkspaceResponse({
+      decodePlayWorkspaceResponse({
         ...response,
         gameplay: { ...response.gameplay, acceptedRandomValues: 0 },
       }),
     ).toThrow('$.gameplay.acceptedRandomValues');
     expect(() =>
-      decodeRulesetWorkspaceResponse({
+      decodePlayWorkspaceResponse({
         ...response,
         gameplay: { ...response.gameplay, acceptedRandomValues: '00' },
       }),
     ).toThrow('$.gameplay.acceptedRandomValues');
   });
 
-  it('strictly decodes an explicit encounter setup document', () => {
+  it('strictly decodes an explicit Scenario document', () => {
     const setup = {
-      schema: { id: 'asha.rpg.encounter.setup', version: 1 },
-      artifactId: 'artifact-1',
+      schema: { id: 'asha.rpg.scenario', version: 1 },
+      playBundleId: 'artifact-1',
       board: {
         width: 3,
         height: 2,
@@ -279,9 +277,9 @@ describe('ruleset protocol decoder', () => {
       randomSource: emptyResponse.hostRandomSource,
     };
 
-    expect(decodeEncounterSetupDocument(setup)).toEqual(setup);
+    expect(decodeScenarioDocument(setup)).toEqual(setup);
     expect(() =>
-      decodeEncounterSetupDocument({ ...setup, expectedEvents: [] }),
+      decodeScenarioDocument({ ...setup, expectedEvents: [] }),
     ).toThrow('$.expectedEvents: unknown field');
   });
 });

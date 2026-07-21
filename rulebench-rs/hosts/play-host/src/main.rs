@@ -1,9 +1,9 @@
 use std::env;
 
-use rulebench_ruleset_host::{
-    EncounterSetupRequestDto, GameplayCommandRequestDto, GameplayReactionRequestDto,
-    GameplayTurnControlRequestDto, PreparedRulesetCompileRequestDto, RulesetDiagnosticDto,
-    RulesetHost, RulesetWorkspaceResponseDto, ScriptedGameplayRandomSource,
+use rulebench_play_host::{
+    GameplayCommandRequestDto, GameplayReactionRequestDto, GameplayTurnControlRequestDto,
+    PlayDiagnosticDto, PlayHost, PlayWorkspaceResponseDto, PreparedPlayBundleCompileRequestDto,
+    ScenarioSetupRequestDto, ScriptedGameplayRandomSource,
 };
 use serde::de::DeserializeOwned;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -11,14 +11,14 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let options = Options::parse()?;
     let host = match env::var("RULEBENCH_RANDOM_TAPE") {
-        Ok(source) => RulesetHost::with_random_source(ScriptedGameplayRandomSource::new(
+        Ok(source) => PlayHost::with_random_source(ScriptedGameplayRandomSource::new(
             parse_random_tape(&source)?,
         )),
-        Err(env::VarError::NotPresent) => RulesetHost::new(),
+        Err(env::VarError::NotPresent) => PlayHost::new(),
         Err(error) => return Err(error.into()),
     };
     let server = Server::http(&options.address)?;
-    println!("RULESET_HOST_URL=http://{}", options.address);
+    println!("PLAY_HOST_URL=http://{}", options.address);
 
     for mut request in server.incoming_requests() {
         let method = request.method().clone();
@@ -55,16 +55,14 @@ fn parse_random_tape(source: &str) -> Result<Vec<u32>, String> {
 }
 
 fn route(
-    host: &RulesetHost,
+    host: &PlayHost,
     method: &Method,
     url: &str,
     request: &mut Request,
-) -> (u16, RulesetWorkspaceResponseDto) {
+) -> (u16, PlayWorkspaceResponseDto) {
     match (method, url) {
-        (&Method::Get, "/api/ruleset") | (&Method::Get, "/api/ruleset/health") => {
-            (200, host.status())
-        }
-        (&Method::Post, "/api/ruleset/compile") => match decode_compile_request(request) {
+        (&Method::Get, "/api/play") | (&Method::Get, "/api/play/health") => (200, host.status()),
+        (&Method::Post, "/api/play-bundle/compile") => match decode_compile_request(request) {
             Ok(compile_request) => {
                 let response = host.compile_candidate(&compile_request.prepared_source);
                 (if response.ok { 200 } else { 422 }, response)
@@ -76,12 +74,12 @@ fn route(
                 (400, response)
             }
         },
-        (&Method::Post, "/api/ruleset/activate") => {
+        (&Method::Post, "/api/play-bundle/activate") => {
             let response = host.activate_candidate();
             (if response.ok { 200 } else { 409 }, response)
         }
-        (&Method::Post, "/api/ruleset/encounter") => {
-            match decode_request::<EncounterSetupRequestDto>(request) {
+        (&Method::Post, "/api/scenario/start") => {
+            match decode_request::<ScenarioSetupRequestDto>(request) {
                 Ok(setup) => {
                     let response = host.start_encounter(setup);
                     (if response.ok { 200 } else { 422 }, response)
@@ -89,7 +87,7 @@ fn route(
                 Err(diagnostic) => invalid_request(host, diagnostic),
             }
         }
-        (&Method::Post, "/api/ruleset/command") => {
+        (&Method::Post, "/api/session/command") => {
             match decode_request::<GameplayCommandRequestDto>(request) {
                 Ok(command) => {
                     let response = host.execute_command(command);
@@ -98,7 +96,7 @@ fn route(
                 Err(diagnostic) => invalid_request(host, diagnostic),
             }
         }
-        (&Method::Post, "/api/ruleset/reaction") => {
+        (&Method::Post, "/api/session/reaction") => {
             match decode_request::<GameplayReactionRequestDto>(request) {
                 Ok(reaction) => {
                     let response = host.resolve_reaction(reaction);
@@ -107,7 +105,7 @@ fn route(
                 Err(diagnostic) => invalid_request(host, diagnostic),
             }
         }
-        (&Method::Post, "/api/ruleset/control") => {
+        (&Method::Post, "/api/session/control") => {
             match decode_request::<GameplayTurnControlRequestDto>(request) {
                 Ok(control) => {
                     let response = host.execute_turn_control(control);
@@ -116,21 +114,21 @@ fn route(
                 Err(diagnostic) => invalid_request(host, diagnostic),
             }
         }
-        (&Method::Post, "/api/ruleset/checkpoint/restore") => {
+        (&Method::Post, "/api/session/checkpoint/restore") => {
             let response = host.restore_latest_checkpoint();
             (if response.ok { 200 } else { 409 }, response)
         }
-        (&Method::Post, "/api/ruleset/replay") => {
+        (&Method::Post, "/api/session/replay") => {
             let response = host.replay_archive();
             (if response.ok { 200 } else { 409 }, response)
         }
         _ => {
             let mut response = host.status();
             response.ok = false;
-            response.diagnostics = vec![RulesetDiagnosticDto {
+            response.diagnostics = vec![PlayDiagnosticDto {
                 stage: "transport".to_owned(),
                 severity: "error".to_owned(),
-                code: "RULESET_ROUTE_NOT_FOUND".to_owned(),
+                code: "PLAY_ROUTE_NOT_FOUND".to_owned(),
                 path: url.to_owned(),
                 message: format!("unsupported request {method} {url}"),
                 package_id: None,
@@ -147,13 +145,13 @@ fn route(
 
 fn decode_compile_request(
     request: &mut Request,
-) -> Result<PreparedRulesetCompileRequestDto, Box<RulesetDiagnosticDto>> {
+) -> Result<PreparedPlayBundleCompileRequestDto, Box<PlayDiagnosticDto>> {
     decode_request(request)
 }
 
 fn decode_request<Value: DeserializeOwned>(
     request: &mut Request,
-) -> Result<Value, Box<RulesetDiagnosticDto>> {
+) -> Result<Value, Box<PlayDiagnosticDto>> {
     let mut body = String::new();
     request
         .as_reader()
@@ -163,20 +161,20 @@ fn decode_request<Value: DeserializeOwned>(
 }
 
 fn invalid_request(
-    host: &RulesetHost,
-    diagnostic: Box<RulesetDiagnosticDto>,
-) -> (u16, RulesetWorkspaceResponseDto) {
+    host: &PlayHost,
+    diagnostic: Box<PlayDiagnosticDto>,
+) -> (u16, PlayWorkspaceResponseDto) {
     let mut response = host.status();
     response.ok = false;
     response.diagnostics = vec![*diagnostic];
     (400, response)
 }
 
-fn request_diagnostic(message: String) -> RulesetDiagnosticDto {
-    RulesetDiagnosticDto {
+fn request_diagnostic(message: String) -> PlayDiagnosticDto {
+    PlayDiagnosticDto {
         stage: "transport".to_owned(),
         severity: "error".to_owned(),
-        code: "RULESET_COMPILE_REQUEST_INVALID".to_owned(),
+        code: "PLAY_BUNDLE_COMPILE_REQUEST_INVALID".to_owned(),
         path: "$".to_owned(),
         message,
         package_id: None,

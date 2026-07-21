@@ -1,95 +1,84 @@
 # ASHA Rulebench
 
-ASHA Rulebench is the authoring and inspection product for compiled Asha RPG
-rulesets. Den tasks #5953, #5955, #5957, and #5956 now build on the deliberate empty
-boundary from #5952:
+ASHA Rulebench is an interactive browser workbench for selecting authored RPG
+content, compiling it through Asha RPG, and playing against the Rust authority.
+The product boundary is explicit:
 
-- no prototype content is bundled;
-- no ruleset is selected by default;
-- no scenario, import, filename, or startup behavior can construct a ruleset;
-- no Rulebench-owned combat, replay, or semantic authority remains;
-- the UI starts and clearly reports **No compiled ruleset active**;
-- one explicitly selected TypeScript ruleset root can be compiled, inspected,
-  atomically activated, and exercised through Asha RPG authority without
-  introducing TypeScript gameplay authority.
+```text
+Ruleset + selected Content Packs -> compiled PlayBundle -> Scenario -> Session
+```
 
-Content enters only through the canonical ruleset-root compiler boundary. A
-machine-local `.rulebench/rulesets.json` may give source locations friendly
-dropdown labels, while a custom absolute-path input remains available for any
-independent checkout. The configuration cannot select a startup default or
-activate content. Each compile click sends one `rulesetRoot` through a
-generated request DTO. The root
-must be a direct child of `rulesets/`; Rulebench infers `ruleset.ts#ruleset` and
-permits only that root plus its repository's conventional `foundations/`. A loopback
-trusted-authoring gateway launches a fresh constrained TypeScript build for
-that request and passes only its closed prepared source to Rust. It does not
-scan directories or consult a product source catalog. The current example
-composition resolves an exact package lock and exported-root closure;
-Rust derives its private normalized execution input from that one closed
-definition graph, compiles it, round-trips the portable artifact through the
-authoritative loader, and only then creates an activation candidate. Source
-directories, server startup, browser execution, and import side effects never
-determine runtime meaning. Invalid build and package graphs prove source
-diagnostics remain user-reachable without replacing the active artifact or its
-persistent session.
+- A **Ruleset** selects semantic models and declares the operations,
+  capabilities, values, and numeric domains it provides.
+- A **Content Pack** contributes authored definitions and states its Ruleset
+  requirements.
+- A **PlayBundle** is a declared, compatible composition of one Ruleset and an
+  exact Content Pack selection. It is the unit Rust compiles and activates.
+- A **Scenario** is setup-only data bound to the active PlayBundle.
+- A **Session** is the live Rust-owned state created from an accepted Scenario.
 
-Activation creates one fresh Asha RPG authority session. The browser's primary
-surface is an interaction-first combat workspace: a DOM grid, participants,
-current actor and revision, authority-provided participant/cell/area targets,
-explicit turn controls, reactions, automatic rolls, and accepted or completed
-outcomes remain visible in one play loop.
-Ruleset lifecycle, artifact/provenance, and replay inspection remain available
-as secondary top-menu dialogs. The browser sends only typed intents and typed
-reaction decisions; it has no random-value input or roll-plan interpreter.
-When Asha RPG rejects a probe with an exact random request, the Rust host draws
-only that count and die size from system entropy and retries from an unchanged
-checkpoint. It records one terminal command with the exact consumed evidence.
-The deterministic browser gate injects a host-side roll tape through process
-configuration, never through gameplay UI or a TypeScript semantic path. The current field
-manual has four TypeScript-authored actions, including one materialized derived
-action. Their sequential workflow moves an actor, applies a modifier, spends a
-bounded resource, resolves d6 and five-d4 requests, and suspends/resumes a
-reaction against the same state revision. Rust owns all interpretation and
-mutation.
+Rulebench bundles no product Ruleset or demo content. The small roots under
+`test-fixtures/` exercise the loader contract only. A complete playable Ruleset
+belongs in an independent repository, such as `asha-d20-fantasy`, and reaches
+Rulebench through a configured or explicitly entered root path.
 
-The active slot also stores Asha RPG's versioned portable checkpoint and typed
-replay entries. Rulebench displays their exact artifact/package/lock bindings,
-fingerprint planes, definition fingerprints, pending phase, state revision,
-random position, structured evidence, accepted events, and canonical state
-hash. Restore and replay buttons delegate to the public Asha RPG APIs; the
-product does not rematerialize TypeScript, resolve package ranges, reapply
-events, or maintain a second gameplay state path.
+## Loading play content
 
-## Retained product surfaces
+Rulebench starts with no active PlayBundle. **Play -> Choose Ruleset and Content
+Packs...** opens the primary content flow:
 
-- `apps/app`: Angular bootstrap.
-- `apps/app-e2e`: focused interaction-first browser and managed live evidence.
-- `libs/content-authoring`: the narrow immutable declaration shape accepted by
-  the root loader; no content catalog, global registry, discovery,
-  callbacks, scenarios, or raw-IR product catalog.
-- `examples/rulesets`: independently owned example roots used by tests and demos.
-  They have no privileged loader path.
-- `examples/foundations`: explicitly imported packages shared by more than one
-  example root; never a ruleset catalog or discovery location.
-- `libs/protocol`: generated Rust host DTOs plus a strict decoder.
-- `libs/transport`, `libs/domain`, `libs/store`: generated-DTO transport,
-  pure inspection mapping, and explicit lifecycle state.
-- `libs/components`: generic workbench panels, menus, and dialogs used by the
-  combat workspace and its secondary inspection tools.
-- `libs/platform`: browser ports, including the JSON HTTP boundary used by the
-  same-origin compiler transport.
-- `libs/scenario-viewer`: the interactive combat grid/action/reaction loop plus
-  secondary compiler, provenance, diagnostics, checkpoint, and replay tools.
-- `libs/shell`: routes only.
-- `libs/theme`: product tokens.
+1. select a configured Ruleset root or enter one;
+2. inspect its exported Ruleset, Content Packs, and declared PlayBundles;
+3. explicitly select Content Packs;
+4. compile the matching compatible PlayBundle;
+5. activate the accepted candidate;
+6. create or load a Scenario.
 
-`rulebench-rs/hosts/ruleset-host` is a fresh narrow loopback host pinned to the
-public Asha RPG revision. It owns compile/load/inspect/activate lifecycle state
-and the product lifecycle of one Asha RPG session. Asha RPG owns the session's
-rules, legality, state mutation, randomness, events, trace, and reaction
-transaction. Rulebench does not reapply events or mirror semantic state.
+The local server reads `.rulebench/rulesets.json`. It only gives source roots
+friendly menu labels; it cannot choose a default, compile, or activate content.
+The ignored local file in this checkout points at the separately cloned
+`/home/dev/asha-d20-fantasy/rulesets/d20-fantasy` root. See
+[Canonical Ruleset roots](docs/ruleset-workspaces.md) for the repository
+contract and a portable configuration example.
 
-## Commands
+Each inspect or compile request builds the selected root's `src/index.ts` in a
+fresh constrained TypeScript subprocess. It discovers immutable exported
+`Ruleset`, `ContentPackSource`, and `PlayBundleManifest` values without ambient
+registration or directory scanning. Compile sends the exact selected Content
+Pack IDs through `preparePlayBundle`; Rust compiles and reloads the closed
+portable artifact before it can become an activation candidate. Failure never
+replaces the active PlayBundle or Session.
+
+## Runtime ownership
+
+TypeScript references and configures Rust behavior. Rust defines and executes
+rule logic.
+
+The browser sends generated Scenario, command, reaction, turn-control,
+checkpoint, and replay DTOs. Rust owns validation, legality, state mutation,
+random requests, accepted events, outcomes, checkpoints, and replay. The
+interactive combat grid, participants, current turn, available actions,
+targets, reactions, automatic rolls, and log are projections of that authority.
+
+`rulebench-rs/hosts/play-host` is the narrow loopback product host. The Angular
+client reaches it through the same-origin local gateway and generated protocol;
+there is no TypeScript rules engine or legacy disposable-session path.
+
+## Repository surfaces
+
+- `apps/app` and `apps/app-e2e`: Angular bootstrap and focused browser checks.
+- `libs/content-authoring`: structural guards for immutable authored exports.
+- `libs/protocol`: generated Rust DTOs and strict decoders.
+- `libs/transport`, `libs/store`, `libs/domain`: HTTP, product state, and pure
+  view mapping.
+- `libs/scenario-viewer`: the interactive play surface and secondary dialogs.
+- `libs/components`, `libs/platform`, `libs/shell`, `libs/theme`: shared UI,
+  host ports, composition, and tokens.
+- `rulebench-rs/hosts/play-host`: compile, activation, Scenario, and Session
+  lifecycle host.
+- `test-fixtures/rulesets`: non-product contract fixtures.
+
+## Validation
 
 ```bash
 pnpm run verify
@@ -109,44 +98,7 @@ den-serve up asha-rulebench -repo /home/dev/asha-rulebench
 BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
-Rulebench's blocking gate is focused product validation, including the fresh
-Rust host and generated protocol. Exhaustive
-cross-repository certification remains downstream, but the old prototype
-expectations have been retired rather than preserved there.
-
-The Session menu now loads a strict JSON setup document or builds an explicit
-artifact-pinned encounter: board and terrain cells, participant/team
-identities, placement, owned definitions, generic participant and cell
-capability DTOs, initiative/current actor/counters, and an explicitly selected
-host-supported random binding are validated atomically by Rust. Rejected setup
-diagnostics are announced, displayed at their matching controls, and focus the
-first invalid path without replacing the active session. Accepted actions and
-end-turn controls advance the authority-owned turn view; setup never contains
-actions, targets, reactions, rolls, expected events, or a winner.
-
-Non-claims: persistent setup libraries, saves across process restarts or
-artifact activation, multiplayer, AI control, nested reaction windows, upgrade
-migration policy, and exhaustive cross-product certification are not
-implemented here.
-
-The fresh composition now demonstrates one primary base, two ordered typed
-mixins, a local relational patch, an authorized semantic overlay, and a
-presentation-only overlay. Rulebench displays the exact base/mixin chain,
-parameters, patch fingerprints, before/after values, effectiveness, impact
-planes, and final definition fingerprints emitted by Asha RPG; it does not
-reimplement materialization semantics.
-
-After an artifact is active, the independently rooted Field Manual 1.1 example can be compiled as a
-candidate without activation. The Rust host structurally compares the two
-fully materialized accepted artifacts and Rulebench displays changed package
-sources, changed definitions, derived descendants, causes, and exact semantic
-or presentation field transitions. The Ruleset menu also retains successfully
-compiled root paths and can compile a recent root as a candidate without
-silently activating it. Root selection is an explicit location request rather
-than a source ID, so adding ordinary content does not extend a Rust enum,
-switch, or product catalog.
-
-See [docs/empty-ruleset-boundary.md](docs/empty-ruleset-boundary.md) for the
-deletion and retention inventory.
-See [docs/ruleset-workspaces.md](docs/ruleset-workspaces.md) for the downstream
-manifest contract and loader constraints.
+The focused gate proves the product boundary and one explicit activation flow.
+It is not an exhaustive content certification. Persistent libraries and saves,
+multiplayer, AI control, migration policy, and compatibility with retired
+Rulebench fixture content remain non-claims.

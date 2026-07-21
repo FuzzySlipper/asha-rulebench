@@ -28,11 +28,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: [
-      'libs/**/*.spec.ts',
-      'tools/**/*.spec.ts',
-      'examples/**/*.spec.ts',
-    ],
+    include: ['libs/**/*.spec.ts', 'tools/**/*.spec.ts'],
     exclude: [
       '**/node_modules/**',
       'dist/**',

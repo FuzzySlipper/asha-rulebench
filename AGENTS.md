@@ -13,19 +13,17 @@
 > TypeScript references and configures Rust behavior. Rust defines and executes
 > rule logic.
 
-Rulesets are explicit, dependency-closed artifacts compiled from one TypeScript
-manifest. Files organize authoring, manifests define packages, exported roots
-define closure, and compiled artifacts define runtime truth.
+Rulesets declare semantic models and provisions. Explicitly selected Content
+Packs contribute authored definitions. One compatible declared PlayBundle is
+the dependency-closed artifact Rust compiles and activates; a Scenario then
+creates a Rust-owned Session.
 
-Rulebench starts intentionally inactive under #5952 and #5953. Do not restore named
-prototype content, implicit rulesets, ambient registration, runtime discovery,
-scenario-defined partial rulesets, hidden defaults, product-owned semantic
-state, replay compatibility, or legacy authority adapters.
-
-The fresh compiler and atomic activation boundary is owned by #5953. Fresh
-runtime and visible gameplay work belongs to #5955. Startup remains
-`No compiled ruleset active`; a user must explicitly compile and activate the
-closed artifact.
+Rulebench starts intentionally inactive. Do not restore named prototype
+content, implicit Rulesets, ambient registration, runtime discovery,
+Scenario-defined partial rules, hidden defaults, product-owned semantic state,
+or legacy authority adapters. Startup remains `No PlayBundle active`; a user
+must explicitly select Content Packs, compile the compatible PlayBundle, and
+activate its closed artifact.
 
 ## Current Repository Structure
 
@@ -34,8 +32,8 @@ closed artifact.
 /apps/app-e2e          focused compiler lifecycle and managed-live evidence
 /libs/components       reusable presentation primitives
 /libs/platform         browser/host ports
-/libs/content-authoring immutable workspace declaration boundary
-/examples/rulesets       explicit non-privileged authoring examples
+/libs/content-authoring immutable authored-export declaration boundary
+/test-fixtures/rulesets narrow non-product loader fixtures
 /libs/protocol         Rust-generated lifecycle DTOs and strict decoder
 /libs/transport        generated-DTO-only compiler host client
 /libs/domain           pure artifact-to-inspection mapping
@@ -43,7 +41,7 @@ closed artifact.
 /libs/scenario-viewer  compiler and artifact inspection feature
 /libs/shell            routes and composition
 /libs/theme            approved tokens
-/rulebench-rs/hosts/ruleset-host narrow loopback compiler/activation host
+/rulebench-rs/hosts/play-host narrow loopback PlayBundle/Session host
 ```
 
 Every retained surface must have a concrete #5953 or #5955 consumer. Do not add

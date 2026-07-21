@@ -1,45 +1,77 @@
 import type {
-  RulesetCompositionManifest,
-  RulesetPackageSource,
+  ContentPackSource,
+  PlayBundleManifest,
+  Ruleset,
 } from '@asha-rpg/authoring';
 
 /**
- * The only value a selected TypeScript entrypoint may expose to Rulebench.
- * It is immutable authoring data; preparation and runtime authority stay in
- * the trusted compiler host and Rust respectively.
+ * Rulebench discovers immutable public authoring values from a canonical
+ * Ruleset root. It does not accept an aggregate wrapper that could blur the
+ * Ruleset, Content Pack, and PlayBundle boundaries.
  */
-export interface RulesetWorkspaceDeclaration {
-  readonly composition: RulesetCompositionManifest;
-  readonly packages: readonly RulesetPackageSource[];
+export function isRuleset(value: unknown): value is Ruleset {
+  if (!isFrozenRecord(value)) return false;
+  const schema = value['schema'];
+  const identity = value['identity'];
+  const language = value['language'];
+  const models = value['models'];
+  const provides = value['provides'];
+  return (
+    isFrozenRecord(schema) &&
+    schema['identity'] === 'asha.rpg.ruleset' &&
+    schema['major'] === 1 &&
+    isVersionedIdentity(identity) &&
+    isVersionedIdentity(language) &&
+    isFrozenRecord(models) &&
+    isFrozenRecord(provides)
+  );
 }
 
-export function isRulesetWorkspaceDeclaration(
+export function isContentPackSource(
   value: unknown,
-): value is RulesetWorkspaceDeclaration {
-  if (!isRecord(value)) return false;
-  if (
-    Object.keys(value).length !== 2 ||
-    !('composition' in value) ||
-    !('packages' in value) ||
-    !Object.isFrozen(value)
-  ) {
-    return false;
-  }
-  if (!isRecord(value['composition'])) return false;
-  if (!Object.isFrozen(value['composition'])) return false;
-  if (!Array.isArray(value['packages'])) return false;
-  if (!Object.isFrozen(value['packages'])) return false;
-  return value['packages'].every((source) => {
-    if (!isRecord(source)) return false;
-    return (
-      Object.isFrozen(source) &&
-      isRecord(source['manifest']) &&
-      Object.isFrozen(source['manifest']) &&
-      typeof source['sourceFingerprint'] === 'string'
-    );
-  });
+): value is ContentPackSource {
+  if (!isFrozenRecord(value)) return false;
+  const manifest = value['manifest'];
+  return (
+    typeof value['sourceFingerprint'] === 'string' &&
+    isFrozenRecord(manifest) &&
+    isVersionedIdentity(manifest['identity']) &&
+    Array.isArray(manifest['definitions']) &&
+    Array.isArray(manifest['exports'])
+  );
 }
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+export function isPlayBundleManifest(
+  value: unknown,
+): value is PlayBundleManifest {
+  if (!isFrozenRecord(value)) return false;
+  return (
+    isVersionedIdentity(value['identity']) &&
+    isRuleset(value['ruleset']) &&
+    isFrozenRecord(value['base']) &&
+    Array.isArray(value['add']) &&
+    Array.isArray(value['overlays']) &&
+    isFrozenRecord(value['configure'])
+  );
+}
+
+function isVersionedIdentity(value: unknown): boolean {
+  return (
+    isFrozenRecord(value) &&
+    typeof value['id'] === 'string' &&
+    value['id'].length > 0 &&
+    typeof value['version'] === 'string' &&
+    value['version'].length > 0
+  );
+}
+
+function isFrozenRecord(
+  value: unknown,
+): value is Readonly<Record<string, unknown>> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.isFrozen(value)
+  );
 }

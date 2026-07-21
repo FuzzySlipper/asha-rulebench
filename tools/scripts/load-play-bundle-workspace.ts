@@ -10,53 +10,79 @@ import {
 } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import {
-  canonicalJson,
-  prepareRulesetCompilation,
-  stableFingerprint,
+import { canonicalJson, preparePlayBundle } from '@asha-rpg/authoring';
+import type {
+  ContentPackSource,
+  PlayBundleCompilerDiagnostic,
+  PlayBundleManifest,
+  Ruleset,
 } from '@asha-rpg/authoring';
-import type { RulesetCompilerDiagnostic } from '@asha-rpg/authoring';
 import ts from 'typescript';
 
-import { isRulesetWorkspaceDeclaration } from '../../libs/content-authoring/src/index.js';
+import {
+  isContentPackSource,
+  isPlayBundleManifest,
+  isRuleset,
+} from '../../libs/content-authoring/src/index.js';
 
-export interface RulesetRootInput {
+export interface PlayBundleSelectionInput {
+  readonly operation: 'inspect' | 'compile';
   readonly rulesetRoot: string;
+  readonly contentPackIds?: readonly string[];
 }
 
-export type RulesetWorkspaceLoadResult =
+export interface RulesetRootCatalog {
+  readonly rulesetRoot: string;
+  readonly ruleset: { readonly id: string; readonly version: string };
+  readonly contentPacks: readonly {
+    readonly id: string;
+    readonly version: string;
+    readonly label: string;
+    readonly requirements: readonly string[];
+  }[];
+  readonly playBundles: readonly {
+    readonly id: string;
+    readonly version: string;
+    readonly contentPackIds: readonly string[];
+    readonly compatible: boolean;
+    readonly diagnostics: readonly PlayBundleCompilerDiagnostic[];
+  }[];
+}
+
+export type PlayBundleWorkspaceLoadResult =
   | {
       readonly ok: true;
-      readonly preparedSource: string;
+      readonly catalog: RulesetRootCatalog;
+      readonly preparedSource: string | null;
       readonly diagnostics: readonly [];
     }
   | {
       readonly ok: false;
-      readonly diagnostics: readonly RulesetCompilerDiagnostic[];
+      readonly diagnostics: readonly PlayBundleCompilerDiagnostic[];
     };
 
-type RulesetWorkspaceFailure = Extract<
-  RulesetWorkspaceLoadResult,
+type PlayBundleWorkspaceFailure = Extract<
+  PlayBundleWorkspaceLoadResult,
   { readonly ok: false }
 >;
 
-interface ResolvedWorkspaceInput {
+interface ResolvedRulesetRoot {
   readonly rulesetRoot: string;
   readonly workspaceRoot: string;
   readonly packageRoots: readonly string[];
-  readonly module: 'ruleset.ts';
-  readonly declaration: 'ruleset';
+  readonly module: 'src/index.ts';
+  readonly declaration: 'discovered exports';
   readonly resolvedWorkspaceRoot: string;
   readonly resolvedPackageRoots: readonly string[];
   readonly resolvedModule: string;
 }
 
-const RESULT_PREFIX = 'RULEBENCH_WORKSPACE_RESULT:';
+const RESULT_PREFIX = 'RULEBENCH_PLAY_BUNDLE_RESULT:';
 
-export async function loadRulesetWorkspace(
+export async function loadPlayBundleWorkspace(
   input: unknown,
   gatewayRoot: string,
-): Promise<RulesetWorkspaceLoadResult> {
+): Promise<PlayBundleWorkspaceLoadResult> {
   const resolved = await resolveWorkspaceInput(input, gatewayRoot);
   if (!resolved.ok) return resolved;
 
@@ -159,54 +185,92 @@ export async function loadRulesetWorkspace(
         resolved.value,
       );
     }
-    if (!(resolved.value.declaration in moduleNamespace)) {
+    const discovered = discoverAuthoringValues(moduleNamespace);
+    if (discovered.rulesets.length !== 1) {
       return failure(
-        'RULESET_WORKSPACE_DECLARATION_NOT_EXPORTED',
+        'RULESET_ROOT_RULESET_COUNT_INVALID',
         '$.rulesetRoot',
-        `Module does not export ${resolved.value.declaration}`,
+        `Expected one exported Ruleset, found ${discovered.rulesets.length}`,
         resolved.value,
       );
     }
-    const declaration = moduleNamespace[resolved.value.declaration];
-    if (!isRulesetWorkspaceDeclaration(declaration)) {
+    if (discovered.contentPacks.length === 0) {
       return failure(
-        'RULESET_WORKSPACE_DECLARATION_INVALID',
+        'RULESET_ROOT_CONTENT_PACK_REQUIRED',
         '$.rulesetRoot',
-        'Export must be immutable package and composition data',
+        'The Ruleset root must export at least one Content Pack source',
         resolved.value,
       );
     }
-
-    const sourceRoot =
-      compilerOptions.rootDir ?? resolved.value.resolvedWorkspaceRoot;
-    const sourceGraphFingerprint = stableFingerprint(
-      authoredSourceFiles
-        .map((sourceFile) => ({
-          module: normalizedPath(relative(sourceRoot, sourceFile.fileName)),
-          source: sourceFile.text,
-        }))
-        .sort((left, right) => left.module.localeCompare(right.module)),
+    if (discovered.playBundles.length === 0) {
+      return failure(
+        'RULESET_ROOT_PLAY_BUNDLE_REQUIRED',
+        '$.rulesetRoot',
+        'The Ruleset root must export at least one explicit PlayBundle',
+        resolved.value,
+      );
+    }
+    const ruleset = discovered.rulesets[0];
+    if (ruleset === undefined) {
+      return failure(
+        'RULESET_ROOT_RULESET_COUNT_INVALID',
+        '$.rulesetRoot',
+        'The Ruleset root did not expose a Ruleset',
+        resolved.value,
+      );
+    }
+    const mismatchedBundle = discovered.playBundles.find(
+      (bundle) =>
+        bundle.ruleset.identity.id !== ruleset.identity.id ||
+        bundle.ruleset.identity.version !== ruleset.identity.version,
     );
-    const entrypoint = {
-      module: normalizedPath(resolved.value.module),
-      declaration: resolved.value.declaration,
-      packageRoots: resolved.value.packageRoots.map(normalizedPath),
-      sourceGraphFingerprint,
-    };
-    const packages = declaration.packages.map((source) => ({
-      manifest: source.manifest,
-      sourceFingerprint: stableFingerprint({
-        entrypoint,
-        packageSourceFingerprint: source.sourceFingerprint,
-      }),
-    }));
-    const prepared = prepareRulesetCompilation({
-      composition: declaration.composition,
-      packages,
+    if (mismatchedBundle !== undefined) {
+      return failure(
+        'PLAY_BUNDLE_RULESET_ROOT_MISMATCH',
+        '$.rulesetRoot',
+        `PlayBundle ${mismatchedBundle.identity.id}@${mismatchedBundle.identity.version} does not use the root Ruleset ${ruleset.identity.id}@${ruleset.identity.version}`,
+        resolved.value,
+      );
+    }
+    const catalog = rootCatalog(
+      resolved.value.rulesetRoot,
+      ruleset,
+      discovered.contentPacks,
+      discovered.playBundles,
+    );
+    if (inputOperation(input) === 'inspect') {
+      return { ok: true, catalog, preparedSource: null, diagnostics: [] };
+    }
+    const selectedIds = selectedContentPackIds(input);
+    if (!selectedIds.ok) return selectedIds;
+    const matchingBundles = discovered.playBundles.filter((bundle) =>
+      sameStrings(bundleContentPackIds(bundle), selectedIds.value),
+    );
+    if (matchingBundles.length !== 1) {
+      return failure(
+        'PLAY_BUNDLE_SELECTION_NOT_DECLARED',
+        '$.contentPackIds',
+        `Selected Content Packs must match exactly one declared PlayBundle; matched ${matchingBundles.length}`,
+        resolved.value,
+      );
+    }
+    const bundle = matchingBundles[0];
+    if (bundle === undefined) {
+      return failure(
+        'PLAY_BUNDLE_SELECTION_NOT_DECLARED',
+        '$.contentPackIds',
+        'Selected Content Packs do not match a declared PlayBundle',
+        resolved.value,
+      );
+    }
+    const prepared = preparePlayBundle({
+      bundle,
+      contentPacks: discovered.contentPacks,
     });
     if (!prepared.ok) return prepared;
     return {
       ok: true,
+      catalog,
       preparedSource: canonicalJson(prepared.prepared),
       diagnostics: [],
     };
@@ -215,29 +279,193 @@ export async function loadRulesetWorkspace(
   }
 }
 
+function discoverAuthoringValues(
+  moduleNamespace: Readonly<Record<string, unknown>>,
+): {
+  readonly rulesets: readonly Ruleset[];
+  readonly contentPacks: readonly ContentPackSource[];
+  readonly playBundles: readonly PlayBundleManifest[];
+} {
+  const values = Object.values(moduleNamespace);
+  return {
+    rulesets: uniqueByIdentity(
+      values.filter(isRuleset),
+      (value) => value.identity,
+    ),
+    contentPacks: uniqueByIdentity(
+      values.filter(isContentPackSource),
+      (value) => value.manifest.identity,
+    ),
+    playBundles: uniqueByIdentity(
+      values.filter(isPlayBundleManifest),
+      (value) => value.identity,
+    ),
+  };
+}
+
+function uniqueByIdentity<Value>(
+  values: readonly Value[],
+  identity: (value: Value) => { readonly id: string; readonly version: string },
+): readonly Value[] {
+  const unique = new Map<string, Value>();
+  for (const value of values) {
+    const current = identity(value);
+    unique.set(`${current.id}@${current.version}`, value);
+  }
+  return [...unique.values()].sort((left, right) => {
+    const leftIdentity = identity(left);
+    const rightIdentity = identity(right);
+    return `${leftIdentity.id}@${leftIdentity.version}`.localeCompare(
+      `${rightIdentity.id}@${rightIdentity.version}`,
+    );
+  });
+}
+
+function rootCatalog(
+  rulesetRoot: string,
+  ruleset: Ruleset,
+  contentPacks: readonly ContentPackSource[],
+  playBundles: readonly PlayBundleManifest[],
+): RulesetRootCatalog {
+  return {
+    rulesetRoot,
+    ruleset: { id: ruleset.identity.id, version: ruleset.identity.version },
+    contentPacks: contentPacks.map((source) => ({
+      id: source.manifest.identity.id,
+      version: source.manifest.identity.version,
+      label: readableId(source.manifest.identity.id),
+      requirements: contentPackRequirements(source),
+    })),
+    playBundles: playBundles.map((bundle) => {
+      const preparation = preparePlayBundle({ bundle, contentPacks });
+      return {
+        id: bundle.identity.id,
+        version: bundle.identity.version,
+        contentPackIds: bundleContentPackIds(bundle),
+        compatible: preparation.ok,
+        diagnostics: preparation.diagnostics,
+      };
+    }),
+  };
+}
+
+function contentPackRequirements(source: ContentPackSource): readonly string[] {
+  const requirements = source.manifest.requirements;
+  return [
+    ...requirements.operations.map((value) => `${value.id}@${value.version}`),
+    ...requirements.capabilities.map((value) => `${value.id}@${value.version}`),
+    ...requirements.values.map((value) => `${value.kind}:${value.id}`),
+    ...requirements.numericDomains.map((value) => `numeric-domain:${value}`),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+function readableId(id: string): string {
+  const segment = id.split('.').at(-1) ?? id;
+  return segment
+    .split(/[-_]/)
+    .filter((part) => part.length > 0)
+    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
+    .join(' ');
+}
+
+function bundleContentPackIds(bundle: PlayBundleManifest): readonly string[] {
+  return [
+    ...new Set([
+      bundle.base.id,
+      ...bundle.add.map((request) => request.id),
+      ...bundle.overlays.map((request) => request.id),
+    ]),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+function inputOperation(input: unknown): 'inspect' | 'compile' | null {
+  if (!isRecord(input)) return null;
+  const operation = input['operation'];
+  return operation === 'inspect' || operation === 'compile' ? operation : null;
+}
+
+function selectedContentPackIds(
+  input: unknown,
+):
+  | { readonly ok: true; readonly value: readonly string[] }
+  | PlayBundleWorkspaceFailure {
+  if (!isRecord(input) || !Array.isArray(input['contentPackIds'])) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_CONTENT_PACK_SELECTION_INVALID',
+      '$.contentPackIds',
+      'contentPackIds must be an array of unique non-empty Content Pack IDs',
+    );
+  }
+  const values = input['contentPackIds'];
+  if (
+    values.some(
+      (value) => typeof value !== 'string' || value.trim().length === 0,
+    )
+  ) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_CONTENT_PACK_SELECTION_INVALID',
+      '$.contentPackIds',
+      'contentPackIds must contain only non-empty strings',
+    );
+  }
+  const normalized = values.map((value) => value.trim());
+  if (new Set(normalized).size !== normalized.length) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_CONTENT_PACK_SELECTION_DUPLICATE',
+      '$.contentPackIds',
+      'contentPackIds must not contain duplicates',
+    );
+  }
+  return {
+    ok: true,
+    value: normalized.sort((left, right) => left.localeCompare(right)),
+  };
+}
+
+function sameStrings(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
 async function resolveWorkspaceInput(
   input: unknown,
   gatewayRoot: string,
 ): Promise<
-  | { readonly ok: true; readonly value: ResolvedWorkspaceInput }
-  | RulesetWorkspaceFailure
+  | { readonly ok: true; readonly value: ResolvedRulesetRoot }
+  | PlayBundleWorkspaceFailure
 > {
   if (!isRecord(input)) {
     return failureWithoutSource(
-      'RULESET_WORKSPACE_INPUT_INVALID',
+      'PLAY_BUNDLE_WORKSPACE_INPUT_INVALID',
       '$',
-      'Compile input must be an object',
+      'Workspace input must be an object',
     );
   }
-  const exactKeys = ['rulesetRoot'];
+  const operation = inputOperation(input);
+  if (operation === null) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_WORKSPACE_OPERATION_INVALID',
+      '$.operation',
+      'operation must be inspect or compile',
+    );
+  }
+  const exactKeys =
+    operation === 'inspect'
+      ? ['operation', 'rulesetRoot']
+      : ['operation', 'rulesetRoot', 'contentPackIds'];
   if (
     Object.keys(input).length !== exactKeys.length ||
     !exactKeys.every((key) => key in input)
   ) {
     return failureWithoutSource(
-      'RULESET_WORKSPACE_INPUT_INVALID',
+      'PLAY_BUNDLE_WORKSPACE_INPUT_INVALID',
       '$',
-      `Compile input must contain exactly ${exactKeys.join(', ')}`,
+      `Workspace input must contain exactly ${exactKeys.join(', ')}`,
     );
   }
   const rulesetRoot = input['rulesetRoot'];
@@ -257,8 +485,8 @@ async function resolveWorkspaceInput(
       'rulesetRoot must be a direct child of a rulesets directory',
     );
   }
-  const module = 'ruleset.ts';
-  const declaration = 'ruleset';
+  const module = 'src/index.ts';
+  const declaration = 'discovered exports';
   const workspaceRoot = rulesetRoot;
   const resolvedModule = join(resolvedWorkspaceRoot, module);
   const repositoryRoot = dirname(rulesetsDirectory);
@@ -286,7 +514,7 @@ async function resolveWorkspaceInput(
   const packageRoots = resolvedPackageRoots.map((packageRoot) =>
     normalizedPath(relative(resolvedWorkspaceRoot, packageRoot) || '.'),
   );
-  const resolvedValue: ResolvedWorkspaceInput = {
+  const resolvedValue: ResolvedRulesetRoot = {
     rulesetRoot,
     workspaceRoot,
     packageRoots,
@@ -317,8 +545,8 @@ async function resolveWorkspaceInput(
 
 function typescriptDiagnostic(
   diagnostic: ts.Diagnostic,
-  input: ResolvedWorkspaceInput,
-): RulesetCompilerDiagnostic {
+  input: ResolvedRulesetRoot,
+): PlayBundleCompilerDiagnostic {
   const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
   if (diagnostic.file === undefined || diagnostic.start === undefined) {
     return diagnosticValue(
@@ -346,8 +574,8 @@ function failure(
   code: string,
   path: string,
   message: string,
-  input: ResolvedWorkspaceInput,
-): RulesetWorkspaceFailure {
+  input: ResolvedRulesetRoot,
+): PlayBundleWorkspaceFailure {
   return {
     ok: false,
     diagnostics: [diagnosticValue(code, path, message, input)],
@@ -358,7 +586,7 @@ function failureWithoutSource(
   code: string,
   path: string,
   message: string,
-): RulesetWorkspaceFailure {
+): PlayBundleWorkspaceFailure {
   return {
     ok: false,
     diagnostics: [
@@ -377,8 +605,8 @@ function diagnosticValue(
   code: string,
   path: string,
   message: string,
-  input: Pick<ResolvedWorkspaceInput, 'module' | 'declaration'>,
-): RulesetCompilerDiagnostic {
+  input: Pick<ResolvedRulesetRoot, 'module' | 'declaration'>,
+): PlayBundleCompilerDiagnostic {
   return {
     stage: 'source',
     severity: 'error',
@@ -501,7 +729,7 @@ async function run(): Promise<void> {
     process.stdout.write(`${RESULT_PREFIX}${JSON.stringify(result)}\n`);
     return;
   }
-  const result = await loadRulesetWorkspace(input, process.cwd());
+  const result = await loadPlayBundleWorkspace(input, process.cwd());
   process.stdout.write(`${RESULT_PREFIX}${JSON.stringify(result)}\n`);
 }
 

@@ -1,14 +1,14 @@
 import type {
-  RulesetArtifactSummaryDto,
-  RulesetWorkspaceResponseDto,
+  PlayBundleArtifactSummaryDto,
+  PlayWorkspaceResponseDto,
 } from '@asha-rulebench/protocol';
 import { describe, expect, it } from 'vitest';
 
-import { rulesetWorkspaceView } from './domain.js';
+import { playWorkspaceView } from './domain.js';
 
-describe('ruleset workspace view mapping', () => {
+describe('play workspace view mapping', () => {
   it('keeps source, semantic, and presentation fingerprints visibly separate', () => {
-    const view = rulesetWorkspaceView(
+    const view = playWorkspaceView(
       response('compiledCandidate', null, artifact()),
     );
 
@@ -33,10 +33,10 @@ describe('ruleset workspace view mapping', () => {
   it('reports active artifact identity with the persistent authority view', () => {
     const active = artifact();
     const activeResponse = response('active', active, null);
-    activeResponse.encounterSetupRequired = false;
+    activeResponse.scenarioSetupRequired = false;
     activeResponse.gameplayAvailable = true;
     activeResponse.gameplay = gameplay();
-    const view = rulesetWorkspaceView(activeResponse);
+    const view = playWorkspaceView(activeResponse);
 
     expect(view.phase).toBe('active');
     expect(view.activeArtifactId).toBe(active.artifactId);
@@ -79,7 +79,7 @@ describe('ruleset workspace view mapping', () => {
       ],
     };
 
-    const view = rulesetWorkspaceView(candidateResponse);
+    const view = playWorkspaceView(candidateResponse);
 
     expect(view.phase).toBe('candidate');
     expect(view.activationRevision).toBe(0);
@@ -99,10 +99,10 @@ describe('ruleset workspace view mapping', () => {
 });
 
 function response(
-  status: RulesetWorkspaceResponseDto['status'],
-  activeArtifact: RulesetArtifactSummaryDto | null,
-  candidateArtifact: RulesetArtifactSummaryDto | null,
-): RulesetWorkspaceResponseDto {
+  status: PlayWorkspaceResponseDto['status'],
+  activeArtifact: PlayBundleArtifactSummaryDto | null,
+  candidateArtifact: PlayBundleArtifactSummaryDto | null,
+): PlayWorkspaceResponseDto {
   return {
     ok: true,
     status,
@@ -124,14 +124,14 @@ function response(
         sourceVersion: 1,
       },
     ],
-    encounterSetupRequired: status === 'active',
+    scenarioSetupRequired: status === 'active',
     gameplayAvailable: false,
     gameplay: null,
     diagnostics: [],
   };
 }
 
-function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
+function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
   return {
     artifactId: 'rulebench.fresh-start@1.0.0:fnv1a64:4444444444444444',
     actorId: 'hero',
@@ -182,12 +182,12 @@ function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
       replaySchemaVersion: 1,
       eventSchemaVersion: 1,
       artifactId: 'rulebench.fresh-start@1.0.0:fnv1a64:4444444444444444',
-      artifactSchema: 'asha.rpg.ruleset.compiled@1',
-      composition: 'rulebench.fresh-start@1.0.0',
-      language: 'asha-rpg@1.0.0',
+      artifactSchema: 'asha.rpg.play-bundle.compiled@1',
+      playBundle: 'rulebench.fresh-start@1.0.0',
+      ruleset: 'rulebench.semantic-profile@1.0.0',
       operationSchemas: ['operation.damage@1'],
       capabilitySchemas: ['capability.vitality@1'],
-      sourcePackages: ['rulebench.field-manual@1.0.0 · fnv1a64:source'],
+      contentPacks: ['rulebench.field-manual@1.0.0 · fnv1a64:source'],
       dependencyLock: [],
       fingerprints: {
         source: 'fnv1a64:1111111111111111',
@@ -229,13 +229,14 @@ function gameplay(): NonNullable<RulesetWorkspaceResponseDto['gameplay']> {
   };
 }
 
-function artifact(): RulesetArtifactSummaryDto {
+function artifact(): PlayBundleArtifactSummaryDto {
   return {
-    schema: { id: 'asha.rpg.ruleset.compiled', version: '1' },
+    schema: { id: 'asha.rpg.play-bundle.compiled', version: '1' },
     artifactId: 'rulebench.fresh-start@1.0.0:fnv1a64:4444444444444444',
-    composition: { id: 'rulebench.fresh-start', version: '1.0.0' },
+    playBundle: { id: 'rulebench.fresh-start', version: '1.0.0' },
+    ruleset: { id: 'rulebench.semantic-profile', version: '1.0.0' },
     language: { id: 'asha-rpg', version: '1.0.0' },
-    sourcePackages: [
+    contentPacks: [
       {
         id: 'rulebench.field-manual',
         version: '1.0.0',
@@ -245,6 +246,8 @@ function artifact(): RulesetArtifactSummaryDto {
     dependencyLock: [],
     requiredOperations: [{ id: 'operation.damage', version: 1 }],
     requiredCapabilities: [{ id: 'capability.vitality', version: 1 }],
+    requiredValues: [],
+    requiredNumericDomains: [],
     exportedRoots: ['rulebench.signal-flare'],
     definitions: [
       {

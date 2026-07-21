@@ -122,7 +122,7 @@ export function inspectTypeScriptAuthority(source, fileName = "fixture.ts") {
   const normalizedFileName = fileName.replaceAll("\\", "/");
   const contentAuthoringFile =
     normalizedFileName.startsWith("libs/content-authoring/") ||
-    normalizedFileName.startsWith("examples/rulesets/");
+    normalizedFileName.startsWith("test-fixtures/rulesets/");
   const rpgPolicyFile = fileName
     .replaceAll("\\", "/")
     .startsWith("libs/rpg-policy/");
@@ -436,7 +436,7 @@ function collectProductionTypeScript() {
   for (const directory of [
     join(root, "apps"),
     join(root, "libs"),
-    join(root, "examples"),
+    join(root, "test-fixtures"),
   ]) {
     walk(directory, files);
   }

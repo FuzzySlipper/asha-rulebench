@@ -1,14 +1,14 @@
 import type {
-  EncounterBoardDto,
-  EncounterBoundedValueDto,
-  EncounterCellCapabilityDto,
-  EncounterCellCapabilityValueDto,
-  EncounterCellDto,
-  EncounterRandomSourceDto,
-  EncounterInitialCapabilityDto,
-  EncounterParticipantSetupDto,
-  EncounterSetupRequestDto,
-  EncounterTurnDto,
+  ScenarioBoardDto,
+  ScenarioBoundedValueDto,
+  ScenarioCellCapabilityDto,
+  ScenarioCellCapabilityValueDto,
+  ScenarioCellDto,
+  ScenarioRandomSourceDto,
+  ScenarioInitialCapabilityDto,
+  ScenarioParticipantDto,
+  ScenarioSetupRequestDto,
+  ScenarioTurnDto,
   GameplayActionOptionsDto,
   GameplayArchiveDto,
   GameplayAuthorityActionDto,
@@ -28,37 +28,42 @@ import type {
   GameplayReplayEntryDto,
   GameplaySessionDto,
   GameplayTraceDto,
-  RulesetArtifactSummaryDto,
-  RulesetDefinitionDto,
-  RulesetDerivationProvenanceDto,
-  RulesetDiagnosticDto,
-  RulesetDiagnosticSourceDto,
-  RulesetFingerprintDto,
-  RulesetIdentityDto,
-  RulesetLifecycleStatus,
-  RulesetLockEntryDto,
-  RulesetMixinProvenanceDto,
-  RulesetOverlayProvenanceDto,
-  RulesetPatchChangeDto,
-  RulesetRelationshipDto,
-  RulesetRequirementDto,
-  RulesetSourcePackageDto,
-  RulesetUpgradeDefinitionDto,
-  RulesetUpgradeFieldDto,
-  RulesetUpgradeImpactDto,
-  RulesetWorkspaceResponseDto,
-} from '../generated/ruleset-protocol.js';
+  PlayBundleArtifactSummaryDto,
+  ContentDefinitionDto,
+  ContentDerivationProvenanceDto,
+  PlayDiagnosticDto,
+  PlayDiagnosticSourceDto,
+  PlayBundleFingerprintDto,
+  VersionedIdentityDto,
+  PlayBundleLifecycleStatus,
+  ContentPackLockEntryDto,
+  ContentMixinProvenanceDto,
+  ContentOverlayProvenanceDto,
+  ContentPatchChangeDto,
+  ContentRelationshipDto,
+  VersionedRequirementDto,
+  ContentPackSummaryDto,
+  RulesetCatalogContentPackDto,
+  RulesetCatalogDto,
+  RulesetCatalogPlayBundleDto,
+  RulesetCatalogResponseDto,
+  RulesetLocationConfigDto,
+  PlayBundleUpgradeDefinitionDto,
+  PlayBundleUpgradeFieldDto,
+  PlayBundleUpgradeImpactDto,
+  PlayWorkspaceResponseDto,
+} from '../generated/play-protocol.js';
 
-export class RulesetProtocolDecodeError extends Error {
+export class PlayProtocolDecodeError extends Error {
   public constructor(path: string, message: string) {
     super(`${path}: ${message}`);
-    this.name = 'RulesetProtocolDecodeError';
+    this.name = 'PlayProtocolDecodeError';
   }
 }
 
-export function decodeRulesetWorkspaceResponse(
+export function decodePlayWorkspaceResponse(
   value: unknown,
-): RulesetWorkspaceResponseDto {
+): PlayWorkspaceResponseDto {
   const record = requiredRecord(value, '$');
   exactKeys(
     record,
@@ -71,7 +76,7 @@ export function decodeRulesetWorkspaceResponse(
       'activationRevision',
       'hostRandomSource',
       'supportedRandomSources',
-      'encounterSetupRequired',
+      'scenarioSetupRequired',
       'gameplayAvailable',
       'gameplay',
       'diagnostics',
@@ -97,7 +102,7 @@ export function decodeRulesetWorkspaceResponse(
       record['activationRevision'],
       '$.activationRevision',
     ),
-    hostRandomSource: encounterRandomSource(
+    hostRandomSource: scenarioRandomSource(
       record['hostRandomSource'],
       '$.hostRandomSource',
     ),
@@ -105,11 +110,11 @@ export function decodeRulesetWorkspaceResponse(
       record['supportedRandomSources'],
       '$.supportedRandomSources',
     ).map((entry, index) =>
-      encounterRandomSource(entry, `$.supportedRandomSources[${index}]`),
+      scenarioRandomSource(entry, `$.supportedRandomSources[${index}]`),
     ),
-    encounterSetupRequired: requiredBoolean(
-      record['encounterSetupRequired'],
-      '$.encounterSetupRequired',
+    scenarioSetupRequired: requiredBoolean(
+      record['scenarioSetupRequired'],
+      '$.scenarioSetupRequired',
     ),
     gameplayAvailable: requiredBoolean(
       record['gameplayAvailable'],
@@ -122,13 +127,126 @@ export function decodeRulesetWorkspaceResponse(
   };
 }
 
-export function decodeEncounterSetupDocument(
+export function decodeRulesetLocationConfig(
   value: unknown,
-): EncounterSetupRequestDto {
+): RulesetLocationConfigDto {
+  const record = requiredRecord(value, '$');
+  exactKeys(record, ['schemaVersion', 'rulesets'], '$');
+  const schemaVersion = nonNegativeInteger(
+    record['schemaVersion'],
+    '$.schemaVersion',
+  );
+  if (schemaVersion !== 1) {
+    throw new PlayProtocolDecodeError('$.schemaVersion', 'expected version 1');
+  }
+  return {
+    schemaVersion,
+    rulesets: requiredArray(record['rulesets'], '$.rulesets').map(
+      (entry, index) => {
+        const path = `$.rulesets[${index}]`;
+        const location = requiredRecord(entry, path);
+        exactKeys(location, ['id', 'label', 'rulesetRoot'], path);
+        return {
+          id: requiredString(location['id'], `${path}.id`),
+          label: requiredString(location['label'], `${path}.label`),
+          rulesetRoot: requiredString(
+            location['rulesetRoot'],
+            `${path}.rulesetRoot`,
+          ),
+        };
+      },
+    ),
+  };
+}
+
+export function decodeRulesetCatalogResponse(
+  value: unknown,
+): RulesetCatalogResponseDto {
+  const record = requiredRecord(value, '$');
+  exactKeys(record, ['ok', 'catalog', 'diagnostics'], '$');
+  return {
+    ok: requiredBoolean(record['ok'], '$.ok'),
+    catalog:
+      record['catalog'] === null
+        ? null
+        : rulesetCatalog(record['catalog'], '$.catalog'),
+    diagnostics: requiredArray(record['diagnostics'], '$.diagnostics').map(
+      (entry, index) => diagnostic(entry, `$.diagnostics[${index}]`),
+    ),
+  };
+}
+
+function rulesetCatalog(value: unknown, path: string): RulesetCatalogDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['rulesetRoot', 'ruleset', 'contentPacks', 'playBundles'],
+    path,
+  );
+  return {
+    rulesetRoot: requiredString(record['rulesetRoot'], `${path}.rulesetRoot`),
+    ruleset: identity(record['ruleset'], `${path}.ruleset`),
+    contentPacks: requiredArray(
+      record['contentPacks'],
+      `${path}.contentPacks`,
+    ).map((entry, index) =>
+      catalogContentPack(entry, `${path}.contentPacks[${index}]`),
+    ),
+    playBundles: requiredArray(
+      record['playBundles'],
+      `${path}.playBundles`,
+    ).map((entry, index) =>
+      catalogPlayBundle(entry, `${path}.playBundles[${index}]`),
+    ),
+  };
+}
+
+function catalogContentPack(
+  value: unknown,
+  path: string,
+): RulesetCatalogContentPackDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['id', 'version', 'label', 'requirements'], path);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    version: requiredString(record['version'], `${path}.version`),
+    label: requiredString(record['label'], `${path}.label`),
+    requirements: stringArray(record['requirements'], `${path}.requirements`),
+  };
+}
+
+function catalogPlayBundle(
+  value: unknown,
+  path: string,
+): RulesetCatalogPlayBundleDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['id', 'version', 'contentPackIds', 'compatible', 'diagnostics'],
+    path,
+  );
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    version: requiredString(record['version'], `${path}.version`),
+    contentPackIds: stringArray(
+      record['contentPackIds'],
+      `${path}.contentPackIds`,
+    ),
+    compatible: requiredBoolean(record['compatible'], `${path}.compatible`),
+    diagnostics: requiredArray(
+      record['diagnostics'],
+      `${path}.diagnostics`,
+    ).map((entry, index) => diagnostic(entry, `${path}.diagnostics[${index}]`)),
+  };
+}
+
+export function decodeScenarioDocument(
+  value: unknown,
+): ScenarioSetupRequestDto {
   const record = requiredRecord(value, '$');
   exactKeys(
     record,
-    ['schema', 'artifactId', 'board', 'participants', 'turn', 'randomSource'],
+    ['schema', 'playBundleId', 'board', 'participants', 'turn', 'randomSource'],
     '$',
   );
   const schema = requiredRecord(record['schema'], '$.schema');
@@ -138,13 +256,13 @@ export function decodeEncounterSetupDocument(
       id: requiredString(schema['id'], '$.schema.id'),
       version: nonNegativeInteger(schema['version'], '$.schema.version'),
     },
-    artifactId: requiredString(record['artifactId'], '$.artifactId'),
-    board: encounterBoard(record['board'], '$.board'),
+    playBundleId: requiredString(record['playBundleId'], '$.playBundleId'),
+    board: scenarioBoard(record['board'], '$.board'),
     participants: requiredArray(record['participants'], '$.participants').map(
-      (entry, index) => encounterParticipant(entry, `$.participants[${index}]`),
+      (entry, index) => scenarioParticipant(entry, `$.participants[${index}]`),
     ),
-    turn: encounterTurn(record['turn'], '$.turn'),
-    randomSource: encounterRandomSource(
+    turn: scenarioTurn(record['turn'], '$.turn'),
+    randomSource: scenarioRandomSource(
       record['randomSource'],
       '$.randomSource',
     ),
@@ -189,12 +307,12 @@ function nullableGameplay(
       record['acceptedRandomValues'],
       `${path}.acceptedRandomValues`,
     ),
-    randomSource: encounterRandomSource(
+    randomSource: scenarioRandomSource(
       record['randomSource'],
       `${path}.randomSource`,
     ),
-    board: encounterBoard(record['board'], `${path}.board`),
-    turn: encounterTurn(record['turn'], `${path}.turn`),
+    board: scenarioBoard(record['board'], `${path}.board`),
+    turn: scenarioTurn(record['turn'], `${path}.turn`),
     actions: requiredArray(record['actions'], `${path}.actions`).map(
       (entry, index) =>
         gameplayAuthorityAction(entry, `${path}.actions[${index}]`),
@@ -219,10 +337,10 @@ function nullableGameplay(
   };
 }
 
-function encounterParticipant(
+function scenarioParticipant(
   value: unknown,
   path: string,
-): EncounterParticipantSetupDto {
+): ScenarioParticipantDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -247,15 +365,15 @@ function encounterParticipant(
       record['capabilities'],
       `${path}.capabilities`,
     ).map((entry, index) =>
-      encounterInitialCapability(entry, `${path}.capabilities[${index}]`),
+      scenarioInitialCapability(entry, `${path}.capabilities[${index}]`),
     ),
   };
 }
 
-function encounterInitialCapability(
+function scenarioInitialCapability(
   value: unknown,
   path: string,
-): EncounterInitialCapabilityDto {
+): ScenarioInitialCapabilityDto {
   const record = requiredRecord(value, path);
   const owner = requiredString(record['owner'], `${path}.owner`);
   switch (owner) {
@@ -263,7 +381,7 @@ function encounterInitialCapability(
       exactKeys(record, ['owner', 'value'], path);
       return {
         owner,
-        value: encounterBoundedValue(record['value'], `${path}.value`),
+        value: scenarioBoundedValue(record['value'], `${path}.value`),
       };
     case 'stat':
     case 'defense':
@@ -278,7 +396,7 @@ function encounterInitialCapability(
       return {
         owner,
         id: requiredString(record['id'], `${path}.id`),
-        value: encounterBoundedValue(record['value'], `${path}.value`),
+        value: scenarioBoundedValue(record['value'], `${path}.value`),
       };
     case 'modifier':
       exactKeys(
@@ -300,17 +418,17 @@ function encounterInitialCapability(
         ),
       };
     default:
-      throw new RulesetProtocolDecodeError(
+      throw new PlayProtocolDecodeError(
         path,
         `unknown capability owner ${owner}`,
       );
   }
 }
 
-function encounterBoundedValue(
+function scenarioBoundedValue(
   value: unknown,
   path: string,
-): EncounterBoundedValueDto {
+): ScenarioBoundedValueDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['current', 'max'], path);
   return {
@@ -319,10 +437,10 @@ function encounterBoundedValue(
   };
 }
 
-function encounterRandomSource(
+function scenarioRandomSource(
   value: unknown,
   path: string,
-): EncounterRandomSourceDto {
+): ScenarioRandomSourceDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -343,19 +461,19 @@ function encounterRandomSource(
   };
 }
 
-function encounterBoard(value: unknown, path: string): EncounterBoardDto {
+function scenarioBoard(value: unknown, path: string): ScenarioBoardDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['width', 'height', 'cells'], path);
   return {
     width: nonNegativeInteger(record['width'], `${path}.width`),
     height: nonNegativeInteger(record['height'], `${path}.height`),
     cells: requiredArray(record['cells'], `${path}.cells`).map((entry, index) =>
-      encounterCell(entry, `${path}.cells[${index}]`),
+      scenarioCell(entry, `${path}.cells[${index}]`),
     ),
   };
 }
 
-function encounterCell(value: unknown, path: string): EncounterCellDto {
+function scenarioCell(value: unknown, path: string): ScenarioCellDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['id', 'position', 'capabilities'], path);
   const position = requiredRecord(record['position'], `${path}.position`);
@@ -378,7 +496,7 @@ function encounterCell(value: unknown, path: string): EncounterCellDto {
 function encounterCellCapability(
   value: unknown,
   path: string,
-): EncounterCellCapabilityDto {
+): ScenarioCellCapabilityDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['id', 'version', 'definitionId', 'value'], path);
   return {
@@ -395,7 +513,7 @@ function encounterCellCapability(
 function encounterCellCapabilityValue(
   value: unknown,
   path: string,
-): EncounterCellCapabilityValueDto {
+): ScenarioCellCapabilityValueDto {
   const record = requiredRecord(value, path);
   const kind = requiredString(record['kind'], `${path}.kind`);
   switch (kind) {
@@ -428,11 +546,11 @@ function encounterCellCapabilityValue(
         valueId: requiredString(record['valueId'], `${path}.valueId`),
       };
     default:
-      throw new RulesetProtocolDecodeError(path, `unknown cell value ${kind}`);
+      throw new PlayProtocolDecodeError(path, `unknown cell value ${kind}`);
   }
 }
 
-function encounterTurn(value: unknown, path: string): EncounterTurnDto {
+function scenarioTurn(value: unknown, path: string): ScenarioTurnDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -496,11 +614,11 @@ function gameplayArchive(value: unknown, path: string): GameplayArchiveDto {
       'eventSchemaVersion',
       'artifactId',
       'artifactSchema',
-      'composition',
-      'language',
+      'playBundle',
+      'ruleset',
       'operationSchemas',
       'capabilitySchemas',
-      'sourcePackages',
+      'contentPacks',
       'dependencyLock',
       'fingerprints',
       'definitionFingerprints',
@@ -533,8 +651,8 @@ function gameplayArchive(value: unknown, path: string): GameplayArchiveDto {
       record['artifactSchema'],
       `${path}.artifactSchema`,
     ),
-    composition: requiredString(record['composition'], `${path}.composition`),
-    language: requiredString(record['language'], `${path}.language`),
+    playBundle: requiredString(record['playBundle'], `${path}.playBundle`),
+    ruleset: requiredString(record['ruleset'], `${path}.ruleset`),
     operationSchemas: stringArray(
       record['operationSchemas'],
       `${path}.operationSchemas`,
@@ -543,10 +661,7 @@ function gameplayArchive(value: unknown, path: string): GameplayArchiveDto {
       record['capabilitySchemas'],
       `${path}.capabilitySchemas`,
     ),
-    sourcePackages: stringArray(
-      record['sourcePackages'],
-      `${path}.sourcePackages`,
-    ),
+    contentPacks: stringArray(record['contentPacks'], `${path}.contentPacks`),
     dependencyLock: stringArray(
       record['dependencyLock'],
       `${path}.dependencyLock`,
@@ -945,7 +1060,7 @@ function gameplayTrace(value: unknown, path: string): GameplayTraceDto {
 function nullableUpgradeImpact(
   value: unknown,
   path: string,
-): RulesetUpgradeImpactDto | null {
+): PlayBundleUpgradeImpactDto | null {
   if (value === null) return null;
   const record = requiredRecord(value, path);
   exactKeys(
@@ -978,7 +1093,7 @@ function nullableUpgradeImpact(
 function upgradeDefinition(
   value: unknown,
   path: string,
-): RulesetUpgradeDefinitionDto {
+): PlayBundleUpgradeDefinitionDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -999,7 +1114,7 @@ function upgradeDefinition(
   };
 }
 
-function upgradeField(value: unknown, path: string): RulesetUpgradeFieldDto {
+function upgradeField(value: unknown, path: string): PlayBundleUpgradeFieldDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['plane', 'path', 'before', 'after'], path);
   return {
@@ -1013,23 +1128,26 @@ function upgradeField(value: unknown, path: string): RulesetUpgradeFieldDto {
 function nullableArtifact(
   value: unknown,
   path: string,
-): RulesetArtifactSummaryDto | null {
+): PlayBundleArtifactSummaryDto | null {
   return value === null ? null : artifact(value, path);
 }
 
-function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
+function artifact(value: unknown, path: string): PlayBundleArtifactSummaryDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
     [
       'schema',
       'artifactId',
-      'composition',
+      'playBundle',
+      'ruleset',
       'language',
-      'sourcePackages',
+      'contentPacks',
       'dependencyLock',
       'requiredOperations',
       'requiredCapabilities',
+      'requiredValues',
+      'requiredNumericDomains',
       'exportedRoots',
       'definitions',
       'policyBindingIds',
@@ -1045,13 +1163,14 @@ function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
   return {
     schema: identity(record['schema'], `${path}.schema`),
     artifactId: requiredString(record['artifactId'], `${path}.artifactId`),
-    composition: identity(record['composition'], `${path}.composition`),
+    playBundle: identity(record['playBundle'], `${path}.playBundle`),
+    ruleset: identity(record['ruleset'], `${path}.ruleset`),
     language: identity(record['language'], `${path}.language`),
-    sourcePackages: requiredArray(
-      record['sourcePackages'],
-      `${path}.sourcePackages`,
+    contentPacks: requiredArray(
+      record['contentPacks'],
+      `${path}.contentPacks`,
     ).map((entry, index) =>
-      sourcePackage(entry, `${path}.sourcePackages[${index}]`),
+      sourcePackage(entry, `${path}.contentPacks[${index}]`),
     ),
     dependencyLock: requiredArray(
       record['dependencyLock'],
@@ -1070,6 +1189,14 @@ function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
       `${path}.requiredCapabilities`,
     ).map((entry, index) =>
       requirement(entry, `${path}.requiredCapabilities[${index}]`),
+    ),
+    requiredValues: stringArray(
+      record['requiredValues'],
+      `${path}.requiredValues`,
+    ),
+    requiredNumericDomains: stringArray(
+      record['requiredNumericDomains'],
+      `${path}.requiredNumericDomains`,
     ),
     exportedRoots: stringArray(
       record['exportedRoots'],
@@ -1111,7 +1238,7 @@ function artifact(value: unknown, path: string): RulesetArtifactSummaryDto {
 function derivation(
   value: unknown,
   path: string,
-): RulesetDerivationProvenanceDto {
+): ContentDerivationProvenanceDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -1155,7 +1282,7 @@ function derivation(
   };
 }
 
-function mixin(value: unknown, path: string): RulesetMixinProvenanceDto {
+function mixin(value: unknown, path: string): ContentMixinProvenanceDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['identity', 'fingerprint', 'parameters', 'order'], path);
   return {
@@ -1166,7 +1293,7 @@ function mixin(value: unknown, path: string): RulesetMixinProvenanceDto {
   };
 }
 
-function overlay(value: unknown, path: string): RulesetOverlayProvenanceDto {
+function overlay(value: unknown, path: string): ContentOverlayProvenanceDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -1215,7 +1342,7 @@ function overlay(value: unknown, path: string): RulesetOverlayProvenanceDto {
   };
 }
 
-function patchChange(value: unknown, path: string): RulesetPatchChangeDto {
+function patchChange(value: unknown, path: string): ContentPatchChangeDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['plane', 'path', 'before', 'after', 'effective'], path);
   return {
@@ -1227,7 +1354,7 @@ function patchChange(value: unknown, path: string): RulesetPatchChangeDto {
   };
 }
 
-function diagnostic(value: unknown, path: string): RulesetDiagnosticDto {
+function diagnostic(value: unknown, path: string): PlayDiagnosticDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -1267,7 +1394,7 @@ function diagnostic(value: unknown, path: string): RulesetDiagnosticDto {
 function nullableDiagnosticSource(
   value: unknown,
   path: string,
-): RulesetDiagnosticSourceDto | null {
+): PlayDiagnosticSourceDto | null {
   if (value === null) return null;
   const record = requiredRecord(value, path);
   exactKeys(record, ['module', 'declaration'], path);
@@ -1277,7 +1404,7 @@ function nullableDiagnosticSource(
   };
 }
 
-function identity(value: unknown, path: string): RulesetIdentityDto {
+function identity(value: unknown, path: string): VersionedIdentityDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['id', 'version'], path);
   return {
@@ -1286,7 +1413,7 @@ function identity(value: unknown, path: string): RulesetIdentityDto {
   };
 }
 
-function sourcePackage(value: unknown, path: string): RulesetSourcePackageDto {
+function sourcePackage(value: unknown, path: string): ContentPackSummaryDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['id', 'version', 'sourceFingerprint'], path);
   return {
@@ -1299,7 +1426,7 @@ function sourcePackage(value: unknown, path: string): RulesetSourcePackageDto {
   };
 }
 
-function lockEntry(value: unknown, path: string): RulesetLockEntryDto {
+function lockEntry(value: unknown, path: string): ContentPackLockEntryDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -1337,7 +1464,7 @@ function lockEntry(value: unknown, path: string): RulesetLockEntryDto {
   };
 }
 
-function requirement(value: unknown, path: string): RulesetRequirementDto {
+function requirement(value: unknown, path: string): VersionedRequirementDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['id', 'version'], path);
   return {
@@ -1346,7 +1473,7 @@ function requirement(value: unknown, path: string): RulesetRequirementDto {
   };
 }
 
-function definition(value: unknown, path: string): RulesetDefinitionDto {
+function definition(value: unknown, path: string): ContentDefinitionDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
@@ -1392,7 +1519,7 @@ function definition(value: unknown, path: string): RulesetDefinitionDto {
   };
 }
 
-function relationship(value: unknown, path: string): RulesetRelationshipDto {
+function relationship(value: unknown, path: string): ContentRelationshipDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['kind', 'source', 'target', 'order'], path);
   return {
@@ -1403,7 +1530,7 @@ function relationship(value: unknown, path: string): RulesetRelationshipDto {
   };
 }
 
-function fingerprints(value: unknown, path: string): RulesetFingerprintDto {
+function fingerprints(value: unknown, path: string): PlayBundleFingerprintDto {
   const record = requiredRecord(value, path);
   exactKeys(record, ['source', 'semantic', 'presentation'], path);
   return {
@@ -1416,15 +1543,18 @@ function fingerprints(value: unknown, path: string): RulesetFingerprintDto {
   };
 }
 
-function lifecycleStatus(value: unknown, path: string): RulesetLifecycleStatus {
+function lifecycleStatus(
+  value: unknown,
+  path: string,
+): PlayBundleLifecycleStatus {
   if (
-    value === 'noActiveRuleset' ||
+    value === 'noActivePlayBundle' ||
     value === 'compiledCandidate' ||
     value === 'active'
   ) {
     return value;
   }
-  throw new RulesetProtocolDecodeError(path, 'unknown lifecycle status');
+  throw new PlayProtocolDecodeError(path, 'unknown lifecycle status');
 }
 
 function requiredRecord(
@@ -1432,7 +1562,7 @@ function requiredRecord(
   path: string,
 ): Readonly<Record<string, unknown>> {
   if (!isUnknownRecord(value)) {
-    throw new RulesetProtocolDecodeError(path, 'expected an object');
+    throw new PlayProtocolDecodeError(path, 'expected an object');
   }
   return value;
 }
@@ -1445,7 +1575,7 @@ function isUnknownRecord(
 
 function requiredArray(value: unknown, path: string): readonly unknown[] {
   if (!Array.isArray(value)) {
-    throw new RulesetProtocolDecodeError(path, 'expected an array');
+    throw new PlayProtocolDecodeError(path, 'expected an array');
   }
   return value;
 }
@@ -1462,7 +1592,7 @@ function nullableStringArray(value: unknown, path: string): string[] | null {
 
 function requiredString(value: unknown, path: string): string {
   if (typeof value !== 'string') {
-    throw new RulesetProtocolDecodeError(path, 'expected a string');
+    throw new PlayProtocolDecodeError(path, 'expected a string');
   }
   return value;
 }
@@ -1470,7 +1600,7 @@ function requiredString(value: unknown, path: string): string {
 function nonNegativeIntegerString(value: unknown, path: string): string {
   const source = requiredString(value, path);
   if (!/^(?:0|[1-9][0-9]*)$/.test(source)) {
-    throw new RulesetProtocolDecodeError(
+    throw new PlayProtocolDecodeError(
       path,
       'expected a canonical non-negative integer string',
     );
@@ -1484,24 +1614,21 @@ function nullableString(value: unknown, path: string): string | null {
 
 function requiredBoolean(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') {
-    throw new RulesetProtocolDecodeError(path, 'expected a boolean');
+    throw new PlayProtocolDecodeError(path, 'expected a boolean');
   }
   return value;
 }
 
 function nonNegativeInteger(value: unknown, path: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    throw new RulesetProtocolDecodeError(
-      path,
-      'expected a non-negative integer',
-    );
+    throw new PlayProtocolDecodeError(path, 'expected a non-negative integer');
   }
   return value;
 }
 
 function requiredInteger(value: unknown, path: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
-    throw new RulesetProtocolDecodeError(path, 'expected an integer');
+    throw new PlayProtocolDecodeError(path, 'expected an integer');
   }
   return value;
 }
@@ -1518,12 +1645,12 @@ function exactKeys(
   const expected = new Set(keys);
   for (const key of Object.keys(record)) {
     if (!expected.has(key)) {
-      throw new RulesetProtocolDecodeError(`${path}.${key}`, 'unknown field');
+      throw new PlayProtocolDecodeError(`${path}.${key}`, 'unknown field');
     }
   }
   for (const key of keys) {
     if (!(key in record)) {
-      throw new RulesetProtocolDecodeError(`${path}.${key}`, 'missing field');
+      throw new PlayProtocolDecodeError(`${path}.${key}`, 'missing field');
     }
   }
 }

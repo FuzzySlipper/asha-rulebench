@@ -22,9 +22,9 @@
     "e2e:gate": "playwright test --config apps/app-e2e/playwright.config.mts --grep @gate",
     "e2e:live": "pnpm run e2e:live-artifacts",
     "e2e:live-artifacts": "playwright test --config apps/app-e2e/playwright.config.mts --grep @live-artifact",
-    "ruleset:prepare": "tsc -p tools/content-compiler/tsconfig.json && node tmp/content-compiler/tools/scripts/emit-prepared-ruleset.js --output tmp/ruleset/prepared-ruleset.json --ruleset-root examples/rulesets/field-manual",
-    "generate:protocol": "cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-ruleset-host --bin generate_ruleset_protocol -- libs/protocol/src/generated/ruleset-protocol.ts",
-    "check:generated": "cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-ruleset-host --bin generate_ruleset_protocol -- --check libs/protocol/src/generated/ruleset-protocol.ts",
+    "play-bundle:prepare": "tsc -p tools/content-compiler/tsconfig.json && node tmp/content-compiler/tools/scripts/emit-prepared-play-bundle.js",
+    "generate:protocol": "cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-play-host --bin generate_play_protocol -- libs/protocol/src/generated/play-protocol.ts",
+    "check:generated": "cargo run --quiet --manifest-path rulebench-rs/Cargo.toml -p rulebench-play-host --bin generate_play_protocol -- --check libs/protocol/src/generated/play-protocol.ts",
     "test:rust": "cargo test --manifest-path rulebench-rs/Cargo.toml --workspace"
   },
   "dependencies": {
@@ -33,8 +33,8 @@
     "@angular/core": "~21.2.0",
     "@angular/platform-browser": "~21.2.0",
     "@angular/router": "~21.2.0",
-    "@asha-rpg/authoring": "github:FuzzySlipper/asha-rpg#556bba29f390b8160ea3c84a734e18a2cba4d158&path:/packages/authoring",
-    "@asha-rpg/ir": "github:FuzzySlipper/asha-rpg#556bba29f390b8160ea3c84a734e18a2cba4d158&path:/packages/ir",
+    "@asha-rpg/authoring": "github:FuzzySlipper/asha-rpg#30408fcd3ec2f629c502b7fcb4677b85933fc2a9&path:/packages/authoring",
+    "@asha-rpg/ir": "github:FuzzySlipper/asha-rpg#30408fcd3ec2f629c502b7fcb4677b85933fc2a9&path:/packages/ir",
     "rxjs": "~7.8.0",
     "tslib": "^2.8.1"
   },

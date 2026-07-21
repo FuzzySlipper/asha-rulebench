@@ -1,16 +1,16 @@
 import type {
-  RulesetPatchChangeDto,
-  RulesetArtifactSummaryDto,
-  RulesetDiagnosticDto,
-  RulesetWorkspaceResponseDto,
+  ContentPatchChangeDto,
+  PlayBundleArtifactSummaryDto,
+  PlayDiagnosticDto,
+  PlayWorkspaceResponseDto,
 } from '@asha-rulebench/protocol';
 
-export interface RulesetSourceView {
+export interface ContentPackSourceView {
   readonly identity: string;
   readonly fingerprint: string;
 }
 
-export interface RulesetLockView {
+export interface ContentPackLockView {
   readonly requester: string;
   readonly resolution: string;
   readonly importAs: string;
@@ -18,7 +18,7 @@ export interface RulesetLockView {
   readonly fingerprint: string;
 }
 
-export interface RulesetDefinitionView {
+export interface ContentDefinitionView {
   readonly id: string;
   readonly fingerprint: string;
   readonly label: string;
@@ -28,14 +28,14 @@ export interface RulesetDefinitionView {
   readonly references: readonly string[];
 }
 
-export interface RulesetPatchChangeView {
+export interface ContentPatchChangeView {
   readonly plane: string;
   readonly path: string;
   readonly transition: string;
   readonly effective: boolean;
 }
 
-export interface RulesetDerivationView {
+export interface ContentDerivationView {
   readonly definitionId: string;
   readonly owner: string;
   readonly base: string;
@@ -48,10 +48,10 @@ export interface RulesetDerivationView {
   }[];
   readonly localPatchFingerprint: string;
   readonly materializedFingerprint: string;
-  readonly changes: readonly RulesetPatchChangeView[];
+  readonly changes: readonly ContentPatchChangeView[];
 }
 
-export interface RulesetOverlayView {
+export interface ContentOverlayView {
   readonly overlay: string;
   readonly target: string;
   readonly impact: string;
@@ -60,10 +60,10 @@ export interface RulesetOverlayView {
   readonly afterFingerprint: string;
   readonly patchFingerprint: string;
   readonly order: number;
-  readonly changes: readonly RulesetPatchChangeView[];
+  readonly changes: readonly ContentPatchChangeView[];
 }
 
-export interface RulesetUpgradeImpactView {
+export interface PlayBundleUpgradeImpactView {
   readonly transition: string;
   readonly sourceChanges: readonly string[];
   readonly definitions: readonly {
@@ -78,27 +78,30 @@ export interface RulesetUpgradeImpactView {
   }[];
 }
 
-export interface RulesetRelationshipView {
+export interface ContentRelationshipView {
   readonly kind: string;
   readonly edge: string;
   readonly order: number;
 }
 
-export interface RulesetArtifactInspectionView {
+export interface PlayBundleArtifactInspectionView {
   readonly artifactId: string;
   readonly schema: string;
-  readonly composition: string;
+  readonly playBundle: string;
+  readonly ruleset: string;
   readonly language: string;
-  readonly sources: readonly RulesetSourceView[];
-  readonly lock: readonly RulesetLockView[];
+  readonly contentPacks: readonly ContentPackSourceView[];
+  readonly lock: readonly ContentPackLockView[];
   readonly operations: readonly string[];
   readonly capabilities: readonly string[];
+  readonly values: readonly string[];
+  readonly numericDomains: readonly string[];
   readonly exportedRoots: readonly string[];
-  readonly definitions: readonly RulesetDefinitionView[];
+  readonly definitions: readonly ContentDefinitionView[];
   readonly policyBindingIds: readonly string[];
-  readonly relationships: readonly RulesetRelationshipView[];
-  readonly derivations: readonly RulesetDerivationView[];
-  readonly overlays: readonly RulesetOverlayView[];
+  readonly relationships: readonly ContentRelationshipView[];
+  readonly derivations: readonly ContentDerivationView[];
+  readonly overlays: readonly ContentOverlayView[];
   readonly reservedSlots: string;
   readonly fingerprints: readonly {
     readonly plane: string;
@@ -106,13 +109,13 @@ export interface RulesetArtifactInspectionView {
   }[];
 }
 
-export interface RulesetWorkspaceView {
+export interface PlayWorkspaceView {
   readonly phase: 'empty' | 'candidate' | 'active';
   readonly statusLabel: string;
   readonly headline: string;
   readonly summary: string;
   readonly activationRevision: number;
-  readonly encounterSetupRequired: boolean;
+  readonly scenarioSetupRequired: boolean;
   readonly hostRandomSource: {
     readonly policyId: string;
     readonly policyVersion: number;
@@ -128,9 +131,9 @@ export interface RulesetWorkspaceView {
   readonly gameplayAvailable: boolean;
   readonly gameplay: GameplayWorkspaceView | null;
   readonly activeArtifactId: string | null;
-  readonly artifact: RulesetArtifactInspectionView | null;
-  readonly upgradeImpact: RulesetUpgradeImpactView | null;
-  readonly diagnostics: readonly RulesetDiagnosticDto[];
+  readonly artifact: PlayBundleArtifactInspectionView | null;
+  readonly upgradeImpact: PlayBundleUpgradeImpactView | null;
+  readonly diagnostics: readonly PlayDiagnosticDto[];
 }
 
 export interface GameplayActionView {
@@ -232,11 +235,11 @@ export interface GameplayWorkspaceView {
     readonly eventSchemaVersion: number;
     readonly artifactId: string;
     readonly artifactSchema: string;
-    readonly composition: string;
-    readonly language: string;
+    readonly playBundle: string;
+    readonly ruleset: string;
     readonly operationSchemas: readonly string[];
     readonly capabilitySchemas: readonly string[];
-    readonly sourcePackages: readonly string[];
+    readonly contentPacks: readonly string[];
     readonly dependencyLock: readonly string[];
     readonly fingerprints: readonly string[];
     readonly definitionFingerprints: readonly string[];
@@ -258,14 +261,14 @@ export interface GameplayWorkspaceView {
   };
 }
 
-export function rulesetWorkspaceView(
-  response: RulesetWorkspaceResponseDto,
-): RulesetWorkspaceView {
+export function playWorkspaceView(
+  response: PlayWorkspaceResponseDto,
+): PlayWorkspaceView {
   const inspectedArtifact =
     response.candidateArtifact ?? response.activeArtifact;
   const common = {
     activationRevision: response.activationRevision,
-    encounterSetupRequired: response.encounterSetupRequired,
+    scenarioSetupRequired: response.scenarioSetupRequired,
     hostRandomSource: response.hostRandomSource,
     supportedRandomSources: response.supportedRandomSources,
     gameplayAvailable: response.gameplayAvailable,
@@ -313,24 +316,24 @@ export function rulesetWorkspaceView(
       ...common,
       phase: 'active',
       statusLabel: `Activation revision ${response.activationRevision}`,
-      headline: 'Compiled ruleset active',
-      summary: response.encounterSetupRequired
-        ? 'The complete accepted artifact replaced the active slot atomically. Create an explicit artifact-pinned encounter before play.'
-        : 'The complete accepted artifact and explicit encounter setup are active in one persistent Rust authority session.',
+      headline: 'PlayBundle active',
+      summary: response.scenarioSetupRequired
+        ? 'The accepted PlayBundle replaced the active slot atomically. Create or load an explicit PlayBundle-pinned Scenario before play.'
+        : 'The accepted PlayBundle and explicit Scenario are active in one persistent Rust authority session.',
     };
   }
   return {
     ...common,
     phase: 'empty',
     statusLabel: 'Awaiting explicit compilation',
-    headline: 'No compiled ruleset active',
+    headline: 'No PlayBundle active',
     summary:
-      'Files and imports do not activate content. Compile the explicit TypeScript composition, inspect the Rust artifact, then activate it.',
+      'Select a Ruleset and compatible Content Packs, compile the declared PlayBundle, then activate it.',
   };
 }
 
 function gameplayView(
-  gameplay: NonNullable<RulesetWorkspaceResponseDto['gameplay']>,
+  gameplay: NonNullable<PlayWorkspaceResponseDto['gameplay']>,
 ): GameplayWorkspaceView {
   return {
     artifactId: gameplay.artifactId,
@@ -448,11 +451,11 @@ function gameplayView(
       eventSchemaVersion: gameplay.archive.eventSchemaVersion,
       artifactId: gameplay.archive.artifactId,
       artifactSchema: gameplay.archive.artifactSchema,
-      composition: gameplay.archive.composition,
-      language: gameplay.archive.language,
+      playBundle: gameplay.archive.playBundle,
+      ruleset: gameplay.archive.ruleset,
       operationSchemas: gameplay.archive.operationSchemas,
       capabilitySchemas: gameplay.archive.capabilitySchemas,
-      sourcePackages: gameplay.archive.sourcePackages,
+      contentPacks: gameplay.archive.contentPacks,
       dependencyLock: gameplay.archive.dependencyLock,
       fingerprints: [
         `source ${gameplay.archive.fingerprints.source}`,
@@ -480,14 +483,15 @@ function gameplayView(
 }
 
 function artifactInspection(
-  artifact: RulesetArtifactSummaryDto,
-): RulesetArtifactInspectionView {
+  artifact: PlayBundleArtifactSummaryDto,
+): PlayBundleArtifactInspectionView {
   return {
     artifactId: artifact.artifactId,
     schema: `${artifact.schema.id}@${artifact.schema.version}`,
-    composition: `${artifact.composition.id}@${artifact.composition.version}`,
+    playBundle: `${artifact.playBundle.id}@${artifact.playBundle.version}`,
+    ruleset: `${artifact.ruleset.id}@${artifact.ruleset.version}`,
     language: `${artifact.language.id}@${artifact.language.version}`,
-    sources: artifact.sourcePackages.map((source) => ({
+    contentPacks: artifact.contentPacks.map((source) => ({
       identity: `${source.id}@${source.version}`,
       fingerprint: source.sourceFingerprint,
     })),
@@ -504,6 +508,8 @@ function artifactInspection(
     capabilities: artifact.requiredCapabilities.map(
       (requirement) => `${requirement.id}@${requirement.version}`,
     ),
+    values: artifact.requiredValues,
+    numericDomains: artifact.requiredNumericDomains,
     exportedRoots: artifact.exportedRoots,
     definitions: artifact.definitions.map((definition) => ({
       id: definition.id,
@@ -559,8 +565,8 @@ function artifactInspection(
 }
 
 function patchChangeView(
-  change: RulesetPatchChangeDto,
-): RulesetPatchChangeView {
+  change: ContentPatchChangeDto,
+): ContentPatchChangeView {
   return {
     plane: change.plane,
     path: change.path,

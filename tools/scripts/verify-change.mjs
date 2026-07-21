@@ -72,7 +72,6 @@ export function buildVerifyChangePlan(selection) {
         break;
       case 'content-authoring':
         addScript('check:typescript-authority');
-        addScript('ruleset:prepare');
         addScript('typecheck');
         addScript('test');
         break;
@@ -85,7 +84,6 @@ export function buildVerifyChangePlan(selection) {
         addScript('test');
         break;
       case 'host-transport':
-        addScript('ruleset:prepare');
         addScript('test:rust');
         addScript('typecheck');
         addScript('test');

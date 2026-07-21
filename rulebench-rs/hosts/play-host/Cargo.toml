@@ -1,5 +1,5 @@
 [package]
-name = "rulebench-ruleset-host"
+name = "rulebench-play-host"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,9 +17,9 @@ tiny_http.workspace = true
 ts-rs.workspace = true
 
 [[bin]]
-name = "rulebench-ruleset-host"
+name = "rulebench-play-host"
 path = "src/main.rs"
 
 [[bin]]
-name = "generate_ruleset_protocol"
-path = "src/bin/generate_ruleset_protocol.rs"
+name = "generate_play_protocol"
+path = "src/bin/generate_play_protocol.rs"

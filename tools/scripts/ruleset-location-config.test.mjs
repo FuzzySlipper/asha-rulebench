@@ -26,9 +26,9 @@ test('loads friendly ruleset locations without resolving their roots', async () 
         schemaVersion: 1,
         rulesets: [
           {
-            id: 'field-manual',
-            label: 'Field Manual',
-            rulesetRoot: 'examples/rulesets/field-manual',
+            id: 'local-rules',
+            label: 'Local rules',
+            rulesetRoot: 'rulesets/local-rules',
           },
           {
             id: 'external',
@@ -40,7 +40,7 @@ test('loads friendly ruleset locations without resolving their roots', async () 
       'utf8',
     );
     const result = await loadRulesetLocationConfig(directory, 'rulesets.json');
-    assert.equal(result.rulesets[0]?.label, 'Field Manual');
+    assert.equal(result.rulesets[0]?.label, 'Local rules');
     assert.equal(
       result.rulesets[1]?.rulesetRoot,
       '/home/dev/my-rules/rulesets/main',

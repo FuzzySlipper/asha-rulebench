@@ -74,7 +74,6 @@ test('selects fresh compiler owners without restoring retired crate filters', ()
       'pnpm:check:generated',
       'pnpm:typecheck',
       'pnpm:test',
-      'pnpm:ruleset:prepare',
     ],
   );
 });
