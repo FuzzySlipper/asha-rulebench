@@ -234,9 +234,9 @@ function diagnostic(code: string) {
 
 function randomSource() {
   return {
-    policyId: 'rulebench.automatic-random',
+    policyId: 'random.automatic',
     policyVersion: 1,
-    sourceId: 'rulebench.system-random',
+    sourceId: 'random.system',
     sourceVersion: 1,
   };
 }

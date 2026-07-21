@@ -41,15 +41,12 @@ public revisions and must not become another compiler or authority path.
 
 ```bash
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
-BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
-Inspect all milestone screenshots and the evidence packet. The current live
-claim covers inactive startup, per-click source preparation, artifact
-inspection as a secondary dialog, activation, explicit artifact-pinned setup,
-the desktop and narrow combat workspace, alternating authority-owned turns,
-participant/cell/area authority target choice, explicit turn control, real
-system-supplied automatic roll feedback, inline reaction completion, completed
-outcome presentation, and replay of the exact recorded values. Persistent
-setup libraries, persistence across activation/process restart, multiplayer,
-AI, migration policy, and exhaustive certification remain explicit non-claims.
+Use the printed local or LAN URL for human interaction. Record the exact content
+and dependency revisions, the user controls exercised, accepted Rust outcomes,
+desktop and narrow screenshots actually inspected, and explicit non-claims in
+the Den handoff. A scripted product journey is intentionally not the evidence
+source for the interaction-first campaign. Persistent setup libraries,
+persistence across activation/process restart, multiplayer, AI, migration
+policy, and exhaustive certification remain explicit non-claims.

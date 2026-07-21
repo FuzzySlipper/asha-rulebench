@@ -8,6 +8,7 @@ import type {
   ScenarioInitialCapabilityDto,
   ScenarioParticipantDto,
   ScenarioSetupRequestDto,
+  ScenarioTemplateDto,
   ScenarioTurnDto,
   GameplayActionOptionsDto,
   GameplayArchiveDto,
@@ -30,6 +31,8 @@ import type {
   GameplayTraceDto,
   PlayBundleArtifactSummaryDto,
   ContentDefinitionDto,
+  ParticipantProfileDto,
+  RulesetValueDto,
   ContentDerivationProvenanceDto,
   PlayDiagnosticDto,
   PlayDiagnosticSourceDto,
@@ -180,7 +183,7 @@ function rulesetCatalog(value: unknown, path: string): RulesetCatalogDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
-    ['rulesetRoot', 'ruleset', 'contentPacks', 'playBundles'],
+    ['rulesetRoot', 'ruleset', 'contentPacks', 'playBundles', 'scenarios'],
     path,
   );
   return {
@@ -197,6 +200,64 @@ function rulesetCatalog(value: unknown, path: string): RulesetCatalogDto {
       `${path}.playBundles`,
     ).map((entry, index) =>
       catalogPlayBundle(entry, `${path}.playBundles[${index}]`),
+    ),
+    scenarios: requiredArray(record['scenarios'], `${path}.scenarios`).map(
+      (entry, index) => scenarioTemplate(entry, `${path}.scenarios[${index}]`),
+    ),
+  };
+}
+
+function scenarioTemplate(value: unknown, path: string): ScenarioTemplateDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'schema',
+      'identity',
+      'playBundle',
+      'presentation',
+      'board',
+      'participants',
+      'turn',
+      'randomSource',
+    ],
+    path,
+  );
+  const schema = requiredRecord(record['schema'], `${path}.schema`);
+  exactKeys(schema, ['id', 'version'], `${path}.schema`);
+  const presentation = requiredRecord(
+    record['presentation'],
+    `${path}.presentation`,
+  );
+  exactKeys(presentation, ['label', 'description'], `${path}.presentation`);
+  return {
+    schema: {
+      id: requiredString(schema['id'], `${path}.schema.id`),
+      version: nonNegativeInteger(schema['version'], `${path}.schema.version`),
+    },
+    identity: identity(record['identity'], `${path}.identity`),
+    playBundle: identity(record['playBundle'], `${path}.playBundle`),
+    presentation: {
+      label: requiredString(
+        presentation['label'],
+        `${path}.presentation.label`,
+      ),
+      description: nullableString(
+        presentation['description'],
+        `${path}.presentation.description`,
+      ),
+    },
+    board: scenarioBoard(record['board'], `${path}.board`),
+    participants: requiredArray(
+      record['participants'],
+      `${path}.participants`,
+    ).map((entry, index) =>
+      scenarioParticipant(entry, `${path}.participants[${index}]`),
+    ),
+    turn: scenarioTurn(record['turn'], `${path}.turn`),
+    randomSource: scenarioRandomSource(
+      record['randomSource'],
+      `${path}.randomSource`,
     ),
   };
 }
@@ -1148,6 +1209,8 @@ function artifact(value: unknown, path: string): PlayBundleArtifactSummaryDto {
       'requiredCapabilities',
       'requiredValues',
       'requiredNumericDomains',
+      'rulesetValues',
+      'participantProfiles',
       'exportedRoots',
       'definitions',
       'policyBindingIds',
@@ -1197,6 +1260,18 @@ function artifact(value: unknown, path: string): PlayBundleArtifactSummaryDto {
     requiredNumericDomains: stringArray(
       record['requiredNumericDomains'],
       `${path}.requiredNumericDomains`,
+    ),
+    rulesetValues: requiredArray(
+      record['rulesetValues'],
+      `${path}.rulesetValues`,
+    ).map((entry, index) =>
+      rulesetValue(entry, `${path}.rulesetValues[${index}]`),
+    ),
+    participantProfiles: requiredArray(
+      record['participantProfiles'],
+      `${path}.participantProfiles`,
+    ).map((entry, index) =>
+      participantProfile(entry, `${path}.participantProfiles[${index}]`),
     ),
     exportedRoots: stringArray(
       record['exportedRoots'],
@@ -1481,6 +1556,10 @@ function definition(value: unknown, path: string): ContentDefinitionDto {
       'id',
       'fingerprint',
       'label',
+      'description',
+      'tags',
+      'catalog',
+      'catalogId',
       'kind',
       'visibility',
       'extensionPolicy',
@@ -1496,6 +1575,10 @@ function definition(value: unknown, path: string): ContentDefinitionDto {
     id: requiredString(record['id'], `${path}.id`),
     fingerprint: requiredString(record['fingerprint'], `${path}.fingerprint`),
     label: nullableString(record['label'], `${path}.label`),
+    description: nullableString(record['description'], `${path}.description`),
+    tags: stringArray(record['tags'], `${path}.tags`),
+    catalog: nullableString(record['catalog'], `${path}.catalog`),
+    catalogId: nullableString(record['catalogId'], `${path}.catalogId`),
     kind: requiredString(record['kind'], `${path}.kind`),
     visibility: requiredString(record['visibility'], `${path}.visibility`),
     extensionPolicy: requiredString(
@@ -1515,6 +1598,60 @@ function definition(value: unknown, path: string): ContentDefinitionDto {
     sourceDeclaration: requiredString(
       record['sourceDeclaration'],
       `${path}.sourceDeclaration`,
+    ),
+  };
+}
+
+function rulesetValue(value: unknown, path: string): RulesetValueDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['kind', 'id', 'label', 'numericDomainId'], path);
+  return {
+    kind: requiredString(record['kind'], `${path}.kind`),
+    id: requiredString(record['id'], `${path}.id`),
+    label: requiredString(record['label'], `${path}.label`),
+    numericDomainId: requiredString(
+      record['numericDomainId'],
+      `${path}.numericDomainId`,
+    ),
+  };
+}
+
+function participantProfile(
+  value: unknown,
+  path: string,
+): ParticipantProfileDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'definitionId',
+      'profileId',
+      'label',
+      'description',
+      'role',
+      'definitionIds',
+      'capabilities',
+    ],
+    path,
+  );
+  return {
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    profileId: requiredString(record['profileId'], `${path}.profileId`),
+    label: requiredString(record['label'], `${path}.label`),
+    description: nullableString(record['description'], `${path}.description`),
+    role: requiredString(record['role'], `${path}.role`),
+    definitionIds: stringArray(
+      record['definitionIds'],
+      `${path}.definitionIds`,
+    ),
+    capabilities: requiredArray(
+      record['capabilities'],
+      `${path}.capabilities`,
+    ).map((entry, index) =>
+      scenarioInitialCapability(entry, `${path}.capabilities[${index}]`),
     ),
   };
 }

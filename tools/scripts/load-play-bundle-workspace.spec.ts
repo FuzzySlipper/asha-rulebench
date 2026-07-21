@@ -29,6 +29,10 @@ describe('canonical Ruleset root loader', () => {
         contentPackIds: ['rulebench.minimal.content'],
       }),
     ]);
+    expect(result.catalog.scenarios).toHaveLength(1);
+    expect(result.catalog.scenarios[0]?.presentation.label).toBe(
+      'Minimal Scenario',
+    );
   });
 
   it('prepares only an exact declared Content Pack selection', async () => {

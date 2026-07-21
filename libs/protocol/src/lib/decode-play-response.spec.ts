@@ -14,16 +14,16 @@ const emptyResponse = {
   upgradeImpact: null,
   activationRevision: 0,
   hostRandomSource: {
-    policyId: 'rulebench.automatic-random',
+    policyId: 'random.automatic',
     policyVersion: 1,
-    sourceId: 'rulebench.system-random',
+    sourceId: 'random.system',
     sourceVersion: 1,
   },
   supportedRandomSources: [
     {
-      policyId: 'rulebench.automatic-random',
+      policyId: 'random.automatic',
       policyVersion: 1,
-      sourceId: 'rulebench.system-random',
+      sourceId: 'random.system',
       sourceVersion: 1,
     },
   ],
@@ -120,9 +120,9 @@ describe('play protocol decoder', () => {
         stateRevision: 0,
         acceptedRandomValues: '0',
         randomSource: {
-          policyId: 'rulebench.automatic-random',
+          policyId: 'random.automatic',
           policyVersion: 1,
-          sourceId: 'rulebench.system-random',
+          sourceId: 'random.system',
           sourceVersion: 1,
         },
         board: { width: 5, height: 3, cells: [] },

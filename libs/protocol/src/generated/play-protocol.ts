@@ -14,7 +14,11 @@ export type ContentPackLockEntryDto = { requester: string, packageId: string, re
 
 export type VersionedRequirementDto = { id: string, version: number, };
 
-export type ContentDefinitionDto = { id: string, fingerprint: string, label: string | null, kind: string, visibility: string, extensionPolicy: string, references: Array<string>, packageId: string, packageVersion: string, sourceModule: string, sourceDeclaration: string, };
+export type ContentDefinitionDto = { id: string, fingerprint: string, label: string | null, description: string | null, tags: Array<string>, catalog: string | null, catalogId: string | null, kind: string, visibility: string, extensionPolicy: string, references: Array<string>, packageId: string, packageVersion: string, sourceModule: string, sourceDeclaration: string, };
+
+export type RulesetValueDto = { kind: string, id: string, label: string, numericDomainId: string, };
+
+export type ParticipantProfileDto = { definitionId: string, profileId: string, label: string, description: string | null, role: string, definitionIds: Array<string>, capabilities: Array<ScenarioInitialCapabilityDto>, };
 
 export type ContentRelationshipDto = { kind: string, source: string, target: string, order: number, };
 
@@ -28,7 +32,7 @@ export type ContentDerivationProvenanceDto = { definitionId: string, owner: stri
 
 export type ContentOverlayProvenanceDto = { overlay: string, target: string, expectedFingerprint: string, beforeFingerprint: string, afterFingerprint: string, plane: string, conflictPolicy: string, patchFingerprint: string, order: number, changes: Array<ContentPatchChangeDto>, };
 
-export type PlayBundleArtifactSummaryDto = { schema: VersionedIdentityDto, artifactId: string, playBundle: VersionedIdentityDto, ruleset: VersionedIdentityDto, language: VersionedIdentityDto, contentPacks: Array<ContentPackSummaryDto>, dependencyLock: Array<ContentPackLockEntryDto>, requiredOperations: Array<VersionedRequirementDto>, requiredCapabilities: Array<VersionedRequirementDto>, requiredValues: Array<string>, requiredNumericDomains: Array<string>, exportedRoots: Array<string>, definitions: Array<ContentDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<ContentRelationshipDto>, derivationSlots: number, overlaySlots: number, derivations: Array<ContentDerivationProvenanceDto>, overlays: Array<ContentOverlayProvenanceDto>, fingerprints: PlayBundleFingerprintDto, };
+export type PlayBundleArtifactSummaryDto = { schema: VersionedIdentityDto, artifactId: string, playBundle: VersionedIdentityDto, ruleset: VersionedIdentityDto, language: VersionedIdentityDto, contentPacks: Array<ContentPackSummaryDto>, dependencyLock: Array<ContentPackLockEntryDto>, requiredOperations: Array<VersionedRequirementDto>, requiredCapabilities: Array<VersionedRequirementDto>, requiredValues: Array<string>, requiredNumericDomains: Array<string>, rulesetValues: Array<RulesetValueDto>, participantProfiles: Array<ParticipantProfileDto>, exportedRoots: Array<string>, definitions: Array<ContentDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<ContentRelationshipDto>, derivationSlots: number, overlaySlots: number, derivations: Array<ContentDerivationProvenanceDto>, overlays: Array<ContentOverlayProvenanceDto>, fingerprints: PlayBundleFingerprintDto, };
 
 export type PlayBundleUpgradeFieldDto = { plane: string, path: string, before: string, after: string, };
 
@@ -59,6 +63,10 @@ export type ScenarioTurnDto = { initiativeOrder: Array<string>, currentActorId: 
 export type ScenarioRandomSourceDto = { policyId: string, policyVersion: number, sourceId: string, sourceVersion: number, };
 
 export type ScenarioSetupRequestDto = { schema: ScenarioSchemaDto, playBundleId: string, board: ScenarioBoardDto, participants: Array<ScenarioParticipantDto>, turn: ScenarioTurnDto, randomSource: ScenarioRandomSourceDto, };
+
+export type ScenarioTemplatePresentationDto = { label: string, description: string | null, };
+
+export type ScenarioTemplateDto = { schema: ScenarioSchemaDto, identity: VersionedIdentityDto, playBundle: VersionedIdentityDto, presentation: ScenarioTemplatePresentationDto, board: ScenarioBoardDto, participants: Array<ScenarioParticipantDto>, turn: ScenarioTurnDto, randomSource: ScenarioRandomSourceDto, };
 
 export type GameplayUnavailableDto = { code: string, path: string, message: string, };
 
@@ -112,7 +120,7 @@ export type RulesetCatalogContentPackDto = { id: string, version: string, label:
 
 export type RulesetCatalogPlayBundleDto = { id: string, version: string, contentPackIds: Array<string>, compatible: boolean, diagnostics: Array<PlayDiagnosticDto>, };
 
-export type RulesetCatalogDto = { rulesetRoot: string, ruleset: VersionedIdentityDto, contentPacks: Array<RulesetCatalogContentPackDto>, playBundles: Array<RulesetCatalogPlayBundleDto>, };
+export type RulesetCatalogDto = { rulesetRoot: string, ruleset: VersionedIdentityDto, contentPacks: Array<RulesetCatalogContentPackDto>, playBundles: Array<RulesetCatalogPlayBundleDto>, scenarios: Array<ScenarioTemplateDto>, };
 
 export type RulesetCatalogResponseDto = { ok: boolean, catalog: RulesetCatalogDto | null, diagnostics: Array<PlayDiagnosticDto>, };
 

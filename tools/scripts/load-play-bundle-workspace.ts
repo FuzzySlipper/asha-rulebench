@@ -16,6 +16,7 @@ import type {
   PlayBundleCompilerDiagnostic,
   PlayBundleManifest,
   Ruleset,
+  ScenarioTemplate,
 } from '@asha-rpg/authoring';
 import ts from 'typescript';
 
@@ -23,6 +24,7 @@ import {
   isContentPackSource,
   isPlayBundleManifest,
   isRuleset,
+  isScenarioTemplate,
 } from '../../libs/content-authoring/src/index.js';
 
 export interface PlayBundleSelectionInput {
@@ -47,6 +49,7 @@ export interface RulesetRootCatalog {
     readonly compatible: boolean;
     readonly diagnostics: readonly PlayBundleCompilerDiagnostic[];
   }[];
+  readonly scenarios: readonly ReturnType<typeof catalogScenario>[];
 }
 
 export type PlayBundleWorkspaceLoadResult =
@@ -232,11 +235,28 @@ export async function loadPlayBundleWorkspace(
         resolved.value,
       );
     }
+    const mismatchedScenario = discovered.scenarios.find(
+      (scenario) =>
+        !discovered.playBundles.some(
+          (bundle) =>
+            bundle.identity.id === scenario.playBundle.id &&
+            bundle.identity.version === scenario.playBundle.version,
+        ),
+    );
+    if (mismatchedScenario !== undefined) {
+      return failure(
+        'SCENARIO_TEMPLATE_PLAY_BUNDLE_NOT_DECLARED',
+        '$.rulesetRoot',
+        `Scenario template ${mismatchedScenario.identity.id}@${mismatchedScenario.identity.version} names undeclared PlayBundle ${mismatchedScenario.playBundle.id}@${mismatchedScenario.playBundle.version}`,
+        resolved.value,
+      );
+    }
     const catalog = rootCatalog(
       resolved.value.rulesetRoot,
       ruleset,
       discovered.contentPacks,
       discovered.playBundles,
+      discovered.scenarios,
     );
     if (inputOperation(input) === 'inspect') {
       return { ok: true, catalog, preparedSource: null, diagnostics: [] };
@@ -285,6 +305,7 @@ function discoverAuthoringValues(
   readonly rulesets: readonly Ruleset[];
   readonly contentPacks: readonly ContentPackSource[];
   readonly playBundles: readonly PlayBundleManifest[];
+  readonly scenarios: readonly ScenarioTemplate[];
 } {
   const values = Object.values(moduleNamespace);
   return {
@@ -298,6 +319,10 @@ function discoverAuthoringValues(
     ),
     playBundles: uniqueByIdentity(
       values.filter(isPlayBundleManifest),
+      (value) => value.identity,
+    ),
+    scenarios: uniqueByIdentity(
+      values.filter(isScenarioTemplate),
       (value) => value.identity,
     ),
   };
@@ -326,6 +351,7 @@ function rootCatalog(
   ruleset: Ruleset,
   contentPacks: readonly ContentPackSource[],
   playBundles: readonly PlayBundleManifest[],
+  scenarios: readonly ScenarioTemplate[],
 ): RulesetRootCatalog {
   return {
     rulesetRoot,
@@ -346,6 +372,32 @@ function rootCatalog(
         diagnostics: preparation.diagnostics,
       };
     }),
+    scenarios: scenarios.map(catalogScenario),
+  };
+}
+
+function catalogScenario(template: ScenarioTemplate) {
+  return {
+    schema: template.schema,
+    identity: template.identity,
+    playBundle: template.playBundle,
+    presentation: {
+      label: template.presentation.label,
+      description: template.presentation.description ?? null,
+    },
+    board: {
+      ...template.board,
+      cells: template.board.cells.map((cell) => ({
+        ...cell,
+        capabilities: cell.capabilities.map((capability) => ({
+          ...capability,
+          definitionId: capability.definitionId ?? null,
+        })),
+      })),
+    },
+    participants: template.participants,
+    turn: template.turn,
+    randomSource: template.randomSource,
   };
 }
 

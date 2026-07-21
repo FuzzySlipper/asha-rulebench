@@ -43,11 +43,17 @@ contract and a portable configuration example.
 
 Each inspect or compile request builds the selected root's `src/index.ts` in a
 fresh constrained TypeScript subprocess. It discovers immutable exported
-`Ruleset`, `ContentPackSource`, and `PlayBundleManifest` values without ambient
-registration or directory scanning. Compile sends the exact selected Content
-Pack IDs through `preparePlayBundle`; Rust compiles and reloads the closed
-portable artifact before it can become an activation candidate. Failure never
-replaces the active PlayBundle or Session.
+`Ruleset`, `ContentPackSource`, `PlayBundleManifest`, and setup-only
+`ScenarioTemplate` values without ambient registration or directory scanning.
+Compile sends the exact selected Content Pack IDs through `preparePlayBundle`;
+Rust compiles and reloads the closed portable artifact before it can become an
+activation candidate. Failure never replaces the active PlayBundle or Session.
+
+After activation, Scenario examples and participant profiles exported by the
+selected repository provide editable starting points. They never provide a
+command order, targets, reactions, rolls, expected events, or outcome. Named
+Ruleset values such as Strength and Armor Class remain visible by identity in
+setup and in the live participant state.
 
 ## Runtime ownership
 
@@ -95,8 +101,12 @@ For managed visual evidence:
 
 ```bash
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
-BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
+
+Use the printed local or LAN URL to conduct the interaction itself. Capture and
+inspect desktop and narrow screenshots, record the content revisions and
+authority outcomes, and state the non-claims in the Den handoff. Rulebench does
+not keep a scripted product journey for this interaction-first campaign.
 
 The focused gate proves the product boundary and one explicit activation flow.
 It is not an exhaustive content certification. Persistent libraries and saves,

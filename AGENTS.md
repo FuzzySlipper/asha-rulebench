@@ -60,7 +60,6 @@ pnpm run verify:change -- --profile browser
 pnpm run verify:change -- --profile docs
 
 den-serve up asha-rulebench -repo /home/dev/asha-rulebench
-BASE_URL=<local-url-from-den-serve> LIVE_RUN=1 pnpm run e2e:live
 ```
 
 `verify:change` accepts only the closed current vocabulary `frontend`,

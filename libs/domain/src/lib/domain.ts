@@ -3,6 +3,7 @@ import type {
   PlayBundleArtifactSummaryDto,
   PlayDiagnosticDto,
   PlayWorkspaceResponseDto,
+  ScenarioInitialCapabilityDto,
 } from '@asha-rulebench/protocol';
 
 export interface ContentPackSourceView {
@@ -22,10 +23,31 @@ export interface ContentDefinitionView {
   readonly id: string;
   readonly fingerprint: string;
   readonly label: string;
+  readonly description: string | null;
+  readonly tags: readonly string[];
+  readonly catalog: string | null;
+  readonly catalogId: string | null;
   readonly contract: string;
   readonly owner: string;
   readonly source: string;
   readonly references: readonly string[];
+}
+
+export interface RulesetValueView {
+  readonly kind: string;
+  readonly id: string;
+  readonly label: string;
+  readonly numericDomainId: string;
+}
+
+export interface ParticipantProfileView {
+  readonly definitionId: string;
+  readonly profileId: string;
+  readonly label: string;
+  readonly description: string | null;
+  readonly role: string;
+  readonly definitionIds: readonly string[];
+  readonly capabilities: readonly ScenarioInitialCapabilityDto[];
 }
 
 export interface ContentPatchChangeView {
@@ -96,6 +118,8 @@ export interface PlayBundleArtifactInspectionView {
   readonly capabilities: readonly string[];
   readonly values: readonly string[];
   readonly numericDomains: readonly string[];
+  readonly rulesetValues: readonly RulesetValueView[];
+  readonly participantProfiles: readonly ParticipantProfileView[];
   readonly exportedRoots: readonly string[];
   readonly definitions: readonly ContentDefinitionView[];
   readonly policyBindingIds: readonly string[];
@@ -139,6 +163,8 @@ export interface PlayWorkspaceView {
 export interface GameplayActionView {
   readonly id: string;
   readonly name: string;
+  readonly description: string | null;
+  readonly tags: readonly string[];
   readonly available: boolean;
   readonly unavailable: string | null;
   readonly maximumTargets: number;
@@ -273,7 +299,13 @@ export function playWorkspaceView(
     supportedRandomSources: response.supportedRandomSources,
     gameplayAvailable: response.gameplayAvailable,
     gameplay:
-      response.gameplay === null ? null : gameplayView(response.gameplay),
+      response.gameplay === null
+        ? null
+        : gameplayView(
+            response.gameplay,
+            response.activeArtifact?.rulesetValues ?? [],
+            response.activeArtifact?.definitions ?? [],
+          ),
     activeArtifactId: response.activeArtifact?.artifactId ?? null,
     artifact:
       inspectedArtifact === null ? null : artifactInspection(inspectedArtifact),
@@ -334,7 +366,27 @@ export function playWorkspaceView(
 
 function gameplayView(
   gameplay: NonNullable<PlayWorkspaceResponseDto['gameplay']>,
+  rulesetValues: PlayBundleArtifactSummaryDto['rulesetValues'],
+  definitions: PlayBundleArtifactSummaryDto['definitions'],
 ): GameplayWorkspaceView {
+  const rulesetValueLabels = new Map(
+    rulesetValues.map((value) => [`${value.kind}:${value.id}`, value.label]),
+  );
+  const catalogLabels = new Map(
+    definitions.flatMap((definition) =>
+      definition.catalog === null || definition.catalogId === null
+        ? []
+        : [
+            [
+              `${definition.catalog}:${definition.catalogId}`,
+              definition.label ?? definition.catalogId,
+            ] as const,
+          ],
+    ),
+  );
+  const definitionsById = new Map(
+    definitions.map((definition) => [definition.id, definition]),
+  );
   return {
     artifactId: gameplay.artifactId,
     actorId: gameplay.actorId,
@@ -362,6 +414,9 @@ function gameplayView(
     actions: gameplay.actions.map((action) => ({
       id: action.definitionId,
       name: action.label,
+      description:
+        definitionsById.get(action.definitionId)?.description ?? null,
+      tags: definitionsById.get(action.definitionId)?.tags ?? [],
       available: action.available,
       unavailable:
         action.unavailable === null
@@ -390,15 +445,21 @@ function gameplayView(
       position: `(${entity.x}, ${entity.y})`,
       vitality: `${entity.vitality.current}/${entity.vitality.maximum ?? 'unbounded'}`,
       definitionIds: entity.definitionIds,
-      stats: entity.stats.map((value) => `${value.id} ${value.current}`),
-      defenses: entity.defenses.map((value) => `${value.id} ${value.current}`),
+      stats: entity.stats.map(
+        (value) =>
+          `${rulesetValueLabels.get(`stat:${value.id}`) ?? value.id} ${value.current}`,
+      ),
+      defenses: entity.defenses.map(
+        (value) =>
+          `${rulesetValueLabels.get(`defense:${value.id}`) ?? value.id} ${value.current}`,
+      ),
       resources: entity.resources.map(
         (value) =>
-          `${value.id} ${value.current}/${value.maximum ?? 'unbounded'}`,
+          `${catalogLabels.get(`resource:${value.id}`) ?? value.id} ${value.current}/${value.maximum ?? 'unbounded'}`,
       ),
       modifiers: entity.modifiers.map(
         (modifier) =>
-          `${modifier.id} ${modifier.value} (${modifier.remainingTurns} turns, ${modifier.stackingGroup})`,
+          `${catalogLabels.get(`modifier:${modifier.id}`) ?? modifier.id} ${modifier.value} (${modifier.remainingTurns} turns, ${modifier.stackingGroup})`,
       ),
     })),
     log: gameplay.log.map((entry) => ({
@@ -510,11 +571,17 @@ function artifactInspection(
     ),
     values: artifact.requiredValues,
     numericDomains: artifact.requiredNumericDomains,
+    rulesetValues: artifact.rulesetValues,
+    participantProfiles: artifact.participantProfiles,
     exportedRoots: artifact.exportedRoots,
     definitions: artifact.definitions.map((definition) => ({
       id: definition.id,
       fingerprint: definition.fingerprint,
       label: definition.label ?? definition.id,
+      description: definition.description,
+      tags: definition.tags,
+      catalog: definition.catalog,
+      catalogId: definition.catalogId,
       contract: `${definition.kind} · ${definition.visibility} · ${definition.extensionPolicy}`,
       owner: `${definition.packageId}@${definition.packageVersion}`,
       source: `${definition.sourceModule}#${definition.sourceDeclaration}`,

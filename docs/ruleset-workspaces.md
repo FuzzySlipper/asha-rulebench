@@ -46,20 +46,22 @@ them.
 export { myRuleset } from './ruleset.js';
 export { starterContentSource } from '../content-packs/starter/src/content-pack.js';
 export { starterPlayBundle } from '../play-bundles/starter.js';
+export { starterScenario } from '../scenarios/starter-skirmish.js';
 ```
 
 The complete module graph may expose other authoring helpers, but the loader
-selects only structurally branded `Ruleset`, `ContentPackSource`, and
-`PlayBundleManifest` values. It rejects duplicate identities and escaped or
-unapproved imports. There is no required aggregate export, magic filename
-beyond `src/index.ts`, side-effect registration, directory enumeration, or
-Rulebench-owned content catalog.
+selects only structurally branded `Ruleset`, `ContentPackSource`,
+`PlayBundleManifest`, and `ScenarioTemplate` values. It rejects duplicate
+identities and escaped or unapproved imports. There is no required aggregate
+export, magic filename beyond `src/index.ts`, side-effect registration,
+directory enumeration, or Rulebench-owned content catalog.
 
 Inspecting a root returns:
 
 - the one semantic Ruleset;
 - all exported Content Packs and their explicit requirements;
-- all declared PlayBundles and compatibility diagnostics.
+- all declared PlayBundles and compatibility diagnostics;
+- all setup-only Scenario templates and their declared PlayBundle binding.
 
 Compiling additionally requires an explicit list of Content Pack IDs. That
 selection must match exactly one declared PlayBundle. The loader then calls
@@ -105,4 +107,7 @@ After activation, **Session -> Create Scenario...** accepts or authors a strict
 Scenario data contains the board, participants, capabilities, initiative, and
 random-source binding. It does not contain a scripted action order, target
 choices, reactions, requested roll results, expected events, or winner. Those
-decisions happen interactively against the Rust-owned Session.
+decisions happen interactively against the Rust-owned Session. A content
+repository may also publish participant profiles in ordinary authored semantic
+data; Rulebench presents those public defaults as setup conveniences while Rust
+continues to validate the resulting Scenario.

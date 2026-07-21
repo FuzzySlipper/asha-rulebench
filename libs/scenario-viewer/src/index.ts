@@ -27,6 +27,7 @@ import type {
   ScenarioParticipantDto,
   ScenarioRandomSourceDto,
   ScenarioSetupRequestDto,
+  ScenarioTemplateDto,
   PlayDiagnosticDto,
 } from '@asha-rulebench/protocol';
 import { decodeScenarioDocument } from '@asha-rulebench/protocol';
@@ -260,6 +261,10 @@ class SetupDiagnosticsComponent {
       .battlefield {
         display: grid;
         gap: 0.45rem;
+        grid-template-columns: repeat(
+          var(--board-columns),
+          minmax(4.75rem, 1fr)
+        );
         margin: auto;
         max-width: 52rem;
         min-width: min(100%, 33rem);
@@ -534,7 +539,7 @@ class SetupDiagnosticsComponent {
           grid-template-columns: minmax(0, 1fr);
           grid-template-rows:
             13rem minmax(19rem, 45vh) minmax(24rem, 58vh)
-            minmax(30rem, 70vh) minmax(24rem, 58vh);
+            minmax(18rem, 45vh) minmax(24rem, 58vh);
         }
 
         .battlefield-wrap {
@@ -542,7 +547,24 @@ class SetupDiagnosticsComponent {
         }
 
         .battlefield {
-          min-width: 29rem;
+          gap: 0.25rem;
+          grid-template-columns: repeat(var(--board-columns), minmax(0, 1fr));
+          min-width: 100%;
+        }
+
+        .grid-cell {
+          min-height: 4.25rem;
+          padding: 0.2rem;
+        }
+
+        .piece strong {
+          display: none;
+        }
+
+        .piece-token {
+          font-size: 0.72rem;
+          height: 2rem;
+          width: 2rem;
         }
       }
     `,
@@ -595,7 +617,7 @@ class SetupDiagnosticsComponent {
                     class="battlefield"
                     role="grid"
                     aria-label="Combat grid"
-                    [style.grid-template-columns]="boardColumns()"
+                    [style.--board-columns]="boardWidth()"
                   >
                     @for (
                       cell of boardCells();
@@ -685,6 +707,22 @@ class SetupDiagnosticsComponent {
                       <span
                         >Vitality {{ entity.vitality }} · cell
                         {{ entity.position }}</span
+                      >
+                      <span class="muted"
+                        >Stats:
+                        {{
+                          entity.stats.length === 0
+                            ? 'none'
+                            : entity.stats.join(', ')
+                        }}</span
+                      >
+                      <span class="muted"
+                        >Defenses:
+                        {{
+                          entity.defenses.length === 0
+                            ? 'none'
+                            : entity.defenses.join(', ')
+                        }}</span
                       >
                       <span class="muted"
                         >Resources:
@@ -849,7 +887,15 @@ class SetupDiagnosticsComponent {
                             (click)="selectAction(action)"
                           >
                             <strong>{{ action.name }}</strong>
+                            @if (action.description) {
+                              <span>{{ action.description }}</span>
+                            }
                             <code>{{ action.id }}</code>
+                            @if (action.tags.length > 0) {
+                              <span class="muted">{{
+                                action.tags.join(' · ')
+                              }}</span>
+                            }
                             <span
                               >{{ actionOptionCount(action) }} available
                               option{{
@@ -876,6 +922,9 @@ class SetupDiagnosticsComponent {
                         <div>
                           <p class="section-label">Selected action</p>
                           <h3>{{ action.name }}</h3>
+                          @if (action.description) {
+                            <p>{{ action.description }}</p>
+                          }
                           <code>{{ action.id }}</code>
                           <p class="muted">
                             Rust exposed these legal candidates at revision
@@ -911,7 +960,7 @@ class SetupDiagnosticsComponent {
                                 )
                               "
                             >
-                              Participant {{ candidate }}
+                              Target {{ participantLabel(candidate) }}
                             </button>
                           }
                           @for (candidate of action.cellIds; track candidate) {
@@ -1334,6 +1383,42 @@ class SetupDiagnosticsComponent {
     >
       <div class="dialog-body">
         @if (setupDraft(); as setup) {
+          @if (scenarioTemplates().length > 0) {
+            <section>
+              <p class="section-label">Scenario examples</p>
+              <ul class="action-list" aria-label="Available Scenario examples">
+                @for (
+                  template of scenarioTemplates();
+                  track template.identity.id
+                ) {
+                  <li>
+                    <button
+                      class="action-choice"
+                      type="button"
+                      [attr.aria-pressed]="
+                        setupDocumentName() === template.presentation.label
+                      "
+                      (click)="useScenarioTemplate(template)"
+                    >
+                      <strong>{{ template.presentation.label }}</strong>
+                      @if (template.presentation.description) {
+                        <span>{{ template.presentation.description }}</span>
+                      }
+                      <span class="muted">
+                        {{ template.participants.length }} participants ·
+                        {{ template.board.width }} × {{ template.board.height }}
+                        board
+                      </span>
+                    </button>
+                  </li>
+                }
+              </ul>
+              <p class="muted">
+                Examples contain setup only. Every action, target, reaction,
+                roll, and turn transition remains interactive.
+              </p>
+            </section>
+          }
           <div>
             <p class="section-label">Setup document</p>
             <input
@@ -1351,7 +1436,7 @@ class SetupDiagnosticsComponent {
               {{
                 setupDocumentName() === null
                   ? 'Choose an explicit JSON setup document, or author one below.'
-                  : 'Loaded ' + setupDocumentName()
+                  : 'Selected setup: ' + setupDocumentName()
               }}
             </p>
             @if (setupImportError(); as importError) {
@@ -1485,6 +1570,37 @@ class SetupDiagnosticsComponent {
               [messageId]="setupDiagnosticId('$.randomSource')"
             />
           </label>
+
+          @if (participantProfiles().length > 0) {
+            <fieldset class="definition-choices">
+              <legend class="section-label">
+                Add from participant profile
+              </legend>
+              <ul
+                class="action-list"
+                aria-label="Available participant profiles"
+              >
+                @for (
+                  profile of participantProfiles();
+                  track profile.definitionId
+                ) {
+                  <li>
+                    <button
+                      class="action-choice"
+                      type="button"
+                      (click)="addParticipantFromProfile(profile.definitionId)"
+                    >
+                      <strong>{{ profile.label }}</strong>
+                      <span>{{ profile.role }}</span>
+                      @if (profile.description) {
+                        <span class="muted">{{ profile.description }}</span>
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+            </fieldset>
+          }
 
           <div class="button-row">
             <button
@@ -1832,7 +1948,85 @@ class SetupDiagnosticsComponent {
                     {{ capability.owner }} capability {{ capabilityIndex + 1 }}
                   </legend>
                   <div class="setup-grid">
-                    @if (capability.owner !== 'vitality') {
+                    @if (
+                      capability.owner === 'stat' ||
+                      capability.owner === 'defense'
+                    ) {
+                      <label>
+                        <span class="section-label">
+                          {{ capability.owner === 'stat' ? 'Stat' : 'Defense' }}
+                        </span>
+                        <select
+                          #setupControl
+                          #capabilityValueSelect
+                          class="setup-select"
+                          [attr.data-setup-path]="
+                            capabilityFieldPath(
+                              participantIndex,
+                              capabilityIndex,
+                              'id'
+                            )
+                          "
+                          [attr.aria-invalid]="
+                            setupHasError(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                          [attr.aria-describedby]="
+                            setupDescribedBy(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                          [value]="capability.id"
+                          (change)="
+                            updateParticipantCapabilityText(
+                              participantIndex,
+                              capabilityIndex,
+                              'id',
+                              capabilityValueSelect.value
+                            )
+                          "
+                        >
+                          <option value="">Choose a named value</option>
+                          @for (
+                            value of rulesetValuesFor(capability.owner);
+                            track value.id
+                          ) {
+                            <option [value]="value.id">
+                              {{ value.label }} · {{ value.id }}
+                            </option>
+                          }
+                        </select>
+                        <arb-setup-diagnostics
+                          [diagnostics]="
+                            setupDiagnosticsFor(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                          [messageId]="
+                            setupDiagnosticId(
+                              capabilityFieldPath(
+                                participantIndex,
+                                capabilityIndex,
+                                'id'
+                              )
+                            )
+                          "
+                        />
+                      </label>
+                    } @else if (capability.owner !== 'vitality') {
                       <label>
                         <span class="section-label">ID</span>
                         <input
@@ -2326,7 +2520,13 @@ class SetupDiagnosticsComponent {
                         )
                       "
                     />
-                    <span>{{ definition.label }} · {{ definition.id }}</span>
+                    <span>
+                      <strong>{{ definition.label }}</strong>
+                      <code>{{ definition.id }}</code>
+                      @if (definition.description) {
+                        <small>{{ definition.description }}</small>
+                      }
+                    </span>
                   </label>
                 }
                 <arb-setup-diagnostics
@@ -3368,10 +3568,6 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return this.store.view()?.gameplay?.board.height ?? 1;
   });
 
-  protected readonly boardColumns = computed(
-    () => `repeat(${this.boardWidth()}, minmax(4.75rem, 1fr))`,
-  );
-
   protected readonly boardCells = computed<readonly BoardCell[]>(() => {
     const gameplay = this.store.view()?.gameplay;
     const entities = gameplay?.entities ?? [];
@@ -3429,6 +3625,21 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       ) ?? null
     );
   });
+
+  protected readonly scenarioTemplates = computed(() => {
+    const catalog = this.store.rulesetCatalog();
+    const activePlayBundle = this.store.view()?.artifact?.playBundle;
+    if (catalog === null || activePlayBundle === undefined) return [];
+    return catalog.scenarios.filter(
+      (template) =>
+        `${template.playBundle.id}@${template.playBundle.version}` ===
+        activePlayBundle,
+    );
+  });
+
+  protected readonly participantProfiles = computed(
+    () => this.store.view()?.artifact?.participantProfiles ?? [],
+  );
 
   protected readonly actionDefinitions = computed(() =>
     (this.store.view()?.artifact?.definitions ?? []).filter((definition) =>
@@ -3656,6 +3867,39 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     });
   }
 
+  protected useScenarioTemplate(template: ScenarioTemplateDto): void {
+    const activeArtifactId = this.store.view()?.activeArtifactId;
+    if (activeArtifactId === null || activeArtifactId === undefined) return;
+    this.setupDraft.set({
+      schema: { id: 'asha.rpg.scenario', version: 1 },
+      playBundleId: activeArtifactId,
+      board: {
+        ...template.board,
+        cells: template.board.cells.map((cell) => ({
+          ...cell,
+          position: { ...cell.position },
+          capabilities: cell.capabilities.map((capability) => ({
+            ...capability,
+            value: { ...capability.value },
+          })),
+        })),
+      },
+      participants: template.participants.map((participant) => ({
+        ...participant,
+        position: { ...participant.position },
+        definitionIds: [...participant.definitionIds],
+        capabilities: participant.capabilities.map(cloneInitialCapability),
+      })),
+      turn: {
+        ...template.turn,
+        initiativeOrder: [...template.turn.initiativeOrder],
+      },
+      randomSource: { ...template.randomSource },
+    });
+    this.setupDocumentName.set(template.presentation.label);
+    this.setupImportError.set(null);
+  }
+
   protected async loadSetupDocument(files: FileList | null): Promise<void> {
     const file = files?.item(0);
     if (file === null || file === undefined) return;
@@ -3726,6 +3970,53 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         },
       };
     });
+  }
+
+  protected addParticipantFromProfile(definitionId: string): void {
+    const profile = this.participantProfiles().find(
+      (candidate) => candidate.definitionId === definitionId,
+    );
+    if (profile === undefined) return;
+    this.updateSetup((setup) => {
+      const profileCount = setup.participants.filter((participant) =>
+        participant.definitionIds.includes(profile.definitionId),
+      ).length;
+      const suffix = profileCount === 0 ? '' : `-${profileCount + 1}`;
+      const id = `${profile.profileId}${suffix}`;
+      const participant: ScenarioParticipantDto = {
+        id,
+        label: `${profile.label}${profileCount === 0 ? '' : ` ${profileCount + 1}`}`,
+        teamId: profile.role === 'player' ? 'players' : 'creatures',
+        position: firstAvailablePosition(setup),
+        definitionIds: [profile.definitionId, ...profile.definitionIds],
+        capabilities: profile.capabilities.map(cloneInitialCapability),
+      };
+      const participants = [...setup.participants, participant];
+      return {
+        ...setup,
+        participants,
+        turn: {
+          ...setup.turn,
+          initiativeOrder: participants.map((entry) => entry.id),
+          currentActorId: setup.turn.currentActorId || id,
+        },
+      };
+    });
+  }
+
+  protected rulesetValuesFor(owner: 'stat' | 'defense') {
+    return (this.store.view()?.artifact?.rulesetValues ?? []).filter(
+      (value) => value.kind === owner,
+    );
+  }
+
+  protected participantLabel(participantId: string): string {
+    const entity = this.store
+      .view()
+      ?.gameplay?.entities.find((candidate) => candidate.id === participantId);
+    return entity === undefined
+      ? participantId
+      : `${entity.label} (${participantId})`;
   }
 
   protected removeParticipant(index: number): void {
@@ -4424,6 +4715,30 @@ function sameStringSet(
   return normalizedLeft.every(
     (value, index) => value === normalizedRight[index],
   );
+}
+
+function firstAvailablePosition(
+  setup: ScenarioSetupRequestDto,
+): ScenarioParticipantDto['position'] {
+  for (let y = 0; y < setup.board.height; y += 1) {
+    for (let x = 0; x < setup.board.width; x += 1) {
+      const occupied = setup.participants.some(
+        (participant) =>
+          participant.position.x === x && participant.position.y === y,
+      );
+      if (!occupied) return { x, y };
+    }
+  }
+  return { x: 0, y: 0 };
+}
+
+function cloneInitialCapability(
+  capability: ScenarioInitialCapabilityDto,
+): ScenarioInitialCapabilityDto {
+  if (capability.owner === 'vitality' || capability.owner === 'resource') {
+    return { ...capability, value: { ...capability.value } };
+  }
+  return { ...capability };
 }
 
 function formInteger(value: string): number {

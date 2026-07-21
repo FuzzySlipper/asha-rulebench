@@ -111,16 +111,16 @@ function response(
     upgradeImpact: null,
     activationRevision: status === 'active' ? 1 : 0,
     hostRandomSource: {
-      policyId: 'rulebench.automatic-random',
+      policyId: 'random.automatic',
       policyVersion: 1,
-      sourceId: 'rulebench.system-random',
+      sourceId: 'random.system',
       sourceVersion: 1,
     },
     supportedRandomSources: [
       {
-        policyId: 'rulebench.automatic-random',
+        policyId: 'random.automatic',
         policyVersion: 1,
-        sourceId: 'rulebench.system-random',
+        sourceId: 'random.system',
         sourceVersion: 1,
       },
     ],
@@ -138,9 +138,9 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
     stateRevision: 2,
     acceptedRandomValues: '3',
     randomSource: {
-      policyId: 'rulebench.automatic-random',
+      policyId: 'random.automatic',
       policyVersion: 1,
-      sourceId: 'rulebench.system-random',
+      sourceId: 'random.system',
       sourceVersion: 1,
     },
     board: { width: 5, height: 3, cells: [] },

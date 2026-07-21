@@ -2,6 +2,7 @@ import type {
   ContentPackSource,
   PlayBundleManifest,
   Ruleset,
+  ScenarioTemplate,
 } from '@asha-rpg/authoring';
 
 /**
@@ -52,6 +53,29 @@ export function isPlayBundleManifest(
     Array.isArray(value['add']) &&
     Array.isArray(value['overlays']) &&
     isFrozenRecord(value['configure'])
+  );
+}
+
+export function isScenarioTemplate(value: unknown): value is ScenarioTemplate {
+  if (!isFrozenRecord(value)) return false;
+  const schema = value['schema'];
+  const presentation = value['presentation'];
+  const board = value['board'];
+  const turn = value['turn'];
+  const randomSource = value['randomSource'];
+  return (
+    isFrozenRecord(schema) &&
+    schema['id'] === 'asha.rpg.scenario-template' &&
+    schema['version'] === 1 &&
+    isVersionedIdentity(value['identity']) &&
+    isVersionedIdentity(value['playBundle']) &&
+    isFrozenRecord(presentation) &&
+    typeof presentation['label'] === 'string' &&
+    isFrozenRecord(board) &&
+    Array.isArray(board['cells']) &&
+    Array.isArray(value['participants']) &&
+    isFrozenRecord(turn) &&
+    isFrozenRecord(randomSource)
   );
 }
 

@@ -17,7 +17,7 @@ use rpg_core::{
 use rpg_ir::{
     CompiledPlayBundleArtifact, ContentConflictPolicy, ContentExtensionPolicy, ContentImpactPlane,
     ContentPackDependencyRelationship, ContentRelationshipKind, MaterializedContentDefinitionKind,
-    MaterializedContentVisibility,
+    MaterializedContentVisibility, RulesetValueKind,
 };
 use rpg_runtime::{
     RpgActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure, RpgBoardSetup,
@@ -66,7 +66,8 @@ pub struct PlayDiagnosticSourceDto {
     pub declaration: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct VersionedIdentityDto {
@@ -111,6 +112,10 @@ pub struct ContentDefinitionDto {
     pub id: String,
     pub fingerprint: String,
     pub label: Option<String>,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub catalog: Option<String>,
+    pub catalog_id: Option<String>,
     pub kind: String,
     pub visibility: String,
     pub extension_policy: String,
@@ -119,6 +124,29 @@ pub struct ContentDefinitionDto {
     pub package_version: String,
     pub source_module: String,
     pub source_declaration: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RulesetValueDto {
+    pub kind: String,
+    pub id: String,
+    pub label: String,
+    pub numeric_domain_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ParticipantProfileDto {
+    pub definition_id: String,
+    pub profile_id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub role: String,
+    pub definition_ids: Vec<String>,
+    pub capabilities: Vec<ScenarioInitialCapabilityDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -206,6 +234,8 @@ pub struct PlayBundleArtifactSummaryDto {
     pub required_capabilities: Vec<VersionedRequirementDto>,
     pub required_values: Vec<String>,
     pub required_numeric_domains: Vec<String>,
+    pub ruleset_values: Vec<RulesetValueDto>,
+    pub participant_profiles: Vec<ParticipantProfileDto>,
     pub exported_roots: Vec<String>,
     pub definitions: Vec<ContentDefinitionDto>,
     pub policy_binding_ids: Vec<String>,
@@ -385,6 +415,28 @@ pub struct ScenarioRandomSourceDto {
 pub struct ScenarioSetupRequestDto {
     pub schema: ScenarioSchemaDto,
     pub play_bundle_id: String,
+    pub board: ScenarioBoardDto,
+    pub participants: Vec<ScenarioParticipantDto>,
+    pub turn: ScenarioTurnDto,
+    pub random_source: ScenarioRandomSourceDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct ScenarioTemplatePresentationDto {
+    pub label: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct ScenarioTemplateDto {
+    pub schema: ScenarioSchemaDto,
+    pub identity: VersionedIdentityDto,
+    pub play_bundle: VersionedIdentityDto,
+    pub presentation: ScenarioTemplatePresentationDto,
     pub board: ScenarioBoardDto,
     pub participants: Vec<ScenarioParticipantDto>,
     pub turn: ScenarioTurnDto,
@@ -767,6 +819,7 @@ pub struct RulesetCatalogDto {
     pub ruleset: VersionedIdentityDto,
     pub content_packs: Vec<RulesetCatalogContentPackDto>,
     pub play_bundles: Vec<RulesetCatalogPlayBundleDto>,
+    pub scenarios: Vec<ScenarioTemplateDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -829,7 +882,7 @@ pub struct SystemGameplayRandomSource {
 impl Default for SystemGameplayRandomSource {
     fn default() -> Self {
         Self {
-            binding: random_source_binding("rulebench.system-random"),
+            binding: random_source_binding("random.system"),
         }
     }
 }
@@ -862,7 +915,7 @@ pub struct ScriptedGameplayRandomSource {
 impl ScriptedGameplayRandomSource {
     pub fn new(values: impl IntoIterator<Item = u32>) -> Self {
         Self {
-            binding: random_source_binding("rulebench.roll-tape"),
+            binding: random_source_binding("random.roll-tape"),
             values: values.into_iter().collect(),
         }
     }
@@ -960,7 +1013,7 @@ fn random_source_failure(
 
 fn random_source_binding(source_id: &str) -> RpgRandomSourceBinding {
     RpgRandomSourceBinding {
-        policy_id: "rulebench.automatic-random".to_owned(),
+        policy_id: "random.automatic".to_owned(),
         policy_version: 1,
         source_id: source_id.to_owned(),
         source_version: 1,
@@ -999,7 +1052,7 @@ impl Default for ActivationSlots {
             candidate: None,
             active: None,
             activation_revision: 0,
-            random_source_binding: random_source_binding("rulebench.system-random"),
+            random_source_binding: random_source_binding("random.system"),
         }
     }
 }
@@ -2759,6 +2812,23 @@ fn artifact_summary(artifact: &CompiledPlayBundleArtifact) -> PlayBundleArtifact
             .map(|value| format!("{:?}:{}", value.kind, value.id))
             .collect(),
         required_numeric_domains: artifact.content_requirements.numeric_domains.clone(),
+        ruleset_values: artifact
+            .ruleset
+            .provides
+            .values
+            .iter()
+            .map(|value| RulesetValueDto {
+                kind: ruleset_value_kind(value.kind).to_owned(),
+                id: value.id.clone(),
+                label: value.label.clone(),
+                numeric_domain_id: value.numeric_domain_id.clone(),
+            })
+            .collect(),
+        participant_profiles: artifact
+            .materialized_definitions
+            .iter()
+            .filter_map(participant_profile)
+            .collect(),
         exported_roots: artifact.exported_roots.clone(),
         definitions: artifact
             .materialized_definitions
@@ -2770,6 +2840,33 @@ fn artifact_summary(artifact: &CompiledPlayBundleArtifact) -> PlayBundleArtifact
                     .presentation
                     .get("label")
                     .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
+                description: definition
+                    .presentation
+                    .get("description")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
+                tags: definition
+                    .presentation
+                    .get("tags")
+                    .and_then(serde_json::Value::as_array)
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(serde_json::Value::as_str)
+                            .map(str::to_owned)
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                catalog: definition
+                    .semantic
+                    .get("catalog")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                catalog_id: definition
+                    .semantic
+                    .get("id")
+                    .and_then(Value::as_str)
                     .map(str::to_owned),
                 kind: definition_kind(definition.kind).to_owned(),
                 visibility: definition_visibility(definition.visibility).to_owned(),
@@ -2902,6 +2999,50 @@ fn dependency_relationship(relationship: ContentPackDependencyRelationship) -> &
     }
 }
 
+fn participant_profile(
+    definition: &rpg_ir::MaterializedContentDefinition,
+) -> Option<ParticipantProfileDto> {
+    if definition.semantic.get("catalog")?.as_str()? != "participantProfile" {
+        return None;
+    }
+    let data = definition.semantic.get("data")?;
+    let definition_ids = data
+        .get("definitionIds")?
+        .as_array()?
+        .iter()
+        .map(|value| value.as_str().map(str::to_owned))
+        .collect::<Option<Vec<_>>>()?;
+    let capabilities = serde_json::from_value::<Vec<ScenarioInitialCapabilityDto>>(
+        data.get("capabilities")?.clone(),
+    )
+    .ok()?;
+    Some(ParticipantProfileDto {
+        definition_id: definition.id.clone(),
+        profile_id: definition.semantic.get("id")?.as_str()?.to_owned(),
+        label: definition
+            .presentation
+            .get("label")
+            .and_then(Value::as_str)
+            .unwrap_or(&definition.id)
+            .to_owned(),
+        description: definition
+            .presentation
+            .get("description")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        role: data.get("role")?.as_str()?.to_owned(),
+        definition_ids,
+        capabilities,
+    })
+}
+
+fn ruleset_value_kind(kind: RulesetValueKind) -> &'static str {
+    match kind {
+        RulesetValueKind::Defense => "defense",
+        RulesetValueKind::Stat => "stat",
+    }
+}
+
 fn definition_kind(kind: MaterializedContentDefinitionKind) -> &'static str {
     match kind {
         MaterializedContentDefinitionKind::Action => "action",
@@ -2946,6 +3087,8 @@ pub fn generated_protocol() -> String {
         ContentPackLockEntryDto::decl(),
         VersionedRequirementDto::decl(),
         ContentDefinitionDto::decl(),
+        RulesetValueDto::decl(),
+        ParticipantProfileDto::decl(),
         ContentRelationshipDto::decl(),
         PlayBundleFingerprintDto::decl(),
         ContentPatchChangeDto::decl(),
@@ -2968,6 +3111,8 @@ pub fn generated_protocol() -> String {
         ScenarioTurnDto::decl(),
         ScenarioRandomSourceDto::decl(),
         ScenarioSetupRequestDto::decl(),
+        ScenarioTemplatePresentationDto::decl(),
+        ScenarioTemplateDto::decl(),
         GameplayUnavailableDto::decl(),
         GameplayActionOptionsDto::decl(),
         GameplayAuthorityActionDto::decl(),

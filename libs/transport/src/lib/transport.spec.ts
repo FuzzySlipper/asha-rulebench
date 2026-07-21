@@ -99,9 +99,9 @@ describe('play transport', () => {
 
 function automaticRandomSource() {
   return {
-    policyId: 'rulebench.automatic-random',
+    policyId: 'random.automatic',
     policyVersion: 1,
-    sourceId: 'rulebench.system-random',
+    sourceId: 'random.system',
     sourceVersion: 1,
   };
 }

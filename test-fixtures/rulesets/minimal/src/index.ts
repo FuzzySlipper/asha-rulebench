@@ -4,6 +4,7 @@ import {
   contentPackSource,
   defineContentPack,
   defineRuleset,
+  defineScenarioTemplate,
 } from '@asha-rpg/authoring';
 
 export const minimalRuleset = defineRuleset({
@@ -43,4 +44,24 @@ export const minimalPlayBundle = composePlayBundle({
   add: [],
   overlays: [],
   configure: {},
+});
+
+export const minimalScenario = defineScenarioTemplate({
+  identity: { id: 'rulebench.minimal.scenario', version: '1.0.0' },
+  playBundle: minimalPlayBundle.identity,
+  presentation: { label: 'Minimal Scenario' },
+  board: { width: 3, height: 3, cells: [] },
+  participants: [],
+  turn: {
+    initiativeOrder: [],
+    currentActorId: '',
+    round: 1,
+    turn: 1,
+  },
+  randomSource: {
+    policyId: 'random.automatic',
+    policyVersion: 1,
+    sourceId: 'random.system',
+    sourceVersion: 1,
+  },
 });

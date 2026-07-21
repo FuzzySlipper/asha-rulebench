@@ -4,6 +4,7 @@ import {
   isContentPackSource,
   isPlayBundleManifest,
   isRuleset,
+  isScenarioTemplate,
 } from './content-authoring.js';
 
 const ruleset = Object.freeze({
@@ -32,11 +33,26 @@ describe('Ruleset root authoring discovery', () => {
       overlays: Object.freeze([]),
       configure: Object.freeze({}),
     });
+    const scenario = Object.freeze({
+      schema: Object.freeze({
+        id: 'asha.rpg.scenario-template',
+        version: 1,
+      }),
+      identity: Object.freeze({ id: 'scenario.duel', version: '1.0.0' }),
+      playBundle: bundle.identity,
+      presentation: Object.freeze({ label: 'Duel' }),
+      board: Object.freeze({ width: 3, height: 3, cells: Object.freeze([]) }),
+      participants: Object.freeze([]),
+      turn: Object.freeze({}),
+      randomSource: Object.freeze({}),
+    });
 
     expect(isRuleset(ruleset)).toBe(true);
     expect(isContentPackSource(source)).toBe(true);
     expect(isPlayBundleManifest(bundle)).toBe(true);
+    expect(isScenarioTemplate(scenario)).toBe(true);
     expect(isRuleset({ ...ruleset })).toBe(false);
     expect(isPlayBundleManifest(() => bundle)).toBe(false);
+    expect(isScenarioTemplate({ ...scenario })).toBe(false);
   });
 });
