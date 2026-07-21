@@ -1,3 +1,7 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -222,6 +226,34 @@ describe('explicit PlayBundle source-set loader', () => {
     );
   });
 
+  it('loads a standalone external TypeScript root without package module metadata', async () => {
+    const externalRoot = await mkdtemp(
+      join(tmpdir(), 'rulebench-standalone-source-'),
+    );
+    try {
+      await mkdir(join(externalRoot, 'src'));
+      const source = await readFile(
+        join(gatewayRoot, minimalRoot, 'src/index.ts'),
+        'utf8',
+      );
+      await writeFile(join(externalRoot, 'src/index.ts'), source, 'utf8');
+
+      const result = await loadPlayBundleWorkspace(
+        { operation: 'inspect', sourceSet: oneSource(externalRoot) },
+        gatewayRoot,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.catalog.ruleset.id).toBe('rulebench.minimal');
+      expect(result.catalog.contentPacks[0]?.id).toBe(
+        'rulebench.minimal.content',
+      );
+    } finally {
+      await rm(externalRoot, { recursive: true, force: true });
+    }
+  });
+
   it('rejects undeclared cross-root imports', async () => {
     const sourceSet = oneSource(
       'test-fixtures/source-sets/independent/content',
@@ -281,5 +313,64 @@ describe('explicit PlayBundle source-set loader', () => {
     expect(result.diagnostics[0]?.message).toContain(
       'primary and duplicate-content',
     );
+  });
+
+  it('rejects the same Content Pack ID at different versions with source-specific diagnostics', async () => {
+    const externalRoot = await mkdtemp(
+      join(tmpdir(), 'rulebench-version-conflict-'),
+    );
+    try {
+      await mkdir(join(externalRoot, 'src'));
+      await writeFile(
+        join(externalRoot, 'src/index.ts'),
+        `import { contentPackSource, defineContentPack } from '@asha-rpg/authoring';
+
+const contentPack = defineContentPack({
+  identity: { id: 'rulebench.minimal.content', version: '2.0.0' },
+  entry: { module: 'src/index.ts', declaration: 'versionTwoContent' },
+  definitions: [],
+});
+
+export const versionTwoContent = contentPackSource(contentPack);
+`,
+        'utf8',
+      );
+      const minimal = oneSource(minimalRoot);
+      const result = await loadPlayBundleWorkspace(
+        {
+          operation: 'inspect',
+          sourceSet: {
+            schemaVersion: 1,
+            allowedRoots: [minimalRoot, externalRoot],
+            entries: [
+              minimal.entries[0]!,
+              {
+                id: 'version-two-content',
+                label: 'Version two content',
+                sourceRoot: externalRoot,
+                module: 'src/index.ts',
+                exportKinds: ['contentPack'],
+              },
+            ],
+          },
+        },
+        gatewayRoot,
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.diagnostics[0]).toMatchObject({
+        code: 'PLAY_BUNDLE_SOURCE_IDENTITY_DUPLICATE',
+        path: '$.sourceSet.entries[1]',
+      });
+      expect(result.diagnostics[0]?.message).toContain(
+        'rulebench.minimal.content at versions 1.0.0 and 2.0.0',
+      );
+      expect(result.diagnostics[0]?.message).toContain(
+        'primary and version-two-content',
+      );
+    } finally {
+      await rm(externalRoot, { recursive: true, force: true });
+    }
   });
 });

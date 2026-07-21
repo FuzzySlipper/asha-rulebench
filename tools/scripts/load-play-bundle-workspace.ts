@@ -110,8 +110,11 @@ export async function loadPlayBundleWorkspace(
   const buildRoot = await createBuildRoot(gatewayRoot);
   try {
     const compilerOptions: ts.CompilerOptions = {
-      module: ts.ModuleKind.NodeNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeNext,
+      // Authoring sources are data modules. Emit one explicit ESM format instead
+      // of inheriting each external checkout's nearest package.json mode and
+      // then evaluating mixed CommonJS output inside Rulebench's ESM temp tree.
+      module: ts.ModuleKind.ES2022,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
       target: ts.ScriptTarget.ES2022,
       rootDir: commonAncestor(resolved.value.resolvedAllowedRoots),
       outDir: buildRoot,
@@ -495,10 +498,15 @@ function duplicateLocatedIdentity<Value>(
   const seen = new Map<string, Located<Value>>();
   for (const located of values) {
     const currentIdentity = identity(located);
-    const key = `${currentIdentity.id}@${currentIdentity.version}`;
+    const key = currentIdentity.id;
     const previous = seen.get(key);
     if (previous !== undefined && previous.value !== located.value) {
-      return { identity: key, previous, current: located };
+      const previousIdentity = identity(previous);
+      return {
+        identity: `${key} at versions ${previousIdentity.version} and ${currentIdentity.version}`,
+        previous,
+        current: located,
+      };
     }
     seen.set(key, located);
   }
@@ -579,13 +587,18 @@ function duplicateIdentity<Value>(
   values: readonly Value[],
   identity: (value: Value) => { readonly id: string; readonly version: string },
 ): string | null {
-  const discovered = new Map<string, Value>();
+  const discovered = new Map<
+    string,
+    { readonly value: Value; readonly version: string }
+  >();
   for (const value of values) {
     const current = identity(value);
-    const key = `${current.id}@${current.version}`;
+    const key = current.id;
     const previous = discovered.get(key);
-    if (previous !== undefined && previous !== value) return key;
-    discovered.set(key, value);
+    if (previous !== undefined && previous.value !== value) {
+      return `${key} at versions ${previous.version} and ${current.version}`;
+    }
+    discovered.set(key, { value, version: current.version });
   }
   return null;
 }
