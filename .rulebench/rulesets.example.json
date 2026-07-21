@@ -1,10 +1,27 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "rulesets": [
     {
       "id": "rulebench-minimal",
       "label": "Rulebench minimal contract fixture",
-      "rulesetRoot": "test-fixtures/rulesets/minimal"
+      "sourceSet": {
+        "schemaVersion": 1,
+        "allowedRoots": ["test-fixtures/rulesets/minimal"],
+        "entries": [
+          {
+            "id": "primary",
+            "label": "Rulebench minimal contract fixture",
+            "sourceRoot": "test-fixtures/rulesets/minimal",
+            "module": "src/index.ts",
+            "exportKinds": [
+              "ruleset",
+              "contentPack",
+              "playBundle",
+              "scenarioTemplate"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

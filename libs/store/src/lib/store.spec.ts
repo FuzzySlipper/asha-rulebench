@@ -2,6 +2,7 @@ import type {
   PlayBundleCompileRequestDto,
   PlayWorkspaceResponseDto,
   RulesetCatalogResponseDto,
+  PlayBundleSourceSetDto,
 } from '@asha-rulebench/protocol';
 import type { KeyValueStoragePort } from '@asha-rulebench/platform';
 import type { PlayTransport } from '@asha-rulebench/transport';
@@ -22,7 +23,7 @@ describe('play workspace store', () => {
       {
         id: 'minimal',
         label: 'Minimal',
-        rulesetRoot: 'test-fixtures/rulesets/minimal',
+        sourceSet: sourceSet('test-fixtures/rulesets/minimal'),
       },
     ]);
   });
@@ -58,7 +59,7 @@ describe('play workspace store', () => {
 
     expect(requests).toEqual([
       {
-        rulesetRoot: 'test-fixtures/rulesets/minimal',
+        sourceSet: sourceSet('test-fixtures/rulesets/minimal'),
         contentPackIds: ['rulebench.minimal.content'],
       },
     ]);
@@ -98,12 +99,12 @@ describe('play workspace store', () => {
 function baseTransport(overrides: Partial<PlayTransport> = {}): PlayTransport {
   const transport: PlayTransport = {
     rulesetLocations: async () => ({
-      schemaVersion: 1,
+      schemaVersion: 2,
       rulesets: [
         {
           id: 'minimal',
           label: 'Minimal',
-          rulesetRoot: 'test-fixtures/rulesets/minimal',
+          sourceSet: sourceSet('test-fixtures/rulesets/minimal'),
         },
       ],
     }),
@@ -125,7 +126,7 @@ function catalogResponse(): RulesetCatalogResponseDto {
   return {
     ok: true,
     catalog: {
-      rulesetRoot: 'test-fixtures/rulesets/minimal',
+      sourceSet: sourceSet('test-fixtures/rulesets/minimal'),
       ruleset: { id: 'rulebench.minimal', version: '1.0.0' },
       contentPacks: [
         {
@@ -221,7 +222,7 @@ function diagnostic(code: string) {
     stage: 'source',
     severity: 'error',
     code,
-    path: '$.rulesetRoot',
+    path: '$.sourceSet',
     message: 'missing',
     packageId: null,
     definitionId: null,
@@ -238,6 +239,27 @@ function randomSource() {
     policyVersion: 1,
     sourceId: 'random.system',
     sourceVersion: 1,
+  };
+}
+
+function sourceSet(sourceRoot: string): PlayBundleSourceSetDto {
+  return {
+    schemaVersion: 1,
+    allowedRoots: [sourceRoot],
+    entries: [
+      {
+        id: 'ruleset',
+        label: 'Ruleset source',
+        sourceRoot,
+        module: 'src/index.ts',
+        exportKinds: [
+          'ruleset',
+          'contentPack',
+          'playBundle',
+          'scenarioTemplate',
+        ],
+      },
+    ],
   };
 }
 

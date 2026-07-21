@@ -1,4 +1,7 @@
-import type { PlayWorkspaceResponseDto } from '@asha-rulebench/protocol';
+import type {
+  PlayBundleSourceSetDto,
+  PlayWorkspaceResponseDto,
+} from '@asha-rulebench/protocol';
 import { describe, expect, it } from 'vitest';
 
 import { createPlayTransport, type JsonHttpClient } from './transport.js';
@@ -14,7 +17,7 @@ describe('play transport', () => {
       request: async (method, path, body) => {
         requests.push({ method, path, body });
         if (path === '/api/rulesets/config') {
-          return { schemaVersion: 1, rulesets: [] };
+          return { schemaVersion: 2, rulesets: [] };
         }
         if (path === '/api/rulesets/inspect') {
           return { ok: true, catalog: null, diagnostics: [] };
@@ -24,11 +27,12 @@ describe('play transport', () => {
     };
     const transport = createPlayTransport(http);
     const root = 'test-fixtures/rulesets/minimal';
+    const sources = sourceSet(root);
 
     await transport.rulesetLocations();
-    await transport.inspectRuleset({ rulesetRoot: root });
+    await transport.inspectRuleset({ sourceSet: sources });
     await transport.compile({
-      rulesetRoot: root,
+      sourceSet: sources,
       contentPackIds: ['rulebench.minimal.content'],
     });
     await transport.activatePlayBundle();
@@ -71,12 +75,12 @@ describe('play transport', () => {
   it('strictly decodes configured Ruleset locations without a product default', async () => {
     const http: JsonHttpClient = {
       request: async () => ({
-        schemaVersion: 1,
+        schemaVersion: 2,
         rulesets: [
           {
             id: 'd20-fantasy',
             label: 'd20 Fantasy',
-            rulesetRoot: '/rules/rulesets/d20-fantasy',
+            sourceSet: sourceSet('/rules/rulesets/d20-fantasy'),
           },
         ],
       }),
@@ -84,12 +88,12 @@ describe('play transport', () => {
 
     await expect(createPlayTransport(http).rulesetLocations()).resolves.toEqual(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         rulesets: [
           {
             id: 'd20-fantasy',
             label: 'd20 Fantasy',
-            rulesetRoot: '/rules/rulesets/d20-fantasy',
+            sourceSet: sourceSet('/rules/rulesets/d20-fantasy'),
           },
         ],
       },
@@ -103,6 +107,27 @@ function automaticRandomSource() {
     policyVersion: 1,
     sourceId: 'random.system',
     sourceVersion: 1,
+  };
+}
+
+function sourceSet(sourceRoot: string): PlayBundleSourceSetDto {
+  return {
+    schemaVersion: 1,
+    allowedRoots: [sourceRoot],
+    entries: [
+      {
+        id: 'ruleset',
+        label: 'Ruleset source',
+        sourceRoot,
+        module: 'src/index.ts',
+        exportKinds: [
+          'ruleset',
+          'contentPack',
+          'playBundle',
+          'scenarioTemplate',
+        ],
+      },
+    ],
   };
 }
 

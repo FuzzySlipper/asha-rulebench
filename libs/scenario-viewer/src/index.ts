@@ -1223,9 +1223,29 @@ class SetupDiagnosticsComponent {
             (input)="store.selectRulesetRoot(rulesetRootInput.value)"
           />
           <p class="muted">
-            Rulebench infers <code>src/index.ts</code> from this canonical
-            Ruleset root and discovers its immutable Ruleset, Content Packs, and
-            declared PlayBundles.
+            Rulebench treats this as the one Ruleset source and infers
+            <code>src/index.ts</code>.
+          </p>
+          <label for="additional-source-roots" class="section-label"
+            >Independent content source roots</label
+          >
+          <textarea
+            #additionalSourceRootsInput
+            id="additional-source-roots"
+            class="ruleset-input"
+            rows="3"
+            [disabled]="store.busy()"
+            placeholder="/home/dev/my-content-pack"
+            [value]="store.additionalSourceRoots()"
+            (input)="
+              store.selectAdditionalSourceRoots(
+                additionalSourceRootsInput.value
+              )
+            "
+          ></textarea>
+          <p class="muted">
+            Optional, one root per line. Each root is an explicit source and
+            import boundary; Rulebench does not scan parent directories.
           </p>
           <button
             class="secondary"
@@ -1245,8 +1265,14 @@ class SetupDiagnosticsComponent {
                 </dd>
               </div>
               <div>
-                <dt>Root</dt>
-                <dd>{{ catalog.rulesetRoot }}</dd>
+                <dt>Sources</dt>
+                <dd>
+                  @for (source of catalog.sourceSet.entries; track source.id) {
+                    <span>
+                      {{ source.label }}: <code>{{ source.sourceRoot }}</code>
+                    </span>
+                  }
+                </dd>
               </div>
             </dl>
             <fieldset>
@@ -3530,8 +3556,6 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   private readonly textFileInput = browserTextFileInput();
 
-  private readonly rulesetRootInput =
-    viewChild<ElementRef<HTMLInputElement>>('rulesetRootInput');
   private readonly boardPanel =
     viewChild<WorkbenchPanelComponent>('boardPanel');
   private readonly actionPanel =
@@ -3606,14 +3630,9 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     () => this.store.rulesetRoot().trim().length > 0,
   );
 
-  protected readonly configuredRulesetId = computed(() => {
-    const selectedRoot = this.store.rulesetRoot();
-    return (
-      this.store
-        .configuredRulesets()
-        .find((location) => location.rulesetRoot === selectedRoot)?.id ?? ''
-    );
-  });
+  protected readonly configuredRulesetId = computed(
+    () => this.store.configuredRulesetId() ?? '',
+  );
 
   protected readonly selectedCatalogPlayBundle = computed(() => {
     const catalog = this.store.rulesetCatalog();
@@ -3821,7 +3840,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     const location = this.store
       .configuredRulesets()
       .find((candidate) => candidate.id === locationId);
-    this.store.selectRulesetRoot(location?.rulesetRoot ?? '');
+    this.store.selectConfiguredRuleset(location ?? null);
     if (location !== undefined) void this.store.inspectSelectedRuleset();
   }
 

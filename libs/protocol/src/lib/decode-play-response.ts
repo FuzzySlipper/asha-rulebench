@@ -51,6 +51,8 @@ import type {
   RulesetCatalogPlayBundleDto,
   RulesetCatalogResponseDto,
   RulesetLocationConfigDto,
+  PlayBundleSourceExportKindDto,
+  PlayBundleSourceSetDto,
   PlayBundleUpgradeDefinitionDto,
   PlayBundleUpgradeFieldDto,
   PlayBundleUpgradeImpactDto,
@@ -139,8 +141,8 @@ export function decodeRulesetLocationConfig(
     record['schemaVersion'],
     '$.schemaVersion',
   );
-  if (schemaVersion !== 1) {
-    throw new PlayProtocolDecodeError('$.schemaVersion', 'expected version 1');
+  if (schemaVersion !== 2) {
+    throw new PlayProtocolDecodeError('$.schemaVersion', 'expected version 2');
   }
   return {
     schemaVersion,
@@ -148,13 +150,13 @@ export function decodeRulesetLocationConfig(
       (entry, index) => {
         const path = `$.rulesets[${index}]`;
         const location = requiredRecord(entry, path);
-        exactKeys(location, ['id', 'label', 'rulesetRoot'], path);
+        exactKeys(location, ['id', 'label', 'sourceSet'], path);
         return {
           id: requiredString(location['id'], `${path}.id`),
           label: requiredString(location['label'], `${path}.label`),
-          rulesetRoot: requiredString(
-            location['rulesetRoot'],
-            `${path}.rulesetRoot`,
+          sourceSet: playBundleSourceSet(
+            location['sourceSet'],
+            `${path}.sourceSet`,
           ),
         };
       },
@@ -183,11 +185,11 @@ function rulesetCatalog(value: unknown, path: string): RulesetCatalogDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
-    ['rulesetRoot', 'ruleset', 'contentPacks', 'playBundles', 'scenarios'],
+    ['sourceSet', 'ruleset', 'contentPacks', 'playBundles', 'scenarios'],
     path,
   );
   return {
-    rulesetRoot: requiredString(record['rulesetRoot'], `${path}.rulesetRoot`),
+    sourceSet: playBundleSourceSet(record['sourceSet'], `${path}.sourceSet`),
     ruleset: identity(record['ruleset'], `${path}.ruleset`),
     contentPacks: requiredArray(
       record['contentPacks'],
@@ -205,6 +207,77 @@ function rulesetCatalog(value: unknown, path: string): RulesetCatalogDto {
       (entry, index) => scenarioTemplate(entry, `${path}.scenarios[${index}]`),
     ),
   };
+}
+
+function playBundleSourceSet(
+  value: unknown,
+  path: string,
+): PlayBundleSourceSetDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['schemaVersion', 'allowedRoots', 'entries'], path);
+  const schemaVersion = nonNegativeInteger(
+    record['schemaVersion'],
+    `${path}.schemaVersion`,
+  );
+  if (schemaVersion !== 1) {
+    throw new PlayProtocolDecodeError(
+      `${path}.schemaVersion`,
+      'expected version 1',
+    );
+  }
+  return {
+    schemaVersion,
+    allowedRoots: requiredArray(
+      record['allowedRoots'],
+      `${path}.allowedRoots`,
+    ).map((root, index) =>
+      requiredString(root, `${path}.allowedRoots[${index}]`),
+    ),
+    entries: requiredArray(record['entries'], `${path}.entries`).map(
+      (value, index) => {
+        const entryPath = `${path}.entries[${index}]`;
+        const entry = requiredRecord(value, entryPath);
+        exactKeys(
+          entry,
+          ['id', 'label', 'sourceRoot', 'module', 'exportKinds'],
+          entryPath,
+        );
+        return {
+          id: requiredString(entry['id'], `${entryPath}.id`),
+          label: requiredString(entry['label'], `${entryPath}.label`),
+          sourceRoot: requiredString(
+            entry['sourceRoot'],
+            `${entryPath}.sourceRoot`,
+          ),
+          module: requiredString(entry['module'], `${entryPath}.module`),
+          exportKinds: requiredArray(
+            entry['exportKinds'],
+            `${entryPath}.exportKinds`,
+          ).map((kind, kindIndex) =>
+            sourceExportKind(
+              requiredString(kind, `${entryPath}.exportKinds[${kindIndex}]`),
+              `${entryPath}.exportKinds[${kindIndex}]`,
+            ),
+          ),
+        };
+      },
+    ),
+  };
+}
+
+function sourceExportKind(
+  value: string,
+  path: string,
+): PlayBundleSourceExportKindDto {
+  if (
+    value === 'ruleset' ||
+    value === 'contentPack' ||
+    value === 'playBundle' ||
+    value === 'scenarioTemplate'
+  ) {
+    return value;
+  }
+  throw new PlayProtocolDecodeError(path, 'unsupported source export kind');
 }
 
 function scenarioTemplate(value: unknown, path: string): ScenarioTemplateDto {

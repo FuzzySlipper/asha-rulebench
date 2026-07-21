@@ -110,21 +110,27 @@ export type GameplaySessionDto = { artifactId: string, actorId: string, stateRev
 
 export type PlayWorkspaceResponseDto = { ok: boolean, status: PlayBundleLifecycleStatus, activeArtifact: PlayBundleArtifactSummaryDto | null, candidateArtifact: PlayBundleArtifactSummaryDto | null, upgradeImpact: PlayBundleUpgradeImpactDto | null, activationRevision: number, hostRandomSource: ScenarioRandomSourceDto, supportedRandomSources: Array<ScenarioRandomSourceDto>, scenarioSetupRequired: boolean, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<PlayDiagnosticDto>, };
 
-export type ConfiguredRulesetLocationDto = { id: string, label: string, rulesetRoot: string, };
+export type PlayBundleSourceExportKindDto = "ruleset" | "contentPack" | "playBundle" | "scenarioTemplate";
+
+export type PlayBundleSourceEntryDto = { id: string, label: string, sourceRoot: string, module: string, exportKinds: Array<PlayBundleSourceExportKindDto>, };
+
+export type PlayBundleSourceSetDto = { schemaVersion: number, allowedRoots: Array<string>, entries: Array<PlayBundleSourceEntryDto>, };
+
+export type ConfiguredRulesetLocationDto = { id: string, label: string, sourceSet: PlayBundleSourceSetDto, };
 
 export type RulesetLocationConfigDto = { schemaVersion: number, rulesets: Array<ConfiguredRulesetLocationDto>, };
 
-export type RulesetCatalogRequestDto = { rulesetRoot: string, };
+export type RulesetCatalogRequestDto = { sourceSet: PlayBundleSourceSetDto, };
 
 export type RulesetCatalogContentPackDto = { id: string, version: string, label: string, requirements: Array<string>, };
 
 export type RulesetCatalogPlayBundleDto = { id: string, version: string, contentPackIds: Array<string>, compatible: boolean, diagnostics: Array<PlayDiagnosticDto>, };
 
-export type RulesetCatalogDto = { rulesetRoot: string, ruleset: VersionedIdentityDto, contentPacks: Array<RulesetCatalogContentPackDto>, playBundles: Array<RulesetCatalogPlayBundleDto>, scenarios: Array<ScenarioTemplateDto>, };
+export type RulesetCatalogDto = { sourceSet: PlayBundleSourceSetDto, ruleset: VersionedIdentityDto, contentPacks: Array<RulesetCatalogContentPackDto>, playBundles: Array<RulesetCatalogPlayBundleDto>, scenarios: Array<ScenarioTemplateDto>, };
 
 export type RulesetCatalogResponseDto = { ok: boolean, catalog: RulesetCatalogDto | null, diagnostics: Array<PlayDiagnosticDto>, };
 
-export type PlayBundleCompileRequestDto = { rulesetRoot: string, contentPackIds: Array<string>, };
+export type PlayBundleCompileRequestDto = { sourceSet: PlayBundleSourceSetDto, contentPackIds: Array<string>, };
 
 export type PreparedPlayBundleCompileRequestDto = { preparedSource: string, };
 

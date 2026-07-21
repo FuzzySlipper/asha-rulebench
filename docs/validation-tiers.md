@@ -25,7 +25,7 @@ pnpm run verify
 
 The required check runs static product validation, the pinned Rust host tests,
 generated-protocol drift, and a focused browser gate. It proves a selected
-`src/index.ts` root exposes a distinct Ruleset, Content Packs, and compatible
+The explicit source set exposes a distinct Ruleset, Content Packs, and compatible
 PlayBundle; compilation reaches Rust's closed artifact loader; and activation
 is explicit and atomic before Scenario setup becomes available. It does not
 prove a playable content corpus, process-restart storage, or migration policy.

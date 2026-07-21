@@ -767,12 +767,42 @@ pub struct PlayWorkspaceResponseDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum PlayBundleSourceExportKindDto {
+    Ruleset,
+    ContentPack,
+    PlayBundle,
+    ScenarioTemplate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct PlayBundleSourceEntryDto {
+    pub id: String,
+    pub label: String,
+    pub source_root: String,
+    pub module: String,
+    pub export_kinds: Vec<PlayBundleSourceExportKindDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct PlayBundleSourceSetDto {
+    pub schema_version: u32,
+    pub allowed_roots: Vec<String>,
+    pub entries: Vec<PlayBundleSourceEntryDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
 pub struct ConfiguredRulesetLocationDto {
     pub id: String,
     pub label: String,
-    pub ruleset_root: String,
+    pub source_set: PlayBundleSourceSetDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -787,7 +817,7 @@ pub struct RulesetLocationConfigDto {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
 pub struct RulesetCatalogRequestDto {
-    pub ruleset_root: String,
+    pub source_set: PlayBundleSourceSetDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -815,7 +845,7 @@ pub struct RulesetCatalogPlayBundleDto {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct RulesetCatalogDto {
-    pub ruleset_root: String,
+    pub source_set: PlayBundleSourceSetDto,
     pub ruleset: VersionedIdentityDto,
     pub content_packs: Vec<RulesetCatalogContentPackDto>,
     pub play_bundles: Vec<RulesetCatalogPlayBundleDto>,
@@ -835,7 +865,7 @@ pub struct RulesetCatalogResponseDto {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
 pub struct PlayBundleCompileRequestDto {
-    pub ruleset_root: String,
+    pub source_set: PlayBundleSourceSetDto,
     pub content_pack_ids: Vec<String>,
 }
 
@@ -3165,6 +3195,9 @@ pub fn generated_protocol() -> String {
         GameplayArchiveDto::decl(),
         GameplaySessionDto::decl(),
         PlayWorkspaceResponseDto::decl(),
+        PlayBundleSourceExportKindDto::decl(),
+        PlayBundleSourceEntryDto::decl(),
+        PlayBundleSourceSetDto::decl(),
         ConfiguredRulesetLocationDto::decl(),
         RulesetLocationConfigDto::decl(),
         RulesetCatalogRequestDto::decl(),

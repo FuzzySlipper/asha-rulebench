@@ -27,7 +27,7 @@ Rulebench through a configured or explicitly entered root path.
 Rulebench starts with no active PlayBundle. **Play -> Choose Ruleset and Content
 Packs...** opens the primary content flow:
 
-1. select a configured Ruleset root or enter one;
+1. select a configured source set or enter a Ruleset root plus independent content roots;
 2. inspect its exported Ruleset, Content Packs, and declared PlayBundles;
 3. explicitly select Content Packs;
 4. compile the matching compatible PlayBundle;
@@ -38,7 +38,7 @@ The local server reads `.rulebench/rulesets.json`. It only gives source roots
 friendly menu labels; it cannot choose a default, compile, or activate content.
 The ignored local file in this checkout points at the separately cloned
 `/home/dev/asha-d20-fantasy/rulesets/d20-fantasy` root. See
-[Canonical Ruleset roots](docs/ruleset-workspaces.md) for the repository
+[Explicit PlayBundle source sets](docs/ruleset-workspaces.md) for the repository
 contract and a portable configuration example.
 
 Each inspect or compile request builds the selected root's `src/index.ts` in a

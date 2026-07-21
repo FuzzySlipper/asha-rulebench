@@ -18,7 +18,28 @@ if (
 }
 
 const result = await loadPlayBundleWorkspace(
-  { operation: 'compile', rulesetRoot, contentPackIds },
+  {
+    operation: 'compile',
+    sourceSet: {
+      schemaVersion: 1,
+      allowedRoots: [rulesetRoot],
+      entries: [
+        {
+          id: 'ruleset',
+          label: 'Ruleset source',
+          sourceRoot: rulesetRoot,
+          module: 'src/index.ts',
+          exportKinds: [
+            'ruleset',
+            'contentPack',
+            'playBundle',
+            'scenarioTemplate',
+          ],
+        },
+      ],
+    },
+    contentPackIds,
+  },
   process.cwd(),
 );
 if (!result.ok) {

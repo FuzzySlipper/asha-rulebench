@@ -14,26 +14,40 @@ test('a missing local ruleset config is an empty explicit location list', async 
     '/workspace',
     '.rulebench/rulesets.json',
   );
-  assert.deepEqual(result, { schemaVersion: 1, rulesets: [] });
+  assert.deepEqual(result, { schemaVersion: 2, rulesets: [] });
 });
 
-test('loads friendly ruleset locations without resolving their roots', async () => {
+const sourceSet = (sourceRoot) => ({
+  schemaVersion: 1,
+  allowedRoots: [sourceRoot],
+  entries: [
+    {
+      id: 'primary',
+      label: 'Primary',
+      sourceRoot,
+      module: 'src/index.ts',
+      exportKinds: ['ruleset', 'contentPack', 'playBundle'],
+    },
+  ],
+});
+
+test('loads friendly source sets without resolving their roots', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'rulebench-locations-'));
   try {
     await writeFile(
       join(directory, 'rulesets.json'),
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         rulesets: [
           {
             id: 'local-rules',
             label: 'Local rules',
-            rulesetRoot: 'rulesets/local-rules',
+            sourceSet: sourceSet('rulesets/local-rules'),
           },
           {
             id: 'external',
             label: 'Independent rules',
-            rulesetRoot: '/home/dev/my-rules/rulesets/main',
+            sourceSet: sourceSet('/home/dev/my-rules/rulesets/main'),
           },
         ],
       }),
@@ -42,7 +56,7 @@ test('loads friendly ruleset locations without resolving their roots', async () 
     const result = await loadRulesetLocationConfig(directory, 'rulesets.json');
     assert.equal(result.rulesets[0]?.label, 'Local rules');
     assert.equal(
-      result.rulesets[1]?.rulesetRoot,
+      result.rulesets[1]?.sourceSet.allowedRoots[0],
       '/home/dev/my-rules/rulesets/main',
     );
   } finally {
@@ -54,18 +68,18 @@ test('rejects ambiguous or extended local configuration', () => {
   assert.throws(
     () =>
       decodeRulesetLocationConfig({
-        schemaVersion: 1,
+        schemaVersion: 2,
         rulesets: [
-          { id: 'one', label: 'One', rulesetRoot: '/rulesets/one' },
-          { id: 'two', label: 'Two', rulesetRoot: '/rulesets/one' },
+          { id: 'one', label: 'One', sourceSet: sourceSet('/rulesets/one') },
+          { id: 'one', label: 'Two', sourceSet: sourceSet('/rulesets/two') },
         ],
       }),
-    /rulesetRoot duplicates/,
+    /id duplicates/,
   );
   assert.throws(
     () =>
       decodeRulesetLocationConfig({
-        schemaVersion: 1,
+        schemaVersion: 2,
         rulesets: [],
         defaultRuleset: 'one',
       }),

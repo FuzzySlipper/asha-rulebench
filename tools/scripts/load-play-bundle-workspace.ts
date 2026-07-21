@@ -1,13 +1,5 @@
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
-import {
-  basename,
-  dirname,
-  extname,
-  join,
-  relative,
-  resolve,
-  sep,
-} from 'node:path';
+import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { canonicalJson, preparePlayBundle } from '@asha-rpg/authoring';
@@ -29,12 +21,32 @@ import {
 
 export interface PlayBundleSelectionInput {
   readonly operation: 'inspect' | 'compile';
-  readonly rulesetRoot: string;
+  readonly sourceSet: PlayBundleSourceSet;
   readonly contentPackIds?: readonly string[];
 }
 
-export interface RulesetRootCatalog {
-  readonly rulesetRoot: string;
+export type PlayBundleSourceExportKind =
+  | 'ruleset'
+  | 'contentPack'
+  | 'playBundle'
+  | 'scenarioTemplate';
+
+export interface PlayBundleSourceEntry {
+  readonly id: string;
+  readonly label: string;
+  readonly sourceRoot: string;
+  readonly module: string;
+  readonly exportKinds: readonly PlayBundleSourceExportKind[];
+}
+
+export interface PlayBundleSourceSet {
+  readonly schemaVersion: 1;
+  readonly allowedRoots: readonly string[];
+  readonly entries: readonly PlayBundleSourceEntry[];
+}
+
+export interface RulesetSourceCatalog {
+  readonly sourceSet: PlayBundleSourceSet;
   readonly ruleset: { readonly id: string; readonly version: string };
   readonly contentPacks: readonly {
     readonly id: string;
@@ -55,7 +67,7 @@ export interface RulesetRootCatalog {
 export type PlayBundleWorkspaceLoadResult =
   | {
       readonly ok: true;
-      readonly catalog: RulesetRootCatalog;
+      readonly catalog: RulesetSourceCatalog;
       readonly preparedSource: string | null;
       readonly diagnostics: readonly [];
     }
@@ -69,15 +81,21 @@ type PlayBundleWorkspaceFailure = Extract<
   { readonly ok: false }
 >;
 
-interface ResolvedRulesetRoot {
-  readonly rulesetRoot: string;
-  readonly workspaceRoot: string;
-  readonly packageRoots: readonly string[];
-  readonly module: 'src/index.ts';
-  readonly declaration: 'discovered exports';
-  readonly resolvedWorkspaceRoot: string;
-  readonly resolvedPackageRoots: readonly string[];
+interface ResolvedSourceEntry extends PlayBundleSourceEntry {
+  readonly resolvedSourceRoot: string;
   readonly resolvedModule: string;
+}
+
+interface ResolvedSourceSet {
+  readonly sourceSet: PlayBundleSourceSet;
+  readonly resolvedAllowedRoots: readonly string[];
+  readonly entries: readonly ResolvedSourceEntry[];
+}
+
+interface Located<Value> {
+  readonly value: Value;
+  readonly entry: ResolvedSourceEntry;
+  readonly entryIndex: number;
 }
 
 const RESULT_PREFIX = 'RULEBENCH_PLAY_BUNDLE_RESULT:';
@@ -86,7 +104,7 @@ export async function loadPlayBundleWorkspace(
   input: unknown,
   gatewayRoot: string,
 ): Promise<PlayBundleWorkspaceLoadResult> {
-  const resolved = await resolveWorkspaceInput(input, gatewayRoot);
+  const resolved = await resolveSourceSetInput(input, gatewayRoot);
   if (!resolved.ok) return resolved;
 
   const buildRoot = await createBuildRoot(gatewayRoot);
@@ -95,7 +113,7 @@ export async function loadPlayBundleWorkspace(
       module: ts.ModuleKind.NodeNext,
       moduleResolution: ts.ModuleResolutionKind.NodeNext,
       target: ts.ScriptTarget.ES2022,
-      rootDir: commonAncestor(resolved.value.resolvedPackageRoots),
+      rootDir: commonAncestor(resolved.value.resolvedAllowedRoots),
       outDir: buildRoot,
       strict: true,
       noEmitOnError: true,
@@ -110,7 +128,7 @@ export async function loadPlayBundleWorkspace(
       },
     };
     const program = ts.createProgram(
-      [resolved.value.resolvedModule],
+      resolved.value.entries.map((entry) => entry.resolvedModule),
       compilerOptions,
     );
     const authoredSourceFiles = program
@@ -120,14 +138,14 @@ export async function loadPlayBundleWorkspace(
       (sourceFile) =>
         !isWithinAnyRoot(
           sourceFile.fileName,
-          resolved.value.resolvedPackageRoots,
+          resolved.value.resolvedAllowedRoots,
         ),
     );
     if (escapedSource !== undefined) {
       return failure(
-        'RULESET_WORKSPACE_IMPORT_OUTSIDE_PACKAGE_ROOTS',
-        '$.rulesetRoot',
-        `Imported source ${normalizedPath(escapedSource.fileName)} is outside the selected ruleset root and its repository foundations`,
+        'PLAY_BUNDLE_SOURCE_IMPORT_OUTSIDE_ALLOWED_ROOTS',
+        '$.sourceSet.allowedRoots',
+        `Imported source ${normalizedPath(escapedSource.fileName)} is outside the explicitly allowed roots`,
         resolved.value,
       );
     }
@@ -136,8 +154,8 @@ export async function loadPlayBundleWorkspace(
       .find((specifier) => specifier !== null);
     if (disallowedImport !== undefined) {
       return failure(
-        'RULESET_WORKSPACE_IMPORT_NOT_ALLOWED',
-        '$.rulesetRoot',
+        'PLAY_BUNDLE_SOURCE_IMPORT_NOT_ALLOWED',
+        '$.sourceSet.entries',
         `Authoring modules may import only relative modules and published Asha RPG packages, not ${disallowedImport}`,
         resolved.value,
       );
@@ -162,72 +180,133 @@ export async function loadPlayBundleWorkspace(
       };
     }
 
-    const emittedModule = emittedModulePath(
-      resolved.value.resolvedModule,
-      compilerOptions.rootDir ?? resolved.value.resolvedWorkspaceRoot,
-      buildRoot,
-    );
-    let moduleNamespace: unknown;
-    try {
-      moduleNamespace = await import(
-        `${pathToFileURL(emittedModule).href}?load=${Date.now()}`
+    const locatedRulesets: Located<Ruleset>[] = [];
+    const locatedContentPacks: Located<ContentPackSource>[] = [];
+    const locatedPlayBundles: Located<PlayBundleManifest>[] = [];
+    const locatedScenarios: Located<ScenarioTemplate>[] = [];
+    for (const [entryIndex, entry] of resolved.value.entries.entries()) {
+      const emittedModule = emittedModulePath(
+        entry.resolvedModule,
+        compilerOptions.rootDir ??
+          commonAncestor(resolved.value.resolvedAllowedRoots),
+        buildRoot,
       );
-    } catch (error: unknown) {
-      return failure(
-        'RULESET_WORKSPACE_EVALUATION_FAILED',
-        '$.rulesetRoot',
-        error instanceof Error ? error.message : String(error),
-        resolved.value,
+      let moduleNamespace: unknown;
+      try {
+        moduleNamespace = await import(
+          `${pathToFileURL(emittedModule).href}?load=${Date.now()}`
+        );
+      } catch (error: unknown) {
+        return failureForEntry(
+          'PLAY_BUNDLE_SOURCE_EVALUATION_FAILED',
+          `$.sourceSet.entries[${entryIndex}].module`,
+          error instanceof Error ? error.message : String(error),
+          entry,
+        );
+      }
+      if (!isRecord(moduleNamespace)) {
+        return failureForEntry(
+          'PLAY_BUNDLE_SOURCE_MODULE_INVALID',
+          `$.sourceSet.entries[${entryIndex}].module`,
+          'The selected module did not expose an ES module namespace',
+          entry,
+        );
+      }
+      const discovery = discoverAuthoringValues(moduleNamespace);
+      if (!discovery.ok) {
+        return failureForEntry(
+          'PLAY_BUNDLE_SOURCE_EXPORTED_IDENTITY_DUPLICATE',
+          `$.sourceSet.entries[${entryIndex}]`,
+          `Distinct exported ${discovery.kind} declarations in source ${entry.id} share identity ${discovery.identity}`,
+          entry,
+        );
+      }
+      const kindMismatch = firstUndeclaredExportKind(
+        discovery.value,
+        entry.exportKinds,
+      );
+      if (kindMismatch !== null) {
+        return failureForEntry(
+          'PLAY_BUNDLE_SOURCE_EXPORT_KIND_UNDECLARED',
+          `$.sourceSet.entries[${entryIndex}].exportKinds`,
+          `Source ${entry.id} exports ${kindMismatch}, but that kind is not declared`,
+          entry,
+        );
+      }
+      locatedRulesets.push(
+        ...discovery.value.rulesets.map((value) => ({
+          value,
+          entry,
+          entryIndex,
+        })),
+      );
+      locatedContentPacks.push(
+        ...discovery.value.contentPacks.map((value) => ({
+          value,
+          entry,
+          entryIndex,
+        })),
+      );
+      locatedPlayBundles.push(
+        ...discovery.value.playBundles.map((value) => ({
+          value,
+          entry,
+          entryIndex,
+        })),
+      );
+      locatedScenarios.push(
+        ...discovery.value.scenarios.map((value) => ({
+          value,
+          entry,
+          entryIndex,
+        })),
       );
     }
-    if (!isRecord(moduleNamespace)) {
-      return failure(
-        'RULESET_WORKSPACE_MODULE_INVALID',
-        '$.rulesetRoot',
-        'The selected module did not expose an ES module namespace',
-        resolved.value,
+    const aggregate = aggregateLocatedValues({
+      rulesets: locatedRulesets,
+      contentPacks: locatedContentPacks,
+      playBundles: locatedPlayBundles,
+      scenarios: locatedScenarios,
+    });
+    if (!aggregate.ok) {
+      return failureForEntry(
+        'PLAY_BUNDLE_SOURCE_IDENTITY_DUPLICATE',
+        `$.sourceSet.entries[${aggregate.current.entryIndex}]`,
+        `Distinct ${aggregate.kind} declarations share identity ${aggregate.identity} in sources ${aggregate.previous.entry.id} and ${aggregate.current.entry.id}`,
+        aggregate.current.entry,
       );
     }
-    const discovery = discoverAuthoringValues(moduleNamespace);
-    if (!discovery.ok) {
-      return failure(
-        'RULESET_ROOT_EXPORTED_IDENTITY_DUPLICATE',
-        '$.rulesetRoot',
-        `Distinct exported ${discovery.kind} declarations share identity ${discovery.identity}`,
-        resolved.value,
-      );
-    }
-    const discovered = discovery.value;
+    const discovered = aggregate.value;
     if (discovered.rulesets.length !== 1) {
       return failure(
-        'RULESET_ROOT_RULESET_COUNT_INVALID',
-        '$.rulesetRoot',
-        `Expected one exported Ruleset, found ${discovered.rulesets.length}`,
+        'PLAY_BUNDLE_SOURCE_RULESET_COUNT_INVALID',
+        '$.sourceSet.entries',
+        `Expected exactly one exported Ruleset across all sources, found ${discovered.rulesets.length}`,
         resolved.value,
       );
     }
     if (discovered.contentPacks.length === 0) {
       return failure(
-        'RULESET_ROOT_CONTENT_PACK_REQUIRED',
-        '$.rulesetRoot',
-        'The Ruleset root must export at least one Content Pack source',
+        'PLAY_BUNDLE_SOURCE_CONTENT_PACK_REQUIRED',
+        '$.sourceSet.entries',
+        'The source set must export at least one Content Pack source',
         resolved.value,
       );
     }
     if (discovered.playBundles.length === 0) {
       return failure(
-        'RULESET_ROOT_PLAY_BUNDLE_REQUIRED',
-        '$.rulesetRoot',
-        'The Ruleset root must export at least one explicit PlayBundle',
+        'PLAY_BUNDLE_SOURCE_PLAY_BUNDLE_REQUIRED',
+        '$.sourceSet.entries',
+        'The source set must export at least one explicit PlayBundle',
         resolved.value,
       );
     }
     const ruleset = discovered.rulesets[0];
     if (ruleset === undefined) {
       return failure(
-        'RULESET_ROOT_RULESET_COUNT_INVALID',
-        '$.rulesetRoot',
-        'The Ruleset root did not expose a Ruleset',
+        'PLAY_BUNDLE_SOURCE_RULESET_COUNT_INVALID',
+        '$.sourceSet.entries',
+        'The source set did not expose a Ruleset',
         resolved.value,
       );
     }
@@ -239,8 +318,8 @@ export async function loadPlayBundleWorkspace(
     if (mismatchedBundle !== undefined) {
       return failure(
         'PLAY_BUNDLE_RULESET_ROOT_MISMATCH',
-        '$.rulesetRoot',
-        `PlayBundle ${mismatchedBundle.identity.id}@${mismatchedBundle.identity.version} does not use the root Ruleset ${ruleset.identity.id}@${ruleset.identity.version}`,
+        '$.sourceSet.entries',
+        `PlayBundle ${mismatchedBundle.identity.id}@${mismatchedBundle.identity.version} does not use the selected Ruleset ${ruleset.identity.id}@${ruleset.identity.version}`,
         resolved.value,
       );
     }
@@ -255,13 +334,13 @@ export async function loadPlayBundleWorkspace(
     if (mismatchedScenario !== undefined) {
       return failure(
         'SCENARIO_TEMPLATE_PLAY_BUNDLE_NOT_DECLARED',
-        '$.rulesetRoot',
+        '$.sourceSet.entries',
         `Scenario template ${mismatchedScenario.identity.id}@${mismatchedScenario.identity.version} names undeclared PlayBundle ${mismatchedScenario.playBundle.id}@${mismatchedScenario.playBundle.version}`,
         resolved.value,
       );
     }
-    const catalog = rootCatalog(
-      resolved.value.rulesetRoot,
+    const catalog = sourceCatalog(
+      resolved.value.sourceSet,
       ruleset,
       discovered.contentPacks,
       discovered.playBundles,
@@ -306,6 +385,124 @@ export async function loadPlayBundleWorkspace(
   } finally {
     await rm(buildRoot, { recursive: true, force: true });
   }
+}
+
+function firstUndeclaredExportKind(
+  discovered: {
+    readonly rulesets: readonly Ruleset[];
+    readonly contentPacks: readonly ContentPackSource[];
+    readonly playBundles: readonly PlayBundleManifest[];
+    readonly scenarios: readonly ScenarioTemplate[];
+  },
+  allowed: readonly PlayBundleSourceExportKind[],
+): PlayBundleSourceExportKind | null {
+  const checks: readonly [PlayBundleSourceExportKind, number][] = [
+    ['ruleset', discovered.rulesets.length],
+    ['contentPack', discovered.contentPacks.length],
+    ['playBundle', discovered.playBundles.length],
+    ['scenarioTemplate', discovered.scenarios.length],
+  ];
+  return (
+    checks.find(([kind, count]) => count > 0 && !allowed.includes(kind))?.[0] ??
+    null
+  );
+}
+
+function aggregateLocatedValues(input: {
+  readonly rulesets: readonly Located<Ruleset>[];
+  readonly contentPacks: readonly Located<ContentPackSource>[];
+  readonly playBundles: readonly Located<PlayBundleManifest>[];
+  readonly scenarios: readonly Located<ScenarioTemplate>[];
+}):
+  | {
+      readonly ok: true;
+      readonly value: {
+        readonly rulesets: readonly Ruleset[];
+        readonly contentPacks: readonly ContentPackSource[];
+        readonly playBundles: readonly PlayBundleManifest[];
+        readonly scenarios: readonly ScenarioTemplate[];
+      };
+    }
+  | {
+      readonly ok: false;
+      readonly kind:
+        | 'Ruleset'
+        | 'Content Pack'
+        | 'PlayBundle'
+        | 'ScenarioTemplate';
+      readonly identity: string;
+      readonly previous: Located<unknown>;
+      readonly current: Located<unknown>;
+    } {
+  const duplicateRuleset = duplicateLocatedIdentity(
+    input.rulesets,
+    (located) => located.value.identity,
+  );
+  if (duplicateRuleset !== null)
+    return { ok: false, kind: 'Ruleset', ...duplicateRuleset };
+  const duplicateContentPack = duplicateLocatedIdentity(
+    input.contentPacks,
+    (located) => located.value.manifest.identity,
+  );
+  if (duplicateContentPack !== null)
+    return { ok: false, kind: 'Content Pack', ...duplicateContentPack };
+  const duplicatePlayBundle = duplicateLocatedIdentity(
+    input.playBundles,
+    (located) => located.value.identity,
+  );
+  if (duplicatePlayBundle !== null)
+    return { ok: false, kind: 'PlayBundle', ...duplicatePlayBundle };
+  const duplicateScenario = duplicateLocatedIdentity(
+    input.scenarios,
+    (located) => located.value.identity,
+  );
+  if (duplicateScenario !== null)
+    return { ok: false, kind: 'ScenarioTemplate', ...duplicateScenario };
+  return {
+    ok: true,
+    value: {
+      rulesets: uniqueByIdentity(
+        input.rulesets.map(({ value }) => value),
+        (value) => value.identity,
+      ),
+      contentPacks: uniqueByIdentity(
+        input.contentPacks.map(({ value }) => value),
+        (value) => value.manifest.identity,
+      ),
+      playBundles: uniqueByIdentity(
+        input.playBundles.map(({ value }) => value),
+        (value) => value.identity,
+      ),
+      scenarios: uniqueByIdentity(
+        input.scenarios.map(({ value }) => value),
+        (value) => value.identity,
+      ),
+    },
+  };
+}
+
+function duplicateLocatedIdentity<Value>(
+  values: readonly Located<Value>[],
+  identity: (value: Located<Value>) => {
+    readonly id: string;
+    readonly version: string;
+  },
+): {
+  readonly identity: string;
+  readonly previous: Located<Value>;
+  readonly current: Located<Value>;
+} | null {
+  const seen = new Map<string, Located<Value>>();
+  for (const located of values) {
+    const currentIdentity = identity(located);
+    const key = `${currentIdentity.id}@${currentIdentity.version}`;
+    const previous = seen.get(key);
+    if (previous !== undefined && previous.value !== located.value) {
+      return { identity: key, previous, current: located };
+    }
+    seen.set(key, located);
+  }
+  return null;
 }
 
 function discoverAuthoringValues(
@@ -411,15 +608,15 @@ function uniqueByIdentity<Value>(
   });
 }
 
-function rootCatalog(
-  rulesetRoot: string,
+function sourceCatalog(
+  sourceSet: PlayBundleSourceSet,
   ruleset: Ruleset,
   contentPacks: readonly ContentPackSource[],
   playBundles: readonly PlayBundleManifest[],
   scenarios: readonly ScenarioTemplate[],
-): RulesetRootCatalog {
+): RulesetSourceCatalog {
   return {
-    rulesetRoot,
+    sourceSet,
     ruleset: { id: ruleset.identity.id, version: ruleset.identity.version },
     contentPacks: contentPacks.map((source) => ({
       id: source.manifest.identity.id,
@@ -549,11 +746,11 @@ function sameStrings(
   );
 }
 
-async function resolveWorkspaceInput(
+async function resolveSourceSetInput(
   input: unknown,
   gatewayRoot: string,
 ): Promise<
-  | { readonly ok: true; readonly value: ResolvedRulesetRoot }
+  | { readonly ok: true; readonly value: ResolvedSourceSet }
   | PlayBundleWorkspaceFailure
 > {
   if (!isRecord(input)) {
@@ -573,8 +770,8 @@ async function resolveWorkspaceInput(
   }
   const exactKeys =
     operation === 'inspect'
-      ? ['operation', 'rulesetRoot']
-      : ['operation', 'rulesetRoot', 'contentPackIds'];
+      ? ['operation', 'sourceSet']
+      : ['operation', 'sourceSet', 'contentPackIds'];
   if (
     Object.keys(input).length !== exactKeys.length ||
     !exactKeys.every((key) => key in input)
@@ -585,74 +782,60 @@ async function resolveWorkspaceInput(
       `Workspace input must contain exactly ${exactKeys.join(', ')}`,
     );
   }
-  const rulesetRoot = input['rulesetRoot'];
-  if (typeof rulesetRoot !== 'string' || rulesetRoot.trim().length === 0) {
-    return failureWithoutSource(
-      'RULESET_ROOT_PATH_INVALID',
-      '$.rulesetRoot',
-      'rulesetRoot must be a non-empty path',
-    );
-  }
-  const resolvedWorkspaceRoot = resolve(gatewayRoot, rulesetRoot);
-  const rulesetsDirectory = dirname(resolvedWorkspaceRoot);
-  if (basename(rulesetsDirectory) !== 'rulesets') {
-    return failureWithoutSource(
-      'RULESET_ROOT_LAYOUT_INVALID',
-      '$.rulesetRoot',
-      'rulesetRoot must be a direct child of a rulesets directory',
-    );
-  }
-  const module = 'src/index.ts';
-  const declaration = 'discovered exports';
-  const workspaceRoot = rulesetRoot;
-  const resolvedModule = join(resolvedWorkspaceRoot, module);
-  const repositoryRoot = dirname(rulesetsDirectory);
-  const resolvedFoundationsRoot = join(repositoryRoot, 'foundations');
-  const resolvedPackageRoots = [resolvedWorkspaceRoot];
-  try {
-    const foundationsStat = await stat(resolvedFoundationsRoot);
-    if (!foundationsStat.isDirectory()) {
-      return failureWithoutSource(
-        'RULESET_ROOT_FOUNDATIONS_INVALID',
-        '$.rulesetRoot',
-        'The conventional foundations path exists but is not a directory',
-      );
-    }
-    resolvedPackageRoots.push(resolvedFoundationsRoot);
-  } catch (error: unknown) {
-    if (!isMissingPath(error)) {
-      return failureWithoutSource(
-        'RULESET_ROOT_FOUNDATIONS_UNREADABLE',
-        '$.rulesetRoot',
-        error instanceof Error ? error.message : String(error),
-      );
-    }
-  }
-  const packageRoots = resolvedPackageRoots.map((packageRoot) =>
-    normalizedPath(relative(resolvedWorkspaceRoot, packageRoot) || '.'),
+  const decoded = decodeSourceSet(input['sourceSet']);
+  if (!decoded.ok) return decoded;
+  const sourceSet = decoded.value;
+  const resolvedAllowedRoots = sourceSet.allowedRoots.map((root) =>
+    resolve(gatewayRoot, root),
   );
-  const resolvedValue: ResolvedRulesetRoot = {
-    rulesetRoot,
-    workspaceRoot,
-    packageRoots,
-    module,
-    declaration,
-    resolvedWorkspaceRoot,
-    resolvedPackageRoots,
-    resolvedModule,
+  const entries = sourceSet.entries.map((entry) => ({
+    ...entry,
+    resolvedSourceRoot: resolve(gatewayRoot, entry.sourceRoot),
+    resolvedModule: resolve(gatewayRoot, entry.sourceRoot, entry.module),
+  }));
+  const outsideAllowedRoot = entries.find(
+    (entry) => !isWithinAnyRoot(entry.resolvedSourceRoot, resolvedAllowedRoots),
+  );
+  if (outsideAllowedRoot !== undefined) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_ROOT_NOT_ALLOWED',
+      `$.sourceSet.entries[${entries.indexOf(outsideAllowedRoot)}].sourceRoot`,
+      `Source root ${outsideAllowedRoot.sourceRoot} is outside allowedRoots`,
+    );
+  }
+  const escapedModule = entries.find(
+    (entry) => !isWithinRoot(entry.resolvedModule, entry.resolvedSourceRoot),
+  );
+  if (escapedModule !== undefined) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_MODULE_OUTSIDE_ROOT',
+      `$.sourceSet.entries[${entries.indexOf(escapedModule)}].module`,
+      `Entry module ${escapedModule.module} is outside source root ${escapedModule.sourceRoot}`,
+    );
+  }
+  const resolvedValue: ResolvedSourceSet = {
+    sourceSet,
+    resolvedAllowedRoots,
+    entries,
   };
   try {
-    const moduleStat = await stat(resolvedModule);
-    if (!moduleStat.isFile()) throw new Error('not a file');
-    for (const packageRoot of resolvedPackageRoots) {
-      const packageStat = await stat(packageRoot);
-      if (!packageStat.isDirectory())
-        throw new Error(`${packageRoot} is not a directory`);
+    for (const allowedRoot of resolvedAllowedRoots) {
+      const rootStat = await stat(allowedRoot);
+      if (!rootStat.isDirectory())
+        throw new Error(`${allowedRoot} is not a directory`);
+    }
+    for (const entry of entries) {
+      const rootStat = await stat(entry.resolvedSourceRoot);
+      if (!rootStat.isDirectory())
+        throw new Error(`${entry.resolvedSourceRoot} is not a directory`);
+      const moduleStat = await stat(entry.resolvedModule);
+      if (!moduleStat.isFile())
+        throw new Error(`${entry.resolvedModule} is not a file`);
     }
   } catch (error: unknown) {
     return failure(
-      'RULESET_ROOT_ENTRY_NOT_FOUND',
-      '$.rulesetRoot',
+      'PLAY_BUNDLE_SOURCE_ENTRY_NOT_FOUND',
+      '$.sourceSet',
       error instanceof Error ? error.message : String(error),
       resolvedValue,
     );
@@ -660,15 +843,171 @@ async function resolveWorkspaceInput(
   return { ok: true, value: resolvedValue };
 }
 
+function decodeSourceSet(
+  value: unknown,
+):
+  | { readonly ok: true; readonly value: PlayBundleSourceSet }
+  | PlayBundleWorkspaceFailure {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['schemaVersion', 'allowedRoots', 'entries'])
+  ) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_SET_INVALID',
+      '$.sourceSet',
+      'sourceSet must contain exactly schemaVersion, allowedRoots, entries',
+    );
+  }
+  if (value['schemaVersion'] !== 1) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_SET_VERSION_UNSUPPORTED',
+      '$.sourceSet.schemaVersion',
+      'sourceSet.schemaVersion must be 1',
+    );
+  }
+  const roots = decodeUniqueStrings(value['allowedRoots']);
+  if (roots === null || roots.length === 0) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_ALLOWED_ROOTS_INVALID',
+      '$.sourceSet.allowedRoots',
+      'allowedRoots must be a non-empty array of unique non-empty paths',
+    );
+  }
+  if (!Array.isArray(value['entries']) || value['entries'].length === 0) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_ENTRIES_INVALID',
+      '$.sourceSet.entries',
+      'entries must be a non-empty array',
+    );
+  }
+  const entries: PlayBundleSourceEntry[] = [];
+  const ids = new Set<string>();
+  for (const [index, candidate] of value['entries'].entries()) {
+    const path = `$.sourceSet.entries[${index}]`;
+    if (
+      !isRecord(candidate) ||
+      !hasExactKeys(candidate, [
+        'id',
+        'label',
+        'sourceRoot',
+        'module',
+        'exportKinds',
+      ])
+    ) {
+      return failureWithoutSource(
+        'PLAY_BUNDLE_SOURCE_ENTRY_INVALID',
+        path,
+        'Each entry must contain exactly id, label, sourceRoot, module, exportKinds',
+      );
+    }
+    const id = nonEmptyString(candidate['id']);
+    const label = nonEmptyString(candidate['label']);
+    const sourceRoot = nonEmptyString(candidate['sourceRoot']);
+    const module = nonEmptyString(candidate['module']);
+    const exportKinds = decodeExportKinds(candidate['exportKinds']);
+    if (
+      id === null ||
+      label === null ||
+      sourceRoot === null ||
+      module === null ||
+      exportKinds === null ||
+      exportKinds.length === 0
+    ) {
+      return failureWithoutSource(
+        'PLAY_BUNDLE_SOURCE_ENTRY_INVALID',
+        path,
+        'Entry fields must be non-empty and exportKinds must contain unique supported kinds',
+      );
+    }
+    if (ids.has(id)) {
+      return failureWithoutSource(
+        'PLAY_BUNDLE_SOURCE_ENTRY_ID_DUPLICATE',
+        `${path}.id`,
+        `Source entry ID ${id} is duplicated`,
+      );
+    }
+    ids.add(id);
+    entries.push({ id, label, sourceRoot, module, exportKinds });
+  }
+  const rulesetEntries = entries.filter((entry) =>
+    entry.exportKinds.includes('ruleset'),
+  );
+  if (rulesetEntries.length !== 1) {
+    return failureWithoutSource(
+      'PLAY_BUNDLE_SOURCE_RULESET_ENTRY_COUNT_INVALID',
+      '$.sourceSet.entries',
+      `Exactly one source entry must declare ruleset exports; found ${rulesetEntries.length}`,
+    );
+  }
+  return {
+    ok: true,
+    value: { schemaVersion: 1, allowedRoots: roots, entries },
+  };
+}
+
+function decodeExportKinds(
+  value: unknown,
+): readonly PlayBundleSourceExportKind[] | null {
+  const strings = decodeUniqueStrings(value);
+  if (strings === null) return null;
+  const kinds: PlayBundleSourceExportKind[] = [];
+  for (const value of strings) {
+    const kind = sourceExportKind(value);
+    if (kind === null) return null;
+    kinds.push(kind);
+  }
+  return kinds;
+}
+
+function decodeUniqueStrings(value: unknown): readonly string[] | null {
+  if (!Array.isArray(value)) return null;
+  const strings: string[] = [];
+  for (const candidate of value) {
+    const decoded = nonEmptyString(candidate);
+    if (decoded === null) return null;
+    strings.push(decoded);
+  }
+  if (new Set(strings).size !== strings.length) return null;
+  return strings;
+}
+
+function sourceExportKind(value: string): PlayBundleSourceExportKind | null {
+  if (
+    value === 'ruleset' ||
+    value === 'contentPack' ||
+    value === 'playBundle' ||
+    value === 'scenarioTemplate'
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function hasExactKeys(
+  value: Readonly<Record<string, unknown>>,
+  expected: readonly string[],
+): boolean {
+  return (
+    Object.keys(value).length === expected.length &&
+    expected.every((key) => key in value)
+  );
+}
+
 function typescriptDiagnostic(
   diagnostic: ts.Diagnostic,
-  input: ResolvedRulesetRoot,
+  input: ResolvedSourceSet,
 ): PlayBundleCompilerDiagnostic {
   const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
   if (diagnostic.file === undefined || diagnostic.start === undefined) {
     return diagnosticValue(
       'RULESET_WORKSPACE_BUILD_FAILED',
-      '$.rulesetRoot',
+      '$.sourceSet.entries',
       `TS${diagnostic.code}: ${message}`,
       input,
     );
@@ -676,14 +1015,20 @@ function typescriptDiagnostic(
   const position = diagnostic.file.getLineAndCharacterOfPosition(
     diagnostic.start,
   );
-  const sourcePath = normalizedPath(
-    relative(input.resolvedWorkspaceRoot, diagnostic.file.fileName),
+  const sourceEntry = input.entries.find((entry) =>
+    isWithinRoot(diagnostic.file?.fileName ?? '', entry.resolvedSourceRoot),
   );
+  const sourcePath =
+    sourceEntry === undefined
+      ? normalizedPath(diagnostic.file.fileName)
+      : normalizedPath(
+          relative(sourceEntry.resolvedSourceRoot, diagnostic.file.fileName),
+        );
   return diagnosticValue(
     'RULESET_WORKSPACE_BUILD_FAILED',
     `${sourcePath}:${position.line + 1}:${position.character + 1}`,
     `TS${diagnostic.code}: ${message}`,
-    input,
+    sourceEntry ?? input,
   );
 }
 
@@ -691,11 +1036,23 @@ function failure(
   code: string,
   path: string,
   message: string,
-  input: ResolvedRulesetRoot,
+  input: ResolvedSourceSet,
 ): PlayBundleWorkspaceFailure {
   return {
     ok: false,
     diagnostics: [diagnosticValue(code, path, message, input)],
+  };
+}
+
+function failureForEntry(
+  code: string,
+  path: string,
+  message: string,
+  entry: ResolvedSourceEntry,
+): PlayBundleWorkspaceFailure {
+  return {
+    ok: false,
+    diagnostics: [diagnosticValue(code, path, message, entry)],
   };
 }
 
@@ -722,15 +1079,23 @@ function diagnosticValue(
   code: string,
   path: string,
   message: string,
-  input: Pick<ResolvedRulesetRoot, 'module' | 'declaration'>,
+  input: ResolvedSourceSet | ResolvedSourceEntry,
 ): PlayBundleCompilerDiagnostic {
+  const entry = 'entries' in input ? input.entries[0] : input;
   return {
     stage: 'source',
     severity: 'error',
     code,
     path,
     message,
-    source: { module: input.module, declaration: input.declaration },
+    ...(entry === undefined
+      ? {}
+      : {
+          source: {
+            module: normalizedPath(join(entry.sourceRoot, entry.module)),
+            declaration: `source entry ${entry.id}`,
+          },
+        }),
   };
 }
 
@@ -813,10 +1178,6 @@ function normalizedPath(path: string): string {
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isMissingPath(error: unknown): boolean {
-  return isRecord(error) && 'code' in error && error['code'] === 'ENOENT';
 }
 
 async function createBuildRoot(gatewayRoot: string): Promise<string> {

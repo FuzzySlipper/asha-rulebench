@@ -151,12 +151,15 @@ function startAuthoringGateway(
         sendJson(response, 200, rulesetLocationConfig);
         return;
       }
-      if (request.method === 'POST' && request.url === '/api/rulesets/inspect') {
+      if (
+        request.method === 'POST' &&
+        request.url === '/api/rulesets/inspect'
+      ) {
         const body = await readJsonBody(request);
         const inspection = await prepareWorkspace(
           loaderPath,
           parseLoaderOutput,
-          { operation: 'inspect', rulesetRoot: body.rulesetRoot },
+          { operation: 'inspect', sourceSet: body.sourceSet },
         );
         sendJson(response, inspection.ok ? 200 : 422, {
           ok: inspection.ok,
@@ -175,7 +178,7 @@ function startAuthoringGateway(
           parseLoaderOutput,
           {
             operation: 'compile',
-            rulesetRoot: body.rulesetRoot,
+            sourceSet: body.sourceSet,
             contentPackIds: body.contentPackIds,
           },
         );
@@ -408,9 +411,7 @@ async function readBody(request) {
 async function waitForHost(url, child) {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (child.exitCode !== null) {
-      throw new Error(
-        `play host exited before startup with ${child.exitCode}`,
-      );
+      throw new Error(`play host exited before startup with ${child.exitCode}`);
     }
     try {
       const response = await fetch(url);

@@ -17,6 +17,8 @@ import type {
   PlayWorkspaceResponseDto,
   RulesetCatalogDto,
   ConfiguredRulesetLocationDto,
+  PlayBundleSourceSetDto,
+  PlayBundleSourceEntryDto,
 } from '@asha-rulebench/protocol';
 import {
   createPlayTransport,
@@ -41,6 +43,8 @@ export class PlayWorkspaceStore {
     kind: 'idle',
   });
   private readonly mutableRulesetRoot = signal('');
+  private readonly mutableAdditionalSourceRoots = signal('');
+  private readonly mutableConfiguredRulesetId = signal<string | null>(null);
   private readonly mutableRecentRulesetRoots = signal<readonly string[]>([]);
   private readonly mutableConfiguredRulesets = signal<
     readonly ConfiguredRulesetLocationDto[]
@@ -64,6 +68,10 @@ export class PlayWorkspaceStore {
     () => this.mutableState().kind === 'loading' || this.mutableCatalogBusy(),
   );
   public readonly rulesetRoot = this.mutableRulesetRoot.asReadonly();
+  public readonly additionalSourceRoots =
+    this.mutableAdditionalSourceRoots.asReadonly();
+  public readonly configuredRulesetId =
+    this.mutableConfiguredRulesetId.asReadonly();
   public readonly recentRulesetRoots =
     this.mutableRecentRulesetRoots.asReadonly();
   public readonly configuredRulesets =
@@ -103,11 +111,11 @@ export class PlayWorkspaceStore {
   }
 
   public async inspectSelectedRuleset(): Promise<boolean> {
-    const rulesetRoot = this.mutableRulesetRoot().trim();
-    if (rulesetRoot.length === 0) return false;
+    const sourceSet = this.selectedSourceSet();
+    if (sourceSet === null) return false;
     this.mutableCatalogBusy.set(true);
     try {
-      const response = await this.transport.inspectRuleset({ rulesetRoot });
+      const response = await this.transport.inspectRuleset({ sourceSet });
       this.mutableRulesetCatalog.set(response.catalog);
       this.mutableCatalogDiagnostics.set(response.diagnostics);
       this.mutableSelectedContentPackIds.set([]);
@@ -118,7 +126,7 @@ export class PlayWorkspaceStore {
       this.mutableCatalogDiagnostics.set([
         clientDiagnostic(
           'RULESET_CATALOG_REQUEST_FAILED',
-          '$.rulesetRoot',
+          '$.sourceSet',
           error instanceof Error
             ? error.message
             : 'Unknown Ruleset catalog failure',
@@ -132,18 +140,90 @@ export class PlayWorkspaceStore {
 
   public async compileSelectedPlayBundle(): Promise<void> {
     const rulesetRoot = this.mutableRulesetRoot().trim();
+    const sourceSet = this.selectedSourceSet();
+    if (sourceSet === null) return;
     const contentPackIds = [...this.mutableSelectedContentPackIds()];
     const response = await this.run(() =>
-      this.transport.compile({ rulesetRoot, contentPackIds }),
+      this.transport.compile({ sourceSet, contentPackIds }),
     );
     if (response?.ok === true) this.rememberRulesetRoot(rulesetRoot);
   }
 
   public selectRulesetRoot(rulesetRoot: string): void {
     this.mutableRulesetRoot.set(rulesetRoot);
+    this.mutableConfiguredRulesetId.set(null);
+    this.clearCatalogSelection();
+  }
+
+  public selectAdditionalSourceRoots(sourceRoots: string): void {
+    this.mutableAdditionalSourceRoots.set(sourceRoots);
+    this.mutableConfiguredRulesetId.set(null);
+    this.clearCatalogSelection();
+  }
+
+  public selectConfiguredRuleset(
+    location: ConfiguredRulesetLocationDto | null,
+  ): void {
+    this.mutableConfiguredRulesetId.set(location?.id ?? null);
+    const entries = location?.sourceSet.entries ?? [];
+    const rulesetEntry = entries.find((entry) =>
+      entry.exportKinds.includes('ruleset'),
+    );
+    this.mutableRulesetRoot.set(rulesetEntry?.sourceRoot ?? '');
+    this.mutableAdditionalSourceRoots.set(
+      entries
+        .filter((entry) => entry !== rulesetEntry)
+        .map((entry) => entry.sourceRoot)
+        .join('\n'),
+    );
+    this.clearCatalogSelection();
+  }
+
+  private clearCatalogSelection(): void {
     this.mutableRulesetCatalog.set(null);
     this.mutableSelectedContentPackIds.set([]);
     this.mutableCatalogDiagnostics.set([]);
+  }
+
+  private selectedSourceSet(): PlayBundleSourceSetDto | null {
+    const configuredId = this.mutableConfiguredRulesetId();
+    const configured = this.mutableConfiguredRulesets().find(
+      (location) => location.id === configuredId,
+    );
+    if (configured !== undefined) return configured.sourceSet;
+
+    const rulesetRoot = this.mutableRulesetRoot().trim();
+    if (rulesetRoot.length === 0) return null;
+    const additionalRoots = uniqueSourceRoots(
+      this.mutableAdditionalSourceRoots(),
+    ).filter((root) => root !== rulesetRoot);
+    return {
+      schemaVersion: 1,
+      allowedRoots: [rulesetRoot, ...additionalRoots],
+      entries: [
+        {
+          id: 'ruleset',
+          label: 'Ruleset source',
+          sourceRoot: rulesetRoot,
+          module: 'src/index.ts',
+          exportKinds: [
+            'ruleset',
+            'contentPack',
+            'playBundle',
+            'scenarioTemplate',
+          ],
+        },
+        ...additionalRoots.map<PlayBundleSourceEntryDto>(
+          (sourceRoot, index) => ({
+            id: `content-${index + 1}`,
+            label: `Content source ${index + 1}`,
+            sourceRoot,
+            module: 'src/index.ts',
+            exportKinds: ['contentPack', 'playBundle', 'scenarioTemplate'],
+          }),
+        ),
+      ],
+    };
   }
 
   public setContentPackSelected(
@@ -227,6 +307,14 @@ export class PlayWorkspaceStore {
     this.mutableRecentRulesetRoots.set(next);
     this.storage.setItem(RECENT_RULESET_ROOTS_KEY, JSON.stringify(next));
   }
+}
+
+function uniqueSourceRoots(value: string): readonly string[] {
+  const roots = value
+    .split(/\r?\n/)
+    .map((root) => root.trim())
+    .filter((root) => root.length > 0);
+  return [...new Set(roots)];
 }
 
 function clientDiagnostic(
