@@ -1544,11 +1544,8 @@ fn response_from_slots(
         active_artifact: slots
             .active
             .as_ref()
-            .map(|active| artifact_summary(active.bundle.artifact())),
-        candidate_artifact: slots
-            .candidate
-            .as_ref()
-            .map(|bundle| artifact_summary(bundle.artifact())),
+            .map(|active| artifact_summary(&active.bundle)),
+        candidate_artifact: slots.candidate.as_ref().map(artifact_summary),
         upgrade_impact,
         activation_revision: slots.activation_revision,
         host_random_source: encounter_random_source(&slots.random_source_binding),
@@ -2746,7 +2743,8 @@ fn diagnostic_severity(severity: RpgDiagnosticSeverity) -> &'static str {
     }
 }
 
-fn artifact_summary(artifact: &CompiledPlayBundleArtifact) -> PlayBundleArtifactSummaryDto {
+fn artifact_summary(bundle: &CompiledPlayBundle) -> PlayBundleArtifactSummaryDto {
+    let artifact = bundle.artifact();
     PlayBundleArtifactSummaryDto {
         schema: VersionedIdentityDto {
             id: artifact.artifact_schema.identity.clone(),
@@ -2824,10 +2822,10 @@ fn artifact_summary(artifact: &CompiledPlayBundleArtifact) -> PlayBundleArtifact
                 numeric_domain_id: value.numeric_domain_id.clone(),
             })
             .collect(),
-        participant_profiles: artifact
-            .materialized_definitions
+        participant_profiles: bundle
+            .participant_profiles()
             .iter()
-            .filter_map(participant_profile)
+            .map(participant_profile)
             .collect(),
         exported_roots: artifact.exported_roots.clone(),
         definitions: artifact
@@ -2999,41 +2997,74 @@ fn dependency_relationship(relationship: ContentPackDependencyRelationship) -> &
     }
 }
 
-fn participant_profile(
-    definition: &rpg_ir::MaterializedContentDefinition,
-) -> Option<ParticipantProfileDto> {
-    if definition.semantic.get("catalog")?.as_str()? != "participantProfile" {
-        return None;
+fn participant_profile(profile: &rpg_ir::CompiledParticipantProfile) -> ParticipantProfileDto {
+    ParticipantProfileDto {
+        definition_id: profile.definition_id.clone(),
+        profile_id: profile.profile_id.clone(),
+        label: profile.label.clone(),
+        description: profile.description.clone(),
+        role: participant_profile_role(profile.role).to_owned(),
+        definition_ids: profile.definition_ids.clone(),
+        capabilities: profile
+            .capabilities
+            .iter()
+            .map(participant_profile_capability)
+            .collect(),
     }
-    let data = definition.semantic.get("data")?;
-    let definition_ids = data
-        .get("definitionIds")?
-        .as_array()?
-        .iter()
-        .map(|value| value.as_str().map(str::to_owned))
-        .collect::<Option<Vec<_>>>()?;
-    let capabilities = serde_json::from_value::<Vec<ScenarioInitialCapabilityDto>>(
-        data.get("capabilities")?.clone(),
-    )
-    .ok()?;
-    Some(ParticipantProfileDto {
-        definition_id: definition.id.clone(),
-        profile_id: definition.semantic.get("id")?.as_str()?.to_owned(),
-        label: definition
-            .presentation
-            .get("label")
-            .and_then(Value::as_str)
-            .unwrap_or(&definition.id)
-            .to_owned(),
-        description: definition
-            .presentation
-            .get("description")
-            .and_then(Value::as_str)
-            .map(str::to_owned),
-        role: data.get("role")?.as_str()?.to_owned(),
-        definition_ids,
-        capabilities,
-    })
+}
+
+fn participant_profile_role(role: rpg_ir::ParticipantProfileRole) -> &'static str {
+    match role {
+        rpg_ir::ParticipantProfileRole::Player => "player",
+        rpg_ir::ParticipantProfileRole::Creature => "creature",
+    }
+}
+
+fn participant_profile_capability(
+    capability: &rpg_ir::ParticipantProfileInitialCapability,
+) -> ScenarioInitialCapabilityDto {
+    match capability {
+        rpg_ir::ParticipantProfileInitialCapability::Vitality { value } => {
+            ScenarioInitialCapabilityDto::Vitality {
+                value: ScenarioBoundedValueDto {
+                    current: value.current,
+                    max: value.max,
+                },
+            }
+        }
+        rpg_ir::ParticipantProfileInitialCapability::Stat { id, value } => {
+            ScenarioInitialCapabilityDto::Stat {
+                id: id.clone(),
+                value: *value,
+            }
+        }
+        rpg_ir::ParticipantProfileInitialCapability::Defense { id, value } => {
+            ScenarioInitialCapabilityDto::Defense {
+                id: id.clone(),
+                value: *value,
+            }
+        }
+        rpg_ir::ParticipantProfileInitialCapability::Resource { id, value } => {
+            ScenarioInitialCapabilityDto::Resource {
+                id: id.clone(),
+                value: ScenarioBoundedValueDto {
+                    current: value.current,
+                    max: value.max,
+                },
+            }
+        }
+        rpg_ir::ParticipantProfileInitialCapability::Modifier {
+            stacking_group,
+            id,
+            value,
+            remaining_turns,
+        } => ScenarioInitialCapabilityDto::Modifier {
+            stacking_group: stacking_group.clone(),
+            id: id.clone(),
+            value: *value,
+            remaining_turns: *remaining_turns,
+        },
+    }
 }
 
 fn ruleset_value_kind(kind: RulesetValueKind) -> &'static str {
@@ -3160,11 +3191,15 @@ pub fn generated_protocol() -> String {
 #[cfg(test)]
 mod tests {
     use rpg_core::{RpgRandomRequest, RpgRandomRequestKind};
+    use rpg_ir::{
+        CompiledParticipantProfile, ParticipantProfileBoundedValue,
+        ParticipantProfileInitialCapability, ParticipantProfileRole,
+    };
     use rpg_runtime::RpgRandomSource;
 
     use super::{
-        PlayBundleLifecycleStatus, PlayHost, ScriptedGameplayRandomSource,
-        SystemGameplayRandomSource,
+        participant_profile, PlayBundleLifecycleStatus, PlayHost, ScenarioInitialCapabilityDto,
+        ScriptedGameplayRandomSource, SystemGameplayRandomSource,
     };
 
     fn random_request(count: u32, sides: u32) -> RpgRandomRequest {
@@ -3205,6 +3240,32 @@ mod tests {
             activation.diagnostics[0].code,
             "PLAY_BUNDLE_ACTIVATION_CANDIDATE_REQUIRED"
         );
+    }
+
+    #[test]
+    fn participant_profile_dto_uses_rust_validated_compiled_readback() {
+        let profile = CompiledParticipantProfile {
+            definition_id: "profile.fighter".to_owned(),
+            profile_id: "fighter".to_owned(),
+            label: "Fighter".to_owned(),
+            description: Some("Typed profile".to_owned()),
+            role: ParticipantProfileRole::Player,
+            definition_ids: vec!["action.strike".to_owned()],
+            capabilities: vec![ParticipantProfileInitialCapability::Vitality {
+                value: ParticipantProfileBoundedValue {
+                    current: 12,
+                    max: 12,
+                },
+            }],
+        };
+
+        let dto = participant_profile(&profile);
+        assert_eq!(dto.profile_id, "fighter");
+        assert_eq!(dto.role, "player");
+        assert!(matches!(
+            dto.capabilities.as_slice(),
+            [ScenarioInitialCapabilityDto::Vitality { .. }]
+        ));
     }
 
     #[test]
