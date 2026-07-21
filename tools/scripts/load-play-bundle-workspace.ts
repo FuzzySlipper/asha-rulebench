@@ -317,7 +317,7 @@ export async function loadPlayBundleWorkspace(
     );
     if (mismatchedBundle !== undefined) {
       return failure(
-        'PLAY_BUNDLE_RULESET_ROOT_MISMATCH',
+        'PLAY_BUNDLE_RULESET_MISMATCH',
         '$.sourceSet.entries',
         `PlayBundle ${mismatchedBundle.identity.id}@${mismatchedBundle.identity.version} does not use the selected Ruleset ${ruleset.identity.id}@${ruleset.identity.version}`,
         resolved.value,
@@ -1006,7 +1006,7 @@ function typescriptDiagnostic(
   const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
   if (diagnostic.file === undefined || diagnostic.start === undefined) {
     return diagnosticValue(
-      'RULESET_WORKSPACE_BUILD_FAILED',
+      'PLAY_BUNDLE_SOURCE_BUILD_FAILED',
       '$.sourceSet.entries',
       `TS${diagnostic.code}: ${message}`,
       input,
@@ -1025,7 +1025,7 @@ function typescriptDiagnostic(
           relative(sourceEntry.resolvedSourceRoot, diagnostic.file.fileName),
         );
   return diagnosticValue(
-    'RULESET_WORKSPACE_BUILD_FAILED',
+    'PLAY_BUNDLE_SOURCE_BUILD_FAILED',
     `${sourcePath}:${position.line + 1}:${position.character + 1}`,
     `TS${diagnostic.code}: ${message}`,
     sourceEntry ?? input,
@@ -1181,7 +1181,7 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 async function createBuildRoot(gatewayRoot: string): Promise<string> {
-  const parent = join(resolve(gatewayRoot), 'tmp', 'ruleset-workspaces');
+  const parent = join(resolve(gatewayRoot), 'tmp', 'play-bundle-sources');
   await mkdir(parent, { recursive: true });
   return mkdtemp(join(parent, 'build-'));
 }
@@ -1200,7 +1200,7 @@ async function run(): Promise<void> {
     input = JSON.parse(await readStandardInput());
   } catch (error: unknown) {
     const result = failureWithoutSource(
-      'RULESET_ROOT_INPUT_INVALID',
+      'PLAY_BUNDLE_SOURCE_INPUT_INVALID',
       '$',
       error instanceof Error ? error.message : String(error),
     );

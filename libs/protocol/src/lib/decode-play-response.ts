@@ -50,7 +50,7 @@ import type {
   RulesetCatalogDto,
   RulesetCatalogPlayBundleDto,
   RulesetCatalogResponseDto,
-  RulesetLocationConfigDto,
+  PlayBundleSourceSetConfigDto,
   PlayBundleSourceExportKindDto,
   PlayBundleSourceSetDto,
   PlayBundleUpgradeDefinitionDto,
@@ -132,11 +132,11 @@ export function decodePlayWorkspaceResponse(
   };
 }
 
-export function decodeRulesetLocationConfig(
+export function decodePlayBundleSourceSetConfig(
   value: unknown,
-): RulesetLocationConfigDto {
+): PlayBundleSourceSetConfigDto {
   const record = requiredRecord(value, '$');
-  exactKeys(record, ['schemaVersion', 'rulesets'], '$');
+  exactKeys(record, ['schemaVersion', 'sourceSets'], '$');
   const schemaVersion = nonNegativeInteger(
     record['schemaVersion'],
     '$.schemaVersion',
@@ -146,9 +146,9 @@ export function decodeRulesetLocationConfig(
   }
   return {
     schemaVersion,
-    rulesets: requiredArray(record['rulesets'], '$.rulesets').map(
+    sourceSets: requiredArray(record['sourceSets'], '$.sourceSets').map(
       (entry, index) => {
-        const path = `$.rulesets[${index}]`;
+        const path = `$.sourceSets[${index}]`;
         const location = requiredRecord(entry, path);
         exactKeys(location, ['id', 'label', 'sourceSet'], path);
         return {

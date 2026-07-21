@@ -5,12 +5,12 @@ import { createServer as createNetServer } from 'node:net';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { loadRulesetLocationConfig } from './ruleset-location-config.mjs';
+import { loadPlayBundleSourceSetConfig } from './play-bundle-source-set-config.mjs';
 
 const root = process.cwd();
-const rulesetLocationConfig = await loadRulesetLocationConfig(
+const playBundleSourceSetConfig = await loadPlayBundleSourceSetConfig(
   root,
-  process.env['RULEBENCH_RULESET_CONFIG'] ?? '.rulebench/rulesets.json',
+  process.env['RULEBENCH_SOURCE_SET_CONFIG'] ?? '.rulebench/source-sets.json',
 );
 const forwardedArguments = process.argv.slice(2);
 if (forwardedArguments[0] === '--') forwardedArguments.shift();
@@ -147,8 +147,11 @@ function startAuthoringGateway(
 ) {
   const server = createHttpServer(async (request, response) => {
     try {
-      if (request.method === 'GET' && request.url === '/api/rulesets/config') {
-        sendJson(response, 200, rulesetLocationConfig);
+      if (
+        request.method === 'GET' &&
+        request.url === '/api/play-bundle/source-sets'
+      ) {
+        sendJson(response, 200, playBundleSourceSetConfig);
         return;
       }
       if (

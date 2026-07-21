@@ -11,15 +11,15 @@ import { describe, expect, it } from 'vitest';
 import { PlayWorkspaceStore } from './store.js';
 
 describe('play workspace store', () => {
-  it('loads configured Ruleset roots without selecting or activating one', async () => {
+  it('loads configured source sets without selecting or activating one', async () => {
     const store = new PlayWorkspaceStore(baseTransport(), memoryStorage());
 
     await store.refresh();
-    await store.refreshConfiguredRulesets();
+    await store.refreshConfiguredSourceSets();
 
     expect(store.view()?.headline).toBe('No PlayBundle active');
     expect(store.rulesetRoot()).toBe('');
-    expect(store.configuredRulesets()).toEqual([
+    expect(store.configuredSourceSets()).toEqual([
       {
         id: 'minimal',
         label: 'Minimal',
@@ -79,7 +79,7 @@ describe('play workspace store', () => {
         inspectRuleset: async () => ({
           ok: false,
           catalog: null,
-          diagnostics: [diagnostic('RULESET_ROOT_ENTRY_NOT_FOUND')],
+          diagnostics: [diagnostic('PLAY_BUNDLE_SOURCE_ENTRY_NOT_FOUND')],
         }),
       }),
       memoryStorage(),
@@ -91,16 +91,16 @@ describe('play workspace store', () => {
 
     expect(store.view()?.phase).toBe('active');
     expect(store.catalogDiagnostics()[0]?.code).toBe(
-      'RULESET_ROOT_ENTRY_NOT_FOUND',
+      'PLAY_BUNDLE_SOURCE_ENTRY_NOT_FOUND',
     );
   });
 });
 
 function baseTransport(overrides: Partial<PlayTransport> = {}): PlayTransport {
   const transport: PlayTransport = {
-    rulesetLocations: async () => ({
+    sourceSets: async () => ({
       schemaVersion: 2,
-      rulesets: [
+      sourceSets: [
         {
           id: 'minimal',
           label: 'Minimal',

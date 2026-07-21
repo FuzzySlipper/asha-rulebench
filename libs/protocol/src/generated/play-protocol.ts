@@ -116,9 +116,9 @@ export type PlayBundleSourceEntryDto = { id: string, label: string, sourceRoot: 
 
 export type PlayBundleSourceSetDto = { schemaVersion: number, allowedRoots: Array<string>, entries: Array<PlayBundleSourceEntryDto>, };
 
-export type ConfiguredRulesetLocationDto = { id: string, label: string, sourceSet: PlayBundleSourceSetDto, };
+export type ConfiguredPlayBundleSourceSetDto = { id: string, label: string, sourceSet: PlayBundleSourceSetDto, };
 
-export type RulesetLocationConfigDto = { schemaVersion: number, rulesets: Array<ConfiguredRulesetLocationDto>, };
+export type PlayBundleSourceSetConfigDto = { schemaVersion: number, sourceSets: Array<ConfiguredPlayBundleSourceSetDto>, };
 
 export type RulesetCatalogRequestDto = { sourceSet: PlayBundleSourceSetDto, };
 

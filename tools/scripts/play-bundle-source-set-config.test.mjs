@@ -5,16 +5,16 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
-  decodeRulesetLocationConfig,
-  loadRulesetLocationConfig,
-} from './ruleset-location-config.mjs';
+  decodePlayBundleSourceSetConfig,
+  loadPlayBundleSourceSetConfig,
+} from './play-bundle-source-set-config.mjs';
 
-test('a missing local ruleset config is an empty explicit location list', async () => {
-  const result = await loadRulesetLocationConfig(
+test('a missing local source-set config is an empty explicit list', async () => {
+  const result = await loadPlayBundleSourceSetConfig(
     '/workspace',
-    '.rulebench/rulesets.json',
+    '.rulebench/source-sets.json',
   );
-  assert.deepEqual(result, { schemaVersion: 2, rulesets: [] });
+  assert.deepEqual(result, { schemaVersion: 2, sourceSets: [] });
 });
 
 const sourceSet = (sourceRoot) => ({
@@ -35,10 +35,10 @@ test('loads friendly source sets without resolving their roots', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'rulebench-locations-'));
   try {
     await writeFile(
-      join(directory, 'rulesets.json'),
+      join(directory, 'source-sets.json'),
       JSON.stringify({
         schemaVersion: 2,
-        rulesets: [
+        sourceSets: [
           {
             id: 'local-rules',
             label: 'Local rules',
@@ -53,10 +53,13 @@ test('loads friendly source sets without resolving their roots', async () => {
       }),
       'utf8',
     );
-    const result = await loadRulesetLocationConfig(directory, 'rulesets.json');
-    assert.equal(result.rulesets[0]?.label, 'Local rules');
+    const result = await loadPlayBundleSourceSetConfig(
+      directory,
+      'source-sets.json',
+    );
+    assert.equal(result.sourceSets[0]?.label, 'Local rules');
     assert.equal(
-      result.rulesets[1]?.sourceSet.allowedRoots[0],
+      result.sourceSets[1]?.sourceSet.allowedRoots[0],
       '/home/dev/my-rules/rulesets/main',
     );
   } finally {
@@ -67,9 +70,9 @@ test('loads friendly source sets without resolving their roots', async () => {
 test('rejects ambiguous or extended local configuration', () => {
   assert.throws(
     () =>
-      decodeRulesetLocationConfig({
+      decodePlayBundleSourceSetConfig({
         schemaVersion: 2,
-        rulesets: [
+        sourceSets: [
           { id: 'one', label: 'One', sourceSet: sourceSet('/rulesets/one') },
           { id: 'one', label: 'Two', sourceSet: sourceSet('/rulesets/two') },
         ],
@@ -78,9 +81,9 @@ test('rejects ambiguous or extended local configuration', () => {
   );
   assert.throws(
     () =>
-      decodeRulesetLocationConfig({
+      decodePlayBundleSourceSetConfig({
         schemaVersion: 2,
-        rulesets: [],
+        sourceSets: [],
         defaultRuleset: 'one',
       }),
     /unexpected defaultRuleset/,

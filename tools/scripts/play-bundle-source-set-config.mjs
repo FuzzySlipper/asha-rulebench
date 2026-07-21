@@ -10,7 +10,7 @@ const EXPORT_KINDS = new Set([
   'scenarioTemplate',
 ]);
 
-export async function loadRulesetLocationConfig(workspaceRoot, configPath) {
+export async function loadPlayBundleSourceSetConfig(workspaceRoot, configPath) {
   const absoluteConfigPath = isAbsolute(configPath)
     ? configPath
     : resolve(workspaceRoot, configPath);
@@ -18,7 +18,7 @@ export async function loadRulesetLocationConfig(workspaceRoot, configPath) {
   try {
     source = await readFile(absoluteConfigPath, 'utf8');
   } catch (error) {
-    if (isMissingFile(error)) return emptyRulesetLocationConfig();
+    if (isMissingFile(error)) return emptyPlayBundleSourceSetConfig();
     throw error;
   }
 
@@ -27,25 +27,28 @@ export async function loadRulesetLocationConfig(workspaceRoot, configPath) {
     parsed = JSON.parse(source);
   } catch (error) {
     throw new Error(
-      `ruleset location config ${absoluteConfigPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      `PlayBundle source-set config ${absoluteConfigPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return decodeRulesetLocationConfig(parsed, absoluteConfigPath);
+  return decodePlayBundleSourceSetConfig(parsed, absoluteConfigPath);
 }
 
-export function decodeRulesetLocationConfig(value, source = 'ruleset config') {
+export function decodePlayBundleSourceSetConfig(
+  value,
+  source = 'PlayBundle source-set config',
+) {
   const record = requiredRecord(value, source);
-  exactKeys(record, ['schemaVersion', 'rulesets'], source);
+  exactKeys(record, ['schemaVersion', 'sourceSets'], source);
   if (record['schemaVersion'] !== SCHEMA_VERSION) {
     throw new Error(`${source}.schemaVersion must be ${SCHEMA_VERSION}`);
   }
-  if (!Array.isArray(record['rulesets'])) {
-    throw new Error(`${source}.rulesets must be an array`);
+  if (!Array.isArray(record['sourceSets'])) {
+    throw new Error(`${source}.sourceSets must be an array`);
   }
 
   const ids = new Set();
-  const rulesets = record['rulesets'].map((entry, index) => {
-    const path = `${source}.rulesets[${index}]`;
+  const sourceSets = record['sourceSets'].map((entry, index) => {
+    const path = `${source}.sourceSets[${index}]`;
     const location = requiredRecord(entry, path);
     exactKeys(location, ['id', 'label', 'sourceSet'], path);
     const id = requiredString(location['id'], `${path}.id`);
@@ -59,7 +62,7 @@ export function decodeRulesetLocationConfig(value, source = 'ruleset config') {
     return { id, label, sourceSet };
   });
 
-  return { schemaVersion: SCHEMA_VERSION, rulesets };
+  return { schemaVersion: SCHEMA_VERSION, sourceSets };
 }
 
 function decodeSourceSet(value, path) {
@@ -136,8 +139,8 @@ function uniqueStrings(value, path) {
   return strings;
 }
 
-function emptyRulesetLocationConfig() {
-  return { schemaVersion: SCHEMA_VERSION, rulesets: [] };
+function emptyPlayBundleSourceSetConfig() {
+  return { schemaVersion: SCHEMA_VERSION, sourceSets: [] };
 }
 
 function requiredRecord(value, path) {

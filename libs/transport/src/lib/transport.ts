@@ -1,7 +1,7 @@
 import {
   decodePlayWorkspaceResponse,
   decodeRulesetCatalogResponse,
-  decodeRulesetLocationConfig,
+  decodePlayBundleSourceSetConfig,
   type GameplayCommandRequestDto,
   type GameplayReactionRequestDto,
   type GameplayTurnControlRequestDto,
@@ -9,7 +9,7 @@ import {
   type PlayWorkspaceResponseDto,
   type RulesetCatalogRequestDto,
   type RulesetCatalogResponseDto,
-  type RulesetLocationConfigDto,
+  type PlayBundleSourceSetConfigDto,
   type ScenarioSetupRequestDto,
 } from '@asha-rulebench/protocol';
 
@@ -22,7 +22,7 @@ export interface JsonHttpClient {
 }
 
 export interface PlayTransport {
-  readonly rulesetLocations: () => Promise<RulesetLocationConfigDto>;
+  readonly sourceSets: () => Promise<PlayBundleSourceSetConfigDto>;
   readonly inspectRuleset: (
     request: RulesetCatalogRequestDto,
   ) => Promise<RulesetCatalogResponseDto>;
@@ -58,9 +58,9 @@ export function createPlayTransport(http: JsonHttpClient): PlayTransport {
   };
 
   return {
-    rulesetLocations: async () => {
-      const payload = await http.request('GET', '/api/rulesets/config');
-      return decodeRulesetLocationConfig(payload);
+    sourceSets: async () => {
+      const payload = await http.request('GET', '/api/play-bundle/source-sets');
+      return decodePlayBundleSourceSetConfig(payload);
     },
     inspectRuleset: async (catalogRequest) => {
       const payload = await http.request(

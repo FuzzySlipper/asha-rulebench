@@ -18,9 +18,9 @@ Ruleset + selected Content Packs -> compiled PlayBundle -> Scenario -> Session
 - A **Session** is the live Rust-owned state created from an accepted Scenario.
 
 Rulebench bundles no product Ruleset or demo content. The small roots under
-`test-fixtures/` exercise the loader contract only. A complete playable Ruleset
-belongs in an independent repository, such as `asha-d20-fantasy`, and reaches
-Rulebench through a configured or explicitly entered root path.
+`test-fixtures/` exercise the loader contract only. Complete playable content
+belongs in independent repositories, such as `asha-d20-fantasy`, and reaches
+Rulebench through a configured or explicitly entered source set.
 
 ## Loading play content
 
@@ -34,14 +34,14 @@ Packs...** opens the primary content flow:
 5. activate the accepted candidate;
 6. create or load a Scenario.
 
-The local server reads `.rulebench/rulesets.json`. It only gives source roots
+The local server reads `.rulebench/source-sets.json`. It only gives source roots
 friendly menu labels; it cannot choose a default, compile, or activate content.
 The ignored local file in this checkout points at the separately cloned
 `/home/dev/asha-d20-fantasy/rulesets/d20-fantasy` root. See
 [Explicit PlayBundle source sets](docs/ruleset-workspaces.md) for the repository
 contract and a portable configuration example.
 
-Each inspect or compile request builds the selected root's `src/index.ts` in a
+Each inspect or compile request builds the declared source entry modules in one
 fresh constrained TypeScript subprocess. It discovers immutable exported
 `Ruleset`, `ContentPackSource`, `PlayBundleManifest`, and setup-only
 `ScenarioTemplate` values without ambient registration or directory scanning.
@@ -82,7 +82,8 @@ there is no TypeScript rules engine or legacy disposable-session path.
   host ports, composition, and tokens.
 - `rulebench-rs/hosts/play-host`: compile, activation, Scenario, and Session
   lifecycle host.
-- `test-fixtures/rulesets`: non-product contract fixtures.
+- `test-fixtures/rulesets` and `test-fixtures/source-sets`: non-product contract
+  fixtures.
 
 ## Validation
 

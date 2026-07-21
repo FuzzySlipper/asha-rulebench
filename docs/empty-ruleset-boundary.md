@@ -7,15 +7,15 @@ new content contract.
 
 The retained `test-fixtures/rulesets` roots are narrow loader fixtures. They do
 not appear in a normal local configuration and make no gameplay claim. Complete
-content belongs in an independent repository and enters through the same public
-root contract available to every downstream author.
+content belongs in independent repositories and enters through the same public
+source-set contract available to every downstream author.
 
 ## Retained product surfaces
 
 | Surface            | Product responsibility                                                 |
 | ------------------ | ---------------------------------------------------------------------- |
 | Angular workspace  | interactive play and secondary inspection dialogs                      |
-| Content loader     | build one selected `src/index.ts` graph and discover immutable exports |
+| Content loader     | build explicitly selected source graphs and discover immutable exports |
 | Rust play host     | compile/activate PlayBundles and own Scenario/Session lifecycle        |
 | Generated protocol | carry product DTOs without a parallel authority model                  |
 | Focused fixtures   | reject boundary drift without becoming demo content                    |

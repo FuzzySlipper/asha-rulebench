@@ -15,7 +15,7 @@ const ruleset = Object.freeze({
   provides: Object.freeze({}),
 });
 
-describe('Ruleset root authoring discovery', () => {
+describe('source-entry authoring discovery', () => {
   it('recognizes only immutable values at each explicit boundary', () => {
     const source = Object.freeze({
       manifest: Object.freeze({

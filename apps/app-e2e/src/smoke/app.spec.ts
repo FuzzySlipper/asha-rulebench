@@ -23,7 +23,7 @@ test('selects a Ruleset and Content Packs before activating a PlayBundle @gate',
   await expect(playDialog).toBeVisible();
 
   await playDialog
-    .getByRole('combobox', { name: 'Configured ruleset' })
+    .getByRole('combobox', { name: 'Configured source set' })
     .selectOption({ label: 'Rulebench minimal contract fixture' });
 
   await expect(playDialog).toContainText('rulebench.minimal@1.0.0');

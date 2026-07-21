@@ -1183,30 +1183,34 @@ class SetupDiagnosticsComponent {
       <div class="dialog-body">
         @if (store.view(); as view) {
           <p class="section-label">{{ view.statusLabel }}</p>
-          <label for="configured-ruleset" class="section-label"
-            >Configured ruleset</label
+          <label for="configured-source-set" class="section-label"
+            >Configured source set</label
           >
           <select
-            #configuredRulesetSelect
-            id="configured-ruleset"
+            #configuredSourceSetSelect
+            id="configured-source-set"
             class="ruleset-select"
             [disabled]="store.busy()"
-            [value]="configuredRulesetId()"
-            (change)="selectConfiguredRuleset(configuredRulesetSelect.value)"
+            [value]="configuredSourceSetId()"
+            (change)="
+              selectConfiguredSourceSet(configuredSourceSetSelect.value)
+            "
           >
-            <option value="">Choose a configured ruleset</option>
-            @for (location of store.configuredRulesets(); track location.id) {
+            <option value="">Choose a configured source set</option>
+            @for (location of store.configuredSourceSets(); track location.id) {
               <option [value]="location.id">{{ location.label }}</option>
             }
           </select>
-          @if (store.rulesetConfigurationError(); as configurationError) {
+          @if (store.sourceSetConfigurationError(); as configurationError) {
             <div class="diagnostic" role="alert">
-              <strong>Local ruleset configuration could not be loaded</strong>
+              <strong
+                >Local source-set configuration could not be loaded</strong
+              >
               <span>{{ configurationError }}</span>
             </div>
-          } @else if (store.configuredRulesets().length === 0) {
+          } @else if (store.configuredSourceSets().length === 0) {
             <p class="muted">
-              No local rulesets are configured. Custom roots remain available
+              No local source sets are configured. Custom roots remain available
               below.
             </p>
           }
@@ -3630,8 +3634,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     () => this.store.rulesetRoot().trim().length > 0,
   );
 
-  protected readonly configuredRulesetId = computed(
-    () => this.store.configuredRulesetId() ?? '',
+  protected readonly configuredSourceSetId = computed(
+    () => this.store.configuredSourceSetId() ?? '',
   );
 
   protected readonly selectedCatalogPlayBundle = computed(() => {
@@ -3786,7 +3790,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   public ngOnInit(): void {
     void this.store.refresh();
-    void this.store.refreshConfiguredRulesets();
+    void this.store.refreshConfiguredSourceSets();
   }
 
   protected handleMenuItem(item: ApplicationMenuItem): void {
@@ -3836,11 +3840,11 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     void this.store.compileSelectedPlayBundle();
   }
 
-  protected selectConfiguredRuleset(locationId: string): void {
+  protected selectConfiguredSourceSet(locationId: string): void {
     const location = this.store
-      .configuredRulesets()
+      .configuredSourceSets()
       .find((candidate) => candidate.id === locationId);
-    this.store.selectConfiguredRuleset(location ?? null);
+    this.store.selectConfiguredSourceSet(location ?? null);
     if (location !== undefined) void this.store.inspectSelectedRuleset();
   }
 

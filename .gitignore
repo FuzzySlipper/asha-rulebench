@@ -9,4 +9,4 @@ playwright-report/
 test-results/
 target/
 *.tsbuildinfo
-/.rulebench/rulesets.json
+/.rulebench/source-sets.json

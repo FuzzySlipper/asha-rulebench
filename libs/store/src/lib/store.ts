@@ -16,7 +16,7 @@ import type {
   PlayDiagnosticDto,
   PlayWorkspaceResponseDto,
   RulesetCatalogDto,
-  ConfiguredRulesetLocationDto,
+  ConfiguredPlayBundleSourceSetDto,
   PlayBundleSourceSetDto,
   PlayBundleSourceEntryDto,
 } from '@asha-rulebench/protocol';
@@ -44,10 +44,10 @@ export class PlayWorkspaceStore {
   });
   private readonly mutableRulesetRoot = signal('');
   private readonly mutableAdditionalSourceRoots = signal('');
-  private readonly mutableConfiguredRulesetId = signal<string | null>(null);
+  private readonly mutableConfiguredSourceSetId = signal<string | null>(null);
   private readonly mutableRecentRulesetRoots = signal<readonly string[]>([]);
-  private readonly mutableConfiguredRulesets = signal<
-    readonly ConfiguredRulesetLocationDto[]
+  private readonly mutableConfiguredSourceSets = signal<
+    readonly ConfiguredPlayBundleSourceSetDto[]
   >([]);
   private readonly mutableRulesetCatalog = signal<RulesetCatalogDto | null>(
     null,
@@ -59,7 +59,7 @@ export class PlayWorkspaceStore {
     readonly PlayDiagnosticDto[]
   >([]);
   private readonly mutableCatalogBusy = signal(false);
-  private readonly mutableRulesetConfigurationError = signal<string | null>(
+  private readonly mutableSourceSetConfigurationError = signal<string | null>(
     null,
   );
   public readonly state = this.mutableState.asReadonly();
@@ -70,19 +70,19 @@ export class PlayWorkspaceStore {
   public readonly rulesetRoot = this.mutableRulesetRoot.asReadonly();
   public readonly additionalSourceRoots =
     this.mutableAdditionalSourceRoots.asReadonly();
-  public readonly configuredRulesetId =
-    this.mutableConfiguredRulesetId.asReadonly();
+  public readonly configuredSourceSetId =
+    this.mutableConfiguredSourceSetId.asReadonly();
   public readonly recentRulesetRoots =
     this.mutableRecentRulesetRoots.asReadonly();
-  public readonly configuredRulesets =
-    this.mutableConfiguredRulesets.asReadonly();
+  public readonly configuredSourceSets =
+    this.mutableConfiguredSourceSets.asReadonly();
   public readonly rulesetCatalog = this.mutableRulesetCatalog.asReadonly();
   public readonly selectedContentPackIds =
     this.mutableSelectedContentPackIds.asReadonly();
   public readonly catalogDiagnostics =
     this.mutableCatalogDiagnostics.asReadonly();
-  public readonly rulesetConfigurationError =
-    this.mutableRulesetConfigurationError.asReadonly();
+  public readonly sourceSetConfigurationError =
+    this.mutableSourceSetConfigurationError.asReadonly();
 
   public constructor(
     private readonly transport: PlayTransport,
@@ -95,17 +95,17 @@ export class PlayWorkspaceStore {
     await this.run(() => this.transport.status());
   }
 
-  public async refreshConfiguredRulesets(): Promise<void> {
+  public async refreshConfiguredSourceSets(): Promise<void> {
     try {
-      const configuration = await this.transport.rulesetLocations();
-      this.mutableConfiguredRulesets.set(configuration.rulesets);
-      this.mutableRulesetConfigurationError.set(null);
+      const configuration = await this.transport.sourceSets();
+      this.mutableConfiguredSourceSets.set(configuration.sourceSets);
+      this.mutableSourceSetConfigurationError.set(null);
     } catch (error: unknown) {
-      this.mutableConfiguredRulesets.set([]);
-      this.mutableRulesetConfigurationError.set(
+      this.mutableConfiguredSourceSets.set([]);
+      this.mutableSourceSetConfigurationError.set(
         error instanceof Error
           ? error.message
-          : 'Unknown ruleset configuration failure',
+          : 'Unknown PlayBundle source-set configuration failure',
       );
     }
   }
@@ -151,20 +151,20 @@ export class PlayWorkspaceStore {
 
   public selectRulesetRoot(rulesetRoot: string): void {
     this.mutableRulesetRoot.set(rulesetRoot);
-    this.mutableConfiguredRulesetId.set(null);
+    this.mutableConfiguredSourceSetId.set(null);
     this.clearCatalogSelection();
   }
 
   public selectAdditionalSourceRoots(sourceRoots: string): void {
     this.mutableAdditionalSourceRoots.set(sourceRoots);
-    this.mutableConfiguredRulesetId.set(null);
+    this.mutableConfiguredSourceSetId.set(null);
     this.clearCatalogSelection();
   }
 
-  public selectConfiguredRuleset(
-    location: ConfiguredRulesetLocationDto | null,
+  public selectConfiguredSourceSet(
+    location: ConfiguredPlayBundleSourceSetDto | null,
   ): void {
-    this.mutableConfiguredRulesetId.set(location?.id ?? null);
+    this.mutableConfiguredSourceSetId.set(location?.id ?? null);
     const entries = location?.sourceSet.entries ?? [];
     const rulesetEntry = entries.find((entry) =>
       entry.exportKinds.includes('ruleset'),
@@ -186,8 +186,8 @@ export class PlayWorkspaceStore {
   }
 
   private selectedSourceSet(): PlayBundleSourceSetDto | null {
-    const configuredId = this.mutableConfiguredRulesetId();
-    const configured = this.mutableConfiguredRulesets().find(
+    const configuredId = this.mutableConfiguredSourceSetId();
+    const configured = this.mutableConfiguredSourceSets().find(
       (location) => location.id === configuredId,
     );
     if (configured !== undefined) return configured.sourceSet;

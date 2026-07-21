@@ -103,13 +103,13 @@ Asha RPG's `preparePlayBundle`; Rust compiles and reloads the closed result.
 
 ## Local source configuration
 
-The trusted local server reads `.rulebench/rulesets.json` by default. The file
+The trusted local server reads `.rulebench/source-sets.json` by default. The file
 is ignored by git so machine paths stay local:
 
 ```json
 {
   "schemaVersion": 2,
-  "rulesets": [
+  "sourceSets": [
     {
       "id": "d20-fantasy",
       "label": "d20 Fantasy",
@@ -136,7 +136,7 @@ is ignored by git so machine paths stay local:
 }
 ```
 
-`RULEBENCH_RULESET_CONFIG` can name another file. Configuration entries are
+`RULEBENCH_SOURCE_SET_CONFIG` can name another file. Configuration entries are
 only friendly source locations. They cannot preselect Content Packs, compile,
 activate, or contribute to artifact identity. Their explicit `allowedRoots`
 authorize local imports. Custom Ruleset and independent-content root inputs

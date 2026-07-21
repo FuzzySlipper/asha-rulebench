@@ -799,7 +799,7 @@ pub struct PlayBundleSourceSetDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct ConfiguredRulesetLocationDto {
+pub struct ConfiguredPlayBundleSourceSetDto {
     pub id: String,
     pub label: String,
     pub source_set: PlayBundleSourceSetDto,
@@ -808,9 +808,9 @@ pub struct ConfiguredRulesetLocationDto {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[ts(rename_all = "camelCase")]
-pub struct RulesetLocationConfigDto {
+pub struct PlayBundleSourceSetConfigDto {
     pub schema_version: u32,
-    pub rulesets: Vec<ConfiguredRulesetLocationDto>,
+    pub source_sets: Vec<ConfiguredPlayBundleSourceSetDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -3198,8 +3198,8 @@ pub fn generated_protocol() -> String {
         PlayBundleSourceExportKindDto::decl(),
         PlayBundleSourceEntryDto::decl(),
         PlayBundleSourceSetDto::decl(),
-        ConfiguredRulesetLocationDto::decl(),
-        RulesetLocationConfigDto::decl(),
+        ConfiguredPlayBundleSourceSetDto::decl(),
+        PlayBundleSourceSetConfigDto::decl(),
         RulesetCatalogRequestDto::decl(),
         RulesetCatalogContentPackDto::decl(),
         RulesetCatalogPlayBundleDto::decl(),

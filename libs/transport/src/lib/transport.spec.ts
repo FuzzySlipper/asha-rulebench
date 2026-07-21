@@ -16,8 +16,8 @@ describe('play transport', () => {
     const http: JsonHttpClient = {
       request: async (method, path, body) => {
         requests.push({ method, path, body });
-        if (path === '/api/rulesets/config') {
-          return { schemaVersion: 2, rulesets: [] };
+        if (path === '/api/play-bundle/source-sets') {
+          return { schemaVersion: 2, sourceSets: [] };
         }
         if (path === '/api/rulesets/inspect') {
           return { ok: true, catalog: null, diagnostics: [] };
@@ -29,7 +29,7 @@ describe('play transport', () => {
     const root = 'test-fixtures/rulesets/minimal';
     const sources = sourceSet(root);
 
-    await transport.rulesetLocations();
+    await transport.sourceSets();
     await transport.inspectRuleset({ sourceSet: sources });
     await transport.compile({
       sourceSet: sources,
@@ -57,7 +57,7 @@ describe('play transport', () => {
     });
 
     expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
-      'GET /api/rulesets/config',
+      'GET /api/play-bundle/source-sets',
       'POST /api/rulesets/inspect',
       'POST /api/play-bundle/compile',
       'POST /api/play-bundle/activate',
@@ -76,7 +76,7 @@ describe('play transport', () => {
     const http: JsonHttpClient = {
       request: async () => ({
         schemaVersion: 2,
-        rulesets: [
+        sourceSets: [
           {
             id: 'd20-fantasy',
             label: 'd20 Fantasy',
@@ -86,18 +86,16 @@ describe('play transport', () => {
       }),
     };
 
-    await expect(createPlayTransport(http).rulesetLocations()).resolves.toEqual(
-      {
-        schemaVersion: 2,
-        rulesets: [
-          {
-            id: 'd20-fantasy',
-            label: 'd20 Fantasy',
-            sourceSet: sourceSet('/rules/rulesets/d20-fantasy'),
-          },
-        ],
-      },
-    );
+    await expect(createPlayTransport(http).sourceSets()).resolves.toEqual({
+      schemaVersion: 2,
+      sourceSets: [
+        {
+          id: 'd20-fantasy',
+          label: 'd20 Fantasy',
+          sourceSet: sourceSet('/rules/rulesets/d20-fantasy'),
+        },
+      ],
+    });
   });
 });
 

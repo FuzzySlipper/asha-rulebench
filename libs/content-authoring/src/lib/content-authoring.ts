@@ -7,7 +7,7 @@ import type {
 
 /**
  * Rulebench discovers immutable public authoring values from a canonical
- * Ruleset root. It does not accept an aggregate wrapper that could blur the
+ * explicit source entry. It does not accept an aggregate wrapper that could blur the
  * Ruleset, Content Pack, and PlayBundle boundaries.
  */
 export function isRuleset(value: unknown): value is Ruleset {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "rulesets": [
+  "sourceSets": [
     {
       "id": "rulebench-minimal",
       "label": "Rulebench minimal contract fixture",
