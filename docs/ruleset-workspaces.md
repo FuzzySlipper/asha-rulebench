@@ -90,6 +90,12 @@ identities and escaped or unapproved imports. There is no required aggregate
 export, magic filename beyond `src/index.ts`, side-effect registration,
 directory enumeration, or Rulebench-owned content catalog.
 
+Relative helper imports may use either explicit emitted extensions such as
+`./ruleset.js` or ordinary extensionless TypeScript specifiers such as
+`./ruleset`. Rulebench resolves the declared graph during compilation and emits
+exact relative output-file specifiers before Node evaluates it; source package
+module metadata is not part of the runtime contract.
+
 Inspecting a source set returns:
 
 - the one semantic Ruleset;

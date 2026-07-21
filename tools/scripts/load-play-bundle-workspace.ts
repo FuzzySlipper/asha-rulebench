@@ -113,6 +113,8 @@ export async function loadPlayBundleWorkspace(
       // Authoring sources are data modules. Emit one explicit ESM format instead
       // of inheriting each external checkout's nearest package.json mode and
       // then evaluating mixed CommonJS output inside Rulebench's ESM temp tree.
+      // The emit transformer below also turns every resolved relative edge into
+      // an exact output-file specifier so the graph follows Node's ESM contract.
       module: ts.ModuleKind.ES2022,
       moduleResolution: ts.ModuleResolutionKind.Bundler,
       target: ts.ScriptTarget.ES2022,
@@ -173,7 +175,22 @@ export async function loadPlayBundleWorkspace(
         ),
       };
     }
-    const emit = program.emit();
+    const compilerRoot =
+      compilerOptions.rootDir ??
+      commonAncestor(resolved.value.resolvedAllowedRoots);
+    const emittedSources = new Set(
+      authoredSourceFiles.map((sourceFile) => resolve(sourceFile.fileName)),
+    );
+    const emit = program.emit(undefined, undefined, undefined, false, {
+      before: [
+        nodeEsmModuleSpecifierTransformer(
+          compilerOptions,
+          compilerRoot,
+          buildRoot,
+          emittedSources,
+        ),
+      ],
+    });
     if (emit.emitSkipped || emit.diagnostics.length > 0) {
       return {
         ok: false,
@@ -1150,6 +1167,110 @@ function disallowedModuleSpecifier(sourceFile: ts.SourceFile): string | null {
   };
   visit(sourceFile);
   return disallowed;
+}
+
+function nodeEsmModuleSpecifierTransformer(
+  compilerOptions: ts.CompilerOptions,
+  compilerRoot: string,
+  outputRoot: string,
+  emittedSources: ReadonlySet<string>,
+): ts.TransformerFactory<ts.SourceFile> {
+  return (context) => {
+    const visit: ts.Visitor = (node) => {
+      if (
+        ts.isImportDeclaration(node) &&
+        ts.isStringLiteral(node.moduleSpecifier)
+      ) {
+        const specifier = executableRelativeModuleSpecifier(
+          node.getSourceFile().fileName,
+          node.moduleSpecifier.text,
+          compilerOptions,
+          compilerRoot,
+          outputRoot,
+          emittedSources,
+        );
+        if (specifier !== null) {
+          return context.factory.updateImportDeclaration(
+            node,
+            node.modifiers,
+            node.importClause,
+            context.factory.createStringLiteral(specifier),
+            node.attributes,
+          );
+        }
+      }
+      if (
+        ts.isExportDeclaration(node) &&
+        node.moduleSpecifier !== undefined &&
+        ts.isStringLiteral(node.moduleSpecifier)
+      ) {
+        const specifier = executableRelativeModuleSpecifier(
+          node.getSourceFile().fileName,
+          node.moduleSpecifier.text,
+          compilerOptions,
+          compilerRoot,
+          outputRoot,
+          emittedSources,
+        );
+        if (specifier !== null) {
+          return context.factory.updateExportDeclaration(
+            node,
+            node.modifiers,
+            node.isTypeOnly,
+            node.exportClause,
+            context.factory.createStringLiteral(specifier),
+            node.attributes,
+          );
+        }
+      }
+      return ts.visitEachChild(node, visit, context);
+    };
+
+    return (sourceFile) => ts.visitEachChild(sourceFile, visit, context);
+  };
+}
+
+function executableRelativeModuleSpecifier(
+  sourceFileName: string,
+  authoredSpecifier: string,
+  compilerOptions: ts.CompilerOptions,
+  compilerRoot: string,
+  outputRoot: string,
+  emittedSources: ReadonlySet<string>,
+): string | null {
+  if (
+    !authoredSpecifier.startsWith('./') &&
+    !authoredSpecifier.startsWith('../')
+  ) {
+    return null;
+  }
+  const resolution = ts.resolveModuleName(
+    authoredSpecifier,
+    sourceFileName,
+    compilerOptions,
+    ts.sys,
+  ).resolvedModule;
+  if (resolution === undefined) return null;
+
+  const resolvedTarget = resolve(resolution.resolvedFileName);
+  if (!emittedSources.has(resolvedTarget)) return null;
+
+  const sourceOutput = emittedModulePath(
+    sourceFileName,
+    compilerRoot,
+    outputRoot,
+  );
+  const targetOutput = emittedModulePath(
+    resolvedTarget,
+    compilerRoot,
+    outputRoot,
+  );
+  const outputRelative = normalizedPath(
+    relative(dirname(sourceOutput), targetOutput),
+  );
+  return outputRelative.startsWith('.')
+    ? outputRelative
+    : `./${outputRelative}`;
 }
 
 function isWithinRoot(path: string, root: string): boolean {

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +13,36 @@ import {
 
 const gatewayRoot = process.cwd();
 const minimalRoot = 'test-fixtures/rulesets/minimal';
+let nativeContentCompilerBuilt = false;
+
+function loadThroughNativeContentCompiler(input: unknown): string {
+  if (!nativeContentCompilerBuilt) {
+    execFileSync(
+      process.execPath,
+      [
+        join(gatewayRoot, 'node_modules/typescript/bin/tsc'),
+        '-p',
+        'tools/content-compiler/tsconfig.json',
+      ],
+      { cwd: gatewayRoot, encoding: 'utf8' },
+    );
+    nativeContentCompilerBuilt = true;
+  }
+  return execFileSync(
+    process.execPath,
+    [
+      join(
+        gatewayRoot,
+        'tmp/content-compiler/tools/scripts/load-play-bundle-workspace.js',
+      ),
+    ],
+    {
+      cwd: gatewayRoot,
+      encoding: 'utf8',
+      input: JSON.stringify(input),
+    },
+  );
+}
 
 function oneSource(
   sourceRoot: string,
@@ -249,6 +280,36 @@ describe('explicit PlayBundle source-set loader', () => {
       expect(result.catalog.contentPacks[0]?.id).toBe(
         'rulebench.minimal.content',
       );
+    } finally {
+      await rm(externalRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('loads extensionless helper modules from a standalone external root', async () => {
+    const externalRoot = await mkdtemp(
+      join(tmpdir(), 'rulebench-helper-source-'),
+    );
+    try {
+      await mkdir(join(externalRoot, 'src'));
+      const source = await readFile(
+        join(gatewayRoot, minimalRoot, 'src/index.ts'),
+        'utf8',
+      );
+      await writeFile(join(externalRoot, 'src/definitions.ts'), source, 'utf8');
+      await writeFile(
+        join(externalRoot, 'src/index.ts'),
+        "export * from './definitions';\n",
+        'utf8',
+      );
+
+      const output = loadThroughNativeContentCompiler({
+        operation: 'inspect',
+        sourceSet: oneSource(externalRoot),
+      });
+
+      expect(output).toContain('RULEBENCH_PLAY_BUNDLE_RESULT:{"ok":true');
+      expect(output).toContain('"id":"rulebench.minimal"');
+      expect(output).toContain('"id":"rulebench.minimal.content"');
     } finally {
       await rm(externalRoot, { recursive: true, force: true });
     }
