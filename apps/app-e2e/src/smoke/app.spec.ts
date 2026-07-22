@@ -73,6 +73,48 @@ test('loads peer roots and opens participant details @gate', async ({
   await expect(scenarioDialog).not.toBeVisible();
 
   await expect(workspace).toContainText('Live Rust authority session');
+  const menubar = workspace.getByRole('menubar', {
+    name: 'Rulebench application menu',
+  });
+  const optionsTrigger = menubar.getByRole('menuitem', {
+    name: 'Options',
+    exact: true,
+  });
+  await optionsTrigger.click();
+  let optionsMenu = page.getByRole('menu', { name: 'Options' });
+  let optionsItems = optionsMenu.getByRole('menuitem');
+  await expect(optionsItems.nth(0)).toHaveText('Execute action key: Space…');
+  await expect(optionsItems.nth(1)).toHaveText('Cancel action key: Escape…');
+  await optionsItems.nth(0).click();
+
+  const optionsDialog = page.getByRole('dialog', {
+    name: 'Gameplay options',
+  });
+  const executeActionKey = optionsDialog.getByLabel('Execute action');
+  const cancelActionKey = optionsDialog.getByLabel('Cancel action');
+  await expect(executeActionKey).toHaveValue(' ');
+  await expect(cancelActionKey).toHaveValue('Escape');
+  await expect(
+    executeActionKey.locator('option[value="Escape"]'),
+  ).toHaveAttribute('disabled', '');
+  await expect(cancelActionKey.locator('option[value=" "]')).toHaveAttribute(
+    'disabled',
+    '',
+  );
+  await executeActionKey.selectOption({ label: 'Enter' });
+  await expect(optionsDialog).toContainText(
+    'Current bindings: execute Enter, cancel Escape',
+  );
+  await optionsDialog.getByRole('button', { name: 'Close' }).click();
+
+  await optionsTrigger.click();
+  optionsMenu = page.getByRole('menu', { name: 'Options' });
+  optionsItems = optionsMenu.getByRole('menuitem');
+  await expect(optionsItems.nth(0)).toHaveText('Execute action key: Enter…');
+  await optionsItems.nth(0).click();
+  await executeActionKey.selectOption({ label: 'Space' });
+  await optionsDialog.getByRole('button', { name: 'Close' }).click();
+
   const action = workspace.getByRole('button', { name: /Catch Breath/ });
   const actionFontSize = await action.evaluate((element) =>
     Number.parseFloat(getComputedStyle(element).fontSize),
@@ -149,16 +191,23 @@ test('loads peer roots and opens participant details @gate', async ({
   const secondStep = workspace.getByRole('gridcell', {
     name: /Cell 1, 1, empty/,
   });
+  const combatGrid = workspace.getByRole('grid', { name: 'Combat grid' });
+  const gridBeforePreview = await requiredBoundingBox(combatGrid);
 
   await destinationChoice.hover();
-  await expect(
-    workspace.getByRole('status', {
-      name: 'Cell 2, 1 · 3 steps · movement cost 3',
-    }),
-  ).toBeVisible();
+  const pathStatus = workspace.getByRole('status', {
+    name: 'Cell 2, 1 · 3 steps · movement cost 3',
+  });
+  await expect(pathStatus).toBeVisible();
   await expect(firstStep).toHaveClass(/path-preview/);
   await expect(secondStep).toHaveClass(/path-preview/);
   await expect(destination).toHaveClass(/path-destination/);
+  const gridDuringPreview = await requiredBoundingBox(combatGrid);
+  expect(gridDuringPreview).toEqual(gridBeforePreview);
+  const pathStatusBox = await requiredBoundingBox(pathStatus);
+  expect(pathStatusBox.y).toBeGreaterThanOrEqual(
+    gridDuringPreview.y + gridDuringPreview.height,
+  );
 
   await page.mouse.move(0, 0);
   await expect(firstStep).not.toHaveClass(/path-preview/);
@@ -195,18 +244,33 @@ test('loads peer roots and opens participant details @gate', async ({
   await destination.click();
   await expect(destination).toHaveClass(/targeted/);
   await expect(firstStep).toHaveClass(/path-preview/);
+  await expect(
+    workspace.getByRole('button', {
+      name: 'Use Move with destination Cell 2, 1',
+    }),
+  ).toHaveAttribute('aria-keyshortcuts', 'Space');
+  await expect(
+    workspace.getByRole('button', { name: 'Cancel Move' }),
+  ).toHaveAttribute('aria-keyshortcuts', 'Escape');
 
-  await destination.click();
+  await page.keyboard.press('Escape');
+  await expect(move).toHaveAttribute('aria-pressed', 'false');
+  await expect(
+    workspace.getByRole('heading', { name: 'Move' }),
+  ).not.toBeVisible();
   await expect(destination).not.toHaveClass(/targeted/);
   await expect(firstStep).not.toHaveClass(/path-preview/);
 
-  await destination.click();
-  await page.keyboard.press('Tab');
-  await workspace
-    .getByRole('button', {
-      name: 'Use Move with destination Cell 2, 1',
-    })
-    .click();
+  await move.click();
+  await destinationChoice.click();
+  await expect(destination).toHaveClass(/targeted/);
+
+  await destinationChoice.click();
+  await expect(destination).not.toHaveClass(/targeted/);
+  await expect(firstStep).not.toHaveClass(/path-preview/);
+
+  await destinationChoice.click();
+  await page.keyboard.press('Space');
 
   await expect(workspace).toContainText('demo-rival is acting');
   await expect(
@@ -245,4 +309,16 @@ async function invokeMenuItem(
     .getByRole('menu', { name: menuName })
     .getByRole('menuitem', { name: itemName, exact: true })
     .click();
+}
+
+async function requiredBoundingBox(locator: Locator): Promise<{
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}> {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  if (box === null) throw new Error('Expected a rendered bounding box');
+  return box;
 }

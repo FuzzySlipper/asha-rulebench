@@ -32,7 +32,12 @@ import type {
 } from '@asha-rulebench/protocol';
 import { decodeScenarioDocument } from '@asha-rulebench/protocol';
 import { browserTextFileInput } from '@asha-rulebench/platform';
-import { createBrowserPlayWorkspaceStore } from '@asha-rulebench/store';
+import {
+  createBrowserPlayWorkspaceStore,
+  DEFAULT_CANCEL_ACTION_KEY,
+  DEFAULT_EXECUTE_ACTION_KEY,
+  GAMEPLAY_SHORTCUT_KEYS,
+} from '@asha-rulebench/store';
 
 type DialogName =
   | 'playBundle'
@@ -40,7 +45,19 @@ type DialogName =
   | 'character'
   | 'artifact'
   | 'replay'
+  | 'options'
   | null;
+
+interface GameplayShortcutChoice {
+  readonly key: string;
+  readonly label: string;
+}
+
+const GAMEPLAY_SHORTCUT_CHOICES: readonly GameplayShortcutChoice[] =
+  GAMEPLAY_SHORTCUT_KEYS.map((key) => ({
+    key,
+    label: gameplayShortcutLabel(key),
+  }));
 
 interface BoardCell {
   readonly id: string | null;
@@ -132,6 +149,24 @@ export function authorityReadbackRequiresTargetingReset(
   currentIdentity: string,
 ): boolean {
   return previousIdentity !== undefined && previousIdentity !== currentIdentity;
+}
+
+export function gameplayShortcutLabel(key: string): string {
+  if (key === ' ') return 'Space';
+  if (key === 'Escape') return 'Escape';
+  if (key === 'Backspace') return 'Backspace';
+  if (key === 'Enter') return 'Enter';
+  return key.length === 1 ? key.toLocaleUpperCase() : key;
+}
+
+export function gameplayShortcutMatches(
+  eventKey: string,
+  configuredKey: string,
+): boolean {
+  if (eventKey.length === 1 && configuredKey.length === 1) {
+    return eventKey.toLocaleLowerCase() === configuredKey.toLocaleLowerCase();
+  }
+  return eventKey === configuredKey;
 }
 
 export function toggleAuthorityOption(
@@ -410,8 +445,13 @@ class SetupDiagnosticsComponent {
 
       .path-status {
         border-left: 3px solid rgb(255 196 92 / 90%);
-        margin: 0.6rem 0 0;
+        margin: 0;
+        min-height: 1.35rem;
         padding-left: 0.65rem;
+      }
+
+      .path-status--empty {
+        visibility: hidden;
       }
 
       .cell-coordinate {
@@ -598,13 +638,26 @@ class SetupDiagnosticsComponent {
       }
 
       .setup-grid,
+      .shortcut-grid,
       .participant-editor {
         display: grid;
         gap: 0.75rem;
       }
 
-      .setup-grid {
+      .setup-grid,
+      .shortcut-grid {
         grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      }
+
+      .shortcut-field {
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      kbd {
+        border: 1px solid var(--arb-border);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        padding: 0.1rem 0.35rem;
       }
 
       .participant-editor {
@@ -716,7 +769,11 @@ class SetupDiagnosticsComponent {
     `,
   ],
   template: `
-    <main class="workspace" aria-label="Rulebench interactive combat workspace">
+    <main
+      class="workspace"
+      aria-label="Rulebench interactive combat workspace"
+      (keydown)="handleWorkspaceShortcut($event)"
+    >
       <arb-workbench-panel
         [panelNumber]="0"
         panelTitle="Application menu"
@@ -755,17 +812,6 @@ class SetupDiagnosticsComponent {
                   Choose an action, then choose a highlighted authority target
                   on the grid.
                 </p>
-                @if (previewedCellPath(); as path) {
-                  <p
-                    class="path-status"
-                    role="status"
-                    aria-live="polite"
-                    aria-atomic="true"
-                    [attr.aria-label]="cellPathLabel(path)"
-                  >
-                    {{ cellPathLabel(path) }}
-                  </p>
-                }
               </div>
 
               @if (view.gameplay; as gameplay) {
@@ -795,6 +841,9 @@ class SetupDiagnosticsComponent {
                         [attr.aria-rowindex]="cell.y + 1"
                         [attr.aria-colindex]="cell.x + 1"
                         [attr.data-authority-cell-id]="cell.id"
+                        [attr.data-gameplay-shortcut-surface]="
+                          cell.targetable ? '' : null
+                        "
                         [attr.aria-label]="cellLabel(cell, gameplay.actorId)"
                         [attr.aria-disabled]="cell.targetable ? null : true"
                         (click)="chooseGridCell(cell)"
@@ -827,6 +876,27 @@ class SetupDiagnosticsComponent {
                     }
                   </div>
                 </div>
+                @if (previewedCellPath(); as path) {
+                  <p
+                    class="path-status"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    [attr.aria-label]="cellPathLabel(path)"
+                  >
+                    {{ cellPathLabel(path) }}
+                  </p>
+                } @else {
+                  <p
+                    class="path-status path-status--empty"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    aria-hidden="true"
+                  >
+                    No movement path selected
+                  </p>
+                }
               } @else {
                 <div class="empty-state">
                   <strong>No active session</strong>
@@ -950,6 +1020,7 @@ class SetupDiagnosticsComponent {
           <arb-workbench-panel
             #actionPanel
             class="actions-panel"
+            data-gameplay-shortcut-surface
             [panelNumber]="4"
             panelTitle="Action palette"
           >
@@ -1056,7 +1127,11 @@ class SetupDiagnosticsComponent {
                     </ul>
 
                     @if (selectedAction(); as action) {
-                      <div class="action-context" tabindex="-1">
+                      <div
+                        class="action-context"
+                        data-gameplay-shortcut-surface
+                        tabindex="-1"
+                      >
                         <h3>{{ action.name }}</h3>
                         <div
                           class="target-row"
@@ -1069,6 +1144,7 @@ class SetupDiagnosticsComponent {
                             <button
                               class="secondary"
                               type="button"
+                              data-gameplay-shortcut-surface
                               [attr.aria-pressed]="
                                 isOptionSelected('participant', candidate)
                               "
@@ -1097,6 +1173,7 @@ class SetupDiagnosticsComponent {
                             <button
                               class="secondary"
                               type="button"
+                              data-gameplay-shortcut-surface
                               [attr.data-authority-option-id]="
                                 path.destinationCellId
                               "
@@ -1135,6 +1212,7 @@ class SetupDiagnosticsComponent {
                             <button
                               class="secondary"
                               type="button"
+                              data-gameplay-shortcut-surface
                               [attr.aria-pressed]="
                                 isOptionSelected('area', candidate)
                               "
@@ -1162,22 +1240,45 @@ class SetupDiagnosticsComponent {
                           requests and consumes the exact dice for the branch it
                           executes.
                         </p>
-                        <button
-                          type="button"
-                          [disabled]="
-                            store.busy() ||
-                            (action.maximumTargets > 0 &&
-                              selectedOptions().length === 0)
-                          "
-                          (click)="executeAction()"
-                        >
-                          Use {{ action.name
-                          }}{{
-                            selectedOptions().length === 0
-                              ? ''
-                              : ' with ' + selectedOptionSummary()
-                          }}
-                        </button>
+                        <p class="muted">
+                          Execute
+                          <kbd>{{
+                            shortcutLabel(store.executeActionKey())
+                          }}</kbd>
+                          · Cancel
+                          <kbd>{{
+                            shortcutLabel(store.cancelActionKey())
+                          }}</kbd>
+                        </p>
+                        <div class="button-row">
+                          <button
+                            type="button"
+                            data-execute-action
+                            [attr.aria-keyshortcuts]="
+                              shortcutAriaKey(store.executeActionKey())
+                            "
+                            [disabled]="!selectedActionReady()"
+                            (click)="executeAction()"
+                          >
+                            Use {{ action.name
+                            }}{{
+                              selectedOptions().length === 0
+                                ? ''
+                                : ' with ' + selectedOptionSummary()
+                            }}
+                          </button>
+                          <button
+                            class="secondary"
+                            type="button"
+                            data-cancel-action
+                            [attr.aria-keyshortcuts]="
+                              shortcutAriaKey(store.cancelActionKey())
+                            "
+                            (click)="cancelAction()"
+                          >
+                            Cancel {{ action.name }}
+                          </button>
+                        </div>
                       </div>
                     } @else {
                       <p class="muted">
@@ -3695,6 +3796,84 @@ class SetupDiagnosticsComponent {
     </arb-application-dialog>
 
     <arb-application-dialog
+      dialogId="options-dialog"
+      dialogTitle="Gameplay options"
+      dialogDescription="Configure human input shortcuts for the interactive action loop."
+      [open]="openDialogName() === 'options'"
+      (closeRequested)="closeDialog()"
+    >
+      <div class="dialog-body">
+        <p class="section-label">Keyboard shortcuts</p>
+        <div class="shortcut-grid">
+          <label class="shortcut-field" for="execute-action-key">
+            <strong>Execute action</strong>
+            <select
+              #executeActionKey
+              id="execute-action-key"
+              class="setup-select"
+              aria-describedby="execute-action-key-help"
+              [value]="store.executeActionKey()"
+              (change)="setExecuteActionKey(executeActionKey.value)"
+            >
+              @for (choice of shortcutChoices; track choice.key) {
+                <option
+                  [value]="choice.key"
+                  [disabled]="choice.key === store.cancelActionKey()"
+                  [selected]="choice.key === store.executeActionKey()"
+                >
+                  {{ choice.label }}
+                </option>
+              }
+            </select>
+            <span id="execute-action-key-help" class="muted">
+              Executes only when the selected action has every required target.
+            </span>
+          </label>
+          <label class="shortcut-field" for="cancel-action-key">
+            <strong>Cancel action</strong>
+            <select
+              #cancelActionKey
+              id="cancel-action-key"
+              class="setup-select"
+              aria-describedby="cancel-action-key-help"
+              [value]="store.cancelActionKey()"
+              (change)="setCancelActionKey(cancelActionKey.value)"
+            >
+              @for (choice of shortcutChoices; track choice.key) {
+                <option
+                  [value]="choice.key"
+                  [disabled]="choice.key === store.executeActionKey()"
+                  [selected]="choice.key === store.cancelActionKey()"
+                >
+                  {{ choice.label }}
+                </option>
+              }
+            </select>
+            <span id="cancel-action-key-help" class="muted">
+              Clears the current action, targets, and movement path without
+              submitting.
+            </span>
+          </label>
+        </div>
+        <p class="muted" role="status" aria-live="polite">
+          Current bindings: execute
+          <kbd>{{ shortcutLabel(store.executeActionKey()) }}</kbd
+          >, cancel <kbd>{{ shortcutLabel(store.cancelActionKey()) }}</kbd
+          >. Changes are saved in this browser.
+        </p>
+        <div class="button-row">
+          <button
+            class="secondary"
+            type="button"
+            (click)="resetGameplayShortcuts()"
+          >
+            Reset keyboard shortcuts
+          </button>
+        </div>
+      </div>
+    </arb-application-dialog>
+
+    <arb-application-dialog
       dialogId="replay-dialog"
       dialogTitle="Replay and checkpoint tools"
       dialogDescription="Secondary verification for exact authority commands and recorded roll evidence."
@@ -3780,6 +3959,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     'integer',
     'identifier',
   ] as const;
+  protected readonly shortcutChoices = GAMEPLAY_SHORTCUT_CHOICES;
   protected readonly store = createBrowserPlayWorkspaceStore();
   protected readonly openDialogName = signal<DialogName>(null);
   protected readonly selectedActionId = signal<string | null>(null);
@@ -3822,6 +4002,12 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       );
     },
   );
+
+  protected readonly selectedActionReady = computed(() => {
+    const action = this.selectedAction();
+    if (action === null || this.store.busy()) return false;
+    return action.maximumTargets === 0 || this.selectedOptions().length > 0;
+  });
 
   protected readonly previewedCellPath = computed(() => {
     const action = this.selectedAction();
@@ -4038,6 +4224,27 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
           },
         ],
       },
+      {
+        id: 'options',
+        label: 'Options',
+        items: [
+          {
+            id: 'configure-execute-action-key',
+            label: `Execute action key: ${gameplayShortcutLabel(this.store.executeActionKey())}…`,
+          },
+          {
+            id: 'configure-cancel-action-key',
+            label: `Cancel action key: ${gameplayShortcutLabel(this.store.cancelActionKey())}…`,
+          },
+          {
+            id: 'reset-gameplay-shortcuts',
+            label: 'Reset action keys to defaults',
+            disabled:
+              this.store.executeActionKey() === DEFAULT_EXECUTE_ACTION_KEY &&
+              this.store.cancelActionKey() === DEFAULT_CANCEL_ACTION_KEY,
+          },
+        ],
+      },
     ],
   );
 
@@ -4109,6 +4316,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected handleMenuItem(item: ApplicationMenuItem): void {
+    if (
+      item.id === 'configure-execute-action-key' ||
+      item.id === 'configure-cancel-action-key'
+    ) {
+      this.openDialog('options');
+      return;
+    }
+    if (item.id === 'reset-gameplay-shortcuts') {
+      this.resetGameplayShortcuts();
+      return;
+    }
     if (item.id === 'choose-play-bundle') {
       this.openDialog('playBundle');
       return;
@@ -4146,6 +4364,26 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected closeDialog(): void {
     this.openDialogName.set(null);
     this.selectedParticipantId.set(null);
+  }
+
+  protected setExecuteActionKey(key: string): void {
+    this.store.setExecuteActionKey(key);
+  }
+
+  protected setCancelActionKey(key: string): void {
+    this.store.setCancelActionKey(key);
+  }
+
+  protected resetGameplayShortcuts(): void {
+    this.store.resetGameplayShortcuts();
+  }
+
+  protected shortcutLabel(key: string): string {
+    return gameplayShortcutLabel(key);
+  }
+
+  protected shortcutAriaKey(key: string): string {
+    return gameplayShortcutLabel(key);
   }
 
   protected openCharacterPanel(participantId: string): void {
@@ -4965,6 +5203,42 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }
   }
 
+  protected handleWorkspaceShortcut(event: KeyboardEvent): void {
+    if (
+      event.defaultPrevented ||
+      this.openDialogName() !== null ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
+      return;
+    }
+    if (
+      this.selectedActionId() !== null &&
+      gameplayShortcutMatches(event.key, this.store.cancelActionKey())
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancelAction();
+      return;
+    }
+    if (
+      this.selectedActionReady() &&
+      gameplayShortcutMatches(event.key, this.store.executeActionKey()) &&
+      gameplayShortcutTargetAllowsExecution(event.target)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.executeAction();
+    }
+  }
+
+  protected cancelAction(): void {
+    if (this.selectedActionId() === null) return;
+    this.clearActionTargeting();
+    this.actionPanel()?.focus();
+  }
+
   protected executeAction(): void {
     const gameplay = this.store.view()?.gameplay;
     const actionId = this.selectedActionId();
@@ -5119,6 +5393,25 @@ function recentRulesetRootIndex(itemId: string): number | null {
   if (!itemId.startsWith(prefix)) return null;
   const index = Number(itemId.slice(prefix.length));
   return Number.isSafeInteger(index) && index >= 0 ? index : null;
+}
+
+function gameplayShortcutTargetAllowsExecution(
+  target: EventTarget | null,
+): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest('[data-cancel-action]') !== null) return false;
+  const interactiveControl = target.closest(
+    'button, input, select, textarea, [contenteditable="true"]',
+  );
+  if (
+    interactiveControl !== null &&
+    !interactiveControl.matches(
+      '[data-gameplay-shortcut-surface], [data-execute-action]',
+    )
+  ) {
+    return false;
+  }
+  return target.closest('[data-gameplay-shortcut-surface]') !== null;
 }
 
 function sameStringSet(

@@ -4,6 +4,8 @@ import {
   authorityReadbackRequiresTargetingReset,
   authorityTargetingReadbackIdentity,
   authorityTargetIds,
+  gameplayShortcutLabel,
+  gameplayShortcutMatches,
   toggleAuthorityOption,
   type AuthorityOptionSelection,
 } from './index.js';
@@ -35,6 +37,14 @@ const targetingReadback = (
 });
 
 describe('authority action option selection', () => {
+  it('matches configurable gameplay keys without making letters case-sensitive', () => {
+    expect(gameplayShortcutLabel(' ')).toBe('Space');
+    expect(gameplayShortcutLabel('e')).toBe('E');
+    expect(gameplayShortcutMatches(' ', ' ')).toBe(true);
+    expect(gameplayShortcutMatches('E', 'e')).toBe(true);
+    expect(gameplayShortcutMatches('Escape', 'Enter')).toBe(false);
+  });
+
   it('resets targeting when an independent authority readback changes', () => {
     const initialIdentity = authorityTargetingReadbackIdentity(
       targetingReadback('hero', 1, 'state-a'),

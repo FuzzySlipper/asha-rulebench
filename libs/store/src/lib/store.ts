@@ -37,12 +37,25 @@ export type AsyncState<Value> =
 
 const RECENT_RULESET_ROOTS_KEY = 'asha-rulebench.recent-ruleset-roots.v1';
 const RECENT_RULESET_ROOT_LIMIT = 8;
+const GAMEPLAY_SHORTCUTS_KEY = 'asha-rulebench.gameplay-shortcuts.v1';
+
+export const DEFAULT_EXECUTE_ACTION_KEY = ' ';
+export const DEFAULT_CANCEL_ACTION_KEY = 'Escape';
+export const GAMEPLAY_SHORTCUT_KEYS: readonly string[] = [
+  DEFAULT_EXECUTE_ACTION_KEY,
+  'Enter',
+  DEFAULT_CANCEL_ACTION_KEY,
+  'Backspace',
+  ...'abcdefghijklmnopqrstuvwxyz',
+];
 
 export class PlayWorkspaceStore {
   private readonly mutableState = signal<AsyncState<PlayWorkspaceView>>({
     kind: 'idle',
   });
   private readonly mutableAuthorityReadbackRevision = signal(0);
+  private readonly mutableExecuteActionKey = signal(DEFAULT_EXECUTE_ACTION_KEY);
+  private readonly mutableCancelActionKey = signal(DEFAULT_CANCEL_ACTION_KEY);
   private readonly mutableRulesetRoot = signal('');
   private readonly mutableAdditionalSourceRoots = signal('');
   private readonly mutableConfiguredSourceSetId = signal<string | null>(null);
@@ -67,6 +80,8 @@ export class PlayWorkspaceStore {
   public readonly view = computed(() => currentView(this.mutableState()));
   public readonly authorityReadbackRevision =
     this.mutableAuthorityReadbackRevision.asReadonly();
+  public readonly executeActionKey = this.mutableExecuteActionKey.asReadonly();
+  public readonly cancelActionKey = this.mutableCancelActionKey.asReadonly();
   public readonly busy = computed(
     () => this.mutableState().kind === 'loading' || this.mutableCatalogBusy(),
   );
@@ -92,6 +107,33 @@ export class PlayWorkspaceStore {
     private readonly storage: KeyValueStoragePort,
   ) {
     this.mutableRecentRulesetRoots.set(readRecentRulesetRoots(storage));
+    const shortcuts = readGameplayShortcuts(storage);
+    this.mutableExecuteActionKey.set(shortcuts.executeAction);
+    this.mutableCancelActionKey.set(shortcuts.cancelAction);
+  }
+
+  public setExecuteActionKey(key: string): boolean {
+    if (!isGameplayShortcutKey(key) || key === this.mutableCancelActionKey()) {
+      return false;
+    }
+    this.mutableExecuteActionKey.set(key);
+    this.persistGameplayShortcuts();
+    return true;
+  }
+
+  public setCancelActionKey(key: string): boolean {
+    if (!isGameplayShortcutKey(key) || key === this.mutableExecuteActionKey()) {
+      return false;
+    }
+    this.mutableCancelActionKey.set(key);
+    this.persistGameplayShortcuts();
+    return true;
+  }
+
+  public resetGameplayShortcuts(): void {
+    this.mutableExecuteActionKey.set(DEFAULT_EXECUTE_ACTION_KEY);
+    this.mutableCancelActionKey.set(DEFAULT_CANCEL_ACTION_KEY);
+    this.persistGameplayShortcuts();
   }
 
   public async refresh(): Promise<void> {
@@ -312,6 +354,16 @@ export class PlayWorkspaceStore {
     this.mutableRecentRulesetRoots.set(next);
     this.storage.setItem(RECENT_RULESET_ROOTS_KEY, JSON.stringify(next));
   }
+
+  private persistGameplayShortcuts(): void {
+    this.storage.setItem(
+      GAMEPLAY_SHORTCUTS_KEY,
+      JSON.stringify({
+        executeAction: this.mutableExecuteActionKey(),
+        cancelAction: this.mutableCancelActionKey(),
+      }),
+    );
+  }
 }
 
 function uniqueSourceRoots(value: string): readonly string[] {
@@ -376,4 +428,45 @@ function readRecentRulesetRoots(
   } catch {
     return [];
   }
+}
+
+function readGameplayShortcuts(storage: KeyValueStoragePort): {
+  readonly executeAction: string;
+  readonly cancelAction: string;
+} {
+  const defaults = {
+    executeAction: DEFAULT_EXECUTE_ACTION_KEY,
+    cancelAction: DEFAULT_CANCEL_ACTION_KEY,
+  };
+  const stored = storage.getItem(GAMEPLAY_SHORTCUTS_KEY);
+  if (stored === null) return defaults;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('executeAction' in parsed) ||
+      !('cancelAction' in parsed)
+    ) {
+      return defaults;
+    }
+    const executeAction = parsed.executeAction;
+    const cancelAction = parsed.cancelAction;
+    if (
+      typeof executeAction !== 'string' ||
+      typeof cancelAction !== 'string' ||
+      !isGameplayShortcutKey(executeAction) ||
+      !isGameplayShortcutKey(cancelAction) ||
+      executeAction === cancelAction
+    ) {
+      return defaults;
+    }
+    return { executeAction, cancelAction };
+  } catch {
+    return defaults;
+  }
+}
+
+function isGameplayShortcutKey(value: string): boolean {
+  return GAMEPLAY_SHORTCUT_KEYS.includes(value);
 }

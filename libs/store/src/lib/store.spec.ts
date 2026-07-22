@@ -11,6 +11,27 @@ import { describe, expect, it } from 'vitest';
 import { PlayWorkspaceStore } from './store.js';
 
 describe('play workspace store', () => {
+  it('persists distinct gameplay shortcut preferences with stable defaults', () => {
+    const storage = memoryStorage();
+    const store = new PlayWorkspaceStore(baseTransport(), storage);
+
+    expect(store.executeActionKey()).toBe(' ');
+    expect(store.cancelActionKey()).toBe('Escape');
+    expect(store.setExecuteActionKey('Escape')).toBe(false);
+    expect(store.setExecuteActionKey('Enter')).toBe(true);
+    expect(storage.getItem('asha-rulebench.gameplay-shortcuts.v1')).toBe(
+      '{"executeAction":"Enter","cancelAction":"Escape"}',
+    );
+
+    const restored = new PlayWorkspaceStore(baseTransport(), storage);
+    expect(restored.executeActionKey()).toBe('Enter');
+    expect(restored.cancelActionKey()).toBe('Escape');
+
+    restored.resetGameplayShortcuts();
+    expect(restored.executeActionKey()).toBe(' ');
+    expect(restored.cancelActionKey()).toBe('Escape');
+  });
+
   it('loads configured source sets without selecting or activating one', async () => {
     const store = new PlayWorkspaceStore(baseTransport(), memoryStorage());
 
