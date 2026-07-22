@@ -11,7 +11,15 @@
       <h2 [id]="titleId()">{{ dialogTitle() }}</h2>
       <p [id]="descriptionId()">{{ dialogDescription() }}</p>
     </div>
-    <button class="close" type="button" aria-label="Close" autofocus (click)="requestClose()">Close</button>
+    <button
+      #closeButton
+      class="close"
+      type="button"
+      aria-label="Close"
+      (click)="requestClose()"
+    >
+      Close
+    </button>
   </header>
   <div class="dialog-content"><ng-content /></div>
 </dialog>

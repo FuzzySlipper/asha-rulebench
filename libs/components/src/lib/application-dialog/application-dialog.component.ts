@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, effect, input, output, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 import type { ElementRef } from '@angular/core';
 
 @Component({
@@ -10,6 +17,9 @@ import type { ElementRef } from '@angular/core';
 })
 export class ApplicationDialogComponent {
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dialog');
+  private readonly closeButton =
+    viewChild<ElementRef<HTMLButtonElement>>('closeButton');
+  private restoreFocusTo: HTMLElement | null = null;
 
   readonly dialogId = input.required<string>();
   readonly dialogTitle = input.required<string>();
@@ -21,8 +31,18 @@ export class ApplicationDialogComponent {
     effect(() => {
       const dialog = this.dialog()?.nativeElement;
       if (dialog === undefined) return;
-      if (this.open() && !dialog.open) dialog.showModal();
-      if (!this.open() && dialog.open) dialog.close();
+      if (this.open() && !dialog.open) {
+        this.restoreFocusTo = focusableActiveElement(dialog);
+        dialog.showModal();
+        this.closeButton()?.nativeElement.focus();
+      }
+      if (!this.open() && dialog.open) {
+        dialog.close();
+        if (this.restoreFocusTo?.isConnected === true) {
+          this.restoreFocusTo.focus();
+        }
+        this.restoreFocusTo = null;
+      }
     });
   }
 
@@ -42,4 +62,12 @@ export class ApplicationDialogComponent {
     event.preventDefault();
     this.requestClose();
   }
+}
+
+function focusableActiveElement(dialog: HTMLDialogElement): HTMLElement | null {
+  const activeElement = dialog.ownerDocument.activeElement;
+  const htmlElement = dialog.ownerDocument.defaultView?.HTMLElement;
+  return htmlElement !== undefined && activeElement instanceof htmlElement
+    ? activeElement
+    : null;
 }

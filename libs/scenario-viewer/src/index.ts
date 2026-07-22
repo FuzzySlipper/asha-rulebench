@@ -34,7 +34,13 @@ import { decodeScenarioDocument } from '@asha-rulebench/protocol';
 import { browserTextFileInput } from '@asha-rulebench/platform';
 import { createBrowserPlayWorkspaceStore } from '@asha-rulebench/store';
 
-type DialogName = 'playBundle' | 'scenario' | 'artifact' | 'replay' | null;
+type DialogName =
+  | 'playBundle'
+  | 'scenario'
+  | 'character'
+  | 'artifact'
+  | 'replay'
+  | null;
 
 interface BoardCell {
   readonly x: number;
@@ -357,9 +363,40 @@ class SetupDiagnosticsComponent {
         padding-top: 0.6rem;
       }
 
-      .participant.current {
-        border-left: 3px solid var(--arb-accent-strong);
-        padding-left: 0.65rem;
+      .participant-summary {
+        align-items: baseline;
+        background: transparent;
+        border: 0;
+        color: var(--arb-foreground);
+        display: grid;
+        font-weight: 400;
+        gap: 0.3rem 0.75rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        min-height: 0;
+        padding: 0.25rem 0;
+        text-align: left;
+        width: 100%;
+      }
+
+      .participant-summary strong {
+        grid-column: 1 / -1;
+      }
+
+      .participant-summary:hover {
+        color: var(--arb-accent-strong);
+      }
+
+      .character-summary {
+        display: grid;
+        gap: 0.65rem;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      }
+
+      .character-summary > div {
+        border: 1px solid var(--arb-border);
+        display: grid;
+        gap: 0.25rem;
+        padding: 0.75rem;
       }
 
       .status-card,
@@ -377,6 +414,14 @@ class SetupDiagnosticsComponent {
 
       .action-list {
         grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      }
+
+      .actions-panel .action-list {
+        font-size: 0.78rem;
+      }
+
+      .actions-panel .action-choice strong {
+        font-size: 0.88rem;
       }
 
       .action-choice {
@@ -695,51 +740,25 @@ class SetupDiagnosticsComponent {
               @if (view.gameplay; as gameplay) {
                 <ul class="participant-list" aria-label="Session participants">
                   @for (entity of gameplay.entities; track entity.id) {
-                    <li
-                      class="participant"
-                      [class.current]="entity.id === gameplay.actorId"
-                    >
-                      <strong>{{ entity.label }} · {{ entity.teamId }}</strong>
-                      <code>{{ entity.id }}</code>
-                      @if (entity.id === gameplay.actorId) {
-                        <span class="section-label">Current actor</span>
-                      }
-                      <span
-                        >Vitality {{ entity.vitality }} · cell
-                        {{ entity.position }}</span
+                    <li class="participant">
+                      <button
+                        class="participant-summary"
+                        type="button"
+                        aria-haspopup="dialog"
+                        [attr.aria-label]="
+                          'View ' +
+                          entity.label +
+                          ' character, faction ' +
+                          entity.teamId +
+                          ', hit points ' +
+                          entity.vitality
+                        "
+                        (click)="openCharacterPanel(entity.id)"
                       >
-                      <span class="muted"
-                        >Stats:
-                        {{
-                          entity.stats.length === 0
-                            ? 'none'
-                            : entity.stats.join(', ')
-                        }}</span
-                      >
-                      <span class="muted"
-                        >Defenses:
-                        {{
-                          entity.defenses.length === 0
-                            ? 'none'
-                            : entity.defenses.join(', ')
-                        }}</span
-                      >
-                      <span class="muted"
-                        >Resources:
-                        {{
-                          entity.resources.length === 0
-                            ? 'none'
-                            : entity.resources.join(', ')
-                        }}</span
-                      >
-                      <span class="muted"
-                        >Modifiers:
-                        {{
-                          entity.modifiers.length === 0
-                            ? 'none'
-                            : entity.modifiers.join(', ')
-                        }}</span
-                      >
+                        <strong>{{ entity.label }}</strong>
+                        <span class="muted">Faction {{ entity.teamId }}</span>
+                        <span>HP {{ entity.vitality }}</span>
+                      </button>
                     </li>
                   }
                 </ul>
@@ -919,18 +938,7 @@ class SetupDiagnosticsComponent {
 
                     @if (selectedAction(); as action) {
                       <div class="action-context" tabindex="-1">
-                        <div>
-                          <p class="section-label">Selected action</p>
-                          <h3>{{ action.name }}</h3>
-                          @if (action.description) {
-                            <p>{{ action.description }}</p>
-                          }
-                          <code>{{ action.id }}</code>
-                          <p class="muted">
-                            Rust exposed these legal candidates at revision
-                            {{ gameplay.stateRevision }}.
-                          </p>
-                        </div>
+                        <h3>{{ action.name }}</h3>
                         <div
                           class="target-row"
                           aria-label="Authority target choices"
@@ -1340,8 +1348,8 @@ class SetupDiagnosticsComponent {
               <div class="diagnostic" role="alert">
                 <strong>No declared PlayBundle matches this selection</strong>
                 <span
-                  >Choose a Content Pack combination published by the
-                  configured source set.</span
+                  >Choose a Content Pack combination published by the configured
+                  source set.</span
                 >
               </div>
             }
@@ -3370,6 +3378,94 @@ class SetupDiagnosticsComponent {
     </arb-application-dialog>
 
     <arb-application-dialog
+      dialogId="character-dialog"
+      [dialogTitle]="characterDialogTitle()"
+      dialogDescription="Current participant details reported by the active Rust authority session."
+      [open]="
+        openDialogName() === 'character' && selectedParticipant() !== null
+      "
+      (closeRequested)="closeDialog()"
+    >
+      <div class="dialog-body">
+        @if (selectedParticipant(); as participant) {
+          <section
+            class="character-summary"
+            [attr.aria-label]="participant.label + ' summary'"
+          >
+            <div>
+              <span class="section-label">Faction</span>
+              <strong>{{ participant.teamId }}</strong>
+            </div>
+            <div>
+              <span class="section-label">Hit points</span>
+              <strong>{{ participant.vitality }}</strong>
+            </div>
+          </section>
+          <dl class="facts">
+            <div>
+              <dt>Participant ID</dt>
+              <dd>{{ participant.id }}</dd>
+            </div>
+            <div>
+              <dt>Turn status</dt>
+              <dd>
+                {{
+                  participant.id === store.view()?.gameplay?.actorId
+                    ? 'Current actor'
+                    : 'Waiting'
+                }}
+              </dd>
+            </div>
+            <div>
+              <dt>Position</dt>
+              <dd>{{ participant.position }}</dd>
+            </div>
+          </dl>
+          <section aria-labelledby="character-stats-heading">
+            <h3 id="character-stats-heading">Stats</h3>
+            <ul class="detail-list">
+              @for (stat of participant.stats; track stat) {
+                <li>{{ stat }}</li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
+          <section aria-labelledby="character-defenses-heading">
+            <h3 id="character-defenses-heading">Defenses</h3>
+            <ul class="detail-list">
+              @for (defense of participant.defenses; track defense) {
+                <li>{{ defense }}</li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
+          <section aria-labelledby="character-resources-heading">
+            <h3 id="character-resources-heading">Resources</h3>
+            <ul class="detail-list">
+              @for (resource of participant.resources; track resource) {
+                <li>{{ resource }}</li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
+          <section aria-labelledby="character-modifiers-heading">
+            <h3 id="character-modifiers-heading">Modifiers</h3>
+            <ul class="detail-list">
+              @for (modifier of participant.modifiers; track modifier) {
+                <li>{{ modifier }}</li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+    </arb-application-dialog>
+
+    <arb-application-dialog
       dialogId="artifact-dialog"
       dialogTitle="Artifact and provenance"
       dialogDescription="Secondary inspection for the closed Rust-accepted artifact."
@@ -3552,6 +3648,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly store = createBrowserPlayWorkspaceStore();
   protected readonly openDialogName = signal<DialogName>(null);
   protected readonly selectedActionId = signal<string | null>(null);
+  protected readonly selectedParticipantId = signal<string | null>(null);
   protected readonly selectedOptions = signal<
     readonly AuthorityOptionSelection[]
   >([]);
@@ -3588,6 +3685,25 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       );
     },
   );
+
+  protected readonly selectedParticipant = computed<GameplayEntityView | null>(
+    () => {
+      const selectedParticipantId = this.selectedParticipantId();
+      if (selectedParticipantId === null) return null;
+      return (
+        this.store
+          .view()
+          ?.gameplay?.entities.find(
+            (participant) => participant.id === selectedParticipantId,
+          ) ?? null
+      );
+    },
+  );
+
+  protected readonly characterDialogTitle = computed(() => {
+    const participant = this.selectedParticipant();
+    return participant === null ? 'Character' : participant.label;
+  });
 
   protected readonly boardWidth = computed(() => {
     return this.store.view()?.gameplay?.board.width ?? 1;
@@ -3787,6 +3903,15 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         this.focusFirstSetupDiagnostic();
       }
     });
+    effect(() => {
+      if (
+        this.openDialogName() === 'character' &&
+        this.selectedParticipantId() !== null &&
+        this.selectedParticipant() === null
+      ) {
+        this.closeDialog();
+      }
+    });
   }
 
   public ngOnInit(): void {
@@ -3831,6 +3956,12 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected closeDialog(): void {
     this.openDialogName.set(null);
+    this.selectedParticipantId.set(null);
+  }
+
+  protected openCharacterPanel(participantId: string): void {
+    this.selectedParticipantId.set(participantId);
+    this.openDialog('character');
   }
 
   protected inspectRuleset(): void {
