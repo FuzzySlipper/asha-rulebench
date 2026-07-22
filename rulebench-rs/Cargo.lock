@@ -89,7 +89,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 [[package]]
 name = "rpg-compiler"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=e31926ca9cce3b13f70e621c59d56efa3f8a2647#e31926ca9cce3b13f70e621c59d56efa3f8a2647"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=06b902098a2add8701b2e271d8777bf1e0db4fac#06b902098a2add8701b2e271d8777bf1e0db4fac"
 dependencies = [
  "rpg-core",
  "rpg-ir",
@@ -100,7 +100,7 @@ dependencies = [
 [[package]]
 name = "rpg-core"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=e31926ca9cce3b13f70e621c59d56efa3f8a2647#e31926ca9cce3b13f70e621c59d56efa3f8a2647"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=06b902098a2add8701b2e271d8777bf1e0db4fac#06b902098a2add8701b2e271d8777bf1e0db4fac"
 dependencies = [
  "serde",
 ]
@@ -108,7 +108,7 @@ dependencies = [
 [[package]]
 name = "rpg-ir"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=e31926ca9cce3b13f70e621c59d56efa3f8a2647#e31926ca9cce3b13f70e621c59d56efa3f8a2647"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=06b902098a2add8701b2e271d8777bf1e0db4fac#06b902098a2add8701b2e271d8777bf1e0db4fac"
 dependencies = [
  "rpg-core",
  "serde",
@@ -118,7 +118,7 @@ dependencies = [
 [[package]]
 name = "rpg-runtime"
 version = "0.1.0"
-source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=e31926ca9cce3b13f70e621c59d56efa3f8a2647#e31926ca9cce3b13f70e621c59d56efa3f8a2647"
+source = "git+https://github.com/FuzzySlipper/asha-rpg.git?rev=06b902098a2add8701b2e271d8777bf1e0db4fac#06b902098a2add8701b2e271d8777bf1e0db4fac"
 dependencies = [
  "rpg-compiler",
  "rpg-core",
