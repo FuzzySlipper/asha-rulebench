@@ -11,6 +11,7 @@ import type {
   ScenarioTemplateDto,
   ScenarioTurnDto,
   GameplayActionOptionsDto,
+  GameplayCellPathDto,
   GameplayArchiveDto,
   GameplayAuthorityActionDto,
   GameplayTurnControlDto,
@@ -957,14 +958,33 @@ function gameplayActionOptions(
   path: string,
 ): GameplayActionOptionsDto {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['participantIds', 'cellIds', 'areaIds'], path);
+  exactKeys(record, ['participantIds', 'cellPaths', 'areaIds'], path);
   return {
     participantIds: stringArray(
       record['participantIds'],
       `${path}.participantIds`,
     ),
-    cellIds: stringArray(record['cellIds'], `${path}.cellIds`),
+    cellPaths: requiredArray(record['cellPaths'], `${path}.cellPaths`).map(
+      (cellPath, index) =>
+        gameplayCellPath(cellPath, `${path}.cellPaths[${index}]`),
+    ),
     areaIds: stringArray(record['areaIds'], `${path}.areaIds`),
+  };
+}
+
+function gameplayCellPath(value: unknown, path: string): GameplayCellPathDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['destinationCellId', 'cellIds', 'movementCost'], path);
+  return {
+    destinationCellId: requiredString(
+      record['destinationCellId'],
+      `${path}.destinationCellId`,
+    ),
+    cellIds: stringArray(record['cellIds'], `${path}.cellIds`),
+    movementCost: nonNegativeInteger(
+      record['movementCost'],
+      `${path}.movementCost`,
+    ),
   };
 }
 

@@ -132,30 +132,67 @@ test('loads peer roots and opens participant details @gate', async ({
   });
   await move.click();
   await expect(workspace.getByRole('heading', { name: 'Move' })).toBeVisible();
-  await expect(
-    workspace.getByRole('button', { name: 'Destination Cell 1, 0' }),
-  ).toBeVisible();
+  const destinationChoice = workspace.locator(
+    '[data-authority-option-id="cell-2-1"]',
+  );
+  await expect(destinationChoice).toContainText(
+    'Destination Cell 2, 1 · 3 steps · movement cost 3',
+  );
 
   const destination = workspace.getByRole('gridcell', {
-    name: 'Cell 1, 0, empty, available destination',
+    name: /Cell 2, 1, empty, available destination, 3 steps, movement cost 3/,
   });
+  const firstStep = workspace.getByRole('gridcell', {
+    name: /Cell 0, 1, empty/,
+  });
+  const secondStep = workspace.getByRole('gridcell', {
+    name: /Cell 1, 1, empty/,
+  });
+
+  await destinationChoice.hover();
+  await expect(
+    workspace.getByRole('status', {
+      name: 'Cell 2, 1 · 3 steps · movement cost 3',
+    }),
+  ).toBeVisible();
+  await expect(firstStep).toHaveClass(/path-preview/);
+  await expect(secondStep).toHaveClass(/path-preview/);
+  await expect(destination).toHaveClass(/path-destination/);
+
+  await page.mouse.move(0, 0);
+  await expect(firstStep).not.toHaveClass(/path-preview/);
+
+  await destinationChoice.focus();
+  await expect(firstStep).toHaveClass(/path-preview/);
+  await page.keyboard.press('Tab');
+  await expect(firstStep).not.toHaveClass(/path-preview/);
+
   await destination.click();
+  await page.keyboard.press('Tab');
   await expect(destination).toHaveClass(/targeted/);
+  await expect(firstStep).toHaveClass(/path-preview/);
+
+  await destination.click();
+  await expect(destination).not.toHaveClass(/targeted/);
+  await expect(firstStep).not.toHaveClass(/path-preview/);
+
+  await destination.click();
+  await page.keyboard.press('Tab');
   await workspace
     .getByRole('button', {
-      name: 'Use Move with destination Cell 1, 0',
+      name: 'Use Move with destination Cell 2, 1',
     })
     .click();
 
   await expect(workspace).toContainText('demo-rival is acting');
   await expect(
     workspace.getByRole('gridcell', {
-      name: /Cell 1, 0, Demo Hero, allies, vitality 10\/10/,
+      name: /Cell 2, 1, Demo Hero, allies, vitality 10\/10/,
     }),
   ).toBeVisible();
   await expect(
     workspace.getByRole('list', { name: 'Combat history' }),
-  ).toContainText('demo-hero moved (0,0) to (1,0); provokes=true');
+  ).toContainText('demo-hero moved (0,0) to (2,1); provokes=true');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await hero.click();

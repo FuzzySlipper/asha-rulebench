@@ -455,9 +455,18 @@ pub struct GameplayUnavailableDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct GameplayCellPathDto {
+    pub destination_cell_id: String,
+    pub cell_ids: Vec<String>,
+    pub movement_cost: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct GameplayActionOptionsDto {
     pub participant_ids: Vec<String>,
-    pub cell_ids: Vec<String>,
+    pub cell_paths: Vec<GameplayCellPathDto>,
     pub area_ids: Vec<String>,
 }
 
@@ -2276,7 +2285,16 @@ fn gameplay_authority_action(action: &rpg_runtime::RpgActionView) -> GameplayAut
         maximum_targets: action.maximum_targets,
         options: GameplayActionOptionsDto {
             participant_ids: action.options.participant_ids.clone(),
-            cell_ids: action.options.cell_ids.clone(),
+            cell_paths: action
+                .options
+                .cell_paths
+                .iter()
+                .map(|path| GameplayCellPathDto {
+                    destination_cell_id: path.destination_cell_id.clone(),
+                    cell_ids: path.cell_ids.clone(),
+                    movement_cost: path.movement_cost,
+                })
+                .collect(),
             area_ids: action.options.area_ids.clone(),
         },
     }
@@ -3175,6 +3193,7 @@ pub fn generated_protocol() -> String {
         ScenarioTemplatePresentationDto::decl(),
         ScenarioTemplateDto::decl(),
         GameplayUnavailableDto::decl(),
+        GameplayCellPathDto::decl(),
         GameplayActionOptionsDto::decl(),
         GameplayAuthorityActionDto::decl(),
         GameplayTurnControlDto::decl(),

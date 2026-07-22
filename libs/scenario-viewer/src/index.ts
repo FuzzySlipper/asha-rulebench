@@ -43,11 +43,14 @@ type DialogName =
   | null;
 
 interface BoardCell {
+  readonly id: string | null;
   readonly x: number;
   readonly y: number;
   readonly entity: GameplayEntityView | null;
   readonly targetable: boolean;
   readonly selection: AuthorityOptionSelection | null;
+  readonly pathStep: number | null;
+  readonly pathDestination: boolean;
 }
 
 export type AuthorityOptionKind = 'participant' | 'cell' | 'area';
@@ -311,6 +314,30 @@ class SetupDiagnosticsComponent {
       .grid-cell.targeted {
         background: var(--arb-accent);
         color: var(--arb-on-accent, #071b1a);
+      }
+
+      .grid-cell.path-preview {
+        background:
+          linear-gradient(rgb(255 196 92 / 20%), rgb(255 196 92 / 20%)),
+          var(--arb-bg);
+        border-color: rgb(255 196 92 / 90%);
+        box-shadow: inset 0 0 0 2px rgb(255 196 92 / 45%);
+        color: var(--arb-foreground);
+      }
+
+      .grid-cell.path-destination {
+        background:
+          linear-gradient(rgb(255 196 92 / 38%), rgb(255 196 92 / 38%)),
+          var(--arb-bg);
+        box-shadow:
+          inset 0 0 0 3px rgb(255 196 92 / 75%),
+          0 0 0 1px var(--arb-bg);
+      }
+
+      .path-status {
+        border-left: 3px solid rgb(255 196 92 / 90%);
+        margin: 0.6rem 0 0;
+        padding-left: 0.65rem;
       }
 
       .cell-coordinate {
@@ -654,6 +681,17 @@ class SetupDiagnosticsComponent {
                   Choose an action, then choose a highlighted authority target
                   on the grid.
                 </p>
+                @if (previewedCellPath(); as path) {
+                  <p
+                    class="path-status"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    [attr.aria-label]="cellPathLabel(path)"
+                  >
+                    {{ cellPathLabel(path) }}
+                  </p>
+                }
               </div>
 
               @if (view.gameplay; as gameplay) {
@@ -678,11 +716,18 @@ class SetupDiagnosticsComponent {
                         [class.current]="cell.entity?.id === gameplay.actorId"
                         [class.targetable]="cell.targetable"
                         [class.targeted]="isSelectionSelected(cell.selection)"
+                        [class.path-preview]="cell.pathStep !== null"
+                        [class.path-destination]="cell.pathDestination"
                         [attr.aria-rowindex]="cell.y + 1"
                         [attr.aria-colindex]="cell.x + 1"
+                        [attr.data-authority-cell-id]="cell.id"
                         [attr.aria-label]="cellLabel(cell, gameplay.actorId)"
                         [attr.aria-disabled]="cell.targetable ? null : true"
                         (click)="chooseGridCell(cell)"
+                        (mouseenter)="previewGridCellPath(cell)"
+                        (mouseleave)="clearGridCellPathPreview(cell)"
+                        (focus)="previewGridCellPath(cell)"
+                        (blur)="clearGridCellPathPreview(cell)"
                         (keydown)="moveGridFocus($event, index)"
                       >
                         <span class="cell-coordinate"
@@ -971,30 +1016,45 @@ class SetupDiagnosticsComponent {
                               Target {{ participantLabel(candidate) }}
                             </button>
                           }
-                          @for (candidate of action.cellIds; track candidate) {
+                          @for (
+                            path of action.cellPaths;
+                            track path.destinationCellId
+                          ) {
                             <button
                               class="secondary"
                               type="button"
-                              [attr.data-authority-option-id]="candidate"
+                              [attr.data-authority-option-id]="
+                                path.destinationCellId
+                              "
                               [attr.aria-pressed]="
-                                isOptionSelected('cell', candidate)
+                                isOptionSelected('cell', path.destinationCellId)
                               "
                               [disabled]="
                                 optionDisabled(
                                   'cell',
-                                  candidate,
+                                  path.destinationCellId,
                                   action.maximumTargets
                                 )
+                              "
+                              (mouseenter)="
+                                previewCellPath(path.destinationCellId)
+                              "
+                              (mouseleave)="
+                                clearCellPathPreview(path.destinationCellId)
+                              "
+                              (focus)="previewCellPath(path.destinationCellId)"
+                              (blur)="
+                                clearCellPathPreview(path.destinationCellId)
                               "
                               (click)="
                                 toggleOption(
                                   'cell',
-                                  candidate,
+                                  path.destinationCellId,
                                   action.maximumTargets
                                 )
                               "
                             >
-                              Destination {{ cellOptionLabel(candidate) }}
+                              Destination {{ cellPathLabel(path) }}
                             </button>
                           }
                           @for (candidate of action.areaIds; track candidate) {
@@ -3653,6 +3713,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected readonly selectedOptions = signal<
     readonly AuthorityOptionSelection[]
   >([]);
+  protected readonly transientCellPathId = signal<string | null>(null);
   protected readonly setupDraft = signal<ScenarioSetupRequestDto | null>(null);
   protected readonly setupDocumentName = signal<string | null>(null);
   protected readonly setupImportError = signal<string | null>(null);
@@ -3687,6 +3748,22 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     },
   );
 
+  protected readonly previewedCellPath = computed(() => {
+    const action = this.selectedAction();
+    if (action === null) return null;
+    const selectedCellId = this.selectedOptions().find(
+      (selection) => selection.kind === 'cell',
+    )?.id;
+    const destinationCellId =
+      selectedCellId ?? this.transientCellPathId() ?? null;
+    if (destinationCellId === null) return null;
+    return (
+      action.cellPaths.find(
+        (path) => path.destinationCellId === destinationCellId,
+      ) ?? null
+    );
+  });
+
   protected readonly selectedParticipant = computed<GameplayEntityView | null>(
     () => {
       const selectedParticipantId = this.selectedParticipantId();
@@ -3719,7 +3796,13 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     const entities = gameplay?.entities ?? [];
     const action = this.selectedAction();
     const participantIds = new Set(action?.candidateIds ?? []);
-    const cellIds = new Set(action?.cellIds ?? []);
+    const cellIds = new Set(
+      action?.cellPaths.map((path) => path.destinationCellId) ?? [],
+    );
+    const previewedPath = this.previewedCellPath();
+    const pathSteps = new Map(
+      previewedPath?.cellIds.map((cellId, index) => [cellId, index + 1]) ?? [],
+    );
     const cells: BoardCell[] = [];
     for (let y = 0; y < this.boardHeight(); y += 1) {
       for (let x = 0; x < this.boardWidth(); x += 1) {
@@ -3737,11 +3820,18 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
               ? { kind: 'cell' as const, id: authoredCell.id }
               : null;
         cells.push({
+          id: authoredCell?.id ?? null,
           x,
           y,
           entity,
           targetable: selection !== null,
           selection,
+          pathStep:
+            authoredCell === undefined
+              ? null
+              : (pathSteps.get(authoredCell.id) ?? null),
+          pathDestination:
+            authoredCell?.id === previewedPath?.destinationCellId,
         });
       }
     }
@@ -4190,6 +4280,22 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return cell === undefined ? cellId : `Cell ${cell.x}, ${cell.y}`;
   }
 
+  protected cellPathLabel(
+    path: GameplayActionView['cellPaths'][number],
+  ): string {
+    const stepLabel = path.cellIds.length === 1 ? 'step' : 'steps';
+    return `${this.cellOptionLabel(path.destinationCellId)} · ${path.cellIds.length} ${stepLabel} · movement cost ${path.movementCost}`;
+  }
+
+  private cellPathAccessibility(destinationCellId: string): string {
+    const path = this.selectedAction()?.cellPaths.find(
+      (candidate) => candidate.destinationCellId === destinationCellId,
+    );
+    if (path === undefined) return '';
+    const stepLabel = path.cellIds.length === 1 ? 'step' : 'steps';
+    return `, ${path.cellIds.length} ${stepLabel}, movement cost ${path.movementCost}`;
+  }
+
   protected removeParticipant(index: number): void {
     this.updateSetup((setup) => {
       const participants = setup.participants.filter(
@@ -4600,6 +4706,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       if (started) {
         this.selectedActionId.set(null);
         this.selectedOptions.set([]);
+        this.transientCellPathId.set(null);
         this.closeDialog();
         if (this.store.view()?.gameplay?.outcome.status === 'completed') {
           this.turnPanel()?.focus();
@@ -4729,6 +4836,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected selectAction(action: GameplayActionView): void {
     this.selectedActionId.set(action.id);
     this.selectedOptions.set([]);
+    this.transientCellPathId.set(null);
   }
 
   protected chooseGridCell(cell: BoardCell): void {
@@ -4739,6 +4847,34 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       cell.selection.id,
       action.maximumTargets,
     );
+  }
+
+  protected previewGridCellPath(cell: BoardCell): void {
+    if (cell.selection?.kind === 'cell') {
+      this.previewCellPath(cell.selection.id);
+    }
+  }
+
+  protected clearGridCellPathPreview(cell: BoardCell): void {
+    if (cell.selection?.kind === 'cell') {
+      this.clearCellPathPreview(cell.selection.id);
+    }
+  }
+
+  protected previewCellPath(destinationCellId: string): void {
+    if (
+      this.selectedAction()?.cellPaths.some(
+        (path) => path.destinationCellId === destinationCellId,
+      )
+    ) {
+      this.transientCellPathId.set(destinationCellId);
+    }
+  }
+
+  protected clearCellPathPreview(destinationCellId: string): void {
+    if (this.transientCellPathId() === destinationCellId) {
+      this.transientCellPathId.set(null);
+    }
   }
 
   protected executeAction(): void {
@@ -4755,6 +4891,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     }
     this.selectedActionId.set(null);
     this.selectedOptions.set([]);
+    this.transientCellPathId.set(null);
     void this.store.command({
       expectedRevision: gameplay.stateRevision,
       actionId,
@@ -4768,6 +4905,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     if (gameplay === null || gameplay === undefined) return;
     this.selectedActionId.set(null);
     this.selectedOptions.set([]);
+    this.transientCellPathId.set(null);
     void this.store.control({
       expectedRevision: gameplay.stateRevision,
       actorId: gameplay.actorId,
@@ -4777,7 +4915,9 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected actionOptionCount(action: GameplayActionView): number {
     return (
-      action.candidateIds.length + action.cellIds.length + action.areaIds.length
+      action.candidateIds.length +
+      action.cellPaths.length +
+      action.areaIds.length
     );
   }
 
@@ -4813,9 +4953,17 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     id: string,
     maximumTargets: number,
   ): void {
+    const removesCurrentSelection = this.isOptionSelected(kind, id);
     this.selectedOptions.update((current) =>
       toggleAuthorityOption(current, { kind, id }, maximumTargets),
     );
+    if (
+      kind === 'cell' &&
+      removesCurrentSelection &&
+      this.transientCellPathId() === id
+    ) {
+      this.transientCellPathId.set(null);
+    }
   }
 
   protected resolveReaction(reactionId: string, optionId: string | null): void {
@@ -4832,13 +4980,19 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     const coordinate = `Cell ${cell.x}, ${cell.y}`;
     if (cell.entity === null) {
       const destination =
-        cell.selection?.kind === 'cell' ? ', available destination' : '';
-      return `${coordinate}, empty${destination}`;
+        cell.selection?.kind === 'cell'
+          ? `, available destination${this.cellPathAccessibility(cell.selection.id)}`
+          : '';
+      const pathStep =
+        cell.pathStep === null ? '' : `, path step ${cell.pathStep}`;
+      return `${coordinate}, empty${destination}${pathStep}`;
     }
     const actor = cell.entity.id === actorId ? ', current actor' : '';
     const target =
       cell.selection?.kind === 'participant' ? ', available target' : '';
-    return `${coordinate}, ${cell.entity.label}, ${cell.entity.teamId}, vitality ${cell.entity.vitality}${actor}${target}`;
+    const pathStep =
+      cell.pathStep === null ? '' : `, path step ${cell.pathStep}`;
+    return `${coordinate}, ${cell.entity.label}, ${cell.entity.teamId}, vitality ${cell.entity.vitality}${actor}${target}${pathStep}`;
   }
 
   protected isOpposingTeam(

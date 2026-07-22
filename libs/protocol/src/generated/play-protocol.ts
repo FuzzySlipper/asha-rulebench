@@ -70,7 +70,9 @@ export type ScenarioTemplateDto = { schema: ScenarioSchemaDto, identity: Version
 
 export type GameplayUnavailableDto = { code: string, path: string, message: string, };
 
-export type GameplayActionOptionsDto = { participantIds: Array<string>, cellIds: Array<string>, areaIds: Array<string>, };
+export type GameplayCellPathDto = { destinationCellId: string, cellIds: Array<string>, movementCost: number, };
+
+export type GameplayActionOptionsDto = { participantIds: Array<string>, cellPaths: Array<GameplayCellPathDto>, areaIds: Array<string>, };
 
 export type GameplayAuthorityActionDto = { definitionId: string, label: string, available: boolean, unavailable: GameplayUnavailableDto | null, maximumTargets: number, options: GameplayActionOptionsDto, };
 

@@ -169,8 +169,14 @@ export interface GameplayActionView {
   readonly unavailable: string | null;
   readonly maximumTargets: number;
   readonly candidateIds: readonly string[];
-  readonly cellIds: readonly string[];
+  readonly cellPaths: readonly GameplayCellPathView[];
   readonly areaIds: readonly string[];
+}
+
+export interface GameplayCellPathView {
+  readonly destinationCellId: string;
+  readonly cellIds: readonly string[];
+  readonly movementCost: number;
 }
 
 export interface GameplayTurnControlView {
@@ -424,7 +430,11 @@ function gameplayView(
           : `${action.unavailable.code}: ${action.unavailable.message}`,
       maximumTargets: action.maximumTargets,
       candidateIds: action.options.participantIds,
-      cellIds: action.options.cellIds,
+      cellPaths: action.options.cellPaths.map((path) => ({
+        destinationCellId: path.destinationCellId,
+        cellIds: path.cellIds,
+        movementCost: path.movementCost,
+      })),
       areaIds: action.options.areaIds,
     })),
     controls: gameplay.controls.map((control) => ({

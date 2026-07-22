@@ -26,10 +26,10 @@ const demoMoveAction = action({
   id: actionId('action.rulebench.demo-move'),
   name: 'Move',
   sourcePath: 'test-fixtures/source-sets/independent/content/src/index.ts',
-  targets: cells({ range: 2 }),
+  targets: cells({ range: 3 }),
   check: noRoll(),
   program: onCheck({
-    noRoll: moveToCell({ maximumDistance: 2, provokes: true }),
+    noRoll: moveToCell({ maximumDistance: 3, provokes: true }),
   }),
 });
 

@@ -43,6 +43,13 @@ describe('play workspace view mapping', () => {
     expect(view.gameplayAvailable).toBe(true);
     expect(view.gameplay?.stateRevision).toBe(2);
     expect(view.gameplay?.actions[0]?.candidateIds).toEqual(['raider']);
+    expect(view.gameplay?.actions[0]?.cellPaths).toEqual([
+      {
+        destinationCellId: 'cell-2-1',
+        cellIds: ['cell-1-0', 'cell-2-0', 'cell-2-1'],
+        movementCost: 4,
+      },
+    ]);
     expect(view.gameplay?.turn.initiativeOrder).toEqual(['hero', 'raider']);
     expect(view.gameplay?.archive.verificationStatus).toBe('verified');
     expect(view.gameplay?.archive.replayEntries[0]?.transition).toContain(
@@ -159,7 +166,13 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
         maximumTargets: 1,
         options: {
           participantIds: ['raider'],
-          cellIds: [],
+          cellPaths: [
+            {
+              destinationCellId: 'cell-2-1',
+              cellIds: ['cell-1-0', 'cell-2-0', 'cell-2-1'],
+              movementCost: 4,
+            },
+          ],
           areaIds: [],
         },
       },

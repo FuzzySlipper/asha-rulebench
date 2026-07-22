@@ -12,11 +12,28 @@ export const scenario = defineScenarioTemplate({
   presentation: { label: 'Independent source scenario' },
   board: {
     width: 3,
-    height: 1,
+    height: 2,
     cells: [
       { id: 'cell-0-0', position: { x: 0, y: 0 }, capabilities: [] },
-      { id: 'cell-1-0', position: { x: 1, y: 0 }, capabilities: [] },
+      {
+        id: 'cell-1-0',
+        position: { x: 1, y: 0 },
+        capabilities: [
+          {
+            id: 'capability.traversal',
+            version: 1,
+            value: {
+              kind: 'traversal',
+              passable: false,
+              movementCost: 1,
+            },
+          },
+        ],
+      },
       { id: 'cell-2-0', position: { x: 2, y: 0 }, capabilities: [] },
+      { id: 'cell-0-1', position: { x: 0, y: 1 }, capabilities: [] },
+      { id: 'cell-1-1', position: { x: 1, y: 1 }, capabilities: [] },
+      { id: 'cell-2-1', position: { x: 2, y: 1 }, capabilities: [] },
     ],
   },
   participants: [
