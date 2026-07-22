@@ -139,9 +139,10 @@ test('loads peer roots and opens participant details @gate', async ({
     'Destination Cell 2, 1 · 3 steps · movement cost 3',
   );
 
-  const destination = workspace.getByRole('gridcell', {
-    name: /Cell 2, 1, empty, available destination, 3 steps, movement cost 3/,
-  });
+  const destination = workspace.locator('[data-authority-cell-id="cell-2-1"]');
+  await expect(destination).toHaveAccessibleName(
+    /Cell 2, 1, empty, available destination, 3 steps, movement cost 3/,
+  );
   const firstStep = workspace.getByRole('gridcell', {
     name: /Cell 0, 1, empty/,
   });
@@ -169,6 +170,29 @@ test('loads peer roots and opens participant details @gate', async ({
 
   await destination.click();
   await page.keyboard.press('Tab');
+  await expect(destination).toHaveClass(/targeted/);
+  await expect(firstStep).toHaveClass(/path-preview/);
+
+  await invokeMenuItem(page, workspace, 'Session', 'Replay and checkpoints…');
+  const replayDialog = page.getByRole('dialog', {
+    name: 'Replay and checkpoint tools',
+  });
+  const restoreCheckpoint = replayDialog.getByRole('button', {
+    name: 'Restore latest checkpoint',
+  });
+  await restoreCheckpoint.click();
+  await expect(restoreCheckpoint).toBeEnabled();
+  await replayDialog.getByRole('button', { name: 'Close' }).click();
+  await expect(move).toHaveAttribute('aria-pressed', 'false');
+  await expect(
+    workspace.getByRole('heading', { name: 'Move' }),
+  ).not.toBeVisible();
+  await expect(destination).not.toHaveClass(/targeted/);
+  await expect(firstStep).not.toHaveClass(/path-preview/);
+
+  await move.click();
+  await expect(workspace.getByRole('heading', { name: 'Move' })).toBeVisible();
+  await destination.click();
   await expect(destination).toHaveClass(/targeted/);
   await expect(firstStep).toHaveClass(/path-preview/);
 

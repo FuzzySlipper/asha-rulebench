@@ -60,6 +60,80 @@ export interface AuthorityOptionSelection {
   readonly id: string;
 }
 
+export interface AuthorityTargetingReadback {
+  readonly activationRevision: number;
+  readonly gameplay: {
+    readonly artifactId: string;
+    readonly actorId: string;
+    readonly stateRevision: number;
+    readonly turn: {
+      readonly currentActorId: string;
+      readonly round: number;
+      readonly turn: number;
+    };
+    readonly outcome: {
+      readonly status: string;
+      readonly winningTeamIds: readonly string[];
+    };
+    readonly result: {
+      readonly status: string;
+      readonly code: string | null;
+    } | null;
+    readonly archive: {
+      readonly stateHash: string;
+    };
+  } | null;
+}
+
+export function authorityTargetingReadbackIdentity(
+  view: AuthorityTargetingReadback | null,
+  readbackRevision: number,
+): string {
+  const gameplay = view?.gameplay ?? null;
+  return JSON.stringify({
+    readbackRevision,
+    activationRevision: view?.activationRevision ?? null,
+    session:
+      gameplay === null
+        ? null
+        : {
+            artifactId: gameplay.artifactId,
+            stateHash: gameplay.archive.stateHash,
+            stateRevision: gameplay.stateRevision,
+          },
+    actorId: gameplay?.actorId ?? null,
+    turn:
+      gameplay === null
+        ? null
+        : {
+            currentActorId: gameplay.turn.currentActorId,
+            round: gameplay.turn.round,
+            turn: gameplay.turn.turn,
+          },
+    outcome:
+      gameplay === null
+        ? null
+        : {
+            status: gameplay.outcome.status,
+            winningTeamIds: gameplay.outcome.winningTeamIds,
+          },
+    result:
+      gameplay?.result === null || gameplay?.result === undefined
+        ? null
+        : {
+            status: gameplay.result.status,
+            code: gameplay.result.code,
+          },
+  });
+}
+
+export function authorityReadbackRequiresTargetingReset(
+  previousIdentity: string | undefined,
+  currentIdentity: string,
+): boolean {
+  return previousIdentity !== undefined && previousIdentity !== currentIdentity;
+}
+
 export function toggleAuthorityOption(
   current: readonly AuthorityOptionSelection[],
   selection: AuthorityOptionSelection,
@@ -3733,6 +3807,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     viewChildren<ElementRef<HTMLButtonElement>>('gridCell');
   private readonly setupControls =
     viewChildren<ElementRef<HTMLElement>>('setupControl');
+  private previousAuthorityTargetingReadbackIdentity: string | undefined;
 
   protected readonly selectedAction = computed<GameplayActionView | null>(
     () => {
@@ -3967,6 +4042,21 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   );
 
   public constructor() {
+    effect(() => {
+      const identity = authorityTargetingReadbackIdentity(
+        this.store.view(),
+        this.store.authorityReadbackRevision(),
+      );
+      if (
+        authorityReadbackRequiresTargetingReset(
+          this.previousAuthorityTargetingReadbackIdentity,
+          identity,
+        )
+      ) {
+        this.clearActionTargeting();
+      }
+      this.previousAuthorityTargetingReadbackIdentity = identity;
+    });
     effect(() => {
       const reaction = this.store.view()?.gameplay?.pendingReaction;
       const panel = this.reactionPanel();
@@ -4704,9 +4794,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     if (setup === null) return;
     void this.store.startScenario(setup).then((started) => {
       if (started) {
-        this.selectedActionId.set(null);
-        this.selectedOptions.set([]);
-        this.transientCellPathId.set(null);
+        this.clearActionTargeting();
         this.closeDialog();
         if (this.store.view()?.gameplay?.outcome.status === 'completed') {
           this.turnPanel()?.focus();
@@ -4889,9 +4977,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     ) {
       return;
     }
-    this.selectedActionId.set(null);
-    this.selectedOptions.set([]);
-    this.transientCellPathId.set(null);
+    this.clearActionTargeting();
     void this.store.command({
       expectedRevision: gameplay.stateRevision,
       actionId,
@@ -4903,9 +4989,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   protected executeTurnControl(kind: string): void {
     const gameplay = this.store.view()?.gameplay;
     if (gameplay === null || gameplay === undefined) return;
-    this.selectedActionId.set(null);
-    this.selectedOptions.set([]);
-    this.transientCellPathId.set(null);
+    this.clearActionTargeting();
     void this.store.control({
       expectedRevision: gameplay.stateRevision,
       actorId: gameplay.actorId,
@@ -4974,6 +5058,12 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       reactionId,
       optionId,
     });
+  }
+
+  private clearActionTargeting(): void {
+    this.selectedActionId.set(null);
+    this.selectedOptions.set([]);
+    this.transientCellPathId.set(null);
   }
 
   protected cellLabel(cell: BoardCell, actorId: string): string {

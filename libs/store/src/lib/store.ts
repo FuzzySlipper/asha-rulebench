@@ -42,6 +42,7 @@ export class PlayWorkspaceStore {
   private readonly mutableState = signal<AsyncState<PlayWorkspaceView>>({
     kind: 'idle',
   });
+  private readonly mutableAuthorityReadbackRevision = signal(0);
   private readonly mutableRulesetRoot = signal('');
   private readonly mutableAdditionalSourceRoots = signal('');
   private readonly mutableConfiguredSourceSetId = signal<string | null>(null);
@@ -64,6 +65,8 @@ export class PlayWorkspaceStore {
   );
   public readonly state = this.mutableState.asReadonly();
   public readonly view = computed(() => currentView(this.mutableState()));
+  public readonly authorityReadbackRevision =
+    this.mutableAuthorityReadbackRevision.asReadonly();
   public readonly busy = computed(
     () => this.mutableState().kind === 'loading' || this.mutableCatalogBusy(),
   );
@@ -278,9 +281,11 @@ export class PlayWorkspaceStore {
     this.mutableState.set({ kind: 'loading', previous });
     try {
       const response = await request();
+      const value = playWorkspaceView(response);
+      this.mutableAuthorityReadbackRevision.update((revision) => revision + 1);
       this.mutableState.set({
         kind: 'ready',
-        value: playWorkspaceView(response),
+        value,
       });
       return response;
     } catch (error: unknown) {
