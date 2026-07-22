@@ -975,6 +975,7 @@ class SetupDiagnosticsComponent {
                             <button
                               class="secondary"
                               type="button"
+                              [attr.data-authority-option-id]="candidate"
                               [attr.aria-pressed]="
                                 isOptionSelected('cell', candidate)
                               "
@@ -993,7 +994,7 @@ class SetupDiagnosticsComponent {
                                 )
                               "
                             >
-                              Cell {{ candidate }}
+                              Destination {{ cellOptionLabel(candidate) }}
                             </button>
                           }
                           @for (candidate of action.areaIds; track candidate) {
@@ -3803,7 +3804,15 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected readonly selectedOptionSummary = computed(() =>
     this.selectedOptions()
-      .map((selection) => `${selection.kind} ${selection.id}`)
+      .map((selection) => {
+        if (selection.kind === 'participant') {
+          return `target ${this.participantLabel(selection.id)}`;
+        }
+        if (selection.kind === 'cell') {
+          return `destination ${this.cellOptionLabel(selection.id)}`;
+        }
+        return `area ${selection.id}`;
+      })
       .join(', '),
   );
 
@@ -4172,6 +4181,13 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return entity === undefined
       ? participantId
       : `${entity.label} (${participantId})`;
+  }
+
+  protected cellOptionLabel(cellId: string): string {
+    const cell = this.store
+      .view()
+      ?.gameplay?.board.cells.find((candidate) => candidate.id === cellId);
+    return cell === undefined ? cellId : `Cell ${cell.x}, ${cell.y}`;
   }
 
   protected removeParticipant(index: number): void {
@@ -4814,9 +4830,14 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected cellLabel(cell: BoardCell, actorId: string): string {
     const coordinate = `Cell ${cell.x}, ${cell.y}`;
-    if (cell.entity === null) return `${coordinate}, empty`;
+    if (cell.entity === null) {
+      const destination =
+        cell.selection?.kind === 'cell' ? ', available destination' : '';
+      return `${coordinate}, empty${destination}`;
+    }
     const actor = cell.entity.id === actorId ? ', current actor' : '';
-    const target = cell.targetable ? ', available target' : '';
+    const target =
+      cell.selection?.kind === 'participant' ? ', available target' : '';
     return `${coordinate}, ${cell.entity.label}, ${cell.entity.teamId}, vitality ${cell.entity.vitality}${actor}${target}`;
   }
 

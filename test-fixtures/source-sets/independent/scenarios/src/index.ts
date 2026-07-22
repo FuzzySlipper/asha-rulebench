@@ -1,20 +1,31 @@
 import { defineScenarioTemplate } from '@asha-rpg/authoring';
 
 import { playBundle } from '../../bundles/src/primary.js';
-import { demoActionDefinition } from '../../content/src/index.js';
+import {
+  demoActionDefinition,
+  demoMoveActionDefinition,
+} from '../../content/src/index.js';
 
 export const scenario = defineScenarioTemplate({
   identity: { id: 'rulebench.independent.scenario', version: '1.0.0' },
   playBundle: playBundle.identity,
   presentation: { label: 'Independent source scenario' },
-  board: { width: 3, height: 1, cells: [] },
+  board: {
+    width: 3,
+    height: 1,
+    cells: [
+      { id: 'cell-0-0', position: { x: 0, y: 0 }, capabilities: [] },
+      { id: 'cell-1-0', position: { x: 1, y: 0 }, capabilities: [] },
+      { id: 'cell-2-0', position: { x: 2, y: 0 }, capabilities: [] },
+    ],
+  },
   participants: [
     {
       id: 'demo-hero',
       label: 'Demo Hero',
       teamId: 'allies',
       position: { x: 0, y: 0 },
-      definitionIds: [demoActionDefinition.id],
+      definitionIds: [demoActionDefinition.id, demoMoveActionDefinition.id],
       capabilities: [{ owner: 'vitality', value: { current: 10, max: 10 } }],
     },
     {
@@ -22,7 +33,7 @@ export const scenario = defineScenarioTemplate({
       label: 'Demo Rival',
       teamId: 'rivals',
       position: { x: 2, y: 0 },
-      definitionIds: [demoActionDefinition.id],
+      definitionIds: [demoActionDefinition.id, demoMoveActionDefinition.id],
       capabilities: [{ owner: 'vitality', value: { current: 8, max: 8 } }],
     },
   ],

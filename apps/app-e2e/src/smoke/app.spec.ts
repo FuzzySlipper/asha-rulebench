@@ -127,6 +127,36 @@ test('loads peer roots and opens participant details @gate', async ({
   await expect(characterDialog).not.toBeVisible();
   await expect(hero).toBeFocused();
 
+  const move = workspace.getByRole('button', {
+    name: /^Move Move to an authority-approved destination\./,
+  });
+  await move.click();
+  await expect(workspace.getByRole('heading', { name: 'Move' })).toBeVisible();
+  await expect(
+    workspace.getByRole('button', { name: 'Destination Cell 1, 0' }),
+  ).toBeVisible();
+
+  const destination = workspace.getByRole('gridcell', {
+    name: 'Cell 1, 0, empty, available destination',
+  });
+  await destination.click();
+  await expect(destination).toHaveClass(/targeted/);
+  await workspace
+    .getByRole('button', {
+      name: 'Use Move with destination Cell 1, 0',
+    })
+    .click();
+
+  await expect(workspace).toContainText('demo-rival is acting');
+  await expect(
+    workspace.getByRole('gridcell', {
+      name: /Cell 1, 0, Demo Hero, allies, vitality 10\/10/,
+    }),
+  ).toBeVisible();
+  await expect(
+    workspace.getByRole('list', { name: 'Combat history' }),
+  ).toContainText('demo-hero moved (0,0) to (1,0); provokes=true');
+
   await page.setViewportSize({ width: 390, height: 844 });
   await hero.click();
   await expect(characterDialog).toBeVisible();

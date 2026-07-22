@@ -166,7 +166,9 @@ function startAuthoringGateway(
         );
         sendJson(response, inspection.ok ? 200 : 422, {
           ok: inspection.ok,
-          catalog: inspection.ok ? inspection.catalog : null,
+          catalog: inspection.ok
+            ? authoringCatalogDto(inspection.catalog)
+            : null,
           diagnostics: inspection.diagnostics.map(authoringDiagnosticDto),
         });
         return;
@@ -381,6 +383,16 @@ function authoringDiagnosticDto(diagnostic) {
       diagnostic.graphPath === undefined ? null : [...diagnostic.graphPath],
     expected: diagnostic.expected ?? null,
     actual: diagnostic.actual ?? null,
+  };
+}
+
+function authoringCatalogDto(catalog) {
+  return {
+    ...catalog,
+    playBundles: catalog.playBundles.map((playBundle) => ({
+      ...playBundle,
+      diagnostics: playBundle.diagnostics.map(authoringDiagnosticDto),
+    })),
   };
 }
 

@@ -15,8 +15,14 @@ export const ruleset = defineRuleset({
     },
   },
   provides: {
-    operations: [{ id: 'operation.heal', version: 1 }],
-    capabilities: [{ id: 'capability.vitality', version: 1 }],
+    operations: [
+      { id: 'operation.heal', version: 1 },
+      { id: 'operation.moveToCell', version: 1 },
+    ],
+    capabilities: [
+      { id: 'capability.position', version: 1 },
+      { id: 'capability.vitality', version: 1 },
+    ],
     values: [],
     numericDomains: [],
   },
