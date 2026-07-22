@@ -181,13 +181,14 @@ describe('explicit PlayBundle source-set loader', () => {
     },
   );
 
-  it('composes a Ruleset and an independent content repository through declared roots', async () => {
+  it('composes Ruleset, Content Pack, PlayBundle, and Scenario peer roots', async () => {
     const rulesRoot = 'test-fixtures/source-sets/independent/rules';
     const contentRoot = 'test-fixtures/source-sets/independent/content';
     const bundlesRoot = 'test-fixtures/source-sets/independent/bundles';
+    const scenariosRoot = 'test-fixtures/source-sets/independent/scenarios';
     const sourceSet: PlayBundleSourceSet = {
       schemaVersion: 1,
-      allowedRoots: [rulesRoot, contentRoot, bundlesRoot],
+      allowedRoots: [rulesRoot, contentRoot, bundlesRoot, scenariosRoot],
       entries: [
         {
           id: 'rules',
@@ -208,7 +209,14 @@ describe('explicit PlayBundle source-set loader', () => {
           label: 'Independent bundle',
           sourceRoot: bundlesRoot,
           module: 'src/primary.ts',
-          exportKinds: ['playBundle', 'scenarioTemplate'],
+          exportKinds: ['playBundle'],
+        },
+        {
+          id: 'scenario',
+          label: 'Independent scenario',
+          sourceRoot: scenariosRoot,
+          module: 'src/index.ts',
+          exportKinds: ['scenarioTemplate'],
         },
       ],
     };
@@ -223,6 +231,12 @@ describe('explicit PlayBundle source-set loader', () => {
     expect(result.catalog.contentPacks[0]?.id).toBe(
       'rulebench.independent.content',
     );
+    expect(result.catalog.playBundles[0]?.id).toBe(
+      'rulebench.independent.play',
+    );
+    expect(result.catalog.scenarios[0]?.identity.id).toBe(
+      'rulebench.independent.scenario',
+    );
 
     const alternateRulesRoot =
       'test-fixtures/source-sets/independent/alternate-rules';
@@ -231,7 +245,12 @@ describe('explicit PlayBundle source-set loader', () => {
         operation: 'inspect',
         sourceSet: {
           ...sourceSet,
-          allowedRoots: [alternateRulesRoot, contentRoot, bundlesRoot],
+          allowedRoots: [
+            alternateRulesRoot,
+            contentRoot,
+            bundlesRoot,
+            scenariosRoot,
+          ],
           entries: [
             {
               ...sourceSet.entries[0]!,

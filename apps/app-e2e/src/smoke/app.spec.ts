@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
-test('selects a Ruleset and Content Packs before activating a PlayBundle @gate', async ({
+test('loads peer source roots before activating a PlayBundle @gate', async ({
   page,
 }) => {
   await page.goto('/');
@@ -24,17 +24,23 @@ test('selects a Ruleset and Content Packs before activating a PlayBundle @gate',
 
   await playDialog
     .getByRole('combobox', { name: 'Configured source set' })
-    .selectOption({ label: 'Rulebench minimal contract fixture' });
+    .selectOption({ label: 'Rulebench split-source demo' });
 
-  await expect(playDialog).toContainText('rulebench.minimal@1.0.0');
-  await expect(playDialog).toContainText('rulebench.minimal.content@1.0.0');
+  await expect(playDialog).toContainText('rulebench.independent@1.0.0');
+  await expect(playDialog).toContainText(
+    'rulebench.independent.content@1.0.0',
+  );
+  await expect(playDialog).toContainText('Independent Ruleset:');
+  await expect(playDialog).toContainText('Independent Content Pack:');
+  await expect(playDialog).toContainText('Independent PlayBundle:');
+  await expect(playDialog).toContainText('Independent Scenario:');
   await expect(playDialog).not.toContainText('Compatible PlayBundle');
 
   await playDialog
-    .getByRole('checkbox', { name: /rulebench\.minimal\.content/ })
+    .getByRole('checkbox', { name: /rulebench\.independent\.content/ })
     .check();
   await expect(playDialog).toContainText('Compatible PlayBundle');
-  await expect(playDialog).toContainText('rulebench.minimal.play@1.0.0');
+  await expect(playDialog).toContainText('rulebench.independent.play@1.0.0');
 
   await playDialog
     .getByRole('button', { name: 'Compile selected PlayBundle' })
@@ -53,7 +59,16 @@ test('selects a Ruleset and Content Packs before activating a PlayBundle @gate',
   const scenarioDialog = page.getByRole('dialog', { name: 'Scenario setup' });
   await expect(scenarioDialog).toBeVisible();
   await expect(scenarioDialog).toContainText('PlayBundle binding');
+  const scenarioExample = scenarioDialog.getByRole('button', {
+    name: /Independent source scenario/,
+  });
+  await expect(scenarioExample).toBeVisible();
   await expect(scenarioDialog).toContainText('Choose an explicit JSON setup');
+  await scenarioExample.click();
+  await expect(scenarioExample).toHaveAttribute('aria-pressed', 'true');
+  await expect(scenarioDialog).toContainText(
+    'Selected setup: Independent source scenario',
+  );
   await scenarioDialog.getByRole('button', { name: 'Cancel' }).click();
 
   await expect(workspace).toContainText('PlayBundle active');

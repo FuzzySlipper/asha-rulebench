@@ -2,23 +2,44 @@
   "schemaVersion": 2,
   "sourceSets": [
     {
-      "id": "rulebench-minimal",
-      "label": "Rulebench minimal contract fixture",
+      "id": "rulebench-split-demo",
+      "label": "Rulebench split-source demo",
       "sourceSet": {
         "schemaVersion": 1,
-        "allowedRoots": ["test-fixtures/rulesets/minimal"],
+        "allowedRoots": [
+          "test-fixtures/source-sets/independent/rules",
+          "test-fixtures/source-sets/independent/content",
+          "test-fixtures/source-sets/independent/bundles",
+          "test-fixtures/source-sets/independent/scenarios"
+        ],
         "entries": [
           {
-            "id": "primary",
-            "label": "Rulebench minimal contract fixture",
-            "sourceRoot": "test-fixtures/rulesets/minimal",
+            "id": "ruleset",
+            "label": "Independent Ruleset",
+            "sourceRoot": "test-fixtures/source-sets/independent/rules",
             "module": "src/index.ts",
-            "exportKinds": [
-              "ruleset",
-              "contentPack",
-              "playBundle",
-              "scenarioTemplate"
-            ]
+            "exportKinds": ["ruleset"]
+          },
+          {
+            "id": "content-pack",
+            "label": "Independent Content Pack",
+            "sourceRoot": "test-fixtures/source-sets/independent/content",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "play-bundle",
+            "label": "Independent PlayBundle",
+            "sourceRoot": "test-fixtures/source-sets/independent/bundles",
+            "module": "src/primary.ts",
+            "exportKinds": ["playBundle"]
+          },
+          {
+            "id": "scenario",
+            "label": "Independent Scenario",
+            "sourceRoot": "test-fixtures/source-sets/independent/scenarios",
+            "module": "src/index.ts",
+            "exportKinds": ["scenarioTemplate"]
           }
         ]
       }

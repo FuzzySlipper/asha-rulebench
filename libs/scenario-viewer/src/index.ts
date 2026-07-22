@@ -1231,7 +1231,7 @@ class SetupDiagnosticsComponent {
             <code>src/index.ts</code>.
           </p>
           <label for="additional-source-roots" class="section-label"
-            >Independent content source roots</label
+            >Additional authored source roots</label
           >
           <textarea
             #additionalSourceRootsInput
@@ -1248,8 +1248,9 @@ class SetupDiagnosticsComponent {
             "
           ></textarea>
           <p class="muted">
-            Optional, one root per line. Each root is an explicit source and
-            import boundary; Rulebench does not scan parent directories.
+            Optional, one Content Pack, PlayBundle, or Scenario root per line.
+            Each root is an explicit source and import boundary; Rulebench does
+            not scan parent directories.
           </p>
           <button
             class="secondary"
@@ -1257,7 +1258,7 @@ class SetupDiagnosticsComponent {
             [disabled]="store.busy() || !rootSelectionComplete()"
             (click)="inspectRuleset()"
           >
-            Inspect Ruleset contents
+            Inspect source set
           </button>
 
           @if (store.rulesetCatalog(); as catalog) {
@@ -1339,8 +1340,8 @@ class SetupDiagnosticsComponent {
               <div class="diagnostic" role="alert">
                 <strong>No declared PlayBundle matches this selection</strong>
                 <span
-                  >Choose a Content Pack combination published by the Ruleset
-                  root.</span
+                  >Choose a Content Pack combination published by the
+                  configured source set.</span
                 >
               </div>
             }
