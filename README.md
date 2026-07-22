@@ -36,8 +36,9 @@ Packs...** opens the primary content flow:
 
 The local server reads `.rulebench/source-sets.json`. It only gives source roots
 friendly menu labels; it cannot choose a default, compile, or activate content.
-The ignored local file in this checkout points at the separately cloned
-`/home/dev/asha-d20-fantasy/rulesets/d20-fantasy` root. See
+The ignored local file in this checkout points at the separately cloned d20
+Ruleset, Content Pack, PlayBundle, and Scenario peer roots under
+`/home/dev/asha-d20-fantasy`. See
 [Explicit PlayBundle source sets](docs/ruleset-workspaces.md) for the repository
 contract and a portable configuration example.
 

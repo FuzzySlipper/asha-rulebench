@@ -17,26 +17,29 @@ intermixing their files:
       src/
         index.ts                   # canonical public entry
         ruleset.ts                 # semantic Ruleset
-      content-packs/
-        starter/
-          src/
-            content-pack.ts
-            actions.ts
-            profiles.ts
-      play-bundles/
-        starter.ts
-      scenarios/                   # optional authored setup documents/helpers
-        starter-skirmish.ts
     another-game/
       src/index.ts
-      ...
+  content-packs/
+    starter/
+      src/
+        index.ts                   # canonical public entry
+        content-pack.ts
+        actions.ts
+        profiles.ts
+  play-bundles/
+    starter.ts
+  scenarios/                       # optional setup-only documents/helpers
+    starter-skirmish.ts
 ```
 
-An entry names both its source root and module. The custom UI defaults the
-module to `src/index.ts`, for example:
+Each entry names its own source root and module. The d20 repository therefore
+declares peer roots such as:
 
 ```text
 /home/dev/asha-d20-fantasy/rulesets/d20-fantasy
+/home/dev/asha-d20-fantasy/content-packs/starter
+/home/dev/asha-d20-fantasy/play-bundles
+/home/dev/asha-d20-fantasy/scenarios
 ```
 
 Unrelated Rulesets do not import each other's files. Truly shared semantic
@@ -74,13 +77,20 @@ module paths, and exported kinds are declarations, not discovery hints.
 
 ## Public entry modules
 
-`src/index.ts` exports immutable values authored with `@asha-rpg/authoring`:
+Each peer root exports only the authoring kind it owns. For example:
 
 ```ts
+// rulesets/d20-fantasy/src/index.ts
 export { myRuleset } from './ruleset.js';
-export { starterContentSource } from '../content-packs/starter/src/content-pack.js';
-export { starterPlayBundle } from '../play-bundles/starter.js';
-export { starterScenario } from '../scenarios/starter-skirmish.js';
+
+// content-packs/starter/src/index.ts
+export { starterContentSource } from './content-pack.js';
+
+// play-bundles/starter.ts
+export const starterPlayBundle = composePlayBundle(/* ... */);
+
+// scenarios/starter-skirmish.ts
+export const starterScenario = defineScenarioTemplate(/* ... */);
 ```
 
 The complete module graph may expose other authoring helpers, but each entry
@@ -121,19 +131,40 @@ is ignored by git so machine paths stay local:
       "label": "d20 Fantasy",
       "sourceSet": {
         "schemaVersion": 1,
-        "allowedRoots": ["/home/dev/asha-d20-fantasy/rulesets/d20-fantasy"],
+        "allowedRoots": [
+          "/home/dev/asha-d20-fantasy/rulesets/d20-fantasy",
+          "/home/dev/asha-d20-fantasy/content-packs/starter",
+          "/home/dev/asha-d20-fantasy/play-bundles",
+          "/home/dev/asha-d20-fantasy/scenarios"
+        ],
         "entries": [
           {
-            "id": "d20-fantasy",
-            "label": "d20 Fantasy",
+            "id": "d20-fantasy-rules",
+            "label": "d20 Fantasy Ruleset",
             "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/d20-fantasy",
             "module": "src/index.ts",
-            "exportKinds": [
-              "ruleset",
-              "contentPack",
-              "playBundle",
-              "scenarioTemplate"
-            ]
+            "exportKinds": ["ruleset"]
+          },
+          {
+            "id": "d20-fantasy-starter-content",
+            "label": "d20 Fantasy Starter Content",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/starter",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "d20-fantasy-starter-play",
+            "label": "d20 Fantasy Starter PlayBundle",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/play-bundles",
+            "module": "starter.ts",
+            "exportKinds": ["playBundle"]
+          },
+          {
+            "id": "d20-fantasy-starter-scenarios",
+            "label": "d20 Fantasy Starter Scenarios",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
+            "module": "starter-skirmish.ts",
+            "exportKinds": ["scenarioTemplate"]
           }
         ]
       }
