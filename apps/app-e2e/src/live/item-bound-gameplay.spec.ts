@@ -63,6 +63,11 @@ liveScenario(
     await scenarioDialog
       .getByRole('button', { name: /Starter Skirmish/ })
       .click();
+    const skeletonShortsword = scenarioDialog.locator(
+      '[data-setup-path="$.participants[3].items[0].id"]',
+    );
+    await fighterLongsword.fill('weapon');
+    await skeletonShortsword.fill('weapon');
     await scenarioDialog
       .getByRole('button', { name: 'Validate and start Scenario' })
       .click();
@@ -95,7 +100,9 @@ liveScenario(
       name: 'Combat history',
     });
     await expect(history).toContainText('Item: Shortsword');
-    await expect(history).toContainText('skeleton-shortsword');
+    await expect(history).toContainText(
+      'Item: Shortsword · weapon · hand.main',
+    );
     await expect(
       actionList.getByRole('button', {
         name: /Basic Attack — Battleaxe/,
@@ -130,7 +137,7 @@ liveScenario(
     );
     await declineReactionIfOpen(workspace);
     await expect(history).toContainText('Item: Longsword');
-    await expect(history).toContainText('fighter-longsword');
+    await expect(history).toContainText('Item: Longsword · weapon · hand.main');
 
     await workspace.getByRole('button', { name: /End turn/ }).click();
     await expect(

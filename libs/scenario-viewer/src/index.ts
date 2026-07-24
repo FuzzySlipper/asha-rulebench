@@ -106,6 +106,15 @@ export interface AuthorityTargetingReadback {
   } | null;
 }
 
+export interface AuthorityItemLabelEntity {
+  readonly id: string;
+  readonly items: readonly {
+    readonly id: string;
+    readonly definitionId: string;
+    readonly label: string;
+  }[];
+}
+
 export function authorityTargetingReadbackIdentity(
   view: AuthorityTargetingReadback | null,
   readbackRevision: number,
@@ -1391,7 +1400,10 @@ class SetupDiagnosticsComponent {
                         <span class="muted"
                           >Item:
                           {{
-                            gameplayItemBindingLabel(entry.itemBinding)
+                            gameplayItemBindingLabel(
+                              entry.actorId,
+                              entry.itemBinding
+                            )
                           }}</span
                         >
                       }
@@ -5072,11 +5084,15 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       : `${item.label} · ${itemInstanceId}`;
   }
 
-  protected gameplayItemBindingLabel(binding: GameplayItemBindingDto): string {
-    const item = (this.store.view()?.gameplay?.entities ?? [])
-      .flatMap((entity) => entity.items)
-      .find((candidate) => candidate.id === binding.itemInstanceId);
-    return `${item?.label ?? binding.itemDefinitionId} · ${binding.itemInstanceId} · ${binding.slotId}`;
+  protected gameplayItemBindingLabel(
+    actorId: string,
+    binding: GameplayItemBindingDto,
+  ): string {
+    return authorityItemBindingLabel(
+      this.store.view()?.gameplay?.entities ?? [],
+      actorId,
+      binding,
+    );
   }
 
   protected itemAttributeLabel(attribute: ItemAttributeDto): string {
@@ -6006,6 +6022,21 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     event.preventDefault();
     this.gridCells()[nextIndex]?.nativeElement.focus();
   }
+}
+
+export function authorityItemBindingLabel(
+  entities: readonly AuthorityItemLabelEntity[],
+  actorId: string,
+  binding: GameplayItemBindingDto,
+): string {
+  const item = entities
+    .find((entity) => entity.id === actorId)
+    ?.items.find(
+      (candidate) =>
+        candidate.id === binding.itemInstanceId &&
+        candidate.definitionId === binding.itemDefinitionId,
+    );
+  return `${item?.label ?? binding.itemDefinitionId} · ${binding.itemInstanceId} · ${binding.slotId}`;
 }
 
 function recentRulesetRootIndex(itemId: string): number | null {
