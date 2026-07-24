@@ -10,9 +10,9 @@ use rpg_compiler::{
     RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity, RpgDiagnosticStage,
 };
 use rpg_core::{
-    BoundedValue, GridPosition, RpgDomainEvent, RpgRandomEvidence, RpgRandomRequest,
-    RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt, RpgResolutionRejection,
-    RpgTeamId, RpgTraceStep,
+    BoundedValue, GridPosition, RpgDomainEvent, RpgIntentItemBinding, RpgRandomEvidence,
+    RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt,
+    RpgResolutionRejection, RpgTeamId, RpgTraceStep,
 };
 use rpg_ir::{
     CompiledPlayBundleArtifact, ContentConflictPolicy, ContentExtensionPolicy, ContentImpactPlane,
@@ -22,11 +22,12 @@ use rpg_ir::{
 use rpg_runtime::{
     RpgActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure, RpgBoardSetup,
     RpgCellCapabilitySetup, RpgCellCapabilityValue, RpgCellSetup, RpgCheckpointPhase,
-    RpgCommandOutcome, RpgEncounterOutcomeView, RpgInitialCapability, RpgParticipantSetup,
-    RpgRandomSource, RpgRandomSourceBinding, RpgRandomSourceFailure, RpgReactionProposal,
-    RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation, RpgReplayPhase,
-    RpgScenario, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal,
-    RpgTurnControlReceipt, RpgTurnInitialization,
+    RpgCommandOutcome, RpgEncounterOutcomeView, RpgEquipmentSlotSetup, RpgInitialCapability,
+    RpgItemInstanceSetup, RpgParticipantSetup, RpgRandomSource, RpgRandomSourceBinding,
+    RpgRandomSourceFailure, RpgReactionProposal, RpgReplayBoundary, RpgReplayEntry,
+    RpgReplayFailure, RpgReplayOperation, RpgReplayPhase, RpgScenario, RpgSchemaIdentity,
+    RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal, RpgTurnControlReceipt,
+    RpgTurnInitialization,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -146,7 +147,74 @@ pub struct ParticipantProfileDto {
     pub description: Option<String>,
     pub role: String,
     pub definition_ids: Vec<String>,
+    pub items: Vec<ScenarioItemInstanceDto>,
+    pub equipment: Vec<ScenarioEquipmentSlotDto>,
     pub capabilities: Vec<ScenarioInitialCapabilityDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ItemCatalogReferenceDto {
+    pub definition_id: String,
+    pub category: String,
+    pub package_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ItemRulesetValueReferenceDto {
+    pub kind: String,
+    pub id: String,
+    pub ruleset_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "type", rename_all = "camelCase")]
+pub enum ItemAttributeDto {
+    BoundedInteger {
+        id: String,
+        value: String,
+        minimum: String,
+        maximum: String,
+    },
+    Identifier {
+        id: String,
+        value_id: String,
+    },
+    Dice {
+        id: String,
+        count: u32,
+        sides: u32,
+        bonus: i32,
+    },
+    CatalogReference {
+        id: String,
+        value: ItemCatalogReferenceDto,
+    },
+    RulesetValueReference {
+        id: String,
+        value: ItemRulesetValueReferenceDto,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ItemDefinitionDto {
+    pub definition_id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub traits: Vec<String>,
+    pub allowed_slots: Vec<String>,
+    pub attributes: Vec<ItemAttributeDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -236,6 +304,7 @@ pub struct PlayBundleArtifactSummaryDto {
     pub required_numeric_domains: Vec<String>,
     pub ruleset_values: Vec<RulesetValueDto>,
     pub participant_profiles: Vec<ParticipantProfileDto>,
+    pub item_definitions: Vec<ItemDefinitionDto>,
     pub exported_roots: Vec<String>,
     pub definitions: Vec<ContentDefinitionDto>,
     pub policy_binding_ids: Vec<String>,
@@ -386,7 +455,25 @@ pub struct ScenarioParticipantDto {
     pub team_id: String,
     pub position: ScenarioPositionDto,
     pub definition_ids: Vec<String>,
+    pub items: Vec<ScenarioItemInstanceDto>,
+    pub equipment: Vec<ScenarioEquipmentSlotDto>,
     pub capabilities: Vec<ScenarioInitialCapabilityDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct ScenarioItemInstanceDto {
+    pub id: String,
+    pub definition_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct ScenarioEquipmentSlotDto {
+    pub slot_id: String,
+    pub item_instance_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -476,10 +563,21 @@ pub struct GameplayActionOptionsDto {
 pub struct GameplayAuthorityActionDto {
     pub definition_id: String,
     pub label: String,
+    pub item_binding: Option<GameplayItemBindingDto>,
     pub available: bool,
     pub unavailable: Option<GameplayUnavailableDto>,
     pub maximum_targets: u32,
     pub options: GameplayActionOptionsDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayItemBindingDto {
+    pub binding_id: String,
+    pub item_instance_id: String,
+    pub item_definition_id: String,
+    pub slot_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -500,6 +598,7 @@ pub struct GameplayLogEntryDto {
     pub state_revision: String,
     pub actor_id: String,
     pub action_id: String,
+    pub item_binding: Option<GameplayItemBindingDto>,
     pub events: Vec<GameplayEventDto>,
 }
 
@@ -615,11 +714,27 @@ pub struct GameplayEntityDto {
     pub x: u32,
     pub y: u32,
     pub definition_ids: Vec<String>,
+    pub items: Vec<GameplayItemInstanceDto>,
+    pub equipment: Vec<ScenarioEquipmentSlotDto>,
     pub vitality: GameplayNamedValueDto,
     pub stats: Vec<GameplayNamedValueDto>,
     pub defenses: Vec<GameplayNamedValueDto>,
     pub resources: Vec<GameplayNamedValueDto>,
     pub modifiers: Vec<GameplayModifierDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayItemInstanceDto {
+    pub id: String,
+    pub definition_id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub traits: Vec<String>,
+    pub allowed_slots: Vec<String>,
+    pub attributes: Vec<ItemAttributeDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -893,6 +1008,7 @@ pub struct GameplayCommandRequestDto {
     pub action_id: String,
     pub actor_id: String,
     pub target_ids: Vec<String>,
+    pub item_binding: Option<GameplayItemBindingDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -1316,6 +1432,7 @@ impl PlayHost {
                 action_id: request.action_id,
                 actor_id: request.actor_id,
                 target_ids: request.target_ids,
+                item_binding: request.item_binding.map(item_binding_from_dto),
             },
             random_source.as_mut(),
         );
@@ -1911,6 +2028,22 @@ fn scenario(request: ScenarioSetupRequestDto) -> RpgScenario {
                 team_id: RpgTeamId::named(participant.team_id),
                 position: grid_position(participant.position),
                 definition_ids: participant.definition_ids,
+                items: participant
+                    .items
+                    .into_iter()
+                    .map(|item| RpgItemInstanceSetup {
+                        id: item.id,
+                        definition_id: item.definition_id,
+                    })
+                    .collect(),
+                equipment: participant
+                    .equipment
+                    .into_iter()
+                    .map(|equipment| RpgEquipmentSlotSetup {
+                        slot_id: equipment.slot_id,
+                        item_instance_id: equipment.item_instance_id,
+                    })
+                    .collect(),
                 capabilities: participant
                     .capabilities
                     .into_iter()
@@ -2273,6 +2406,7 @@ fn gameplay_authority_action(action: &rpg_runtime::RpgActionView) -> GameplayAut
     GameplayAuthorityActionDto {
         definition_id: action.definition_id.clone(),
         label: action.label.clone(),
+        item_binding: action.item_binding.as_ref().map(gameplay_item_binding),
         available: action.available,
         unavailable: action
             .unavailable
@@ -2325,6 +2459,7 @@ fn gameplay_log_entry(entry: &rpg_runtime::RpgEncounterLogEntry) -> GameplayLogE
         state_revision: entry.state_revision.to_string(),
         actor_id: entry.actor_id.clone(),
         action_id: entry.action_id.clone(),
+        item_binding: entry.item_binding.as_ref().map(gameplay_item_binding),
         events: entry.events.iter().map(gameplay_event).collect(),
     }
 }
@@ -2350,6 +2485,28 @@ fn gameplay_entity(entity: &rpg_runtime::RpgParticipantView) -> GameplayEntityDt
         x: entity.position.x,
         y: entity.position.y,
         definition_ids: entity.definition_ids.clone(),
+        items: entity
+            .items
+            .iter()
+            .map(|item| GameplayItemInstanceDto {
+                id: item.id.clone(),
+                definition_id: item.definition_id.clone(),
+                label: item.label.clone(),
+                description: item.description.clone(),
+                tags: item.tags.clone(),
+                traits: item.traits.clone(),
+                allowed_slots: item.allowed_slots.clone(),
+                attributes: item.attributes.iter().map(item_attribute).collect(),
+            })
+            .collect(),
+        equipment: entity
+            .equipment
+            .iter()
+            .map(|equipment| ScenarioEquipmentSlotDto {
+                slot_id: equipment.slot_id.clone(),
+                item_instance_id: equipment.item_instance_id.clone(),
+            })
+            .collect(),
         vitality: GameplayNamedValueDto {
             id: "vitality".to_owned(),
             current: entity.vitality.current,
@@ -2388,6 +2545,24 @@ fn named_value(id: &str, current: i32, maximum: Option<i32>) -> GameplayNamedVal
         id: id.to_owned(),
         current,
         maximum,
+    }
+}
+
+fn gameplay_item_binding(binding: &RpgIntentItemBinding) -> GameplayItemBindingDto {
+    GameplayItemBindingDto {
+        binding_id: binding.binding_id.clone(),
+        item_instance_id: binding.item_instance_id.clone(),
+        item_definition_id: binding.item_definition_id.clone(),
+        slot_id: binding.slot_id.clone(),
+    }
+}
+
+fn item_binding_from_dto(binding: GameplayItemBindingDto) -> RpgIntentItemBinding {
+    RpgIntentItemBinding {
+        binding_id: binding.binding_id,
+        item_instance_id: binding.item_instance_id,
+        item_definition_id: binding.item_definition_id,
+        slot_id: binding.slot_id,
     }
 }
 
@@ -2875,6 +3050,7 @@ fn artifact_summary(bundle: &CompiledPlayBundle) -> PlayBundleArtifactSummaryDto
             .iter()
             .map(participant_profile)
             .collect(),
+        item_definitions: bundle.items().iter().map(item_definition).collect(),
         exported_roots: artifact.exported_roots.clone(),
         definitions: artifact
             .materialized_definitions
@@ -3053,11 +3229,90 @@ fn participant_profile(profile: &rpg_ir::CompiledParticipantProfile) -> Particip
         description: profile.description.clone(),
         role: participant_profile_role(profile.role).to_owned(),
         definition_ids: profile.definition_ids.clone(),
+        items: profile
+            .items
+            .iter()
+            .map(|item| ScenarioItemInstanceDto {
+                id: item.id.clone(),
+                definition_id: item.definition_id.clone(),
+            })
+            .collect(),
+        equipment: profile
+            .equipment
+            .iter()
+            .map(|equipment| ScenarioEquipmentSlotDto {
+                slot_id: equipment.slot_id.clone(),
+                item_instance_id: equipment.item_instance_id.clone(),
+            })
+            .collect(),
         capabilities: profile
             .capabilities
             .iter()
             .map(participant_profile_capability)
             .collect(),
+    }
+}
+
+fn item_definition(item: &rpg_ir::CompiledItemDefinition) -> ItemDefinitionDto {
+    ItemDefinitionDto {
+        definition_id: item.definition_id.clone(),
+        label: item.label.clone(),
+        description: item.description.clone(),
+        tags: item.tags.clone(),
+        traits: item.traits.clone(),
+        allowed_slots: item.allowed_slots.clone(),
+        attributes: item.attributes.iter().map(item_attribute).collect(),
+    }
+}
+
+fn item_attribute(attribute: &rpg_ir::ItemAttribute) -> ItemAttributeDto {
+    match attribute {
+        rpg_ir::ItemAttribute::BoundedInteger {
+            id,
+            value,
+            minimum,
+            maximum,
+        } => ItemAttributeDto::BoundedInteger {
+            id: id.clone(),
+            value: value.to_string(),
+            minimum: minimum.to_string(),
+            maximum: maximum.to_string(),
+        },
+        rpg_ir::ItemAttribute::Identifier { id, value_id } => ItemAttributeDto::Identifier {
+            id: id.clone(),
+            value_id: value_id.clone(),
+        },
+        rpg_ir::ItemAttribute::Dice {
+            id,
+            count,
+            sides,
+            bonus,
+        } => ItemAttributeDto::Dice {
+            id: id.clone(),
+            count: *count,
+            sides: *sides,
+            bonus: *bonus,
+        },
+        rpg_ir::ItemAttribute::CatalogReference { id, value } => {
+            ItemAttributeDto::CatalogReference {
+                id: id.clone(),
+                value: ItemCatalogReferenceDto {
+                    definition_id: value.definition_id.clone(),
+                    category: value.category.clone(),
+                    package_id: value.package_id.clone(),
+                },
+            }
+        }
+        rpg_ir::ItemAttribute::RulesetValueReference { id, value } => {
+            ItemAttributeDto::RulesetValueReference {
+                id: id.clone(),
+                value: ItemRulesetValueReferenceDto {
+                    kind: ruleset_value_kind(value.kind).to_owned(),
+                    id: value.id.clone(),
+                    ruleset_id: value.ruleset_id.clone(),
+                },
+            }
+        }
     }
 }
 
@@ -3125,6 +3380,8 @@ fn ruleset_value_kind(kind: RulesetValueKind) -> &'static str {
 fn definition_kind(kind: MaterializedContentDefinitionKind) -> &'static str {
     match kind {
         MaterializedContentDefinitionKind::Action => "action",
+        MaterializedContentDefinitionKind::ActionProcedure => "actionProcedure",
+        MaterializedContentDefinitionKind::Item => "item",
         MaterializedContentDefinitionKind::Support => "support",
     }
 }
@@ -3168,6 +3425,10 @@ pub fn generated_protocol() -> String {
         ContentDefinitionDto::decl(),
         RulesetValueDto::decl(),
         ParticipantProfileDto::decl(),
+        ItemCatalogReferenceDto::decl(),
+        ItemRulesetValueReferenceDto::decl(),
+        ItemAttributeDto::decl(),
+        ItemDefinitionDto::decl(),
         ContentRelationshipDto::decl(),
         PlayBundleFingerprintDto::decl(),
         ContentPatchChangeDto::decl(),
@@ -3187,6 +3448,8 @@ pub fn generated_protocol() -> String {
         ScenarioBoardDto::decl(),
         ScenarioInitialCapabilityDto::decl(),
         ScenarioParticipantDto::decl(),
+        ScenarioItemInstanceDto::decl(),
+        ScenarioEquipmentSlotDto::decl(),
         ScenarioTurnDto::decl(),
         ScenarioRandomSourceDto::decl(),
         ScenarioSetupRequestDto::decl(),
@@ -3196,6 +3459,7 @@ pub fn generated_protocol() -> String {
         GameplayCellPathDto::decl(),
         GameplayActionOptionsDto::decl(),
         GameplayAuthorityActionDto::decl(),
+        GameplayItemBindingDto::decl(),
         GameplayTurnControlDto::decl(),
         GameplayLogEntryDto::decl(),
         GameplayOutcomeDto::decl(),
@@ -3203,6 +3467,7 @@ pub fn generated_protocol() -> String {
         GameplayNamedValueDto::decl(),
         GameplayModifierDto::decl(),
         GameplayEntityDto::decl(),
+        GameplayItemInstanceDto::decl(),
         GameplayEventDto::decl(),
         GameplayTraceDto::decl(),
         GameplayReactionOptionDto::decl(),
@@ -3245,12 +3510,14 @@ mod tests {
     use rpg_core::{RpgRandomRequest, RpgRandomRequestKind};
     use rpg_ir::{
         CompiledParticipantProfile, ParticipantProfileBoundedValue,
-        ParticipantProfileInitialCapability, ParticipantProfileRole,
+        ParticipantProfileEquipmentSlot, ParticipantProfileInitialCapability,
+        ParticipantProfileItemInstance, ParticipantProfileRole,
     };
     use rpg_runtime::RpgRandomSource;
 
     use super::{
-        participant_profile, PlayBundleLifecycleStatus, PlayHost, ScenarioInitialCapabilityDto,
+        item_binding_from_dto, participant_profile, GameplayCommandRequestDto,
+        PlayBundleLifecycleStatus, PlayHost, ScenarioInitialCapabilityDto,
         ScriptedGameplayRandomSource, SystemGameplayRandomSource,
     };
 
@@ -3303,6 +3570,14 @@ mod tests {
             description: Some("Typed profile".to_owned()),
             role: ParticipantProfileRole::Player,
             definition_ids: vec!["action.strike".to_owned()],
+            items: vec![ParticipantProfileItemInstance {
+                id: "fighter-longsword".to_owned(),
+                definition_id: "item.long-sword".to_owned(),
+            }],
+            equipment: vec![ParticipantProfileEquipmentSlot {
+                slot_id: "hand.main".to_owned(),
+                item_instance_id: "fighter-longsword".to_owned(),
+            }],
             capabilities: vec![ParticipantProfileInitialCapability::Vitality {
                 value: ParticipantProfileBoundedValue {
                     current: 12,
@@ -3314,10 +3589,37 @@ mod tests {
         let dto = participant_profile(&profile);
         assert_eq!(dto.profile_id, "fighter");
         assert_eq!(dto.role, "player");
+        assert_eq!(dto.items[0].id, "fighter-longsword");
+        assert_eq!(dto.items[0].definition_id, "item.long-sword");
+        assert_eq!(dto.equipment[0].slot_id, "hand.main");
+        assert_eq!(dto.equipment[0].item_instance_id, "fighter-longsword");
         assert!(matches!(
             dto.capabilities.as_slice(),
             [ScenarioInitialCapabilityDto::Vitality { .. }]
         ));
+    }
+
+    #[test]
+    fn gameplay_command_dto_preserves_the_selected_item_binding() {
+        let request: GameplayCommandRequestDto = serde_json::from_value(serde_json::json!({
+            "expectedRevision": 7,
+            "actionId": "action.basic-attack",
+            "actorId": "fighter",
+            "targetIds": ["goblin"],
+            "itemBinding": {
+                "bindingId": "weapon",
+                "itemInstanceId": "fighter-longsword",
+                "itemDefinitionId": "item.long-sword",
+                "slotId": "hand.main"
+            }
+        }))
+        .unwrap();
+
+        let binding = item_binding_from_dto(request.item_binding.unwrap());
+        assert_eq!(binding.binding_id, "weapon");
+        assert_eq!(binding.item_instance_id, "fighter-longsword");
+        assert_eq!(binding.item_definition_id, "item.long-sword");
+        assert_eq!(binding.slot_id, "hand.main");
     }
 
     #[test]

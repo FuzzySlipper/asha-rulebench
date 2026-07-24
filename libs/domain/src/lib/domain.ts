@@ -1,9 +1,14 @@
 import type {
   ContentPatchChangeDto,
+  GameplayItemBindingDto,
+  GameplayItemInstanceDto,
+  ItemDefinitionDto,
   PlayBundleArtifactSummaryDto,
   PlayDiagnosticDto,
   PlayWorkspaceResponseDto,
+  ScenarioEquipmentSlotDto,
   ScenarioInitialCapabilityDto,
+  ScenarioItemInstanceDto,
 } from '@asha-rulebench/protocol';
 
 export interface ContentPackSourceView {
@@ -47,6 +52,8 @@ export interface ParticipantProfileView {
   readonly description: string | null;
   readonly role: string;
   readonly definitionIds: readonly string[];
+  readonly items: readonly ScenarioItemInstanceDto[];
+  readonly equipment: readonly ScenarioEquipmentSlotDto[];
   readonly capabilities: readonly ScenarioInitialCapabilityDto[];
 }
 
@@ -120,6 +127,7 @@ export interface PlayBundleArtifactInspectionView {
   readonly numericDomains: readonly string[];
   readonly rulesetValues: readonly RulesetValueView[];
   readonly participantProfiles: readonly ParticipantProfileView[];
+  readonly itemDefinitions: readonly ItemDefinitionDto[];
   readonly exportedRoots: readonly string[];
   readonly definitions: readonly ContentDefinitionView[];
   readonly policyBindingIds: readonly string[];
@@ -161,10 +169,12 @@ export interface PlayWorkspaceView {
 }
 
 export interface GameplayActionView {
+  readonly identity: string;
   readonly id: string;
   readonly name: string;
   readonly description: string | null;
   readonly tags: readonly string[];
+  readonly itemBinding: GameplayItemBindingDto | null;
   readonly available: boolean;
   readonly unavailable: string | null;
   readonly maximumTargets: number;
@@ -195,6 +205,8 @@ export interface GameplayEntityView {
   readonly position: string;
   readonly vitality: string;
   readonly definitionIds: readonly string[];
+  readonly items: readonly GameplayItemInstanceDto[];
+  readonly equipment: readonly ScenarioEquipmentSlotDto[];
   readonly stats: readonly string[];
   readonly defenses: readonly string[];
   readonly resources: readonly string[];
@@ -230,6 +242,7 @@ export interface GameplayWorkspaceView {
     readonly stateRevision: string;
     readonly actorId: string;
     readonly actionId: string;
+    readonly itemBinding: GameplayItemBindingDto | null;
     readonly events: readonly string[];
   }[];
   readonly outcome: {
@@ -291,6 +304,20 @@ export interface GameplayWorkspaceView {
       readonly events: readonly string[];
     }[];
   };
+}
+
+export function gameplayActionIdentity(
+  definitionId: string,
+  itemBinding: GameplayItemBindingDto | null,
+): string {
+  if (itemBinding === null) return definitionId;
+  return [
+    definitionId,
+    itemBinding.bindingId,
+    itemBinding.itemInstanceId,
+    itemBinding.itemDefinitionId,
+    itemBinding.slotId,
+  ].join('\u0000');
 }
 
 export function playWorkspaceView(
@@ -417,26 +444,7 @@ function gameplayView(
       round: gameplay.turn.round,
       turn: gameplay.turn.turn,
     },
-    actions: gameplay.actions.map((action) => ({
-      id: action.definitionId,
-      name: action.label,
-      description:
-        definitionsById.get(action.definitionId)?.description ?? null,
-      tags: definitionsById.get(action.definitionId)?.tags ?? [],
-      available: action.available,
-      unavailable:
-        action.unavailable === null
-          ? null
-          : `${action.unavailable.code}: ${action.unavailable.message}`,
-      maximumTargets: action.maximumTargets,
-      candidateIds: action.options.participantIds,
-      cellPaths: action.options.cellPaths.map((path) => ({
-        destinationCellId: path.destinationCellId,
-        cellIds: path.cellIds,
-        movementCost: path.movementCost,
-      })),
-      areaIds: action.options.areaIds,
-    })),
+    actions: gameplayActionViews(gameplay.actions, definitionsById),
     controls: gameplay.controls.map((control) => ({
       kind: control.kind,
       label: control.label,
@@ -455,6 +463,8 @@ function gameplayView(
       position: `(${entity.x}, ${entity.y})`,
       vitality: `${entity.vitality.current}/${entity.vitality.maximum ?? 'unbounded'}`,
       definitionIds: entity.definitionIds,
+      items: entity.items,
+      equipment: entity.equipment,
       stats: entity.stats.map(
         (value) =>
           `${rulesetValueLabels.get(`stat:${value.id}`) ?? value.id} ${value.current}`,
@@ -477,6 +487,7 @@ function gameplayView(
       stateRevision: entry.stateRevision,
       actorId: entry.actorId,
       actionId: entry.actionId,
+      itemBinding: entry.itemBinding,
       events: entry.events.map((event) => `${event.kind}: ${event.summary}`),
     })),
     outcome: gameplay.outcome,
@@ -553,6 +564,57 @@ function gameplayView(
   };
 }
 
+function gameplayActionViews(
+  actions: NonNullable<PlayWorkspaceResponseDto['gameplay']>['actions'],
+  definitionsById: ReadonlyMap<
+    string,
+    PlayBundleArtifactSummaryDto['definitions'][number]
+  >,
+): readonly GameplayActionView[] {
+  const definitionsWithBoundActions = new Set(
+    actions.flatMap((action) =>
+      action.itemBinding === null ? [] : [action.definitionId],
+    ),
+  );
+  const viewsByIdentity = new Map<string, GameplayActionView>();
+  for (const action of actions) {
+    const isRedundantUnboundItemAction =
+      action.itemBinding === null &&
+      action.unavailable?.code === 'RPG_ACTION_ITEM_BINDING_UNAVAILABLE' &&
+      definitionsWithBoundActions.has(action.definitionId);
+    if (isRedundantUnboundItemAction) continue;
+
+    const identity = gameplayActionIdentity(
+      action.definitionId,
+      action.itemBinding,
+    );
+    if (viewsByIdentity.has(identity)) continue;
+    viewsByIdentity.set(identity, {
+      identity,
+      id: action.definitionId,
+      name: action.label,
+      description:
+        definitionsById.get(action.definitionId)?.description ?? null,
+      tags: definitionsById.get(action.definitionId)?.tags ?? [],
+      itemBinding: action.itemBinding,
+      available: action.available,
+      unavailable:
+        action.unavailable === null
+          ? null
+          : `${action.unavailable.code}: ${action.unavailable.message}`,
+      maximumTargets: action.maximumTargets,
+      candidateIds: action.options.participantIds,
+      cellPaths: action.options.cellPaths.map((path) => ({
+        destinationCellId: path.destinationCellId,
+        cellIds: path.cellIds,
+        movementCost: path.movementCost,
+      })),
+      areaIds: action.options.areaIds,
+    });
+  }
+  return [...viewsByIdentity.values()];
+}
+
 function artifactInspection(
   artifact: PlayBundleArtifactSummaryDto,
 ): PlayBundleArtifactInspectionView {
@@ -583,6 +645,7 @@ function artifactInspection(
     numericDomains: artifact.requiredNumericDomains,
     rulesetValues: artifact.rulesetValues,
     participantProfiles: artifact.participantProfiles,
+    itemDefinitions: artifact.itemDefinitions,
     exportedRoots: artifact.exportedRoots,
     definitions: artifact.definitions.map((definition) => ({
       id: definition.id,

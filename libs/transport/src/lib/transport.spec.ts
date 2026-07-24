@@ -54,6 +54,7 @@ describe('play transport', () => {
       actionId: 'action.arc-lash',
       actorId: 'hero',
       targetIds: ['raider'],
+      itemBinding: null,
     });
 
     expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
@@ -69,6 +70,7 @@ describe('play transport', () => {
       actionId: 'action.arc-lash',
       actorId: 'hero',
       targetIds: ['raider'],
+      itemBinding: null,
     });
   });
 

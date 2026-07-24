@@ -43,6 +43,8 @@ export const scenario = defineScenarioTemplate({
       teamId: 'allies',
       position: { x: 0, y: 0 },
       definitionIds: [demoActionDefinition.id, demoMoveActionDefinition.id],
+      items: [],
+      equipment: [],
       capabilities: [{ owner: 'vitality', value: { current: 10, max: 10 } }],
     },
     {
@@ -51,6 +53,8 @@ export const scenario = defineScenarioTemplate({
       teamId: 'rivals',
       position: { x: 2, y: 0 },
       definitionIds: [demoActionDefinition.id, demoMoveActionDefinition.id],
+      items: [],
+      equipment: [],
       capabilities: [{ owner: 'vitality', value: { current: 8, max: 8 } }],
     },
   ],

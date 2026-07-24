@@ -22,8 +22,12 @@ import type {
   GameplayEntityView,
 } from '@asha-rulebench/domain';
 import type {
+  GameplayItemBindingDto,
+  ItemAttributeDto,
   ScenarioCellCapabilityDto,
+  ScenarioEquipmentSlotDto,
   ScenarioInitialCapabilityDto,
+  ScenarioItemInstanceDto,
   ScenarioParticipantDto,
   ScenarioRandomSourceDto,
   ScenarioSetupRequestDto,
@@ -1084,13 +1088,13 @@ class SetupDiagnosticsComponent {
                     </div>
                   } @else {
                     <ul class="action-list" aria-label="Available actions">
-                      @for (action of gameplay.actions; track action.id) {
+                      @for (action of gameplay.actions; track action.identity) {
                         <li>
                           <button
                             class="action-choice"
                             type="button"
                             [attr.aria-pressed]="
-                              selectedActionId() === action.id
+                              selectedActionId() === action.identity
                             "
                             [disabled]="store.busy() || !action.available"
                             (click)="selectAction(action)"
@@ -1383,6 +1387,14 @@ class SetupDiagnosticsComponent {
                       <span class="muted"
                         >Authority revision {{ entry.stateRevision }}</span
                       >
+                      @if (entry.itemBinding) {
+                        <span class="muted"
+                          >Item:
+                          {{
+                            gameplayItemBindingLabel(entry.itemBinding)
+                          }}</span
+                        >
+                      }
                       @for (event of entry.events; track $index) {
                         <span>{{ event }}</span>
                       }
@@ -2817,6 +2829,395 @@ class SetupDiagnosticsComponent {
                   "
                 />
               </fieldset>
+              <fieldset class="definition-choices">
+                <legend class="section-label">Inventory</legend>
+                @for (
+                  item of participant.items;
+                  track $index;
+                  let itemIndex = $index
+                ) {
+                  <div
+                    class="setup-grid"
+                    [attr.data-setup-path]="
+                      participantItemPath(participantIndex, itemIndex)
+                    "
+                  >
+                    <label>
+                      <span class="section-label">Item instance ID</span>
+                      <input
+                        #setupControl
+                        #itemInstanceIdInput
+                        class="setup-input"
+                        [attr.data-setup-path]="
+                          participantItemFieldPath(
+                            participantIndex,
+                            itemIndex,
+                            'id'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'id'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'id'
+                            )
+                          )
+                        "
+                        [value]="item.id"
+                        (input)="
+                          updateParticipantItem(
+                            participantIndex,
+                            itemIndex,
+                            'id',
+                            itemInstanceIdInput.value
+                          )
+                        "
+                      />
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'id'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'id'
+                            )
+                          )
+                        "
+                      />
+                    </label>
+                    <label>
+                      <span class="section-label">Item definition</span>
+                      <select
+                        #setupControl
+                        #itemDefinitionSelect
+                        class="setup-select"
+                        [attr.data-setup-path]="
+                          participantItemFieldPath(
+                            participantIndex,
+                            itemIndex,
+                            'definitionId'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                        [value]="item.definitionId"
+                        (change)="
+                          updateParticipantItem(
+                            participantIndex,
+                            itemIndex,
+                            'definitionId',
+                            itemDefinitionSelect.value
+                          )
+                        "
+                      >
+                        <option value="">Choose an item definition</option>
+                        @for (
+                          definition of itemDefinitions();
+                          track definition.definitionId
+                        ) {
+                          <option [value]="definition.definitionId">
+                            {{ definition.label }} ·
+                            {{ definition.definitionId }}
+                          </option>
+                        }
+                      </select>
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            participantItemFieldPath(
+                              participantIndex,
+                              itemIndex,
+                              'definitionId'
+                            )
+                          )
+                        "
+                      />
+                    </label>
+                    <button
+                      class="secondary"
+                      type="button"
+                      (click)="
+                        removeParticipantItem(participantIndex, itemIndex)
+                      "
+                    >
+                      Remove item
+                    </button>
+                  </div>
+                } @empty {
+                  <p class="muted">No item instances.</p>
+                }
+                <button
+                  #setupControl
+                  class="secondary"
+                  type="button"
+                  [attr.data-setup-path]="
+                    participantPath(participantIndex, 'items')
+                  "
+                  [attr.aria-invalid]="
+                    setupHasExactError(
+                      participantPath(participantIndex, 'items')
+                    )
+                  "
+                  [attr.aria-describedby]="
+                    setupExactDescribedBy(
+                      participantPath(participantIndex, 'items')
+                    )
+                  "
+                  (click)="addParticipantItem(participantIndex)"
+                >
+                  Add item
+                </button>
+                <arb-setup-diagnostics
+                  [diagnostics]="
+                    setupExactDiagnosticsFor(
+                      participantPath(participantIndex, 'items')
+                    )
+                  "
+                  [messageId]="
+                    setupDiagnosticId(
+                      participantPath(participantIndex, 'items')
+                    )
+                  "
+                />
+              </fieldset>
+              <fieldset class="definition-choices">
+                <legend class="section-label">Equipment</legend>
+                @for (
+                  slot of participant.equipment;
+                  track $index;
+                  let slotIndex = $index
+                ) {
+                  <div
+                    class="setup-grid"
+                    [attr.data-setup-path]="
+                      participantEquipmentPath(participantIndex, slotIndex)
+                    "
+                  >
+                    <label>
+                      <span class="section-label">Slot ID</span>
+                      <input
+                        #setupControl
+                        #equipmentSlotIdInput
+                        class="setup-input"
+                        [attr.data-setup-path]="
+                          participantEquipmentFieldPath(
+                            participantIndex,
+                            slotIndex,
+                            'slotId'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'slotId'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'slotId'
+                            )
+                          )
+                        "
+                        [value]="slot.slotId"
+                        (input)="
+                          updateParticipantEquipment(
+                            participantIndex,
+                            slotIndex,
+                            'slotId',
+                            equipmentSlotIdInput.value
+                          )
+                        "
+                      />
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'slotId'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'slotId'
+                            )
+                          )
+                        "
+                      />
+                    </label>
+                    <label>
+                      <span class="section-label">Equipped item</span>
+                      <select
+                        #setupControl
+                        #equipmentItemSelect
+                        class="setup-select"
+                        [attr.data-setup-path]="
+                          participantEquipmentFieldPath(
+                            participantIndex,
+                            slotIndex,
+                            'itemInstanceId'
+                          )
+                        "
+                        [attr.aria-invalid]="
+                          setupHasError(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'itemInstanceId'
+                            )
+                          )
+                        "
+                        [attr.aria-describedby]="
+                          setupDescribedBy(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'itemInstanceId'
+                            )
+                          )
+                        "
+                        [value]="slot.itemInstanceId"
+                        (change)="
+                          updateParticipantEquipment(
+                            participantIndex,
+                            slotIndex,
+                            'itemInstanceId',
+                            equipmentItemSelect.value
+                          )
+                        "
+                      >
+                        <option value="">Choose an item instance</option>
+                        @for (
+                          candidate of participant.items;
+                          track candidate.id
+                        ) {
+                          <option [value]="candidate.id">
+                            {{ participantItemLabel(candidate) }}
+                          </option>
+                        }
+                      </select>
+                      <arb-setup-diagnostics
+                        [diagnostics]="
+                          setupDiagnosticsFor(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'itemInstanceId'
+                            )
+                          )
+                        "
+                        [messageId]="
+                          setupDiagnosticId(
+                            participantEquipmentFieldPath(
+                              participantIndex,
+                              slotIndex,
+                              'itemInstanceId'
+                            )
+                          )
+                        "
+                      />
+                    </label>
+                    <button
+                      class="secondary"
+                      type="button"
+                      (click)="
+                        removeParticipantEquipment(participantIndex, slotIndex)
+                      "
+                    >
+                      Remove equipment
+                    </button>
+                  </div>
+                } @empty {
+                  <p class="muted">No equipped item slots.</p>
+                }
+                <button
+                  #setupControl
+                  class="secondary"
+                  type="button"
+                  [attr.data-setup-path]="
+                    participantPath(participantIndex, 'equipment')
+                  "
+                  [attr.aria-invalid]="
+                    setupHasExactError(
+                      participantPath(participantIndex, 'equipment')
+                    )
+                  "
+                  [attr.aria-describedby]="
+                    setupExactDescribedBy(
+                      participantPath(participantIndex, 'equipment')
+                    )
+                  "
+                  (click)="addParticipantEquipment(participantIndex)"
+                >
+                  Add equipped slot
+                </button>
+                <arb-setup-diagnostics
+                  [diagnostics]="
+                    setupExactDiagnosticsFor(
+                      participantPath(participantIndex, 'equipment')
+                    )
+                  "
+                  [messageId]="
+                    setupDiagnosticId(
+                      participantPath(participantIndex, 'equipment')
+                    )
+                  "
+                />
+              </fieldset>
             </section>
           } @empty {
             <p class="muted">
@@ -3657,6 +4058,54 @@ class SetupDiagnosticsComponent {
               <dd>{{ participant.position }}</dd>
             </div>
           </dl>
+          <section aria-labelledby="character-inventory-heading">
+            <h3 id="character-inventory-heading">Inventory</h3>
+            <ul class="detail-list">
+              @for (item of participant.items; track item.id) {
+                <li>
+                  <strong>{{ item.label }}</strong>
+                  <code>{{ item.id }}</code>
+                  @if (item.description) {
+                    <span>{{ item.description }}</span>
+                  }
+                  @if (item.tags.length > 0) {
+                    <span>Tags: {{ item.tags.join(' · ') }}</span>
+                  }
+                  @if (item.traits.length > 0) {
+                    <span>Traits: {{ item.traits.join(' · ') }}</span>
+                  }
+                  @if (item.allowedSlots.length > 0) {
+                    <span
+                      >Allowed slots: {{ item.allowedSlots.join(' · ') }}</span
+                    >
+                  }
+                  @for (attribute of item.attributes; track attribute.id) {
+                    <span>{{ itemAttributeLabel(attribute) }}</span>
+                  }
+                </li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
+          <section aria-labelledby="character-equipment-heading">
+            <h3 id="character-equipment-heading">Equipment</h3>
+            <ul class="detail-list">
+              @for (
+                slot of participant.equipment;
+                track slot.slotId + ':' + slot.itemInstanceId
+              ) {
+                <li>
+                  <strong>{{ slot.slotId }}</strong>
+                  <span>{{
+                    gameplayItemLabel(participant, slot.itemInstanceId)
+                  }}</span>
+                </li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
           <section aria-labelledby="character-stats-heading">
             <h3 id="character-stats-heading">Stats</h3>
             <ul class="detail-list">
@@ -3997,7 +4446,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         this.store
           .view()
           ?.gameplay?.actions.find(
-            (action) => action.id === selectedActionId,
+            (action) => action.identity === selectedActionId,
           ) ?? null
       );
     },
@@ -4137,6 +4586,10 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     (this.store.view()?.artifact?.definitions ?? []).filter((definition) =>
       definition.contract.startsWith('action'),
     ),
+  );
+
+  protected readonly itemDefinitions = computed(
+    () => this.store.view()?.artifact?.itemDefinitions ?? [],
   );
 
   protected readonly supportedRandomSources = computed<
@@ -4470,6 +4923,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         ...participant,
         position: { ...participant.position },
         definitionIds: [...participant.definitionIds],
+        items: participant.items.map((item) => ({ ...item })),
+        equipment: participant.equipment.map((slot) => ({ ...slot })),
         capabilities: participant.capabilities.map(cloneInitialCapability),
       })),
       turn: {
@@ -4538,6 +4993,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         teamId: `team-${participantNumber}`,
         position: { x: participantNumber - 1, y: 0 },
         definitionIds: [],
+        items: [],
+        equipment: [],
         capabilities: [{ owner: 'vitality', value: { current: 10, max: 10 } }],
       };
       const participants = [...setup.participants, participant];
@@ -4571,6 +5028,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         teamId: profile.role === 'player' ? 'players' : 'creatures',
         position: firstAvailablePosition(setup),
         definitionIds: [profile.definitionId, ...profile.definitionIds],
+        items: profile.items.map((item) => ({ ...item })),
+        equipment: profile.equipment.map((slot) => ({ ...slot })),
         capabilities: profile.capabilities.map(cloneInitialCapability),
       };
       const participants = [...setup.participants, participant];
@@ -4599,6 +5058,42 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     return entity === undefined
       ? participantId
       : `${entity.label} (${participantId})`;
+  }
+
+  protected gameplayItemLabel(
+    participant: GameplayEntityView,
+    itemInstanceId: string,
+  ): string {
+    const item = participant.items.find(
+      (candidate) => candidate.id === itemInstanceId,
+    );
+    return item === undefined
+      ? itemInstanceId
+      : `${item.label} · ${itemInstanceId}`;
+  }
+
+  protected gameplayItemBindingLabel(binding: GameplayItemBindingDto): string {
+    const item = (this.store.view()?.gameplay?.entities ?? [])
+      .flatMap((entity) => entity.items)
+      .find((candidate) => candidate.id === binding.itemInstanceId);
+    return `${item?.label ?? binding.itemDefinitionId} · ${binding.itemInstanceId} · ${binding.slotId}`;
+  }
+
+  protected itemAttributeLabel(attribute: ItemAttributeDto): string {
+    if (attribute.type === 'boundedInteger') {
+      return `${attribute.id}: ${attribute.value} (${attribute.minimum}–${attribute.maximum})`;
+    }
+    if (attribute.type === 'identifier') {
+      return `${attribute.id}: ${attribute.valueId}`;
+    }
+    if (attribute.type === 'dice') {
+      const bonus = attribute.bonus === 0 ? '' : ` ${signed(attribute.bonus)}`;
+      return `${attribute.id}: ${attribute.count}d${attribute.sides}${bonus}`;
+    }
+    if (attribute.type === 'catalogReference') {
+      return `${attribute.id}: ${attribute.value.category} ${attribute.value.definitionId}`;
+    }
+    return `${attribute.id}: ${attribute.value.kind} ${attribute.value.id}`;
   }
 
   protected cellOptionLabel(cellId: string): string {
@@ -4708,6 +5203,100 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         ? participant.definitionIds.filter((id) => id !== definitionId)
         : [...participant.definitionIds, definitionId],
     }));
+  }
+
+  protected addParticipantItem(participantIndex: number): void {
+    const definitionId = this.itemDefinitions()[0]?.definitionId ?? '';
+    this.updateParticipant(participantIndex, (participant) => {
+      const usedIds = new Set(participant.items.map((item) => item.id));
+      let ordinal = participant.items.length + 1;
+      while (usedIds.has(`item-${ordinal}`)) ordinal += 1;
+      const item: ScenarioItemInstanceDto = {
+        id: `item-${ordinal}`,
+        definitionId,
+      };
+      return { ...participant, items: [...participant.items, item] };
+    });
+  }
+
+  protected removeParticipantItem(
+    participantIndex: number,
+    itemIndex: number,
+  ): void {
+    this.updateParticipant(participantIndex, (participant) => ({
+      ...participant,
+      items: participant.items.filter((_item, index) => index !== itemIndex),
+    }));
+  }
+
+  protected updateParticipantItem(
+    participantIndex: number,
+    itemIndex: number,
+    field: keyof ScenarioItemInstanceDto,
+    value: string,
+  ): void {
+    this.updateParticipant(participantIndex, (participant) => {
+      const previousItemId = participant.items[itemIndex]?.id;
+      const items = participant.items.map((item, index) =>
+        index === itemIndex ? { ...item, [field]: value } : item,
+      );
+      const equipment =
+        field === 'id'
+          ? participant.equipment.map((slot) =>
+              slot.itemInstanceId === previousItemId
+                ? { ...slot, itemInstanceId: value }
+                : slot,
+            )
+          : participant.equipment;
+      return { ...participant, items, equipment };
+    });
+  }
+
+  protected addParticipantEquipment(participantIndex: number): void {
+    this.updateParticipant(participantIndex, (participant) => {
+      const firstItem = participant.items[0];
+      const itemDefinition = this.itemDefinitions().find(
+        (definition) => definition.definitionId === firstItem?.definitionId,
+      );
+      const slot: ScenarioEquipmentSlotDto = {
+        slotId: itemDefinition?.allowedSlots[0] ?? '',
+        itemInstanceId: firstItem?.id ?? '',
+      };
+      return { ...participant, equipment: [...participant.equipment, slot] };
+    });
+  }
+
+  protected removeParticipantEquipment(
+    participantIndex: number,
+    equipmentIndex: number,
+  ): void {
+    this.updateParticipant(participantIndex, (participant) => ({
+      ...participant,
+      equipment: participant.equipment.filter(
+        (_slot, index) => index !== equipmentIndex,
+      ),
+    }));
+  }
+
+  protected updateParticipantEquipment(
+    participantIndex: number,
+    equipmentIndex: number,
+    field: keyof ScenarioEquipmentSlotDto,
+    value: string,
+  ): void {
+    this.updateParticipant(participantIndex, (participant) => ({
+      ...participant,
+      equipment: participant.equipment.map((slot, index) =>
+        index === equipmentIndex ? { ...slot, [field]: value } : slot,
+      ),
+    }));
+  }
+
+  protected participantItemLabel(item: ScenarioItemInstanceDto): string {
+    const definition = this.itemDefinitions().find(
+      (candidate) => candidate.definitionId === item.definitionId,
+    );
+    return `${definition?.label ?? item.definitionId} · ${item.id}`;
   }
 
   protected addParticipantCapability(
@@ -4927,6 +5516,36 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected participantPath(index: number, suffix: string): string {
     return `$.participants[${index}].${suffix}`;
+  }
+
+  protected participantItemPath(
+    participantIndex: number,
+    itemIndex: number,
+  ): string {
+    return `$.participants[${participantIndex}].items[${itemIndex}]`;
+  }
+
+  protected participantItemFieldPath(
+    participantIndex: number,
+    itemIndex: number,
+    suffix: keyof ScenarioItemInstanceDto,
+  ): string {
+    return `${this.participantItemPath(participantIndex, itemIndex)}.${suffix}`;
+  }
+
+  protected participantEquipmentPath(
+    participantIndex: number,
+    equipmentIndex: number,
+  ): string {
+    return `$.participants[${participantIndex}].equipment[${equipmentIndex}]`;
+  }
+
+  protected participantEquipmentFieldPath(
+    participantIndex: number,
+    equipmentIndex: number,
+    suffix: keyof ScenarioEquipmentSlotDto,
+  ): string {
+    return `${this.participantEquipmentPath(participantIndex, equipmentIndex)}.${suffix}`;
   }
 
   protected capabilityPath(
@@ -5160,7 +5779,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   }
 
   protected selectAction(action: GameplayActionView): void {
-    this.selectedActionId.set(action.id);
+    this.selectedActionId.set(action.identity);
     this.selectedOptions.set([]);
     this.transientCellPathId.set(null);
   }
@@ -5241,22 +5860,23 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
 
   protected executeAction(): void {
     const gameplay = this.store.view()?.gameplay;
-    const actionId = this.selectedActionId();
+    const action = this.selectedAction();
     const targetIds = authorityTargetIds(this.selectedOptions());
     if (
       gameplay === null ||
       gameplay === undefined ||
-      actionId === null ||
-      (targetIds.length === 0 && this.selectedAction()?.maximumTargets !== 0)
+      action === null ||
+      (targetIds.length === 0 && action.maximumTargets !== 0)
     ) {
       return;
     }
     this.clearActionTargeting();
     void this.store.command({
       expectedRevision: gameplay.stateRevision,
-      actionId,
+      actionId: action.id,
       actorId: gameplay.actorId,
       targetIds: [...targetIds],
+      itemBinding: action.itemBinding,
     });
   }
 
@@ -5464,6 +6084,10 @@ function formSignedInteger(value: string): number {
   return Number.isSafeInteger(parsed) ? parsed : 0;
 }
 
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 function initialParticipantCapability(
   owner: ScenarioInitialCapabilityDto['owner'],
 ): ScenarioInitialCapabilityDto {
@@ -5554,6 +6178,12 @@ function isExplicitSetupParentRoute(
   }
   if (/\.capabilities\[\d+\]\.value$/.test(diagnosticPath)) {
     return controlPath === `${diagnosticPath}.movementCost`;
+  }
+  if (
+    /\.(?:items|equipment)\[\d+\]$/.test(diagnosticPath) &&
+    controlPath.startsWith(`${diagnosticPath}.`)
+  ) {
+    return true;
   }
   return false;
 }

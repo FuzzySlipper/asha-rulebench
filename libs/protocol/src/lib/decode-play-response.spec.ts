@@ -255,6 +255,8 @@ describe('play protocol decoder', () => {
           teamId: 'allies',
           position: { x: 0, y: 0 },
           definitionIds: ['action.one'],
+          items: [{ id: 'sword-1', definitionId: 'item.sword' }],
+          equipment: [{ slotId: 'main-hand', itemInstanceId: 'sword-1' }],
           capabilities: [
             { owner: 'vitality', value: { current: 10, max: 10 } },
             { owner: 'stat', id: 'power', value: 3 },

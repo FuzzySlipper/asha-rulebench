@@ -7,6 +7,8 @@ import type {
   ScenarioRandomSourceDto,
   ScenarioInitialCapabilityDto,
   ScenarioParticipantDto,
+  ScenarioItemInstanceDto,
+  ScenarioEquipmentSlotDto,
   ScenarioSetupRequestDto,
   ScenarioTemplateDto,
   ScenarioTurnDto,
@@ -14,8 +16,10 @@ import type {
   GameplayCellPathDto,
   GameplayArchiveDto,
   GameplayAuthorityActionDto,
+  GameplayItemBindingDto,
   GameplayTurnControlDto,
   GameplayEntityDto,
+  GameplayItemInstanceDto,
   GameplayEventDto,
   GameplayLogEntryDto,
   GameplayModifierDto,
@@ -33,6 +37,8 @@ import type {
   PlayBundleArtifactSummaryDto,
   ContentDefinitionDto,
   ParticipantProfileDto,
+  ItemAttributeDto,
+  ItemDefinitionDto,
   RulesetValueDto,
   ContentDerivationProvenanceDto,
   PlayDiagnosticDto,
@@ -479,7 +485,16 @@ function scenarioParticipant(
   const record = requiredRecord(value, path);
   exactKeys(
     record,
-    ['id', 'label', 'teamId', 'position', 'definitionIds', 'capabilities'],
+    [
+      'id',
+      'label',
+      'teamId',
+      'position',
+      'definitionIds',
+      'items',
+      'equipment',
+      'capabilities',
+    ],
     path,
   );
   const position = requiredRecord(record['position'], `${path}.position`);
@@ -496,11 +511,44 @@ function scenarioParticipant(
       record['definitionIds'],
       `${path}.definitionIds`,
     ),
+    items: requiredArray(record['items'], `${path}.items`).map((entry, index) =>
+      scenarioItem(entry, `${path}.items[${index}]`),
+    ),
+    equipment: requiredArray(record['equipment'], `${path}.equipment`).map(
+      (entry, index) => scenarioEquipment(entry, `${path}.equipment[${index}]`),
+    ),
     capabilities: requiredArray(
       record['capabilities'],
       `${path}.capabilities`,
     ).map((entry, index) =>
       scenarioInitialCapability(entry, `${path}.capabilities[${index}]`),
+    ),
+  };
+}
+
+function scenarioItem(value: unknown, path: string): ScenarioItemInstanceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['id', 'definitionId'], path);
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+  };
+}
+
+function scenarioEquipment(
+  value: unknown,
+  path: string,
+): ScenarioEquipmentSlotDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['slotId', 'itemInstanceId'], path);
+  return {
+    slotId: requiredString(record['slotId'], `${path}.slotId`),
+    itemInstanceId: requiredString(
+      record['itemInstanceId'],
+      `${path}.itemInstanceId`,
     ),
   };
 }
@@ -710,7 +758,14 @@ function gameplayLogEntry(value: unknown, path: string): GameplayLogEntryDto {
   const record = requiredRecord(value, path);
   exactKeys(
     record,
-    ['sequence', 'stateRevision', 'actorId', 'actionId', 'events'],
+    [
+      'sequence',
+      'stateRevision',
+      'actorId',
+      'actionId',
+      'itemBinding',
+      'events',
+    ],
     path,
   );
   return {
@@ -721,6 +776,10 @@ function gameplayLogEntry(value: unknown, path: string): GameplayLogEntryDto {
     ),
     actorId: requiredString(record['actorId'], `${path}.actorId`),
     actionId: requiredString(record['actionId'], `${path}.actionId`),
+    itemBinding: nullableItemBinding(
+      record['itemBinding'],
+      `${path}.itemBinding`,
+    ),
     events: requiredArray(record['events'], `${path}.events`).map(
       (entry, index) => gameplayEvent(entry, `${path}.events[${index}]`),
     ),
@@ -900,6 +959,7 @@ function gameplayAuthorityAction(
     [
       'definitionId',
       'label',
+      'itemBinding',
       'available',
       'unavailable',
       'maximumTargets',
@@ -913,6 +973,10 @@ function gameplayAuthorityAction(
       `${path}.definitionId`,
     ),
     label: requiredString(record['label'], `${path}.label`),
+    itemBinding: nullableItemBinding(
+      record['itemBinding'],
+      `${path}.itemBinding`,
+    ),
     available: requiredBoolean(record['available'], `${path}.available`),
     unavailable:
       record['unavailable'] === null
@@ -923,6 +987,31 @@ function gameplayAuthorityAction(
       `${path}.maximumTargets`,
     ),
     options: gameplayActionOptions(record['options'], `${path}.options`),
+  };
+}
+
+function nullableItemBinding(
+  value: unknown,
+  path: string,
+): GameplayItemBindingDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['bindingId', 'itemInstanceId', 'itemDefinitionId', 'slotId'],
+    path,
+  );
+  return {
+    bindingId: requiredString(record['bindingId'], `${path}.bindingId`),
+    itemInstanceId: requiredString(
+      record['itemInstanceId'],
+      `${path}.itemInstanceId`,
+    ),
+    itemDefinitionId: requiredString(
+      record['itemDefinitionId'],
+      `${path}.itemDefinitionId`,
+    ),
+    slotId: requiredString(record['slotId'], `${path}.slotId`),
   };
 }
 
@@ -1013,6 +1102,8 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
       'x',
       'y',
       'definitionIds',
+      'items',
+      'equipment',
       'vitality',
       'stats',
       'defenses',
@@ -1031,12 +1122,54 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
       record['definitionIds'],
       `${path}.definitionIds`,
     ),
+    items: requiredArray(record['items'], `${path}.items`).map((entry, index) =>
+      gameplayItemInstance(entry, `${path}.items[${index}]`),
+    ),
+    equipment: requiredArray(record['equipment'], `${path}.equipment`).map(
+      (entry, index) => scenarioEquipment(entry, `${path}.equipment[${index}]`),
+    ),
     vitality: gameplayNamedValue(record['vitality'], `${path}.vitality`),
     stats: gameplayNamedValues(record['stats'], `${path}.stats`),
     defenses: gameplayNamedValues(record['defenses'], `${path}.defenses`),
     resources: gameplayNamedValues(record['resources'], `${path}.resources`),
     modifiers: requiredArray(record['modifiers'], `${path}.modifiers`).map(
       (entry, index) => gameplayModifier(entry, `${path}.modifiers[${index}]`),
+    ),
+  };
+}
+
+function gameplayItemInstance(
+  value: unknown,
+  path: string,
+): GameplayItemInstanceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'id',
+      'definitionId',
+      'label',
+      'description',
+      'tags',
+      'traits',
+      'allowedSlots',
+      'attributes',
+    ],
+    path,
+  );
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    label: requiredString(record['label'], `${path}.label`),
+    description: nullableString(record['description'], `${path}.description`),
+    tags: stringArray(record['tags'], `${path}.tags`),
+    traits: stringArray(record['traits'], `${path}.traits`),
+    allowedSlots: stringArray(record['allowedSlots'], `${path}.allowedSlots`),
+    attributes: requiredArray(record['attributes'], `${path}.attributes`).map(
+      (entry, index) => itemAttribute(entry, `${path}.attributes[${index}]`),
     ),
   };
 }
@@ -1304,6 +1437,7 @@ function artifact(value: unknown, path: string): PlayBundleArtifactSummaryDto {
       'requiredNumericDomains',
       'rulesetValues',
       'participantProfiles',
+      'itemDefinitions',
       'exportedRoots',
       'definitions',
       'policyBindingIds',
@@ -1365,6 +1499,12 @@ function artifact(value: unknown, path: string): PlayBundleArtifactSummaryDto {
       `${path}.participantProfiles`,
     ).map((entry, index) =>
       participantProfile(entry, `${path}.participantProfiles[${index}]`),
+    ),
+    itemDefinitions: requiredArray(
+      record['itemDefinitions'],
+      `${path}.itemDefinitions`,
+    ).map((entry, index) =>
+      itemDefinition(entry, `${path}.itemDefinitions[${index}]`),
     ),
     exportedRoots: stringArray(
       record['exportedRoots'],
@@ -1723,6 +1863,8 @@ function participantProfile(
       'description',
       'role',
       'definitionIds',
+      'items',
+      'equipment',
       'capabilities',
     ],
     path,
@@ -1740,6 +1882,12 @@ function participantProfile(
       record['definitionIds'],
       `${path}.definitionIds`,
     ),
+    items: requiredArray(record['items'], `${path}.items`).map((entry, index) =>
+      scenarioItem(entry, `${path}.items[${index}]`),
+    ),
+    equipment: requiredArray(record['equipment'], `${path}.equipment`).map(
+      (entry, index) => scenarioEquipment(entry, `${path}.equipment[${index}]`),
+    ),
     capabilities: requiredArray(
       record['capabilities'],
       `${path}.capabilities`,
@@ -1747,6 +1895,115 @@ function participantProfile(
       scenarioInitialCapability(entry, `${path}.capabilities[${index}]`),
     ),
   };
+}
+
+function itemDefinition(value: unknown, path: string): ItemDefinitionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'definitionId',
+      'label',
+      'description',
+      'tags',
+      'traits',
+      'allowedSlots',
+      'attributes',
+    ],
+    path,
+  );
+  return {
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    label: requiredString(record['label'], `${path}.label`),
+    description: nullableString(record['description'], `${path}.description`),
+    tags: stringArray(record['tags'], `${path}.tags`),
+    traits: stringArray(record['traits'], `${path}.traits`),
+    allowedSlots: stringArray(record['allowedSlots'], `${path}.allowedSlots`),
+    attributes: requiredArray(record['attributes'], `${path}.attributes`).map(
+      (entry, index) => itemAttribute(entry, `${path}.attributes[${index}]`),
+    ),
+  };
+}
+
+function itemAttribute(value: unknown, path: string): ItemAttributeDto {
+  const record = requiredRecord(value, path);
+  const type = requiredString(record['type'], `${path}.type`);
+  switch (type) {
+    case 'boundedInteger':
+      exactKeys(record, ['type', 'id', 'value', 'minimum', 'maximum'], path);
+      return {
+        type,
+        id: requiredString(record['id'], `${path}.id`),
+        value: canonicalIntegerString(record['value'], `${path}.value`),
+        minimum: canonicalIntegerString(record['minimum'], `${path}.minimum`),
+        maximum: canonicalIntegerString(record['maximum'], `${path}.maximum`),
+      };
+    case 'identifier':
+      exactKeys(record, ['type', 'id', 'valueId'], path);
+      return {
+        type,
+        id: requiredString(record['id'], `${path}.id`),
+        valueId: requiredString(record['valueId'], `${path}.valueId`),
+      };
+    case 'dice':
+      exactKeys(record, ['type', 'id', 'count', 'sides', 'bonus'], path);
+      return {
+        type,
+        id: requiredString(record['id'], `${path}.id`),
+        count: nonNegativeInteger(record['count'], `${path}.count`),
+        sides: nonNegativeInteger(record['sides'], `${path}.sides`),
+        bonus: requiredInteger(record['bonus'], `${path}.bonus`),
+      };
+    case 'catalogReference': {
+      exactKeys(record, ['type', 'id', 'value'], path);
+      const reference = requiredRecord(record['value'], `${path}.value`);
+      exactKeys(
+        reference,
+        ['definitionId', 'category', 'packageId'],
+        `${path}.value`,
+      );
+      return {
+        type,
+        id: requiredString(record['id'], `${path}.id`),
+        value: {
+          definitionId: requiredString(
+            reference['definitionId'],
+            `${path}.value.definitionId`,
+          ),
+          category: requiredString(
+            reference['category'],
+            `${path}.value.category`,
+          ),
+          packageId: requiredString(
+            reference['packageId'],
+            `${path}.value.packageId`,
+          ),
+        },
+      };
+    }
+    case 'rulesetValueReference': {
+      exactKeys(record, ['type', 'id', 'value'], path);
+      const reference = requiredRecord(record['value'], `${path}.value`);
+      exactKeys(reference, ['kind', 'id', 'rulesetId'], `${path}.value`);
+      return {
+        type,
+        id: requiredString(record['id'], `${path}.id`),
+        value: {
+          kind: requiredString(reference['kind'], `${path}.value.kind`),
+          id: requiredString(reference['id'], `${path}.value.id`),
+          rulesetId: requiredString(
+            reference['rulesetId'],
+            `${path}.value.rulesetId`,
+          ),
+        },
+      };
+    }
+    default:
+      throw new PlayProtocolDecodeError(path, `unknown item attribute ${type}`);
+  }
 }
 
 function relationship(value: unknown, path: string): ContentRelationshipDto {
@@ -1833,6 +2090,17 @@ function nonNegativeIntegerString(value: unknown, path: string): string {
     throw new PlayProtocolDecodeError(
       path,
       'expected a canonical non-negative integer string',
+    );
+  }
+  return source;
+}
+
+function canonicalIntegerString(value: unknown, path: string): string {
+  const source = requiredString(value, path);
+  if (!/^(?:0|-?[1-9][0-9]*)$/.test(source)) {
+    throw new PlayProtocolDecodeError(
+      path,
+      'expected a canonical integer string',
     );
   }
   return source;

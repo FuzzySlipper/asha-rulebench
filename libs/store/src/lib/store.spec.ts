@@ -166,6 +166,7 @@ function catalogResponse(): RulesetCatalogResponseDto {
           diagnostics: [],
         },
       ],
+      scenarios: [],
     },
     diagnostics: [],
   };
@@ -222,6 +223,9 @@ function artifact(): NonNullable<PlayWorkspaceResponseDto['activeArtifact']> {
     requiredCapabilities: [],
     requiredValues: [],
     requiredNumericDomains: [],
+    rulesetValues: [],
+    participantProfiles: [],
+    itemDefinitions: [],
     exportedRoots: [],
     definitions: [],
     policyBindingIds: [],
@@ -289,5 +293,6 @@ function memoryStorage(): KeyValueStoragePort {
   return {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
   };
 }

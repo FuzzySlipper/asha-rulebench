@@ -18,7 +18,15 @@ export type ContentDefinitionDto = { id: string, fingerprint: string, label: str
 
 export type RulesetValueDto = { kind: string, id: string, label: string, numericDomainId: string, };
 
-export type ParticipantProfileDto = { definitionId: string, profileId: string, label: string, description: string | null, role: string, definitionIds: Array<string>, capabilities: Array<ScenarioInitialCapabilityDto>, };
+export type ParticipantProfileDto = { definitionId: string, profileId: string, label: string, description: string | null, role: string, definitionIds: Array<string>, items: Array<ScenarioItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, capabilities: Array<ScenarioInitialCapabilityDto>, };
+
+export type ItemCatalogReferenceDto = { definitionId: string, category: string, packageId: string, };
+
+export type ItemRulesetValueReferenceDto = { kind: string, id: string, rulesetId: string, };
+
+export type ItemAttributeDto = { "type": "boundedInteger", id: string, value: string, minimum: string, maximum: string, } | { "type": "identifier", id: string, valueId: string, } | { "type": "dice", id: string, count: number, sides: number, bonus: number, } | { "type": "catalogReference", id: string, value: ItemCatalogReferenceDto, } | { "type": "rulesetValueReference", id: string, value: ItemRulesetValueReferenceDto, };
+
+export type ItemDefinitionDto = { definitionId: string, label: string, description: string | null, tags: Array<string>, traits: Array<string>, allowedSlots: Array<string>, attributes: Array<ItemAttributeDto>, };
 
 export type ContentRelationshipDto = { kind: string, source: string, target: string, order: number, };
 
@@ -32,7 +40,7 @@ export type ContentDerivationProvenanceDto = { definitionId: string, owner: stri
 
 export type ContentOverlayProvenanceDto = { overlay: string, target: string, expectedFingerprint: string, beforeFingerprint: string, afterFingerprint: string, plane: string, conflictPolicy: string, patchFingerprint: string, order: number, changes: Array<ContentPatchChangeDto>, };
 
-export type PlayBundleArtifactSummaryDto = { schema: VersionedIdentityDto, artifactId: string, playBundle: VersionedIdentityDto, ruleset: VersionedIdentityDto, language: VersionedIdentityDto, contentPacks: Array<ContentPackSummaryDto>, dependencyLock: Array<ContentPackLockEntryDto>, requiredOperations: Array<VersionedRequirementDto>, requiredCapabilities: Array<VersionedRequirementDto>, requiredValues: Array<string>, requiredNumericDomains: Array<string>, rulesetValues: Array<RulesetValueDto>, participantProfiles: Array<ParticipantProfileDto>, exportedRoots: Array<string>, definitions: Array<ContentDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<ContentRelationshipDto>, derivationSlots: number, overlaySlots: number, derivations: Array<ContentDerivationProvenanceDto>, overlays: Array<ContentOverlayProvenanceDto>, fingerprints: PlayBundleFingerprintDto, };
+export type PlayBundleArtifactSummaryDto = { schema: VersionedIdentityDto, artifactId: string, playBundle: VersionedIdentityDto, ruleset: VersionedIdentityDto, language: VersionedIdentityDto, contentPacks: Array<ContentPackSummaryDto>, dependencyLock: Array<ContentPackLockEntryDto>, requiredOperations: Array<VersionedRequirementDto>, requiredCapabilities: Array<VersionedRequirementDto>, requiredValues: Array<string>, requiredNumericDomains: Array<string>, rulesetValues: Array<RulesetValueDto>, participantProfiles: Array<ParticipantProfileDto>, itemDefinitions: Array<ItemDefinitionDto>, exportedRoots: Array<string>, definitions: Array<ContentDefinitionDto>, policyBindingIds: Array<string>, relationships: Array<ContentRelationshipDto>, derivationSlots: number, overlaySlots: number, derivations: Array<ContentDerivationProvenanceDto>, overlays: Array<ContentOverlayProvenanceDto>, fingerprints: PlayBundleFingerprintDto, };
 
 export type PlayBundleUpgradeFieldDto = { plane: string, path: string, before: string, after: string, };
 
@@ -56,7 +64,11 @@ export type ScenarioBoardDto = { width: number, height: number, cells: Array<Sce
 
 export type ScenarioInitialCapabilityDto = { "owner": "vitality", value: ScenarioBoundedValueDto, } | { "owner": "stat", id: string, value: number, } | { "owner": "defense", id: string, value: number, } | { "owner": "resource", id: string, value: ScenarioBoundedValueDto, } | { "owner": "modifier", stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type ScenarioParticipantDto = { id: string, label: string, teamId: string, position: ScenarioPositionDto, definitionIds: Array<string>, capabilities: Array<ScenarioInitialCapabilityDto>, };
+export type ScenarioParticipantDto = { id: string, label: string, teamId: string, position: ScenarioPositionDto, definitionIds: Array<string>, items: Array<ScenarioItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, capabilities: Array<ScenarioInitialCapabilityDto>, };
+
+export type ScenarioItemInstanceDto = { id: string, definitionId: string, };
+
+export type ScenarioEquipmentSlotDto = { slotId: string, itemInstanceId: string, };
 
 export type ScenarioTurnDto = { initiativeOrder: Array<string>, currentActorId: string, round: number, turn: number, };
 
@@ -74,11 +86,13 @@ export type GameplayCellPathDto = { destinationCellId: string, cellIds: Array<st
 
 export type GameplayActionOptionsDto = { participantIds: Array<string>, cellPaths: Array<GameplayCellPathDto>, areaIds: Array<string>, };
 
-export type GameplayAuthorityActionDto = { definitionId: string, label: string, available: boolean, unavailable: GameplayUnavailableDto | null, maximumTargets: number, options: GameplayActionOptionsDto, };
+export type GameplayAuthorityActionDto = { definitionId: string, label: string, itemBinding: GameplayItemBindingDto | null, available: boolean, unavailable: GameplayUnavailableDto | null, maximumTargets: number, options: GameplayActionOptionsDto, };
+
+export type GameplayItemBindingDto = { bindingId: string, itemInstanceId: string, itemDefinitionId: string, slotId: string, };
 
 export type GameplayTurnControlDto = { kind: string, label: string, available: boolean, unavailable: GameplayUnavailableDto | null, };
 
-export type GameplayLogEntryDto = { sequence: string, stateRevision: string, actorId: string, actionId: string, events: Array<GameplayEventDto>, };
+export type GameplayLogEntryDto = { sequence: string, stateRevision: string, actorId: string, actionId: string, itemBinding: GameplayItemBindingDto | null, events: Array<GameplayEventDto>, };
 
 export type GameplayOutcomeDto = { status: string, winningTeamIds: Array<string>, };
 
@@ -88,7 +102,9 @@ export type GameplayNamedValueDto = { id: string, current: number, maximum: numb
 
 export type GameplayModifierDto = { stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
+export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, items: Array<GameplayItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
+
+export type GameplayItemInstanceDto = { id: string, definitionId: string, label: string, description: string | null, tags: Array<string>, traits: Array<string>, allowedSlots: Array<string>, attributes: Array<ItemAttributeDto>, };
 
 export type GameplayEventDto = { kind: string, summary: string, };
 
@@ -136,7 +152,7 @@ export type PlayBundleCompileRequestDto = { sourceSet: PlayBundleSourceSetDto, c
 
 export type PreparedPlayBundleCompileRequestDto = { preparedSource: string, };
 
-export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, };
+export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, itemBinding: GameplayItemBindingDto | null, };
 
 export type GameplayReactionRequestDto = { expectedRevision: number, reactionId: string, optionId: string | null, };
 

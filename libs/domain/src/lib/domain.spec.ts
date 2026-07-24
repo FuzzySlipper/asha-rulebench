@@ -43,6 +43,19 @@ describe('play workspace view mapping', () => {
     expect(view.gameplayAvailable).toBe(true);
     expect(view.gameplay?.stateRevision).toBe(2);
     expect(view.gameplay?.actions[0]?.candidateIds).toEqual(['raider']);
+    expect(view.gameplay?.actions[0]?.itemBinding?.itemInstanceId).toBe(
+      'longsword-1',
+    );
+    expect(view.gameplay?.actions[0]?.identity).not.toBe(
+      view.gameplay?.actions[1]?.identity,
+    );
+    expect(view.gameplay?.actions[0]?.id).toBe(view.gameplay?.actions[1]?.id);
+    expect(view.gameplay?.actions).toHaveLength(2);
+    expect(view.gameplay?.entities[0]?.items[0]?.label).toBe('Longsword');
+    expect(view.gameplay?.entities[0]?.equipment[0]).toEqual({
+      slotId: 'main-hand',
+      itemInstanceId: 'longsword-1',
+    });
     expect(view.gameplay?.actions[0]?.cellPaths).toEqual([
       {
         destinationCellId: 'cell-2-1',
@@ -161,6 +174,29 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
       {
         definitionId: 'rulebench.wardbreaker-volley',
         label: 'Wardbreaker Volley',
+        itemBinding: null,
+        available: false,
+        unavailable: {
+          code: 'RPG_ACTION_ITEM_BINDING_UNAVAILABLE',
+          path: '$.action.itemBinding',
+          message: 'a compatible equipped item is required',
+        },
+        maximumTargets: 1,
+        options: {
+          participantIds: [],
+          cellPaths: [],
+          areaIds: [],
+        },
+      },
+      {
+        definitionId: 'rulebench.wardbreaker-volley',
+        label: 'Wardbreaker Volley — Longsword',
+        itemBinding: {
+          bindingId: 'main-hand:longsword-1',
+          itemInstanceId: 'longsword-1',
+          itemDefinitionId: 'item.longsword',
+          slotId: 'main-hand',
+        },
         available: true,
         unavailable: null,
         maximumTargets: 1,
@@ -176,6 +212,24 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
           areaIds: [],
         },
       },
+      {
+        definitionId: 'rulebench.wardbreaker-volley',
+        label: 'Wardbreaker Volley — Shortsword',
+        itemBinding: {
+          bindingId: 'off-hand:shortsword-1',
+          itemInstanceId: 'shortsword-1',
+          itemDefinitionId: 'item.shortsword',
+          slotId: 'off-hand',
+        },
+        available: true,
+        unavailable: null,
+        maximumTargets: 1,
+        options: {
+          participantIds: ['raider'],
+          cellPaths: [],
+          areaIds: [],
+        },
+      },
     ],
     controls: [
       {
@@ -185,7 +239,34 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
         unavailable: null,
       },
     ],
-    entities: [],
+    entities: [
+      {
+        id: 'hero',
+        label: 'Hero',
+        teamId: 'allies',
+        x: 0,
+        y: 0,
+        definitionIds: [],
+        items: [
+          {
+            id: 'longsword-1',
+            definitionId: 'item.longsword',
+            label: 'Longsword',
+            description: null,
+            tags: ['weapon'],
+            traits: ['martial'],
+            allowedSlots: ['main-hand'],
+            attributes: [],
+          },
+        ],
+        equipment: [{ slotId: 'main-hand', itemInstanceId: 'longsword-1' }],
+        vitality: { id: 'vitality', current: 10, maximum: 10 },
+        stats: [],
+        defenses: [],
+        resources: [],
+        modifiers: [],
+      },
+    ],
     pendingReaction: null,
     log: [],
     outcome: { status: 'inProgress', winningTeamIds: [] },
@@ -261,12 +342,19 @@ function artifact(): PlayBundleArtifactSummaryDto {
     requiredCapabilities: [{ id: 'capability.vitality', version: 1 }],
     requiredValues: [],
     requiredNumericDomains: [],
+    rulesetValues: [],
+    participantProfiles: [],
+    itemDefinitions: [],
     exportedRoots: ['rulebench.signal-flare'],
     definitions: [
       {
         id: 'rulebench.signal-flare',
         fingerprint: 'fnv1a64:6666666666666666',
         label: 'Signal Flare',
+        description: null,
+        tags: [],
+        catalog: null,
+        catalogId: null,
         kind: 'action',
         visibility: 'exported',
         extensionPolicy: 'patchable',
