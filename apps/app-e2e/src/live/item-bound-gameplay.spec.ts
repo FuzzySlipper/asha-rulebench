@@ -169,6 +169,83 @@ liveScenario(
     await collector.milestone('narrow character inventory', {
       screenshot: true,
     });
+    await characterDialog.getByRole('button', { name: 'Close' }).click();
+
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    await openMenuItem(page, workspace, 'Session', 'Start new Scenario…');
+    await scenarioDialog
+      .getByRole('button', { name: /Positional Talents/ })
+      .click();
+    await scenarioDialog
+      .getByRole('button', { name: 'Validate and start Scenario' })
+      .click();
+    await expect(scenarioDialog).not.toBeVisible();
+
+    await executeBoundAction(
+      page,
+      workspace,
+      'Basic Attack — Longsword',
+      'Goblin Warrior',
+    );
+    await declineReactionIfOpen(workspace);
+
+    const positionalHistory = workspace.getByRole('list', {
+      name: 'Combat history',
+    });
+    const fighterEntry = positionalHistory.locator(':scope > li').last();
+    const fighterRoll = fighterEntry.getByRole('region', {
+      name: 'Roll resolution for action.basic-attack',
+    });
+    await expect(fighterRoll).toContainText(/Die \d+ → total \d+/);
+    await expect(fighterRoll).toContainText(/vs armor-class \d+ · (hit|miss)/);
+    const fighterContributions = fighterRoll.getByRole('list', {
+      name: 'Applied roll contributions',
+    });
+    await expect(fighterContributions.locator(':scope > li')).toHaveCount(3);
+    await expect(fighterContributions).toContainText('Basic Attack');
+    await expect(fighterContributions).toContainText('action.basic-attack');
+    await expect(fighterContributions).toContainText('+5');
+    await expect(fighterContributions).toContainText('Coordinated Flanker');
+    await expect(fighterContributions).toContainText(
+      'feature.coordinated-flanker',
+    );
+    await expect(fighterContributions).toContainText('+2');
+    await expect(fighterContributions).toContainText('Hold the Line');
+    await expect(fighterContributions).toContainText('feature.hold-the-line');
+    await expect(fighterContributions).toContainText('+1');
+    await fighterContributions.scrollIntoViewIfNeeded();
+
+    await collector.milestone('conditional roll contributions', {
+      screenshot: true,
+      layerSnapshot: {
+        authority: 'Rust attackResolved contribution readback',
+        sources: [
+          'action.basic-attack',
+          'feature.coordinated-flanker',
+          'feature.hold-the-line',
+        ],
+      },
+    });
+
+    await workspace.getByRole('button', { name: /^Fire Bolt/ }).click();
+    await workspace
+      .getByRole('button', { name: /Target Goblin Warrior/ })
+      .click();
+    await workspace.getByRole('button', { name: /^Use Fire Bolt/ }).click();
+    await declineReactionIfOpen(workspace);
+
+    const wizardEntry = positionalHistory.locator(':scope > li').last();
+    const wizardRoll = wizardEntry.getByRole('region', {
+      name: 'Roll resolution for action.wizard.fire-bolt',
+    });
+    await expect(
+      wizardRoll
+        .getByRole('list', { name: 'Applied roll contributions' })
+        .locator(':scope > li'),
+    ).toHaveCount(1);
+    await expect(wizardRoll).not.toContainText('Arcane Composure');
+    await expect(wizardRoll).not.toContainText('Coordinated Flanker');
+    await expect(wizardRoll).not.toContainText('Hold the Line');
   },
 );
 

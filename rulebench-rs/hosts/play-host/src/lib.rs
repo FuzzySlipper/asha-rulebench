@@ -12,7 +12,8 @@ use rpg_compiler::{
 use rpg_core::{
     BoundedValue, GridPosition, RpgDomainEvent, RpgIntentItemBinding, RpgRandomEvidence,
     RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt,
-    RpgResolutionRejection, RpgTeamId, RpgTraceStep,
+    RpgResolutionRejection, RpgRollContribution, RpgRollContributionCondition,
+    RpgRollContributionReason, RpgRollContributionSelector, RpgTeamId, RpgTraceStep,
 };
 use rpg_ir::{
     CompiledPlayBundleArtifact, ContentConflictPolicy, ContentExtensionPolicy, ContentImpactPlane,
@@ -147,6 +148,8 @@ pub struct ParticipantProfileDto {
     pub description: Option<String>,
     pub role: String,
     pub definition_ids: Vec<String>,
+    pub class_definition_id: Option<String>,
+    pub feature_definition_ids: Vec<String>,
     pub items: Vec<ScenarioItemInstanceDto>,
     pub equipment: Vec<ScenarioEquipmentSlotDto>,
     pub capabilities: Vec<ScenarioInitialCapabilityDto>,
@@ -455,6 +458,10 @@ pub struct ScenarioParticipantDto {
     pub team_id: String,
     pub position: ScenarioPositionDto,
     pub definition_ids: Vec<String>,
+    #[serde(default)]
+    pub class_definition_id: Option<String>,
+    #[serde(default)]
+    pub feature_definition_ids: Vec<String>,
     pub items: Vec<ScenarioItemInstanceDto>,
     pub equipment: Vec<ScenarioEquipmentSlotDto>,
     pub capabilities: Vec<ScenarioInitialCapabilityDto>,
@@ -714,6 +721,8 @@ pub struct GameplayEntityDto {
     pub x: u32,
     pub y: u32,
     pub definition_ids: Vec<String>,
+    pub class_definition_id: Option<String>,
+    pub feature_definition_ids: Vec<String>,
     pub items: Vec<GameplayItemInstanceDto>,
     pub equipment: Vec<ScenarioEquipmentSlotDto>,
     pub vitality: GameplayNamedValueDto,
@@ -743,6 +752,33 @@ pub struct GameplayItemInstanceDto {
 pub struct GameplayEventDto {
     pub kind: String,
     pub summary: String,
+    pub roll: Option<GameplayRollResolutionDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayRollResolutionDto {
+    pub kind: String,
+    pub die_result: u32,
+    pub total: i32,
+    pub threshold_label: String,
+    pub threshold: i32,
+    pub outcome: String,
+    pub contributions: Vec<GameplayRollContributionDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayRollContributionDto {
+    pub source_definition_id: String,
+    pub source_label: String,
+    pub amount: i32,
+    pub reason_kind: String,
+    pub contribution_id: Option<String>,
+    pub selector: Option<String>,
+    pub condition: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -2028,6 +2064,8 @@ fn scenario(request: ScenarioSetupRequestDto) -> RpgScenario {
                 team_id: RpgTeamId::named(participant.team_id),
                 position: grid_position(participant.position),
                 definition_ids: participant.definition_ids,
+                class_definition_id: participant.class_definition_id,
+                feature_definition_ids: participant.feature_definition_ids,
                 items: participant
                     .items
                     .into_iter()
@@ -2485,6 +2523,8 @@ fn gameplay_entity(entity: &rpg_runtime::RpgParticipantView) -> GameplayEntityDt
         x: entity.position.x,
         y: entity.position.y,
         definition_ids: entity.definition_ids.clone(),
+        class_definition_id: entity.class_definition_id.clone(),
+        feature_definition_ids: entity.feature_definition_ids.clone(),
         items: entity
             .items
             .iter()
@@ -2710,6 +2750,7 @@ fn gameplay_trace(trace: &RpgTraceStep) -> GameplayTraceDto {
 }
 
 fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
+    let mut roll_resolution = None;
     let (kind, summary) = match event {
         RpgDomainEvent::ResourceSpent {
             entity_id,
@@ -2728,8 +2769,23 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             defense_id,
             defense,
             hit,
+            contributions,
         } => (
-            "attackResolved",
+            {
+                roll_resolution = Some(GameplayRollResolutionDto {
+                    kind: "attack".to_owned(),
+                    die_result: *roll,
+                    total: *total,
+                    threshold_label: defense_id.clone(),
+                    threshold: *defense,
+                    outcome: if *hit { "hit" } else { "miss" }.to_owned(),
+                    contributions: contributions
+                        .iter()
+                        .map(gameplay_roll_contribution)
+                        .collect(),
+                });
+                "attackResolved"
+            },
             format!(
                 "{actor_id} rolled {roll} for {total} against {target_id} {defense_id} {defense}; hit={hit}"
             ),
@@ -2741,7 +2797,18 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             difficulty,
             saved,
         } => (
-            "savingThrowResolved",
+            {
+                roll_resolution = Some(GameplayRollResolutionDto {
+                    kind: "savingThrow".to_owned(),
+                    die_result: *roll,
+                    total: *total,
+                    threshold_label: "difficulty".to_owned(),
+                    threshold: *difficulty,
+                    outcome: if *saved { "saved" } else { "failed" }.to_owned(),
+                    contributions: Vec::new(),
+                });
+                "savingThrowResolved"
+            },
             format!(
                 "{target_id} rolled {roll} for {total} against {difficulty}; saved={saved}"
             ),
@@ -2845,6 +2912,58 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
     GameplayEventDto {
         kind: kind.to_owned(),
         summary,
+        roll: roll_resolution,
+    }
+}
+
+fn gameplay_roll_contribution(contribution: &RpgRollContribution) -> GameplayRollContributionDto {
+    let (reason_kind, contribution_id, selector, condition) = match &contribution.reason {
+        RpgRollContributionReason::ActionCheckModifier => {
+            ("actionCheckModifier", None, Some("attack".to_owned()), None)
+        }
+        RpgRollContributionReason::CharacterFeature {
+            contribution_id,
+            selector,
+            condition,
+        } => (
+            "characterFeature",
+            Some(contribution_id.clone()),
+            Some(gameplay_roll_selector(*selector).to_owned()),
+            Some(gameplay_roll_condition(condition)),
+        ),
+    };
+    GameplayRollContributionDto {
+        source_definition_id: contribution.source_definition_id.clone(),
+        source_label: contribution.source_label.clone(),
+        amount: contribution.amount,
+        reason_kind: reason_kind.to_owned(),
+        contribution_id,
+        selector,
+        condition,
+    }
+}
+
+fn gameplay_roll_selector(selector: RpgRollContributionSelector) -> &'static str {
+    match selector {
+        RpgRollContributionSelector::Attack => "attack",
+    }
+}
+
+fn gameplay_roll_condition(condition: &RpgRollContributionCondition) -> String {
+    match condition {
+        RpgRollContributionCondition::Always => "always".to_owned(),
+        RpgRollContributionCondition::ActorFlanksTarget => "actorFlanksTarget".to_owned(),
+        RpgRollContributionCondition::ActorSurrounded { minimum_hostiles } => {
+            format!("actorSurrounded(minimumHostiles={minimum_hostiles})")
+        }
+        RpgRollContributionCondition::All { conditions } => format!(
+            "all({})",
+            conditions
+                .iter()
+                .map(gameplay_roll_condition)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
     }
 }
 
@@ -3229,6 +3348,8 @@ fn participant_profile(profile: &rpg_ir::CompiledParticipantProfile) -> Particip
         description: profile.description.clone(),
         role: participant_profile_role(profile.role).to_owned(),
         definition_ids: profile.definition_ids.clone(),
+        class_definition_id: profile.class_definition_id.clone(),
+        feature_definition_ids: profile.feature_definition_ids.clone(),
         items: profile
             .items
             .iter()
@@ -3381,6 +3502,8 @@ fn definition_kind(kind: MaterializedContentDefinitionKind) -> &'static str {
     match kind {
         MaterializedContentDefinitionKind::Action => "action",
         MaterializedContentDefinitionKind::ActionProcedure => "actionProcedure",
+        MaterializedContentDefinitionKind::CharacterClass => "characterClass",
+        MaterializedContentDefinitionKind::CharacterFeature => "characterFeature",
         MaterializedContentDefinitionKind::Item => "item",
         MaterializedContentDefinitionKind::Support => "support",
     }
@@ -3469,6 +3592,8 @@ pub fn generated_protocol() -> String {
         GameplayEntityDto::decl(),
         GameplayItemInstanceDto::decl(),
         GameplayEventDto::decl(),
+        GameplayRollResolutionDto::decl(),
+        GameplayRollContributionDto::decl(),
         GameplayTraceDto::decl(),
         GameplayReactionOptionDto::decl(),
         GameplayReactionDto::decl(),
@@ -3507,7 +3632,10 @@ pub fn generated_protocol() -> String {
 
 #[cfg(test)]
 mod tests {
-    use rpg_core::{RpgRandomRequest, RpgRandomRequestKind};
+    use rpg_core::{
+        RpgDomainEvent, RpgRandomRequest, RpgRandomRequestKind, RpgRollContribution,
+        RpgRollContributionCondition, RpgRollContributionReason, RpgRollContributionSelector,
+    };
     use rpg_ir::{
         CompiledParticipantProfile, ParticipantProfileBoundedValue,
         ParticipantProfileEquipmentSlot, ParticipantProfileInitialCapability,
@@ -3516,7 +3644,7 @@ mod tests {
     use rpg_runtime::RpgRandomSource;
 
     use super::{
-        item_binding_from_dto, participant_profile, GameplayCommandRequestDto,
+        gameplay_event, item_binding_from_dto, participant_profile, GameplayCommandRequestDto,
         PlayBundleLifecycleStatus, PlayHost, ScenarioInitialCapabilityDto,
         ScriptedGameplayRandomSource, SystemGameplayRandomSource,
     };
@@ -3570,6 +3698,8 @@ mod tests {
             description: Some("Typed profile".to_owned()),
             role: ParticipantProfileRole::Player,
             definition_ids: vec!["action.strike".to_owned()],
+            class_definition_id: Some("class.fighter".to_owned()),
+            feature_definition_ids: vec!["feature.flanker".to_owned()],
             items: vec![ParticipantProfileItemInstance {
                 id: "fighter-longsword".to_owned(),
                 definition_id: "item.long-sword".to_owned(),
@@ -3589,6 +3719,8 @@ mod tests {
         let dto = participant_profile(&profile);
         assert_eq!(dto.profile_id, "fighter");
         assert_eq!(dto.role, "player");
+        assert_eq!(dto.class_definition_id.as_deref(), Some("class.fighter"));
+        assert_eq!(dto.feature_definition_ids, ["feature.flanker"]);
         assert_eq!(dto.items[0].id, "fighter-longsword");
         assert_eq!(dto.items[0].definition_id, "item.long-sword");
         assert_eq!(dto.equipment[0].slot_id, "hand.main");
@@ -3597,6 +3729,84 @@ mod tests {
             dto.capabilities.as_slice(),
             [ScenarioInitialCapabilityDto::Vitality { .. }]
         ));
+    }
+
+    #[test]
+    fn attack_event_dto_preserves_authoritative_roll_contributions() {
+        let event = RpgDomainEvent::AttackResolved {
+            actor_id: "fighter".to_owned(),
+            target_id: "goblin".to_owned(),
+            roll: 15,
+            total: 23,
+            defense_id: "armorClass".to_owned(),
+            defense: 17,
+            hit: true,
+            contributions: vec![
+                RpgRollContribution {
+                    source_definition_id: "action.basic-attack".to_owned(),
+                    source_label: "Basic Attack".to_owned(),
+                    amount: 5,
+                    reason: RpgRollContributionReason::ActionCheckModifier,
+                },
+                RpgRollContribution {
+                    source_definition_id: "feature.coordinated-flanker".to_owned(),
+                    source_label: "Coordinated Flanker".to_owned(),
+                    amount: 2,
+                    reason: RpgRollContributionReason::CharacterFeature {
+                        contribution_id: "flanking-attack".to_owned(),
+                        selector: RpgRollContributionSelector::Attack,
+                        condition: RpgRollContributionCondition::ActorFlanksTarget,
+                    },
+                },
+                RpgRollContribution {
+                    source_definition_id: "feature.hold-the-line".to_owned(),
+                    source_label: "Hold the Line".to_owned(),
+                    amount: 1,
+                    reason: RpgRollContributionReason::CharacterFeature {
+                        contribution_id: "surrounded-attack".to_owned(),
+                        selector: RpgRollContributionSelector::Attack,
+                        condition: RpgRollContributionCondition::ActorSurrounded {
+                            minimum_hostiles: 2,
+                        },
+                    },
+                },
+            ],
+        };
+
+        let dto = gameplay_event(&event);
+        let roll = dto.roll.expect("attack event should expose a roll");
+        assert_eq!(roll.die_result, 15);
+        assert_eq!(roll.total, 23);
+        assert_eq!(roll.threshold_label, "armorClass");
+        assert_eq!(roll.threshold, 17);
+        assert_eq!(roll.outcome, "hit");
+        assert_eq!(roll.contributions.len(), 3);
+        assert_eq!(
+            roll.contributions
+                .iter()
+                .map(|contribution| (
+                    contribution.source_definition_id.as_str(),
+                    contribution.source_label.as_str(),
+                    contribution.amount,
+                    contribution.condition.as_deref(),
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("action.basic-attack", "Basic Attack", 5, None),
+                (
+                    "feature.coordinated-flanker",
+                    "Coordinated Flanker",
+                    2,
+                    Some("actorFlanksTarget"),
+                ),
+                (
+                    "feature.hold-the-line",
+                    "Hold the Line",
+                    1,
+                    Some("actorSurrounded(minimumHostiles=2)"),
+                ),
+            ]
+        );
     }
 
     #[test]

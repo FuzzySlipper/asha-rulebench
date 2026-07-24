@@ -56,6 +56,48 @@ describe('play workspace view mapping', () => {
       slotId: 'main-hand',
       itemInstanceId: 'longsword-1',
     });
+    expect(view.gameplay?.entities[0]?.classDefinitionId).toBe('class.fighter');
+    expect(view.gameplay?.entities[0]?.featureDefinitionIds).toEqual([
+      'feature.coordinated-flanker',
+      'feature.hold-the-line',
+    ]);
+    expect(view.gameplay?.log[0]?.events[0]?.roll).toEqual({
+      kind: 'attack',
+      dieResult: 15,
+      total: 23,
+      thresholdLabel: 'armorClass',
+      threshold: 17,
+      outcome: 'hit',
+      contributions: [
+        {
+          sourceDefinitionId: 'action.basic-attack',
+          sourceLabel: 'Basic Attack',
+          amount: 5,
+          reasonKind: 'actionCheckModifier',
+          contributionId: null,
+          selector: 'attack',
+          condition: null,
+        },
+        {
+          sourceDefinitionId: 'feature.coordinated-flanker',
+          sourceLabel: 'Coordinated Flanker',
+          amount: 2,
+          reasonKind: 'characterFeature',
+          contributionId: 'flanking-attack',
+          selector: 'attack',
+          condition: 'actorFlanksTarget',
+        },
+        {
+          sourceDefinitionId: 'feature.hold-the-line',
+          sourceLabel: 'Hold the Line',
+          amount: 1,
+          reasonKind: 'characterFeature',
+          contributionId: 'surrounded-attack',
+          selector: 'attack',
+          condition: 'actorSurrounded(minimumHostiles=2)',
+        },
+      ],
+    });
     expect(view.gameplay?.actions[0]?.cellPaths).toEqual([
       {
         destinationCellId: 'cell-2-1',
@@ -247,6 +289,11 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
         x: 0,
         y: 0,
         definitionIds: [],
+        classDefinitionId: 'class.fighter',
+        featureDefinitionIds: [
+          'feature.coordinated-flanker',
+          'feature.hold-the-line',
+        ],
         items: [
           {
             id: 'longsword-1',
@@ -268,7 +315,64 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
       },
     ],
     pendingReaction: null,
-    log: [],
+    log: [
+      {
+        sequence: '1',
+        stateRevision: '2',
+        actorId: 'hero',
+        actionId: 'action.basic-attack',
+        itemBinding: {
+          bindingId: 'main-hand:longsword-1',
+          itemInstanceId: 'longsword-1',
+          itemDefinitionId: 'item.longsword',
+          slotId: 'main-hand',
+        },
+        events: [
+          {
+            kind: 'attackResolved',
+            summary:
+              'hero rolled 15 for 23 against raider armorClass 17; hit=true',
+            roll: {
+              kind: 'attack',
+              dieResult: 15,
+              total: 23,
+              thresholdLabel: 'armorClass',
+              threshold: 17,
+              outcome: 'hit',
+              contributions: [
+                {
+                  sourceDefinitionId: 'action.basic-attack',
+                  sourceLabel: 'Basic Attack',
+                  amount: 5,
+                  reasonKind: 'actionCheckModifier',
+                  contributionId: null,
+                  selector: 'attack',
+                  condition: null,
+                },
+                {
+                  sourceDefinitionId: 'feature.coordinated-flanker',
+                  sourceLabel: 'Coordinated Flanker',
+                  amount: 2,
+                  reasonKind: 'characterFeature',
+                  contributionId: 'flanking-attack',
+                  selector: 'attack',
+                  condition: 'actorFlanksTarget',
+                },
+                {
+                  sourceDefinitionId: 'feature.hold-the-line',
+                  sourceLabel: 'Hold the Line',
+                  amount: 1,
+                  reasonKind: 'characterFeature',
+                  contributionId: 'surrounded-attack',
+                  selector: 'attack',
+                  condition: 'actorSurrounded(minimumHostiles=2)',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
     outcome: { status: 'inProgress', winningTeamIds: [] },
     lastResult: null,
     archive: {

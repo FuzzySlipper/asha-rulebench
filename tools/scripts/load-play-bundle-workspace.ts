@@ -687,7 +687,11 @@ function catalogScenario(template: ScenarioTemplate) {
         })),
       })),
     },
-    participants: template.participants,
+    participants: template.participants.map((participant) => ({
+      ...participant,
+      classDefinitionId: participant.classDefinitionId ?? null,
+      featureDefinitionIds: participant.featureDefinitionIds ?? [],
+    })),
     turn: template.turn,
     randomSource: template.randomSource,
   };

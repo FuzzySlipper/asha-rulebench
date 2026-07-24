@@ -37,7 +37,7 @@ describe('play transport', () => {
     });
     await transport.activatePlayBundle();
     await transport.startScenario({
-      schema: { id: 'asha.rpg.scenario', version: 1 },
+      schema: { id: 'asha.rpg.scenario', version: 2 },
       playBundleId: 'artifact-1',
       board: { width: 5, height: 3, cells: [] },
       participants: [],

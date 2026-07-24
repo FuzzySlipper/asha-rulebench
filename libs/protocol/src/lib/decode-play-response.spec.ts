@@ -136,7 +136,59 @@ describe('play protocol decoder', () => {
         controls: [],
         entities: [],
         pendingReaction: null,
-        log: [],
+        log: [
+          {
+            sequence: '1',
+            stateRevision: '1',
+            actorId: 'hero',
+            actionId: 'action.one',
+            itemBinding: null,
+            events: [
+              {
+                kind: 'attackResolved',
+                summary:
+                  'hero rolled 15 for 23 against raider guard 17; hit=true',
+                roll: {
+                  kind: 'attack',
+                  dieResult: 15,
+                  total: 23,
+                  thresholdLabel: 'guard',
+                  threshold: 17,
+                  outcome: 'hit',
+                  contributions: [
+                    {
+                      sourceDefinitionId: 'action.one',
+                      sourceLabel: 'Attack',
+                      amount: 5,
+                      reasonKind: 'actionCheckModifier',
+                      contributionId: null,
+                      selector: 'attack',
+                      condition: null,
+                    },
+                    {
+                      sourceDefinitionId: 'feature.flanker',
+                      sourceLabel: 'Flanker',
+                      amount: 2,
+                      reasonKind: 'characterFeature',
+                      contributionId: 'flanking',
+                      selector: 'attack',
+                      condition: 'actorFlanksTarget',
+                    },
+                    {
+                      sourceDefinitionId: 'feature.surrounded',
+                      sourceLabel: 'Surrounded',
+                      amount: 1,
+                      reasonKind: 'characterFeature',
+                      contributionId: 'surrounded',
+                      selector: 'attack',
+                      condition: 'actorSurrounded(minimumHostiles=2)',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
         outcome: { status: 'inProgress', winningTeamIds: [] },
         lastResult: {
           status: 'accepted',
@@ -224,7 +276,7 @@ describe('play protocol decoder', () => {
 
   it('strictly decodes an explicit Scenario document', () => {
     const setup = {
-      schema: { id: 'asha.rpg.scenario', version: 1 },
+      schema: { id: 'asha.rpg.scenario', version: 2 },
       playBundleId: 'artifact-1',
       board: {
         width: 3,
@@ -255,6 +307,8 @@ describe('play protocol decoder', () => {
           teamId: 'allies',
           position: { x: 0, y: 0 },
           definitionIds: ['action.one'],
+          classDefinitionId: 'class.fighter',
+          featureDefinitionIds: ['feature.flanker'],
           items: [{ id: 'sword-1', definitionId: 'item.sword' }],
           equipment: [{ slotId: 'main-hand', itemInstanceId: 'sword-1' }],
           capabilities: [

@@ -16,14 +16,34 @@ export const ruleset = defineRuleset({
   },
   provides: {
     operations: [
+      { id: 'operation.damage', version: 1 },
       { id: 'operation.heal', version: 1 },
       { id: 'operation.moveToCell', version: 1 },
     ],
     capabilities: [
+      { id: 'capability.defenses', version: 1 },
       { id: 'capability.position', version: 1 },
+      { id: 'capability.random', version: 1 },
+      { id: 'capability.stats', version: 1 },
       { id: 'capability.vitality', version: 1 },
     ],
-    values: [],
-    numericDomains: [],
+    values: [
+      {
+        kind: 'stat',
+        id: 'attack-bonus',
+        label: 'Attack bonus',
+        numericDomainId: 'signed-bonus',
+      },
+      {
+        kind: 'defense',
+        id: 'guard',
+        label: 'Guard',
+        numericDomainId: 'defense-score',
+      },
+    ],
+    numericDomains: [
+      { id: 'signed-bonus', minimum: -20, maximum: 30 },
+      { id: 'defense-score', minimum: 0, maximum: 50 },
+    ],
   },
 });

@@ -4,6 +4,7 @@ import type { Locator, Page } from '@playwright/test';
 test('loads peer roots and opens participant details @gate', async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   await page.goto('/');
 
   const workspace = page.getByLabel('Rulebench interactive combat workspace');
@@ -36,6 +37,11 @@ test('loads peer roots and opens participant details @gate', async ({
 
   await playDialog
     .getByRole('checkbox', { name: /rulebench\.independent\.content/ })
+    .check();
+  await playDialog
+    .getByRole('checkbox', {
+      name: /rulebench\.independent\.positional-content/,
+    })
     .check();
   await expect(playDialog).toContainText('Compatible PlayBundle');
   await expect(playDialog).toContainText('rulebench.independent.play@1.0.0');
@@ -293,6 +299,77 @@ test('loads peer roots and opens participant details @gate', async ({
     viewport: document.documentElement.clientWidth,
   }));
   expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await invokeMenuItem(page, workspace, 'Session', 'Start new Scenario…');
+  await expect(scenarioDialog).toBeVisible();
+  await scenarioDialog
+    .getByRole('button', { name: /Independent positional contributions/ })
+    .click();
+  await scenarioDialog
+    .getByRole('button', { name: 'Validate and start Scenario' })
+    .click();
+  await expect(scenarioDialog).not.toBeVisible();
+
+  const positionalStrike = workspace.getByRole('button', {
+    name: /^Positional Strike/,
+  });
+  await positionalStrike.click();
+  await workspace
+    .getByRole('button', { name: /Target Practice Target/ })
+    .click();
+  await workspace
+    .getByRole('button', { name: /^Use Positional Strike/ })
+    .click();
+
+  const combatHistory = workspace.getByRole('list', {
+    name: 'Combat history',
+  });
+  const vanguardEntry = combatHistory.locator(':scope > li').last();
+  const vanguardRoll = vanguardEntry.getByRole('region', {
+    name: 'Roll resolution for action.rulebench.positional-strike',
+  });
+  await expect(vanguardRoll).toContainText('Die 10 → total 18');
+  await expect(vanguardRoll).toContainText('vs guard 17 · hit');
+  const vanguardContributions = vanguardRoll.getByRole('list', {
+    name: 'Applied roll contributions',
+  });
+  await expect(vanguardContributions.locator(':scope > li')).toHaveCount(3);
+  await expect(vanguardContributions).toContainText(
+    'action.rulebench.positional-strike',
+  );
+  await expect(vanguardContributions).toContainText('Positional Strike');
+  await expect(vanguardContributions).toContainText('+5');
+  await expect(vanguardContributions).toContainText(
+    'feature.rulebench.coordinated-flanker',
+  );
+  await expect(vanguardContributions).toContainText('Coordinated Flanker');
+  await expect(vanguardContributions).toContainText('+2');
+  await expect(vanguardContributions).toContainText(
+    'feature.rulebench.hold-the-line',
+  );
+  await expect(vanguardContributions).toContainText('Hold the Line');
+  await expect(vanguardContributions).toContainText('+1');
+
+  await workspace.getByRole('button', { name: /^Positional Strike/ }).click();
+  await workspace.getByRole('button', { name: /Target Demo Vanguard/ }).click();
+  await workspace
+    .getByRole('button', { name: /^Use Positional Strike/ })
+    .click();
+
+  const unfeaturedEntry = combatHistory.locator(':scope > li').last();
+  const unfeaturedRoll = unfeaturedEntry.getByRole('region', {
+    name: 'Roll resolution for action.rulebench.positional-strike',
+  });
+  await expect(unfeaturedRoll).toContainText('Die 3 → total 8');
+  await expect(unfeaturedRoll).toContainText('vs guard 15 · miss');
+  await expect(
+    unfeaturedRoll
+      .getByRole('list', { name: 'Applied roll contributions' })
+      .locator(':scope > li'),
+  ).toHaveCount(1);
+  await expect(unfeaturedRoll).not.toContainText('Coordinated Flanker');
+  await expect(unfeaturedRoll).not.toContainText('Hold the Line');
 });
 
 async function invokeMenuItem(

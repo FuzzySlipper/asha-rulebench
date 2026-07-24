@@ -115,6 +115,62 @@ describe('play workspace store', () => {
       'PLAY_BUNDLE_SOURCE_ENTRY_NOT_FOUND',
     );
   });
+
+  it('replaces roll contributions on every authority lifecycle readback', async () => {
+    const stale = activeGameplayResponse('Stale Talent');
+    const current = activeGameplayResponse(null);
+    const operations: readonly {
+      readonly name: string;
+      readonly run: (store: PlayWorkspaceStore) => Promise<void>;
+    }[] = [
+      { name: 'refresh', run: (store) => store.refresh() },
+      {
+        name: 'activation',
+        run: (store) => store.activatePlayBundle(),
+      },
+      {
+        name: 'turn control',
+        run: (store) =>
+          store.control({
+            expectedRevision: 1,
+            actorId: 'fighter',
+            kind: 'endTurn',
+          }),
+      },
+      {
+        name: 'checkpoint restoration',
+        run: (store) => store.restoreCheckpoint(),
+      },
+      { name: 'replay', run: (store) => store.replay() },
+    ];
+
+    for (const operation of operations) {
+      let statusCalls = 0;
+      const store = new PlayWorkspaceStore(
+        baseTransport({
+          status: async () => {
+            statusCalls += 1;
+            return statusCalls === 1 ? stale : current;
+          },
+          activatePlayBundle: async () => current,
+          control: async () => current,
+          restoreCheckpoint: async () => current,
+          replay: async () => current,
+        }),
+        memoryStorage(),
+      );
+      await store.refresh();
+      expect(
+        store.view()?.gameplay?.log[0]?.events[0]?.roll?.contributions[0]
+          ?.sourceLabel,
+        operation.name,
+      ).toBe('Stale Talent');
+
+      await operation.run(store);
+
+      expect(store.view()?.gameplay?.log, operation.name).toEqual([]);
+    }
+  });
 });
 
 function baseTransport(overrides: Partial<PlayTransport> = {}): PlayTransport {
@@ -187,6 +243,102 @@ function activeResponse(): PlayWorkspaceResponseDto {
     activeArtifact: artifact(),
     activationRevision: 1,
     scenarioSetupRequired: true,
+  };
+}
+
+function activeGameplayResponse(
+  contributionLabel: string | null,
+): PlayWorkspaceResponseDto {
+  const value = activeResponse();
+  const artifactId = value.activeArtifact?.artifactId ?? '';
+  return {
+    ...value,
+    scenarioSetupRequired: false,
+    gameplayAvailable: true,
+    gameplay: {
+      artifactId,
+      actorId: 'fighter',
+      stateRevision: 1,
+      acceptedRandomValues: '1',
+      randomSource: randomSource(),
+      board: { width: 1, height: 1, cells: [] },
+      turn: {
+        initiativeOrder: ['fighter'],
+        currentActorId: 'fighter',
+        round: 1,
+        turn: 1,
+      },
+      actions: [],
+      controls: [],
+      entities: [],
+      pendingReaction: null,
+      log:
+        contributionLabel === null
+          ? []
+          : [
+              {
+                sequence: '1',
+                stateRevision: '1',
+                actorId: 'fighter',
+                actionId: 'action.basic-attack',
+                itemBinding: null,
+                events: [
+                  {
+                    kind: 'attackResolved',
+                    summary: 'authoritative attack',
+                    roll: {
+                      kind: 'attack',
+                      dieResult: 10,
+                      total: 12,
+                      thresholdLabel: 'armorClass',
+                      threshold: 11,
+                      outcome: 'hit',
+                      contributions: [
+                        {
+                          sourceDefinitionId: 'feature.stale',
+                          sourceLabel: contributionLabel,
+                          amount: 2,
+                          reasonKind: 'characterFeature',
+                          contributionId: 'stale',
+                          selector: 'attack',
+                          condition: 'always',
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+      outcome: { status: 'inProgress', winningTeamIds: [] },
+      lastResult: null,
+      archive: {
+        checkpointSchema: 'asha.rpg.session.checkpoint@5',
+        replaySchemaVersion: 6,
+        eventSchemaVersion: 3,
+        artifactId,
+        artifactSchema: 'asha.rpg.play-bundle.compiled@2',
+        playBundle: 'rulebench.minimal.play@1.0.0',
+        ruleset: 'rulebench.minimal@1.0.0',
+        operationSchemas: [],
+        capabilitySchemas: [],
+        contentPacks: [],
+        dependencyLock: [],
+        fingerprints: {
+          source: 'source',
+          semantic: 'semantic',
+          presentation: 'presentation',
+        },
+        definitionFingerprints: [],
+        stateRevision: '1',
+        acceptedRandomPosition: '1',
+        phase: 'ready',
+        stateHash: 'state',
+        checkpointBytes: 1,
+        replayEntries: [],
+        verificationStatus: 'verified',
+        verificationMessage: 'verified',
+      },
+    },
   };
 }
 

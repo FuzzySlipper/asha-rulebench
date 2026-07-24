@@ -9,6 +9,7 @@
         "allowedRoots": [
           "test-fixtures/source-sets/independent/rules",
           "test-fixtures/source-sets/independent/content",
+          "test-fixtures/source-sets/independent/positional-content",
           "test-fixtures/source-sets/independent/bundles",
           "test-fixtures/source-sets/independent/scenarios"
         ],
@@ -24,6 +25,13 @@
             "id": "content-pack",
             "label": "Independent Content Pack",
             "sourceRoot": "test-fixtures/source-sets/independent/content",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "positional-content-pack",
+            "label": "Independent Positional Content Pack",
+            "sourceRoot": "test-fixtures/source-sets/independent/positional-content",
             "module": "src/index.ts",
             "exportKinds": ["contentPack"]
           },

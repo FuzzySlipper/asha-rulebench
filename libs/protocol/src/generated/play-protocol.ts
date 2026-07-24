@@ -18,7 +18,7 @@ export type ContentDefinitionDto = { id: string, fingerprint: string, label: str
 
 export type RulesetValueDto = { kind: string, id: string, label: string, numericDomainId: string, };
 
-export type ParticipantProfileDto = { definitionId: string, profileId: string, label: string, description: string | null, role: string, definitionIds: Array<string>, items: Array<ScenarioItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, capabilities: Array<ScenarioInitialCapabilityDto>, };
+export type ParticipantProfileDto = { definitionId: string, profileId: string, label: string, description: string | null, role: string, definitionIds: Array<string>, classDefinitionId: string | null, featureDefinitionIds: Array<string>, items: Array<ScenarioItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, capabilities: Array<ScenarioInitialCapabilityDto>, };
 
 export type ItemCatalogReferenceDto = { definitionId: string, category: string, packageId: string, };
 
@@ -64,7 +64,7 @@ export type ScenarioBoardDto = { width: number, height: number, cells: Array<Sce
 
 export type ScenarioInitialCapabilityDto = { "owner": "vitality", value: ScenarioBoundedValueDto, } | { "owner": "stat", id: string, value: number, } | { "owner": "defense", id: string, value: number, } | { "owner": "resource", id: string, value: ScenarioBoundedValueDto, } | { "owner": "modifier", stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type ScenarioParticipantDto = { id: string, label: string, teamId: string, position: ScenarioPositionDto, definitionIds: Array<string>, items: Array<ScenarioItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, capabilities: Array<ScenarioInitialCapabilityDto>, };
+export type ScenarioParticipantDto = { id: string, label: string, teamId: string, position: ScenarioPositionDto, definitionIds: Array<string>, classDefinitionId: string | null, featureDefinitionIds: Array<string>, items: Array<ScenarioItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, capabilities: Array<ScenarioInitialCapabilityDto>, };
 
 export type ScenarioItemInstanceDto = { id: string, definitionId: string, };
 
@@ -102,11 +102,15 @@ export type GameplayNamedValueDto = { id: string, current: number, maximum: numb
 
 export type GameplayModifierDto = { stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, items: Array<GameplayItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
+export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, classDefinitionId: string | null, featureDefinitionIds: Array<string>, items: Array<GameplayItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
 
 export type GameplayItemInstanceDto = { id: string, definitionId: string, label: string, description: string | null, tags: Array<string>, traits: Array<string>, allowedSlots: Array<string>, attributes: Array<ItemAttributeDto>, };
 
-export type GameplayEventDto = { kind: string, summary: string, };
+export type GameplayEventDto = { kind: string, summary: string, roll: GameplayRollResolutionDto | null, };
+
+export type GameplayRollResolutionDto = { kind: string, dieResult: number, total: number, thresholdLabel: string, threshold: number, outcome: string, contributions: Array<GameplayRollContributionDto>, };
+
+export type GameplayRollContributionDto = { sourceDefinitionId: string, sourceLabel: string, amount: number, reasonKind: string, contributionId: string | null, selector: string | null, condition: string | null, };
 
 export type GameplayTraceDto = { path: string, code: string, detail: string, };
 

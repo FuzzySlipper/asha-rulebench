@@ -21,6 +21,8 @@ import type {
   GameplayEntityDto,
   GameplayItemInstanceDto,
   GameplayEventDto,
+  GameplayRollContributionDto,
+  GameplayRollResolutionDto,
   GameplayLogEntryDto,
   GameplayModifierDto,
   GameplayNamedValueDto,
@@ -491,6 +493,8 @@ function scenarioParticipant(
       'teamId',
       'position',
       'definitionIds',
+      'classDefinitionId',
+      'featureDefinitionIds',
       'items',
       'equipment',
       'capabilities',
@@ -510,6 +514,14 @@ function scenarioParticipant(
     definitionIds: stringArray(
       record['definitionIds'],
       `${path}.definitionIds`,
+    ),
+    classDefinitionId: nullableString(
+      record['classDefinitionId'],
+      `${path}.classDefinitionId`,
+    ),
+    featureDefinitionIds: stringArray(
+      record['featureDefinitionIds'],
+      `${path}.featureDefinitionIds`,
     ),
     items: requiredArray(record['items'], `${path}.items`).map((entry, index) =>
       scenarioItem(entry, `${path}.items[${index}]`),
@@ -1102,6 +1114,8 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
       'x',
       'y',
       'definitionIds',
+      'classDefinitionId',
+      'featureDefinitionIds',
       'items',
       'equipment',
       'vitality',
@@ -1121,6 +1135,14 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
     definitionIds: stringArray(
       record['definitionIds'],
       `${path}.definitionIds`,
+    ),
+    classDefinitionId: nullableString(
+      record['classDefinitionId'],
+      `${path}.classDefinitionId`,
+    ),
+    featureDefinitionIds: stringArray(
+      record['featureDefinitionIds'],
+      `${path}.featureDefinitionIds`,
     ),
     items: requiredArray(record['items'], `${path}.items`).map((entry, index) =>
       gameplayItemInstance(entry, `${path}.items[${index}]`),
@@ -1327,10 +1349,86 @@ function gameplayRandomEvidence(
 
 function gameplayEvent(value: unknown, path: string): GameplayEventDto {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['kind', 'summary'], path);
+  exactKeys(record, ['kind', 'summary', 'roll'], path);
   return {
     kind: requiredString(record['kind'], `${path}.kind`),
     summary: requiredString(record['summary'], `${path}.summary`),
+    roll:
+      record['roll'] === null
+        ? null
+        : gameplayRollResolution(record['roll'], `${path}.roll`),
+  };
+}
+
+function gameplayRollResolution(
+  value: unknown,
+  path: string,
+): GameplayRollResolutionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'kind',
+      'dieResult',
+      'total',
+      'thresholdLabel',
+      'threshold',
+      'outcome',
+      'contributions',
+    ],
+    path,
+  );
+  return {
+    kind: requiredString(record['kind'], `${path}.kind`),
+    dieResult: nonNegativeInteger(record['dieResult'], `${path}.dieResult`),
+    total: requiredInteger(record['total'], `${path}.total`),
+    thresholdLabel: requiredString(
+      record['thresholdLabel'],
+      `${path}.thresholdLabel`,
+    ),
+    threshold: requiredInteger(record['threshold'], `${path}.threshold`),
+    outcome: requiredString(record['outcome'], `${path}.outcome`),
+    contributions: requiredArray(
+      record['contributions'],
+      `${path}.contributions`,
+    ).map((entry, index) =>
+      gameplayRollContribution(entry, `${path}.contributions[${index}]`),
+    ),
+  };
+}
+
+function gameplayRollContribution(
+  value: unknown,
+  path: string,
+): GameplayRollContributionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'sourceDefinitionId',
+      'sourceLabel',
+      'amount',
+      'reasonKind',
+      'contributionId',
+      'selector',
+      'condition',
+    ],
+    path,
+  );
+  return {
+    sourceDefinitionId: requiredString(
+      record['sourceDefinitionId'],
+      `${path}.sourceDefinitionId`,
+    ),
+    sourceLabel: requiredString(record['sourceLabel'], `${path}.sourceLabel`),
+    amount: requiredInteger(record['amount'], `${path}.amount`),
+    reasonKind: requiredString(record['reasonKind'], `${path}.reasonKind`),
+    contributionId: nullableString(
+      record['contributionId'],
+      `${path}.contributionId`,
+    ),
+    selector: nullableString(record['selector'], `${path}.selector`),
+    condition: nullableString(record['condition'], `${path}.condition`),
   };
 }
 
@@ -1863,6 +1961,8 @@ function participantProfile(
       'description',
       'role',
       'definitionIds',
+      'classDefinitionId',
+      'featureDefinitionIds',
       'items',
       'equipment',
       'capabilities',
@@ -1881,6 +1981,14 @@ function participantProfile(
     definitionIds: stringArray(
       record['definitionIds'],
       `${path}.definitionIds`,
+    ),
+    classDefinitionId: nullableString(
+      record['classDefinitionId'],
+      `${path}.classDefinitionId`,
+    ),
+    featureDefinitionIds: stringArray(
+      record['featureDefinitionIds'],
+      `${path}.featureDefinitionIds`,
     ),
     items: requiredArray(record['items'], `${path}.items`).map((entry, index) =>
       scenarioItem(entry, `${path}.items[${index}]`),

@@ -52,6 +52,8 @@ export interface ParticipantProfileView {
   readonly description: string | null;
   readonly role: string;
   readonly definitionIds: readonly string[];
+  readonly classDefinitionId: string | null;
+  readonly featureDefinitionIds: readonly string[];
   readonly items: readonly ScenarioItemInstanceDto[];
   readonly equipment: readonly ScenarioEquipmentSlotDto[];
   readonly capabilities: readonly ScenarioInitialCapabilityDto[];
@@ -205,12 +207,40 @@ export interface GameplayEntityView {
   readonly position: string;
   readonly vitality: string;
   readonly definitionIds: readonly string[];
+  readonly classDefinitionId: string | null;
+  readonly featureDefinitionIds: readonly string[];
   readonly items: readonly GameplayItemInstanceDto[];
   readonly equipment: readonly ScenarioEquipmentSlotDto[];
   readonly stats: readonly string[];
   readonly defenses: readonly string[];
   readonly resources: readonly string[];
   readonly modifiers: readonly string[];
+}
+
+export interface GameplayRollContributionView {
+  readonly sourceDefinitionId: string;
+  readonly sourceLabel: string;
+  readonly amount: number;
+  readonly reasonKind: string;
+  readonly contributionId: string | null;
+  readonly selector: string | null;
+  readonly condition: string | null;
+}
+
+export interface GameplayRollResolutionView {
+  readonly kind: string;
+  readonly dieResult: number;
+  readonly total: number;
+  readonly thresholdLabel: string;
+  readonly threshold: number;
+  readonly outcome: string;
+  readonly contributions: readonly GameplayRollContributionView[];
+}
+
+export interface GameplayEventView {
+  readonly kind: string;
+  readonly summary: string;
+  readonly roll: GameplayRollResolutionView | null;
 }
 
 export interface GameplayWorkspaceView {
@@ -243,7 +273,7 @@ export interface GameplayWorkspaceView {
     readonly actorId: string;
     readonly actionId: string;
     readonly itemBinding: GameplayItemBindingDto | null;
-    readonly events: readonly string[];
+    readonly events: readonly GameplayEventView[];
   }[];
   readonly outcome: {
     readonly status: string;
@@ -463,6 +493,8 @@ function gameplayView(
       position: `(${entity.x}, ${entity.y})`,
       vitality: `${entity.vitality.current}/${entity.vitality.maximum ?? 'unbounded'}`,
       definitionIds: entity.definitionIds,
+      classDefinitionId: entity.classDefinitionId,
+      featureDefinitionIds: entity.featureDefinitionIds,
       items: entity.items,
       equipment: entity.equipment,
       stats: entity.stats.map(
@@ -488,7 +520,30 @@ function gameplayView(
       actorId: entry.actorId,
       actionId: entry.actionId,
       itemBinding: entry.itemBinding,
-      events: entry.events.map((event) => `${event.kind}: ${event.summary}`),
+      events: entry.events.map((event) => ({
+        kind: event.kind,
+        summary: event.summary,
+        roll:
+          event.roll === null
+            ? null
+            : {
+                kind: event.roll.kind,
+                dieResult: event.roll.dieResult,
+                total: event.roll.total,
+                thresholdLabel: event.roll.thresholdLabel,
+                threshold: event.roll.threshold,
+                outcome: event.roll.outcome,
+                contributions: event.roll.contributions.map((contribution) => ({
+                  sourceDefinitionId: contribution.sourceDefinitionId,
+                  sourceLabel: contribution.sourceLabel,
+                  amount: contribution.amount,
+                  reasonKind: contribution.reasonKind,
+                  contributionId: contribution.contributionId,
+                  selector: contribution.selector,
+                  condition: contribution.condition,
+                })),
+              },
+      })),
     })),
     outcome: gameplay.outcome,
     pendingReaction:

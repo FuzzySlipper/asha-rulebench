@@ -517,6 +517,48 @@ class SetupDiagnosticsComponent {
         padding-top: 0.6rem;
       }
 
+      .roll-breakdown {
+        background: color-mix(
+          in srgb,
+          var(--arb-accent) 8%,
+          var(--arb-surface)
+        );
+        border-left: 3px solid var(--arb-accent-strong);
+        display: grid;
+        gap: 0.45rem;
+        padding: 0.55rem 0.65rem;
+      }
+
+      .roll-equation {
+        align-items: baseline;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem 0.65rem;
+        margin: 0;
+      }
+
+      .roll-contributions {
+        display: grid;
+        gap: 0.3rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .roll-contributions li {
+        align-items: baseline;
+        border-top: 1px solid var(--arb-border);
+        display: grid;
+        gap: 0.15rem 0.5rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-top: 0.3rem;
+      }
+
+      .roll-contribution-source {
+        font-size: 0.72rem;
+        grid-column: 1 / -1;
+      }
+
       .participant-summary {
         align-items: baseline;
         background: transparent;
@@ -1408,7 +1450,59 @@ class SetupDiagnosticsComponent {
                         >
                       }
                       @for (event of entry.events; track $index) {
-                        <span>{{ event }}</span>
+                        <span>{{ event.kind }}: {{ event.summary }}</span>
+                        @if (event.roll; as roll) {
+                          <section
+                            class="roll-breakdown"
+                            [attr.aria-label]="
+                              'Roll resolution for ' + entry.actionId
+                            "
+                          >
+                            <p class="roll-equation">
+                              <strong
+                                >Die {{ roll.dieResult }} → total
+                                {{ roll.total }}</strong
+                              >
+                              <span
+                                >vs {{ roll.thresholdLabel }}
+                                {{ roll.threshold }} · {{ roll.outcome }}</span
+                              >
+                            </p>
+                            @if (roll.contributions.length > 0) {
+                              <ul
+                                class="roll-contributions"
+                                aria-label="Applied roll contributions"
+                              >
+                                @for (
+                                  contribution of roll.contributions;
+                                  track contribution.sourceDefinitionId +
+                                    ':' +
+                                    contribution.contributionId +
+                                    ':' +
+                                    $index
+                                ) {
+                                  <li>
+                                    <strong>{{
+                                      contribution.sourceLabel
+                                    }}</strong>
+                                    <strong>{{
+                                      signedAmount(contribution.amount)
+                                    }}</strong>
+                                    <span
+                                      class="muted roll-contribution-source"
+                                    >
+                                      {{ contribution.sourceDefinitionId }} ·
+                                      {{ contribution.reasonKind }}
+                                      @if (contribution.condition) {
+                                        · {{ contribution.condition }}
+                                      }
+                                    </span>
+                                  </li>
+                                }
+                              </ul>
+                            }
+                          </section>
+                        }
                       }
                     </li>
                   } @empty {
@@ -4900,7 +4994,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       return;
     }
     this.setupDraft.set({
-      schema: { id: 'asha.rpg.scenario', version: 1 },
+      schema: { id: 'asha.rpg.scenario', version: 2 },
       playBundleId: view.activeArtifactId,
       board: { width: 5, height: 3, cells: [] },
       participants: [],
@@ -4918,7 +5012,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     const activeArtifactId = this.store.view()?.activeArtifactId;
     if (activeArtifactId === null || activeArtifactId === undefined) return;
     this.setupDraft.set({
-      schema: { id: 'asha.rpg.scenario', version: 1 },
+      schema: { id: 'asha.rpg.scenario', version: 2 },
       playBundleId: activeArtifactId,
       board: {
         ...template.board,
@@ -5005,6 +5099,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         teamId: `team-${participantNumber}`,
         position: { x: participantNumber - 1, y: 0 },
         definitionIds: [],
+        classDefinitionId: null,
+        featureDefinitionIds: [],
         items: [],
         equipment: [],
         capabilities: [{ owner: 'vitality', value: { current: 10, max: 10 } }],
@@ -5040,6 +5136,8 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
         teamId: profile.role === 'player' ? 'players' : 'creatures',
         position: firstAvailablePosition(setup),
         definitionIds: [profile.definitionId, ...profile.definitionIds],
+        classDefinitionId: profile.classDefinitionId,
+        featureDefinitionIds: [...profile.featureDefinitionIds],
         items: profile.items.map((item) => ({ ...item })),
         equipment: profile.equipment.map((slot) => ({ ...slot })),
         capabilities: profile.capabilities.map(cloneInitialCapability),
@@ -5093,6 +5191,10 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       actorId,
       binding,
     );
+  }
+
+  protected signedAmount(amount: number): string {
+    return signed(amount);
   }
 
   protected itemAttributeLabel(attribute: ItemAttributeDto): string {

@@ -184,11 +184,19 @@ describe('explicit PlayBundle source-set loader', () => {
   it('composes Ruleset, Content Pack, PlayBundle, and Scenario peer roots', async () => {
     const rulesRoot = 'test-fixtures/source-sets/independent/rules';
     const contentRoot = 'test-fixtures/source-sets/independent/content';
+    const positionalContentRoot =
+      'test-fixtures/source-sets/independent/positional-content';
     const bundlesRoot = 'test-fixtures/source-sets/independent/bundles';
     const scenariosRoot = 'test-fixtures/source-sets/independent/scenarios';
     const sourceSet: PlayBundleSourceSet = {
       schemaVersion: 1,
-      allowedRoots: [rulesRoot, contentRoot, bundlesRoot, scenariosRoot],
+      allowedRoots: [
+        rulesRoot,
+        contentRoot,
+        positionalContentRoot,
+        bundlesRoot,
+        scenariosRoot,
+      ],
       entries: [
         {
           id: 'rules',
@@ -201,6 +209,13 @@ describe('explicit PlayBundle source-set loader', () => {
           id: 'content',
           label: 'Independent content',
           sourceRoot: contentRoot,
+          module: 'src/index.ts',
+          exportKinds: ['contentPack'],
+        },
+        {
+          id: 'positional-content',
+          label: 'Independent positional content',
+          sourceRoot: positionalContentRoot,
           module: 'src/index.ts',
           exportKinds: ['contentPack'],
         },
@@ -234,8 +249,20 @@ describe('explicit PlayBundle source-set loader', () => {
     expect(result.catalog.playBundles[0]?.id).toBe(
       'rulebench.independent.play',
     );
-    expect(result.catalog.scenarios[0]?.identity.id).toBe(
+    expect(
+      result.catalog.scenarios.map((scenario) => scenario.identity.id),
+    ).toEqual([
+      'rulebench.independent.positional-contributions',
       'rulebench.independent.scenario',
+    ]);
+    const independentScenario = result.catalog.scenarios.find(
+      (scenario) => scenario.identity.id === 'rulebench.independent.scenario',
+    );
+    expect(independentScenario?.participants[0]).toEqual(
+      expect.objectContaining({
+        classDefinitionId: null,
+        featureDefinitionIds: [],
+      }),
     );
 
     const alternateRulesRoot =
@@ -258,7 +285,7 @@ describe('explicit PlayBundle source-set loader', () => {
             },
             sourceSet.entries[1]!,
             {
-              ...sourceSet.entries[2]!,
+              ...sourceSet.entries[3]!,
               module: 'src/alternate.ts',
             },
           ],
