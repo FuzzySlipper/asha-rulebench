@@ -3,6 +3,7 @@ import {
   decodeRulesetCatalogResponse,
   decodePlayBundleSourceSetConfig,
   type GameplayCommandRequestDto,
+  type GameplayForcedMovementRequestDto,
   type GameplayReactionRequestDto,
   type GameplayTurnControlRequestDto,
   type PlayBundleCompileRequestDto,
@@ -39,6 +40,9 @@ export interface PlayTransport {
   ) => Promise<PlayWorkspaceResponseDto>;
   readonly react: (
     reaction: GameplayReactionRequestDto,
+  ) => Promise<PlayWorkspaceResponseDto>;
+  readonly forcedMovement: (
+    request: GameplayForcedMovementRequestDto,
   ) => Promise<PlayWorkspaceResponseDto>;
   readonly control: (
     control: GameplayTurnControlRequestDto,
@@ -77,6 +81,8 @@ export function createPlayTransport(http: JsonHttpClient): PlayTransport {
     startScenario: (setup) => request('POST', '/api/scenario/start', setup),
     command: (command) => request('POST', '/api/session/command', command),
     react: (reaction) => request('POST', '/api/session/reaction', reaction),
+    forcedMovement: (forcedMovement) =>
+      request('POST', '/api/session/forced-movement', forcedMovement),
     control: (control) => request('POST', '/api/session/control', control),
     restoreCheckpoint: () => request('POST', '/api/session/checkpoint/restore'),
     replay: () => request('POST', '/api/session/replay'),

@@ -1,9 +1,9 @@
 use std::env;
 
 use rulebench_play_host::{
-    GameplayCommandRequestDto, GameplayReactionRequestDto, GameplayTurnControlRequestDto,
-    PlayDiagnosticDto, PlayHost, PlayWorkspaceResponseDto, PreparedPlayBundleCompileRequestDto,
-    ScenarioSetupRequestDto, ScriptedGameplayRandomSource,
+    GameplayCommandRequestDto, GameplayForcedMovementRequestDto, GameplayReactionRequestDto,
+    GameplayTurnControlRequestDto, PlayDiagnosticDto, PlayHost, PlayWorkspaceResponseDto,
+    PreparedPlayBundleCompileRequestDto, ScenarioSetupRequestDto, ScriptedGameplayRandomSource,
 };
 use serde::de::DeserializeOwned;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -100,6 +100,15 @@ fn route(
             match decode_request::<GameplayReactionRequestDto>(request) {
                 Ok(reaction) => {
                     let response = host.resolve_reaction(reaction);
+                    (200, response)
+                }
+                Err(diagnostic) => invalid_request(host, diagnostic),
+            }
+        }
+        (&Method::Post, "/api/session/forced-movement") => {
+            match decode_request::<GameplayForcedMovementRequestDto>(request) {
+                Ok(forced_movement) => {
+                    let response = host.resolve_forced_movement(forced_movement);
                     (200, response)
                 }
                 Err(diagnostic) => invalid_request(host, diagnostic),

@@ -2,6 +2,7 @@ import type {
   ContentPatchChangeDto,
   GameplayItemBindingDto,
   GameplayItemInstanceDto,
+  GameplayForcedMovementOptionDto,
   ItemDefinitionDto,
   PlayBundleArtifactSummaryDto,
   PlayDiagnosticDto,
@@ -276,6 +277,23 @@ export interface GameplayWorkspaceView {
   readonly actions: readonly GameplayActionView[];
   readonly controls: readonly GameplayTurnControlView[];
   readonly entities: readonly GameplayEntityView[];
+  readonly spatialSources: readonly {
+    readonly instanceId: string;
+    readonly definitionId: string;
+    readonly label: string;
+    readonly ownerEntityId: string;
+    readonly sourceEntityId: string;
+    readonly origin: string;
+    readonly includedCellIds: readonly string[];
+    readonly radius: number;
+    readonly targetFilter: string;
+    readonly stacking: string;
+    readonly tenure: string;
+    readonly durationAnchor: string;
+    readonly remainingCount: number;
+    readonly triggerBoundaries: readonly string[];
+    readonly triggerEvidence: readonly string[];
+  }[];
   readonly log: readonly {
     readonly sequence: string;
     readonly stateRevision: string;
@@ -297,6 +315,18 @@ export interface GameplayWorkspaceView {
       readonly label: string;
       readonly damageReduction: number;
     }[];
+  } | null;
+  readonly pendingForcedMovement: {
+    readonly movementKind: string;
+    readonly sourceId: string;
+    readonly movedParticipantId: string;
+    readonly maximumDistance: number;
+    readonly operationPath: string;
+    readonly options: readonly GameplayForcedMovementOptionDto[];
+  } | null;
+  readonly pendingTurnSave: {
+    readonly actorId: string;
+    readonly candidates: readonly string[];
   } | null;
   readonly result: {
     readonly status: string;
@@ -524,11 +554,31 @@ function gameplayView(
       ),
       effects: entity.effects.map(
         (effect) =>
-          `${effect.label} · ${effect.definitionId} · ${effect.remainingCount} ${effect.durationAnchor} · ${effect.stacking} · source ${effect.sourceEntityId}`,
+          `${effect.label} · ${effect.definitionId} · ${effect.tenure} · ${effect.remainingCount} ${effect.durationAnchor} · ${effect.stacking} · source ${effect.sourceEntityId}`,
       ),
       activationBudgets: entity.activationBudgets.map(
         (budget) =>
           `${budget.label} ${budget.remaining}/${budget.initialAmount} · ${budget.timing} · resets ${budget.resetBoundary}`,
+      ),
+    })),
+    spatialSources: gameplay.spatialSources.map((source) => ({
+      instanceId: source.instanceId,
+      definitionId: source.definitionId,
+      label: source.label,
+      ownerEntityId: source.ownerEntityId,
+      sourceEntityId: source.sourceEntityId,
+      origin: `(${source.originX}, ${source.originY})`,
+      includedCellIds: source.includedCellIds,
+      radius: source.radius,
+      targetFilter: source.targetFilter,
+      stacking: source.stacking,
+      tenure: source.tenure,
+      durationAnchor: source.durationAnchor,
+      remainingCount: source.remainingCount,
+      triggerBoundaries: source.triggerBoundaries,
+      triggerEvidence: source.triggerEvidence.map(
+        (evidence) =>
+          `${evidence.sequence} · ${evidence.boundary} · ${evidence.participantId} at ${evidence.cellId} · ${evidence.disposition}`,
       ),
     })),
     log: gameplay.log.map((entry) => ({
@@ -585,6 +635,28 @@ function gameplayView(
             actionId: gameplay.pendingReaction.actionId,
             targetId: gameplay.pendingReaction.targetId,
             options: gameplay.pendingReaction.options,
+          },
+    pendingForcedMovement:
+      gameplay.pendingForcedMovement === null
+        ? null
+        : {
+            movementKind: gameplay.pendingForcedMovement.movementKind,
+            sourceId: gameplay.pendingForcedMovement.sourceId,
+            movedParticipantId:
+              gameplay.pendingForcedMovement.movedParticipantId,
+            maximumDistance: gameplay.pendingForcedMovement.maximumDistance,
+            operationPath: gameplay.pendingForcedMovement.operationPath,
+            options: gameplay.pendingForcedMovement.options,
+          },
+    pendingTurnSave:
+      gameplay.pendingTurnSave === null
+        ? null
+        : {
+            actorId: gameplay.pendingTurnSave.actorId,
+            candidates: gameplay.pendingTurnSave.candidates.map(
+              (candidate) =>
+                `${candidate.definitionId} on ${candidate.targetId}`,
+            ),
           },
     result:
       gameplay.lastResult === null

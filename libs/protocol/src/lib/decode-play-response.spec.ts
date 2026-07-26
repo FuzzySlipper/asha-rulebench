@@ -135,7 +135,10 @@ describe('play protocol decoder', () => {
         actions: [],
         controls: [],
         entities: [],
+        spatialSources: [],
         pendingReaction: null,
+        pendingForcedMovement: null,
+        pendingTurnSave: null,
         log: [
           {
             sequence: '1',
@@ -272,6 +275,72 @@ describe('play protocol decoder', () => {
     };
 
     expect(decodePlayWorkspaceResponse(response)).toEqual(response);
+    const extendedResponse = {
+      ...response,
+      gameplay: {
+        ...response.gameplay,
+        spatialSources: [
+          {
+            instanceId: 'zone-1',
+            definitionId: 'spatial.crosswind',
+            label: 'Crosswind',
+            description: 'A shifting tactical zone.',
+            ownerEntityId: 'hero',
+            sourceEntityId: 'hero',
+            originX: 1,
+            originY: 1,
+            includedCellIds: ['cell-1-1', 'cell-2-1'],
+            radius: 1,
+            targetFilter: 'hostiles',
+            stacking: 'independentBySource',
+            tenure: 'fixed',
+            durationAnchor: 'sourceTurnStart',
+            remainingCount: 2,
+            triggerBoundaries: ['enter', 'exit'],
+            triggerEvidence: [
+              {
+                sequence: '2',
+                stateRevision: '1',
+                boundary: 'enter',
+                cellId: 'cell-2-1',
+                participantId: 'raider',
+                operationPath: '$.movement',
+                disposition: 'applied',
+              },
+            ],
+          },
+        ],
+        pendingForcedMovement: {
+          movementKind: 'push',
+          sourceId: 'hero',
+          movedParticipantId: 'raider',
+          maximumDistance: 2,
+          operationPath: '$.program[0]',
+          options: [
+            {
+              sessionBindingId: 'session-1',
+              artifactId: 'artifact-1',
+              scenarioFingerprintAlgorithm: 'fnv1a64',
+              scenarioFingerprintValue: 'scenario-1',
+              authorityRevision: 0,
+              round: '1',
+              turn: '1',
+              currentActorId: 'hero',
+              actionId: 'action.shove',
+              sourceId: 'hero',
+              movedParticipantId: 'raider',
+              operationPath: '$.program[0]',
+              destinationCellId: 'cell-2-1',
+              cellIds: ['cell-1-1', 'cell-2-1'],
+              movementCost: 1,
+            },
+          ],
+        },
+      },
+    };
+    expect(decodePlayWorkspaceResponse(extendedResponse)).toEqual(
+      extendedResponse,
+    );
     expect(() =>
       decodePlayWorkspaceResponse({
         ...response,
@@ -288,7 +357,7 @@ describe('play protocol decoder', () => {
 
   it('strictly decodes an explicit Scenario document', () => {
     const setup = {
-      schema: { id: 'asha.rpg.scenario', version: 2 },
+      schema: { id: 'asha.rpg.scenario', version: 3 },
       playBundleId: 'artifact-1',
       board: {
         width: 3,

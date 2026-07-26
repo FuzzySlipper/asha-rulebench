@@ -1,11 +1,15 @@
 import type { Locator, Page } from '@playwright/test';
-import { decodePlayWorkspaceResponse } from '@asha-rulebench/protocol';
+import {
+  decodePlayWorkspaceResponse,
+  type GameplayForcedMovementOptionDto,
+} from '@asha-rulebench/protocol';
 
 import { expect, liveScenario } from './support/live-scenario';
 
 liveScenario(
-  'three independent representative kits play through the Rust authority @live',
+  'four independent representative kits play through the Rust authority @live',
   async ({ page, collector }) => {
+    liveScenario.setTimeout(120_000);
     collector.addNonClaim(
       'This proves interactive first-wave kit integration and authority readback; it does not claim complete games, unattended scenarios, animation, content import, or TypeScript rule execution.',
     );
@@ -126,13 +130,100 @@ liveScenario(
       },
     });
 
+    await activateKit(
+      page,
+      workspace,
+      'ruleweaver-tactics',
+      'Crosswind Outpost',
+      'Field Shaper',
+    );
+    await executeParticipantAction(
+      workspace,
+      'Raise Pressure Field',
+      'Field Shaper',
+    );
+    await expect(history).toContainText('spatialSourceCreated');
+    await openCharacter(workspace, 'Field Shaper');
+    const fieldShaper = page.getByRole('dialog', { name: 'Field Shaper' });
+    await expect(fieldShaper).toContainText('Spatial sources');
+    await expect(fieldShaper).toContainText('Pressure Field');
+    await expect(fieldShaper).toContainText('Triggers:');
+    await fieldShaper.getByRole('button', { name: 'Close' }).click();
+
+    await restartScenario(
+      page,
+      workspace,
+      'Crosswind Outpost',
+      'Field Shaper',
+    );
+    await workspace.getByRole('button', { name: /^Crosswind Sweep/ }).click();
+    await workspace
+      .getByRole('button', { name: /^Area cell-/ })
+      .first()
+      .click();
+    await workspace
+      .getByRole('button', { name: /^Use Crosswind Sweep/ })
+      .click();
+    await expect(history).toContainText('areaTargetsDerived');
+    await expect(history).toContainText('scalarTestResolved');
+
+    await restartScenario(
+      page,
+      workspace,
+      'Crosswind Outpost',
+      'Field Shaper',
+    );
+    await executeParticipantAction(workspace, 'Disrupt', 'Dust Runner');
+    await expect(history).toContainText('effectApplied');
+    await advanceToActor(page, workspace, 'runner');
+    await workspace.getByRole('button', { name: /End turn/ }).click();
+    await expect(history).toContainText('effectSaveResolved');
+
+    await restartScenario(
+      page,
+      workspace,
+      'Crosswind Outpost',
+      'Pathfinder',
+    );
+    await executeParticipantAction(workspace, 'Redirect', 'Line Sentry');
+    const forcedMovement = workspace.getByRole('group', {
+      name: 'Move Line Sentry',
+    });
+    await expect(forcedMovement).toBeVisible();
+    const staleForcedMovementOption = await firstForcedMovementOption(page);
+    await forcedMovement
+      .getByRole('button', { name: /^Move Line Sentry/ })
+      .first()
+      .click();
+    await expect(history).toContainText('movementTransition');
+    await expect(history).toContainText('Slide');
+    await assertStaleForcedMovementIsAtomic(
+      page,
+      staleForcedMovementOption,
+    );
+    await history
+      .getByText(/movementTransition:/)
+      .last()
+      .scrollIntoViewIfNeeded();
+    await collector.milestone('ruleweaver tactics interactive authority', {
+      screenshot: true,
+      layerSnapshot: {
+        sourceSet: 'ruleweaver-tactics',
+        authorityReadback: [
+          'spatial source lifecycle',
+          'per-target area resolution',
+          'human-choice forced movement',
+        ],
+      },
+    });
+
     await page.setViewportSize({ width: 390, height: 844 });
-    await openCharacter(workspace, 'Reader');
-    const reader = page.getByRole('dialog', { name: 'Reader' });
+    await openCharacter(workspace, 'Line Sentry');
+    const reader = page.getByRole('dialog', { name: 'Line Sentry' });
     await expect(reader).toContainText('Resources');
-    await expect(reader).toContainText('Charge');
-    await expect(reader).toContainText('Reserve');
+    await expect(reader).toContainText('Focus');
     await expect(reader).toContainText('Activation budgets');
+    await expect(reader).toContainText('Position');
     await collector.milestone('narrow representative character readback', {
       screenshot: true,
     });
@@ -145,6 +236,7 @@ async function activateKit(
   workspace: Locator,
   sourceSetId: string,
   scenarioName: string,
+  startingActor?: string,
 ): Promise<void> {
   await openMenuItem(
     page,
@@ -156,9 +248,12 @@ async function activateKit(
   await playDialog
     .getByLabel('Configured source set')
     .selectOption(sourceSetId);
-  const contentPack = playDialog.getByRole('checkbox').first();
-  await expect(contentPack).toBeVisible({ timeout: 30_000 });
-  await contentPack.check();
+  const contentPacks = playDialog.getByRole('checkbox');
+  await expect(contentPacks.first()).toBeVisible({ timeout: 30_000 });
+  const contentPackCount = await contentPacks.count();
+  for (let index = 0; index < contentPackCount; index += 1) {
+    await contentPacks.nth(index).check();
+  }
   await expect(playDialog).toContainText('Compatible PlayBundle');
   await playDialog
     .getByRole('button', { name: 'Compile selected PlayBundle' })
@@ -174,6 +269,11 @@ async function activateKit(
   await scenarioDialog
     .getByRole('button', { name: new RegExp(scenarioName) })
     .click();
+  if (startingActor !== undefined) {
+    await scenarioDialog
+      .getByRole('combobox', { name: 'Starting actor' })
+      .selectOption({ label: startingActor });
+  }
   await scenarioDialog
     .getByRole('button', { name: 'Validate and start Scenario' })
     .click();
@@ -184,12 +284,18 @@ async function restartScenario(
   page: Page,
   workspace: Locator,
   scenarioName: string,
+  startingActor?: string,
 ): Promise<void> {
   await openMenuItem(page, workspace, 'Session', 'Start new Scenario…');
   const scenarioDialog = page.getByRole('dialog', { name: 'Scenario setup' });
   await scenarioDialog
     .getByRole('button', { name: new RegExp(scenarioName) })
     .click();
+  if (startingActor !== undefined) {
+    await scenarioDialog
+      .getByRole('combobox', { name: 'Starting actor' })
+      .selectOption({ label: startingActor });
+  }
   await scenarioDialog
     .getByRole('button', { name: 'Validate and start Scenario' })
     .click();
@@ -226,6 +332,44 @@ async function openCharacter(
       name: new RegExp(`View ${escapePattern(participantName)} character`),
     })
     .click();
+}
+
+async function advanceToActor(
+  page: Page,
+  workspace: Locator,
+  actorId: string,
+): Promise<void> {
+  for (let step = 0; step < 8; step += 1) {
+    const response = decodePlayWorkspaceResponse(
+      await (await page.request.get('/api/play')).json(),
+    );
+    if (response.gameplay?.actorId === actorId) return;
+    const previousActorId = response.gameplay?.actorId;
+    await workspace.getByRole('button', { name: /End turn/ }).click();
+    await expect
+      .poll(async () => {
+        const next = decodePlayWorkspaceResponse(
+          await (await page.request.get('/api/play')).json(),
+        );
+        return next.gameplay?.actorId;
+      })
+      .not.toBe(previousActorId);
+  }
+  throw new Error(`did not advance to actor ${actorId}`);
+}
+
+async function firstForcedMovementOption(
+  page: Page,
+): Promise<GameplayForcedMovementOptionDto> {
+  const response = decodePlayWorkspaceResponse(
+    await (await page.request.get('/api/play')).json(),
+  );
+  const option = response.gameplay?.pendingForcedMovement?.options[0];
+  expect(option).toBeDefined();
+  if (option === undefined) {
+    throw new Error('authority did not expose a forced-movement option');
+  }
+  return option;
 }
 
 async function chooseFirstReactionIfOpen(workspace: Locator): Promise<void> {
@@ -300,6 +444,55 @@ async function assertStaleAreaCommandIsAtomic(page: Page): Promise<void> {
     expect.objectContaining({
       status: 'rejected',
       code: 'RPG_AREA_OPTION_STALE',
+    }),
+  );
+
+  const afterResponse = await page.request.get('/api/play');
+  expect(afterResponse.ok()).toBe(true);
+  const after = decodePlayWorkspaceResponse(await afterResponse.json());
+  const afterGameplay = after.gameplay;
+  expect(afterGameplay).not.toBeNull();
+  if (afterGameplay === null) return;
+
+  expect(afterGameplay.stateRevision).toBe(beforeGameplay.stateRevision);
+  expect(afterGameplay.acceptedRandomValues).toBe(
+    beforeGameplay.acceptedRandomValues,
+  );
+  expect(afterGameplay.log).toHaveLength(beforeGameplay.log.length);
+  expect(afterGameplay.archive.stateRevision).toBe(
+    beforeGameplay.archive.stateRevision,
+  );
+  expect(afterGameplay.archive.acceptedRandomPosition).toBe(
+    beforeGameplay.archive.acceptedRandomPosition,
+  );
+  expect(afterGameplay.archive.stateHash).toBe(beforeGameplay.archive.stateHash);
+  expect(afterGameplay.archive.replayEntries).toHaveLength(
+    beforeGameplay.archive.replayEntries.length,
+  );
+}
+
+async function assertStaleForcedMovementIsAtomic(
+  page: Page,
+  option: GameplayForcedMovementOptionDto,
+): Promise<void> {
+  const beforeResponse = await page.request.get('/api/play');
+  expect(beforeResponse.ok()).toBe(true);
+  const before = decodePlayWorkspaceResponse(await beforeResponse.json());
+  const beforeGameplay = before.gameplay;
+  expect(beforeGameplay).not.toBeNull();
+  if (beforeGameplay === null) return;
+
+  const staleResponse = await page.request.post(
+    '/api/session/forced-movement',
+    { data: { option } },
+  );
+  expect(staleResponse.ok()).toBe(true);
+  const rejected = decodePlayWorkspaceResponse(await staleResponse.json());
+  expect(rejected.ok).toBe(false);
+  expect(rejected.gameplay?.lastResult).toEqual(
+    expect.objectContaining({
+      status: 'rejected',
+      code: 'RPG_FORCED_MOVEMENT_PENDING_ABSENT',
     }),
   );
 

@@ -54,7 +54,7 @@ export type ScenarioPositionDto = { x: number, y: number, };
 
 export type ScenarioBoundedValueDto = { current: number, max: number, };
 
-export type ScenarioCellCapabilityValueDto = { "kind": "traversal", passable: boolean, movementCost: number, } | { "kind": "flag", value: boolean, } | { "kind": "integer", value: number, } | { "kind": "identifier", valueId: string, };
+export type ScenarioCellCapabilityValueDto = { "kind": "traversal", passable: boolean, movementCost: number, } | { "kind": "lineOfEffectObstruction", blocks: boolean, } | { "kind": "flag", value: boolean, } | { "kind": "integer", value: number, } | { "kind": "identifier", valueId: string, };
 
 export type ScenarioCellCapabilityDto = { id: string, version: number, definitionId: string | null, value: ScenarioCellCapabilityValueDto, };
 
@@ -104,7 +104,11 @@ export type GameplayNamedValueDto = { id: string, current: number, maximum: numb
 
 export type GameplayModifierDto = { stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type GameplayEffectDto = { instanceId: string, definitionId: string, label: string, sourceEntityId: string, stacking: string, rank: number, durationAnchor: string, remainingCount: number, };
+export type GameplayEffectDto = { instanceId: string, definitionId: string, label: string, sourceEntityId: string, stacking: string, rank: number, durationAnchor: string, tenure: string, remainingCount: number, };
+
+export type GameplaySpatialSourceTriggerDto = { sequence: string, stateRevision: string, boundary: string, cellId: string, participantId: string, operationPath: string, disposition: string, };
+
+export type GameplaySpatialSourceDto = { instanceId: string, definitionId: string, label: string, description: string | null, ownerEntityId: string, sourceEntityId: string, originX: number, originY: number, includedCellIds: Array<string>, radius: number, targetFilter: string, stacking: string, tenure: string, durationAnchor: string, remainingCount: number, triggerBoundaries: Array<string>, triggerEvidence: Array<GameplaySpatialSourceTriggerDto>, };
 
 export type GameplayActivationBudgetDto = { id: string, label: string, timing: string, resetBoundary: string, initialAmount: number, remaining: number, };
 
@@ -126,6 +130,14 @@ export type GameplayReactionOptionDto = { id: string, label: string, damageReduc
 
 export type GameplayReactionDto = { reactionId: string, actorId: string, targetId: string, actionId: string, options: Array<GameplayReactionOptionDto>, path: string, };
 
+export type GameplayForcedMovementOptionDto = { sessionBindingId: string, artifactId: string, scenarioFingerprintAlgorithm: string, scenarioFingerprintValue: string, authorityRevision: number, round: string, turn: string, currentActorId: string, actionId: string, sourceId: string, movedParticipantId: string, operationPath: string, destinationCellId: string, cellIds: Array<string>, movementCost: number, };
+
+export type GameplayPendingForcedMovementDto = { movementKind: string, sourceId: string, movedParticipantId: string, maximumDistance: number, operationPath: string, options: Array<GameplayForcedMovementOptionDto>, };
+
+export type GameplayEffectSaveCandidateDto = { targetId: string, instanceId: string, definitionId: string, sourceEntityId: string, randomRequest: GameplayRandomRequestDto, };
+
+export type GameplayPendingTurnSaveDto = { expectedRevision: number, actorId: string, control: string, candidates: Array<GameplayEffectSaveCandidateDto>, };
+
 export type GameplayRandomEvidenceDto = { kind: string, count: number, sides: number, path: string, values: Array<number>, heterogeneousValues: Array<GameplayHeterogeneousRandomValueDto>, };
 
 export type GameplayHeterogeneousRandomValueDto = { dieTypeId: string, ordinal: number, sides: number, value: number, };
@@ -138,7 +150,7 @@ export type GameplayReplayEntryDto = { sequence: number, operation: string, outc
 
 export type GameplayArchiveDto = { checkpointSchema: string, replaySchemaVersion: number, eventSchemaVersion: number, artifactId: string, artifactSchema: string, playBundle: string, ruleset: string, operationSchemas: Array<string>, capabilitySchemas: Array<string>, contentPacks: Array<string>, dependencyLock: Array<string>, fingerprints: PlayBundleFingerprintDto, definitionFingerprints: Array<string>, stateRevision: string, acceptedRandomPosition: string, phase: string, stateHash: string, checkpointBytes: number, replayEntries: Array<GameplayReplayEntryDto>, verificationStatus: string, verificationMessage: string, };
 
-export type GameplaySessionDto = { artifactId: string, actorId: string, stateRevision: number, acceptedRandomValues: string, randomSource: ScenarioRandomSourceDto, board: ScenarioBoardDto, turn: ScenarioTurnDto, actions: Array<GameplayAuthorityActionDto>, controls: Array<GameplayTurnControlDto>, entities: Array<GameplayEntityDto>, pendingReaction: GameplayReactionDto | null, log: Array<GameplayLogEntryDto>, outcome: GameplayOutcomeDto, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
+export type GameplaySessionDto = { artifactId: string, actorId: string, stateRevision: number, acceptedRandomValues: string, randomSource: ScenarioRandomSourceDto, board: ScenarioBoardDto, turn: ScenarioTurnDto, actions: Array<GameplayAuthorityActionDto>, controls: Array<GameplayTurnControlDto>, entities: Array<GameplayEntityDto>, spatialSources: Array<GameplaySpatialSourceDto>, pendingReaction: GameplayReactionDto | null, pendingForcedMovement: GameplayPendingForcedMovementDto | null, pendingTurnSave: GameplayPendingTurnSaveDto | null, log: Array<GameplayLogEntryDto>, outcome: GameplayOutcomeDto, lastResult: GameplayResultDto | null, archive: GameplayArchiveDto, };
 
 export type PlayWorkspaceResponseDto = { ok: boolean, status: PlayBundleLifecycleStatus, activeArtifact: PlayBundleArtifactSummaryDto | null, candidateArtifact: PlayBundleArtifactSummaryDto | null, upgradeImpact: PlayBundleUpgradeImpactDto | null, activationRevision: number, hostRandomSource: ScenarioRandomSourceDto, supportedRandomSources: Array<ScenarioRandomSourceDto>, scenarioSetupRequired: boolean, gameplayAvailable: boolean, gameplay: GameplaySessionDto | null, diagnostics: Array<PlayDiagnosticDto>, };
 
@@ -169,5 +181,7 @@ export type PreparedPlayBundleCompileRequestDto = { preparedSource: string, };
 export type GameplayCommandRequestDto = { expectedRevision: number, actionId: string, actorId: string, targetIds: Array<string>, itemBinding: GameplayItemBindingDto | null, };
 
 export type GameplayReactionRequestDto = { expectedRevision: number, reactionId: string, optionId: string | null, };
+
+export type GameplayForcedMovementRequestDto = { option: GameplayForcedMovementOptionDto, };
 
 export type GameplayTurnControlRequestDto = { expectedRevision: number, actorId: string, kind: string, };

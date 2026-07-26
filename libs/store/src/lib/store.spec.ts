@@ -192,6 +192,7 @@ function baseTransport(overrides: Partial<PlayTransport> = {}): PlayTransport {
     startScenario: async () => activeResponse(),
     command: async () => activeResponse(),
     react: async () => activeResponse(),
+    forcedMovement: async () => activeResponse(),
     control: async () => activeResponse(),
     restoreCheckpoint: async () => activeResponse(),
     replay: async () => activeResponse(),
@@ -271,7 +272,10 @@ function activeGameplayResponse(
       actions: [],
       controls: [],
       entities: [],
+      spatialSources: [],
       pendingReaction: null,
+      pendingForcedMovement: null,
+      pendingTurnSave: null,
       log:
         contributionLabel === null
           ? []

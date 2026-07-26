@@ -13,7 +13,7 @@ use rpg_core::{
     BoundedValue, GridPosition, RpgContributionDisposition, RpgDomainEvent, RpgIntentItemBinding,
     RpgPoolContributionDecision, RpgPoolContributionEffect, RpgRandomEvidence, RpgRandomRequest,
     RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt, RpgResolutionRejection,
-    RpgScalarContributionDecision, RpgTeamId, RpgTraceStep,
+    RpgScalarContributionDecision, RpgTeamId, RpgTraceStep, StateFingerprint,
 };
 use rpg_ir::{
     CompiledPlayBundleArtifact, ContentConflictPolicy, ContentExtensionPolicy, ContentImpactPlane,
@@ -24,10 +24,10 @@ use rpg_runtime::{
     RpgActionProposal, RpgAreaActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure,
     RpgBoardSetup, RpgCellCapabilitySetup, RpgCellCapabilityValue, RpgCellSetup,
     RpgCheckpointPhase, RpgCommandOutcome, RpgEncounterOutcomeView, RpgEquipmentSlotSetup,
-    RpgInitialCapability, RpgItemInstanceSetup, RpgParticipantSetup, RpgRandomSource,
-    RpgRandomSourceBinding, RpgRandomSourceFailure, RpgReactionProposal, RpgReplayBoundary,
-    RpgReplayEntry, RpgReplayFailure, RpgReplayOperation, RpgReplayPhase, RpgScenario,
-    RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal,
+    RpgForcedMovementOptionView, RpgInitialCapability, RpgItemInstanceSetup, RpgParticipantSetup,
+    RpgRandomSource, RpgRandomSourceBinding, RpgRandomSourceFailure, RpgReactionProposal,
+    RpgReplayBoundary, RpgReplayEntry, RpgReplayFailure, RpgReplayOperation, RpgReplayPhase,
+    RpgScenario, RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal,
     RpgTurnControlReceipt, RpgTurnInitialization,
 };
 use serde::{Deserialize, Serialize};
@@ -384,6 +384,7 @@ pub struct ScenarioBoundedValueDto {
 #[ts(tag = "kind", rename_all = "camelCase")]
 pub enum ScenarioCellCapabilityValueDto {
     Traversal { passable: bool, movement_cost: u32 },
+    LineOfEffectObstruction { blocks: bool },
     Flag { value: bool },
     Integer { value: i32 },
     Identifier { value_id: String },
@@ -732,7 +733,44 @@ pub struct GameplayEffectDto {
     pub stacking: String,
     pub rank: i32,
     pub duration_anchor: String,
+    pub tenure: String,
     pub remaining_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplaySpatialSourceTriggerDto {
+    pub sequence: String,
+    pub state_revision: String,
+    pub boundary: String,
+    pub cell_id: String,
+    pub participant_id: String,
+    pub operation_path: String,
+    pub disposition: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplaySpatialSourceDto {
+    pub instance_id: String,
+    pub definition_id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub owner_entity_id: String,
+    pub source_entity_id: String,
+    pub origin_x: u32,
+    pub origin_y: u32,
+    pub included_cell_ids: Vec<String>,
+    pub radius: u32,
+    pub target_filter: String,
+    pub stacking: String,
+    pub tenure: String,
+    pub duration_anchor: String,
+    pub remaining_count: u32,
+    pub trigger_boundaries: Vec<String>,
+    pub trigger_evidence: Vec<GameplaySpatialSourceTriggerDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -861,6 +899,60 @@ pub struct GameplayReactionDto {
     pub path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayForcedMovementOptionDto {
+    pub session_binding_id: String,
+    pub artifact_id: String,
+    pub scenario_fingerprint_algorithm: String,
+    pub scenario_fingerprint_value: String,
+    pub authority_revision: u32,
+    pub round: String,
+    pub turn: String,
+    pub current_actor_id: String,
+    pub action_id: String,
+    pub source_id: String,
+    pub moved_participant_id: String,
+    pub operation_path: String,
+    pub destination_cell_id: String,
+    pub cell_ids: Vec<String>,
+    pub movement_cost: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayPendingForcedMovementDto {
+    pub movement_kind: String,
+    pub source_id: String,
+    pub moved_participant_id: String,
+    pub maximum_distance: u32,
+    pub operation_path: String,
+    pub options: Vec<GameplayForcedMovementOptionDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayEffectSaveCandidateDto {
+    pub target_id: String,
+    pub instance_id: String,
+    pub definition_id: String,
+    pub source_entity_id: String,
+    pub random_request: GameplayRandomRequestDto,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayPendingTurnSaveDto {
+    pub expected_revision: u32,
+    pub actor_id: String,
+    pub control: String,
+    pub candidates: Vec<GameplayEffectSaveCandidateDto>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
@@ -962,7 +1054,10 @@ pub struct GameplaySessionDto {
     pub actions: Vec<GameplayAuthorityActionDto>,
     pub controls: Vec<GameplayTurnControlDto>,
     pub entities: Vec<GameplayEntityDto>,
+    pub spatial_sources: Vec<GameplaySpatialSourceDto>,
     pub pending_reaction: Option<GameplayReactionDto>,
+    pub pending_forced_movement: Option<GameplayPendingForcedMovementDto>,
+    pub pending_turn_save: Option<GameplayPendingTurnSaveDto>,
     pub log: Vec<GameplayLogEntryDto>,
     pub outcome: GameplayOutcomeDto,
     pub last_result: Option<GameplayResultDto>,
@@ -1115,6 +1210,13 @@ pub struct GameplayReactionRequestDto {
     pub expected_revision: u32,
     pub reaction_id: String,
     pub option_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayForcedMovementRequestDto {
+    pub option: GameplayForcedMovementOptionDto,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, TS)]
@@ -1691,6 +1793,63 @@ impl PlayHost {
         )
     }
 
+    pub fn resolve_forced_movement(
+        &self,
+        request: GameplayForcedMovementRequestDto,
+    ) -> PlayWorkspaceResponseDto {
+        let mut slots = self.slots.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = slots
+            .active
+            .as_mut()
+            .and_then(|active| active.encounter.as_mut())
+        else {
+            return response_from_slots(
+                false,
+                &slots,
+                vec![host_diagnostic(
+                    "RPG_SESSION_ACTIVE_ARTIFACT_REQUIRED",
+                    "$.activeArtifact",
+                    "create an encounter before resolving forced movement",
+                )],
+            );
+        };
+        let mut random_source = self
+            .random_source
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let recorded = active
+            .session
+            .resolve_forced_movement_with_random_source_recorded(
+                forced_movement_option_from_dto(request.option),
+                random_source.as_mut(),
+            );
+        let (outcome, entry) = match recorded {
+            Ok(recorded) => recorded,
+            Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_automatic_failure(failure),
+                );
+            }
+        };
+        if !matches!(outcome, RpgCommandOutcome::Rejected(_)) {
+            if let Err(failure) = active.store_entry(entry) {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_replay_failure(failure),
+                );
+            }
+        }
+        active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
+        response_from_slots(
+            !matches!(outcome, RpgCommandOutcome::Rejected(_)),
+            &slots,
+            Vec::new(),
+        )
+    }
+
     pub fn execute_turn_control(
         &self,
         request: GameplayTurnControlRequestDto,
@@ -1726,23 +1885,36 @@ impl PlayHost {
                 );
             }
         };
-        let recorded = active.session.control_recorded(RpgTurnControlProposal {
-            expected_revision: u64::from(request.expected_revision),
-            actor_id: request.actor_id,
-            control,
-        });
-        let (outcome, entry) = match recorded {
+        let mut random_source = self
+            .random_source
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let recorded = active.session.control_with_random_source_recorded(
+            RpgTurnControlProposal {
+                expected_revision: u64::from(request.expected_revision),
+                actor_id: request.actor_id,
+                control,
+            },
+            random_source.as_mut(),
+        );
+        let (outcome, entries) = match recorded {
             Ok(recorded) => recorded,
             Err(failure) => {
+                return response_from_slots(
+                    false,
+                    &slots,
+                    diagnostics_from_automatic_failure(failure),
+                );
+            }
+        };
+        for entry in entries {
+            if let Err(failure) = active.store_entry(entry) {
                 return response_from_slots(
                     false,
                     &slots,
                     diagnostics_from_replay_failure(failure),
                 );
             }
-        };
-        if let Err(failure) = active.store_entry(entry) {
-            return response_from_slots(false, &slots, diagnostics_from_replay_failure(failure));
         }
         active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
         response_from_slots(
@@ -2185,6 +2357,9 @@ fn scenario(request: ScenarioSetupRequestDto) -> RpgScenario {
                                     passable,
                                     movement_cost,
                                 },
+                                ScenarioCellCapabilityValueDto::LineOfEffectObstruction {
+                                    blocks,
+                                } => RpgCellCapabilityValue::LineOfEffectObstruction { blocks },
                                 ScenarioCellCapabilityValueDto::Flag { value } => {
                                     RpgCellCapabilityValue::Flag { value }
                                 }
@@ -2329,6 +2504,11 @@ fn encounter_board(board: &RpgBoardSetup) -> ScenarioBoardDto {
                                 passable: *passable,
                                 movement_cost: *movement_cost,
                             },
+                            RpgCellCapabilityValue::LineOfEffectObstruction { blocks } => {
+                                ScenarioCellCapabilityValueDto::LineOfEffectObstruction {
+                                    blocks: *blocks,
+                                }
+                            }
                             RpgCellCapabilityValue::Flag { value } => {
                                 ScenarioCellCapabilityValueDto::Flag { value: *value }
                             }
@@ -2370,7 +2550,20 @@ fn gameplay_session(active: &ActiveEncounter) -> GameplaySessionDto {
         actions: view.actions.iter().map(gameplay_authority_action).collect(),
         controls: view.controls.iter().map(gameplay_turn_control).collect(),
         entities: view.participants.iter().map(gameplay_entity).collect(),
+        spatial_sources: view
+            .spatial_sources
+            .iter()
+            .map(gameplay_spatial_source)
+            .collect(),
         pending_reaction: view.pending_reaction.as_ref().map(gameplay_reaction),
+        pending_forced_movement: view
+            .pending_forced_movement
+            .as_ref()
+            .map(gameplay_pending_forced_movement),
+        pending_turn_save: view
+            .pending_turn_save
+            .as_ref()
+            .map(gameplay_pending_turn_save),
         log: view.log.iter().map(gameplay_log_entry).collect(),
         outcome: gameplay_outcome(&view.outcome),
         last_result: active.last_result.clone(),
@@ -2489,6 +2682,15 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
                 .collect(),
             Vec::new(),
         ),
+        RpgCommandOutcome::AwaitingForcedMovement(pending) => (
+            pending
+                .random_evidence
+                .iter()
+                .map(gameplay_random_evidence_label)
+                .collect(),
+            Vec::new(),
+        ),
+        RpgCommandOutcome::AwaitingTurnSave(_) => (Vec::new(), Vec::new()),
         RpgCommandOutcome::Rejected(rejection) => (
             rejection
                 .random_evidence
@@ -2518,6 +2720,10 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
                     command.expected_revision
                 )
             }
+            RpgReplayOperation::ForcedMovement { command, .. } => format!(
+                "forced movement {} to {}",
+                command.option.moved_participant_id, command.option.route.destination_cell_id
+            ),
             RpgReplayOperation::TurnControl { command } => format!(
                 "{} by {} at revision {}",
                 command.control.id(),
@@ -2529,6 +2735,8 @@ fn gameplay_replay_entry(index: usize, entry: &RpgReplayEntry) -> GameplayReplay
             RpgCommandOutcome::Accepted(_) => "accepted",
             RpgCommandOutcome::ControlAccepted(_) => "controlAccepted",
             RpgCommandOutcome::AwaitingReaction(_) => "awaitingReaction",
+            RpgCommandOutcome::AwaitingForcedMovement(_) => "awaitingForcedMovement",
+            RpgCommandOutcome::AwaitingTurnSave(_) => "awaitingTurnSave",
             RpgCommandOutcome::Rejected(_) => "rejected",
         }
         .to_owned(),
@@ -2557,6 +2765,13 @@ fn checkpoint_phase_label(phase: &RpgCheckpointPhase) -> String {
         RpgCheckpointPhase::AwaitingReaction { pending, .. } => {
             format!("awaitingReaction {}", pending.request.reaction_id)
         }
+        RpgCheckpointPhase::AwaitingForcedMovement { pending, .. } => format!(
+            "awaitingForcedMovement {}",
+            pending.request.moved_participant_id
+        ),
+        RpgCheckpointPhase::AwaitingTurnSave { pending, .. } => {
+            format!("awaitingTurnSave {}", pending.actor_id)
+        }
     }
 }
 
@@ -2565,6 +2780,13 @@ fn replay_phase_label(phase: &RpgReplayPhase) -> String {
         RpgReplayPhase::Ready => "ready".to_owned(),
         RpgReplayPhase::AwaitingReaction { reaction_id } => {
             format!("awaitingReaction {reaction_id}")
+        }
+        RpgReplayPhase::AwaitingForcedMovement {
+            moved_participant_id,
+            ..
+        } => format!("awaitingForcedMovement {moved_participant_id}"),
+        RpgReplayPhase::AwaitingTurnSave { actor_id, .. } => {
+            format!("awaitingTurnSave {actor_id}")
         }
     }
 }
@@ -2622,7 +2844,7 @@ fn gameplay_authority_action(action: &rpg_runtime::RpgActionView) -> GameplayAut
             .map(|rejection| GameplayUnavailableDto {
                 code: rejection.code.clone(),
                 path: rejection.path.clone(),
-                message: rejection.message.clone(),
+                message: rejection.message.to_string(),
             }),
         maximum_targets: action.maximum_targets,
         options: GameplayActionOptionsDto {
@@ -2661,7 +2883,7 @@ fn gameplay_turn_control(control: &rpg_runtime::RpgTurnControlView) -> GameplayT
             .map(|rejection| GameplayUnavailableDto {
                 code: rejection.code.clone(),
                 path: rejection.path.clone(),
-                message: rejection.message.clone(),
+                message: rejection.message.to_string(),
             }),
     }
 }
@@ -2763,6 +2985,7 @@ fn gameplay_entity(entity: &rpg_runtime::RpgParticipantView) -> GameplayEntityDt
                 stacking: effect_stacking_label(effect.stacking).to_owned(),
                 rank: effect.rank,
                 duration_anchor: effect_duration_anchor_label(effect.duration_anchor).to_owned(),
+                tenure: effect_tenure_label(effect.tenure).to_owned(),
                 remaining_count: effect.remaining_count,
             })
             .collect(),
@@ -2795,6 +3018,79 @@ fn effect_duration_anchor_label(anchor: rpg_core::RpgEffectDurationAnchor) -> &'
         rpg_core::RpgEffectDurationAnchor::RoundTransition => "roundTransition",
         rpg_core::RpgEffectDurationAnchor::SourceTurnStart => "sourceTurnStart",
         rpg_core::RpgEffectDurationAnchor::TargetTurnStart => "targetTurnStart",
+        rpg_core::RpgEffectDurationAnchor::TargetTurnEndSave => "targetTurnEndSave",
+    }
+}
+
+fn effect_tenure_label(tenure: rpg_core::RpgEffectTenure) -> &'static str {
+    match tenure {
+        rpg_core::RpgEffectTenure::Fixed { .. } => "fixed",
+        rpg_core::RpgEffectTenure::TargetTurnEndSave {} => "targetTurnEndSave",
+    }
+}
+
+fn spatial_boundary_label(boundary: rpg_core::RpgSpatialSourceBoundary) -> &'static str {
+    match boundary {
+        rpg_core::RpgSpatialSourceBoundary::Enter => "enter",
+        rpg_core::RpgSpatialSourceBoundary::StartTurn => "startTurn",
+        rpg_core::RpgSpatialSourceBoundary::EndTurn => "endTurn",
+        rpg_core::RpgSpatialSourceBoundary::Exit => "exit",
+    }
+}
+
+fn spatial_target_filter_label(filter: rpg_core::RpgSpatialSourceTargetFilter) -> &'static str {
+    match filter {
+        rpg_core::RpgSpatialSourceTargetFilter::All => "all",
+        rpg_core::RpgSpatialSourceTargetFilter::Allies => "allies",
+        rpg_core::RpgSpatialSourceTargetFilter::Hostiles => "hostiles",
+    }
+}
+
+fn spatial_trigger_disposition_label(
+    disposition: &rpg_core::RpgSpatialSourceTriggerDisposition,
+) -> &'static str {
+    match disposition {
+        rpg_core::RpgSpatialSourceTriggerDisposition::Applied => "applied",
+        rpg_core::RpgSpatialSourceTriggerDisposition::Inapplicable { .. } => "inapplicable",
+        rpg_core::RpgSpatialSourceTriggerDisposition::Suppressed { .. } => "suppressed",
+    }
+}
+
+fn gameplay_spatial_source(source: &rpg_runtime::RpgSpatialSourceView) -> GameplaySpatialSourceDto {
+    GameplaySpatialSourceDto {
+        instance_id: source.instance_id.clone(),
+        definition_id: source.definition_id.clone(),
+        label: source.label.clone(),
+        description: source.description.clone(),
+        owner_entity_id: source.owner_entity_id.clone(),
+        source_entity_id: source.source_entity_id.clone(),
+        origin_x: source.origin.x,
+        origin_y: source.origin.y,
+        included_cell_ids: source.included_cell_ids.clone(),
+        radius: source.radius,
+        target_filter: spatial_target_filter_label(source.target_filter).to_owned(),
+        stacking: effect_stacking_label(source.stacking).to_owned(),
+        tenure: effect_tenure_label(source.tenure).to_owned(),
+        duration_anchor: effect_duration_anchor_label(source.duration_anchor).to_owned(),
+        remaining_count: source.remaining_count,
+        trigger_boundaries: source
+            .trigger_boundaries
+            .iter()
+            .map(|boundary| spatial_boundary_label(*boundary).to_owned())
+            .collect(),
+        trigger_evidence: source
+            .trigger_evidence
+            .iter()
+            .map(|evidence| GameplaySpatialSourceTriggerDto {
+                sequence: evidence.sequence.to_string(),
+                state_revision: evidence.state_revision.to_string(),
+                boundary: spatial_boundary_label(evidence.boundary).to_owned(),
+                cell_id: evidence.cell_id.clone(),
+                participant_id: evidence.participant_id.clone(),
+                operation_path: evidence.operation_path.clone(),
+                disposition: spatial_trigger_disposition_label(&evidence.disposition).to_owned(),
+            })
+            .collect(),
     }
 }
 
@@ -2857,6 +3153,95 @@ fn gameplay_reaction(request: &RpgReactionRequest) -> GameplayReactionDto {
     }
 }
 
+fn gameplay_forced_movement_option(
+    option: &RpgForcedMovementOptionView,
+) -> GameplayForcedMovementOptionDto {
+    GameplayForcedMovementOptionDto {
+        session_binding_id: option.session_binding_id.clone(),
+        artifact_id: option.artifact_id.clone(),
+        scenario_fingerprint_algorithm: option.scenario_fingerprint.algorithm.clone(),
+        scenario_fingerprint_value: option.scenario_fingerprint.value.clone(),
+        authority_revision: dto_revision(option.authority_revision),
+        round: option.round.to_string(),
+        turn: option.turn.to_string(),
+        current_actor_id: option.current_actor_id.clone(),
+        action_id: option.action_id.clone(),
+        source_id: option.source_id.clone(),
+        moved_participant_id: option.moved_participant_id.clone(),
+        operation_path: option.operation_path.clone(),
+        destination_cell_id: option.route.destination_cell_id.clone(),
+        cell_ids: option.route.cell_ids.clone(),
+        movement_cost: option.route.movement_cost,
+    }
+}
+
+fn forced_movement_option_from_dto(
+    option: GameplayForcedMovementOptionDto,
+) -> RpgForcedMovementOptionView {
+    RpgForcedMovementOptionView {
+        session_binding_id: option.session_binding_id,
+        artifact_id: option.artifact_id,
+        scenario_fingerprint: StateFingerprint {
+            algorithm: option.scenario_fingerprint_algorithm,
+            value: option.scenario_fingerprint_value,
+        },
+        authority_revision: u64::from(option.authority_revision),
+        round: option.round.parse().unwrap_or(u64::MAX),
+        turn: option.turn.parse().unwrap_or(u64::MAX),
+        current_actor_id: option.current_actor_id,
+        action_id: option.action_id,
+        source_id: option.source_id,
+        moved_participant_id: option.moved_participant_id,
+        operation_path: option.operation_path,
+        route: rpg_runtime::RpgCellPathView {
+            destination_cell_id: option.destination_cell_id,
+            cell_ids: option.cell_ids,
+            movement_cost: option.movement_cost,
+        },
+    }
+}
+
+fn gameplay_pending_forced_movement(
+    pending: &rpg_runtime::RpgPendingForcedMovement,
+) -> GameplayPendingForcedMovementDto {
+    GameplayPendingForcedMovementDto {
+        movement_kind: format!("{:?}", pending.request.movement_kind).to_lowercase(),
+        source_id: pending.request.source_id.clone(),
+        moved_participant_id: pending.request.moved_participant_id.clone(),
+        maximum_distance: pending.request.maximum_distance,
+        operation_path: pending.request.operation_path.clone(),
+        options: pending
+            .options
+            .iter()
+            .map(gameplay_forced_movement_option)
+            .collect(),
+    }
+}
+
+fn gameplay_pending_turn_save(
+    pending: &rpg_runtime::RpgPendingTurnSave,
+) -> GameplayPendingTurnSaveDto {
+    GameplayPendingTurnSaveDto {
+        expected_revision: dto_revision(pending.expected_revision),
+        actor_id: pending.actor_id.clone(),
+        control: pending.control.id().to_owned(),
+        candidates: pending
+            .candidates
+            .iter()
+            .map(|candidate| GameplayEffectSaveCandidateDto {
+                target_id: candidate.target_id.clone(),
+                instance_id: candidate.instance_id.clone(),
+                definition_id: format!(
+                    "{}@{}",
+                    candidate.definition_id, candidate.definition_version
+                ),
+                source_entity_id: candidate.source_entity_id.clone(),
+                random_request: gameplay_random_request(&candidate.request),
+            })
+            .collect(),
+    }
+}
+
 fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> GameplayResultDto {
     match outcome {
         RpgCommandOutcome::Accepted(receipt) => accepted_result(receipt),
@@ -2873,6 +3258,39 @@ fn gameplay_result(outcome: &RpgCommandOutcome, current_revision: u64) -> Gamepl
                 .iter()
                 .map(gameplay_random_evidence)
                 .collect(),
+            state_revision: dto_revision(current_revision),
+            random_request: None,
+        },
+        RpgCommandOutcome::AwaitingForcedMovement(pending) => GameplayResultDto {
+            status: "awaitingForcedMovement".to_owned(),
+            code: None,
+            message: format!(
+                "Choose where to move {}",
+                pending.request.moved_participant_id
+            ),
+            events: Vec::new(),
+            trace: pending.trace.iter().map(gameplay_trace).collect(),
+            random_consumed: pending.random_attempted.to_string(),
+            random_evidence: pending
+                .random_evidence
+                .iter()
+                .map(gameplay_random_evidence)
+                .collect(),
+            state_revision: dto_revision(current_revision),
+            random_request: None,
+        },
+        RpgCommandOutcome::AwaitingTurnSave(pending) => GameplayResultDto {
+            status: "awaitingTurnSave".to_owned(),
+            code: None,
+            message: format!(
+                "Resolving {} end-turn save(s) for {}",
+                pending.candidates.len(),
+                pending.actor_id
+            ),
+            events: Vec::new(),
+            trace: Vec::new(),
+            random_consumed: "0".to_owned(),
+            random_evidence: Vec::new(),
             state_revision: dto_revision(current_revision),
             random_request: None,
         },
@@ -2923,7 +3341,7 @@ fn rejected_result(rejection: &RpgResolutionRejection, current_revision: u64) ->
     GameplayResultDto {
         status: "rejected".to_owned(),
         code: Some(rejection.code.clone()),
-        message: rejection.message.clone(),
+        message: rejection.message.to_string(),
         events: Vec::new(),
         trace: rejection.trace.iter().map(gameplay_trace).collect(),
         random_consumed: rejection.random_attempted.to_string(),
@@ -2949,6 +3367,7 @@ fn gameplay_random_request(request: &RpgRandomRequest) -> GameplayRandomRequestD
         kind: match request.kind {
             RpgRandomRequestKind::AttackCheck => "attackCheck",
             RpgRandomRequestKind::SavingThrowCheck => "savingThrowCheck",
+            RpgRandomRequestKind::EffectSave => "effectSave",
             RpgRandomRequestKind::ScalarTest => "scalarTest",
             RpgRandomRequestKind::FormulaDice => "formulaDice",
             RpgRandomRequestKind::HeterogeneousPool => "heterogeneousPool",
@@ -2974,6 +3393,7 @@ fn gameplay_random_evidence(evidence: &RpgRandomEvidence) -> GameplayRandomEvide
         kind: match evidence.request.kind {
             RpgRandomRequestKind::AttackCheck => "attackCheck",
             RpgRandomRequestKind::SavingThrowCheck => "savingThrowCheck",
+            RpgRandomRequestKind::EffectSave => "effectSave",
             RpgRandomRequestKind::ScalarTest => "scalarTest",
             RpgRandomRequestKind::FormulaDice => "formulaDice",
             RpgRandomRequestKind::HeterogeneousPool => "heterogeneousPool",
@@ -3439,6 +3859,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             stacking,
             rank,
             duration_anchor,
+            tenure,
             remaining_count,
             application_revision,
             replaced_instance_ids,
@@ -3449,6 +3870,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
                 event_detail("stacking", format!("{stacking_id} / {stacking:?}")),
                 event_detail("rank", rank),
                 event_detail("duration anchor", format!("{duration_anchor:?}")),
+                event_detail("tenure", format!("{tenure:?}")),
                 event_detail("remaining", remaining_count),
                 event_detail("application revision", application_revision),
                 event_detail("replaced instances", replaced_instance_ids.join(", ")),
@@ -3468,6 +3890,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             stacking,
             rank,
             duration_anchor,
+            tenure,
             previous_count,
             remaining_count,
             application_revision,
@@ -3479,6 +3902,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
                 event_detail("stacking", format!("{stacking_id} / {stacking:?}")),
                 event_detail("rank", rank),
                 event_detail("duration anchor", format!("{duration_anchor:?}")),
+                event_detail("tenure", format!("{tenure:?}")),
                 event_detail("duration", format!("{previous_count} → {remaining_count}")),
                 event_detail("application revision", application_revision),
                 event_detail("removed instances", removed_instance_ids.join(", ")),
@@ -3512,6 +3936,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             definition_id,
             definition_version,
             duration_anchor,
+            tenure,
             previous_count,
             remaining_count,
         } => {
@@ -3519,6 +3944,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
                 event_detail("instance", instance_id),
                 event_detail("definition", format!("{definition_id}@{definition_version}")),
                 event_detail("duration anchor", format!("{duration_anchor:?}")),
+                event_detail("tenure", format!("{tenure:?}")),
             ]);
             (
                 "effectDurationChanged",
@@ -3534,31 +3960,183 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             definition_version,
             source_id,
             duration_anchor,
+            tenure,
         } => {
             details.extend([
                 event_detail("instance", instance_id),
                 event_detail("definition", format!("{definition_id}@{definition_version}")),
                 event_detail("source", source_id),
                 event_detail("duration anchor", format!("{duration_anchor:?}")),
+                event_detail("tenure", format!("{tenure:?}")),
             ]);
             (
                 "effectExpired",
                 format!("{target_id} {definition_id} expired"),
             )
         }
-        RpgDomainEvent::PositionChanged {
-            entity_id,
-            previous,
-            current,
-            provokes,
+        RpgDomainEvent::EffectSaveResolved {
+            target_id,
+            instance_id,
+            definition_id,
+            source_id,
+            roll,
+            difficulty,
+            saved,
             ..
         } => (
-            "positionChanged",
+            {
+                roll_resolution = Some(GameplayRollResolutionDto {
+                    kind: "effectSave".to_owned(),
+                    die_result: *roll,
+                    total: i32::try_from(*roll).unwrap_or(i32::MAX),
+                    threshold_label: "difficulty".to_owned(),
+                    threshold: i32::try_from(*difficulty).unwrap_or(i32::MAX),
+                    outcome: if *saved { "saved" } else { "failed" }.to_owned(),
+                    contributions: Vec::new(),
+                });
+                details.extend([
+                    event_detail("instance", instance_id),
+                    event_detail("source", source_id),
+                ]);
+                "effectSaveResolved"
+            },
             format!(
-                "{entity_id} moved ({},{}) to ({},{}); provokes={provokes}",
-                previous.x, previous.y, current.x, current.y
+                "{target_id} rolled {roll} against {difficulty} for {definition_id}; saved={saved}"
             ),
         ),
+        RpgDomainEvent::SpatialSourceCreated {
+            owner_id,
+            source_id,
+            instance_id,
+            definition_id,
+            origin,
+            included_cell_ids,
+            remaining_count,
+            ..
+        } => (
+            {
+                details.extend([
+                    event_detail("instance", instance_id),
+                    event_detail("origin", format!("({}, {})", origin.x, origin.y)),
+                    event_detail("included cells", included_cell_ids.join(", ")),
+                    event_detail("remaining", remaining_count),
+                ]);
+                "spatialSourceCreated"
+            },
+            format!("{source_id} created {definition_id} for {owner_id}"),
+        ),
+        RpgDomainEvent::SpatialSourceRefreshed {
+            owner_id,
+            source_id,
+            instance_id,
+            definition_id,
+            included_cell_ids,
+            previous_count,
+            remaining_count,
+            ..
+        } => (
+            {
+                details.extend([
+                    event_detail("instance", instance_id),
+                    event_detail("included cells", included_cell_ids.join(", ")),
+                    event_detail("duration", format!("{previous_count} → {remaining_count}")),
+                ]);
+                "spatialSourceRefreshed"
+            },
+            format!("{source_id} refreshed {definition_id} for {owner_id}"),
+        ),
+        RpgDomainEvent::SpatialSourceDurationChanged {
+            instance_id,
+            definition_id,
+            previous_count,
+            remaining_count,
+            ..
+        } => (
+            {
+                details.push(event_detail("instance", instance_id));
+                "spatialSourceDurationChanged"
+            },
+            format!("{definition_id} duration {previous_count} → {remaining_count}"),
+        ),
+        RpgDomainEvent::SpatialSourceExpired {
+            instance_id,
+            definition_id,
+            owner_id,
+            ..
+        } => (
+            {
+                details.push(event_detail("instance", instance_id));
+                "spatialSourceExpired"
+            },
+            format!("{definition_id} expired for {owner_id}"),
+        ),
+        RpgDomainEvent::SpatialSourceRemoved {
+            instance_id,
+            definition_id,
+            owner_id,
+            reason,
+            ..
+        } => (
+            {
+                details.extend([
+                    event_detail("instance", instance_id),
+                    event_detail("reason", reason),
+                ]);
+                "spatialSourceRemoved"
+            },
+            format!("{definition_id} removed for {owner_id}"),
+        ),
+        RpgDomainEvent::SpatialSourceTriggerEvaluated {
+            boundary,
+            instance_id,
+            definition_id,
+            cell_id,
+            participant_id,
+            operation_path,
+            disposition,
+            ..
+        } => (
+            {
+                details.extend([
+                    event_detail("instance", instance_id),
+                    event_detail("cell", cell_id),
+                    event_detail("operation", operation_path),
+                    event_detail(
+                        "disposition",
+                        spatial_trigger_disposition_label(disposition),
+                    ),
+                ]);
+                "spatialSourceTriggerEvaluated"
+            },
+            format!(
+                "{definition_id} evaluated {boundary:?} for {participant_id}: {}",
+                spatial_trigger_disposition_label(disposition)
+            ),
+        ),
+        RpgDomainEvent::MovementTransition {
+            source_id,
+            moved_participant_id,
+            movement_kind,
+            start,
+            end,
+            route_cell_ids,
+            movement_cost,
+            provokes,
+        } => {
+            details.extend([
+                event_detail("source", source_id),
+                event_detail("kind", format!("{movement_kind:?}")),
+                event_detail("route", route_cell_ids.join(" → ")),
+                event_detail("movement cost", movement_cost),
+            ]);
+            (
+                "movementTransition",
+                format!(
+                    "{moved_participant_id} moved ({},{}) to ({},{}); provokes={provokes}",
+                    start.x, start.y, end.x, end.y
+                ),
+            )
+        }
         RpgDomainEvent::ReactionOpened {
             reaction_id,
             target_id,
@@ -3576,6 +4154,29 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             format!(
                 "resolved {reaction_id} with {}; damage reduction {damage_reduction}",
                 option_id.as_deref().unwrap_or("decline")
+            ),
+        ),
+        RpgDomainEvent::MovementReactionOpened {
+            reaction_id,
+            owner_id,
+            moved_participant_id,
+            response_action_id,
+            ..
+        } => (
+            "movementReactionOpened",
+            format!(
+                "opened {reaction_id} for {owner_id} against {moved_participant_id} using {response_action_id}"
+            ),
+        ),
+        RpgDomainEvent::MovementReactionResolved {
+            reaction_id,
+            owner_id,
+            accepted,
+            response_action_id,
+        } => (
+            "movementReactionResolved",
+            format!(
+                "resolved {reaction_id} for {owner_id}; {response_action_id} accepted={accepted}"
             ),
         ),
     };
@@ -4246,6 +4847,7 @@ fn definition_kind(kind: MaterializedContentDefinitionKind) -> &'static str {
         MaterializedContentDefinitionKind::CharacterFeature => "characterFeature",
         MaterializedContentDefinitionKind::Effect => "effect",
         MaterializedContentDefinitionKind::Item => "item",
+        MaterializedContentDefinitionKind::SpatialSource => "spatialSource",
         MaterializedContentDefinitionKind::Support => "support",
     }
 }
@@ -4332,6 +4934,8 @@ pub fn generated_protocol() -> String {
         GameplayNamedValueDto::decl(),
         GameplayModifierDto::decl(),
         GameplayEffectDto::decl(),
+        GameplaySpatialSourceTriggerDto::decl(),
+        GameplaySpatialSourceDto::decl(),
         GameplayActivationBudgetDto::decl(),
         GameplayEntityDto::decl(),
         GameplayItemInstanceDto::decl(),
@@ -4342,6 +4946,10 @@ pub fn generated_protocol() -> String {
         GameplayTraceDto::decl(),
         GameplayReactionOptionDto::decl(),
         GameplayReactionDto::decl(),
+        GameplayForcedMovementOptionDto::decl(),
+        GameplayPendingForcedMovementDto::decl(),
+        GameplayEffectSaveCandidateDto::decl(),
+        GameplayPendingTurnSaveDto::decl(),
         GameplayRandomEvidenceDto::decl(),
         GameplayHeterogeneousRandomValueDto::decl(),
         GameplayResultDto::decl(),
@@ -4364,6 +4972,7 @@ pub fn generated_protocol() -> String {
         PreparedPlayBundleCompileRequestDto::decl(),
         GameplayCommandRequestDto::decl(),
         GameplayReactionRequestDto::decl(),
+        GameplayForcedMovementRequestDto::decl(),
         GameplayTurnControlRequestDto::decl(),
     ];
     let exports = declarations

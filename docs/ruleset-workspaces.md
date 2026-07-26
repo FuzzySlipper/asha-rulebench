@@ -131,7 +131,7 @@ is ignored by git so machine paths stay local:
       "label": "Tactical Rollover",
       "repository": {
         "root": "/home/dev/asha-d20-fantasy",
-        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+        "revision": "e2bcc32346e70555b59a10034d8621118d53a27c"
       },
       "sourceSet": {
         "schemaVersion": 1,
@@ -178,15 +178,16 @@ is ignored by git so machine paths stay local:
 ```
 
 The tracked `.rulebench/source-sets.example.json` contains the complete
-first-wave configuration for Tactical Rollover, Context Tactics, and Multi-Axis
-Pool. All three point at independent peer roots in `asha-d20-fantasy`; no
-authored content is copied into Rulebench.
+first-wave configuration for Tactical Rollover, Context Tactics, Multi-Axis
+Pool, and RuleWeaver Tactics with its Crosswind Outpost content. All four point
+at independent peer roots in `asha-d20-fantasy`; no authored content is copied
+into Rulebench.
 
 The optional `repository` record is trusted local provenance, not gameplay
 input. Startup resolves `root` and fails closed unless its current `HEAD`
 exactly equals the full lowercase `revision`. The record is stripped before the
 generated source-set DTO reaches the browser. This checkout uses Asha RPG
-`64a7c08815fa9856a1a8e95c767eca5096d74d9f` and the representative content
+`e4d6d1afb5b8387de4ff805d73b2041df29ee590` and the representative content
 repository revision shown above.
 
 `RULEBENCH_SOURCE_SET_CONFIG` can name another file. Configuration entries are
@@ -208,7 +209,7 @@ and artifact-closure diagnostics use the same product response. A failed
 inspection or compile does not replace the active PlayBundle or Session.
 
 After activation, **Session -> Create Scenario...** accepts or authors a strict
-`asha.rpg.scenario@2` setup document bound to the exact PlayBundle artifact.
+`asha.rpg.scenario@3` setup document bound to the exact PlayBundle artifact.
 Scenario data contains the board, participants, capabilities, initiative, and
 random-source binding. It does not contain a scripted action order, target
 choices, reactions, requested roll results, expected events, or winner. Those

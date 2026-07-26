@@ -36,6 +36,12 @@ import type {
   GameplayRandomRequestDto,
   GameplayReactionDto,
   GameplayReactionOptionDto,
+  GameplayForcedMovementOptionDto,
+  GameplayPendingForcedMovementDto,
+  GameplayEffectSaveCandidateDto,
+  GameplayPendingTurnSaveDto,
+  GameplaySpatialSourceDto,
+  GameplaySpatialSourceTriggerDto,
   GameplayResultDto,
   GameplayReplayBoundaryDto,
   GameplayReplayEntryDto,
@@ -436,7 +442,10 @@ function nullableGameplay(
       'actions',
       'controls',
       'entities',
+      'spatialSources',
       'pendingReaction',
+      'pendingForcedMovement',
+      'pendingTurnSave',
       'log',
       'outcome',
       'lastResult',
@@ -472,9 +481,23 @@ function nullableGameplay(
     entities: requiredArray(record['entities'], `${path}.entities`).map(
       (entry, index) => gameplayEntity(entry, `${path}.entities[${index}]`),
     ),
+    spatialSources: requiredArray(
+      record['spatialSources'],
+      `${path}.spatialSources`,
+    ).map((entry, index) =>
+      gameplaySpatialSource(entry, `${path}.spatialSources[${index}]`),
+    ),
     pendingReaction: nullableReaction(
       record['pendingReaction'],
       `${path}.pendingReaction`,
+    ),
+    pendingForcedMovement: nullablePendingForcedMovement(
+      record['pendingForcedMovement'],
+      `${path}.pendingForcedMovement`,
+    ),
+    pendingTurnSave: nullablePendingTurnSave(
+      record['pendingTurnSave'],
+      `${path}.pendingTurnSave`,
     ),
     log: requiredArray(record['log'], `${path}.log`).map((entry, index) =>
       gameplayLogEntry(entry, `${path}.log[${index}]`),
@@ -726,6 +749,12 @@ function encounterCellCapabilityValue(
           record['movementCost'],
           `${path}.movementCost`,
         ),
+      };
+    case 'lineOfEffectObstruction':
+      exactKeys(record, ['kind', 'blocks'], path);
+      return {
+        kind,
+        blocks: requiredBoolean(record['blocks'], `${path}.blocks`),
       };
     case 'flag':
       exactKeys(record, ['kind', 'value'], path);
@@ -1214,6 +1243,7 @@ function gameplayEffect(value: unknown, path: string): GameplayEffectDto {
       'stacking',
       'rank',
       'durationAnchor',
+      'tenure',
       'remainingCount',
     ],
     path,
@@ -1235,9 +1265,135 @@ function gameplayEffect(value: unknown, path: string): GameplayEffectDto {
       record['durationAnchor'],
       `${path}.durationAnchor`,
     ),
+    tenure: requiredString(record['tenure'], `${path}.tenure`),
     remainingCount: nonNegativeInteger(
       record['remainingCount'],
       `${path}.remainingCount`,
+    ),
+  };
+}
+
+function gameplaySpatialSource(
+  value: unknown,
+  path: string,
+): GameplaySpatialSourceDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'instanceId',
+      'definitionId',
+      'label',
+      'description',
+      'ownerEntityId',
+      'sourceEntityId',
+      'originX',
+      'originY',
+      'includedCellIds',
+      'radius',
+      'targetFilter',
+      'stacking',
+      'tenure',
+      'durationAnchor',
+      'remainingCount',
+      'triggerBoundaries',
+      'triggerEvidence',
+    ],
+    path,
+  );
+  return {
+    instanceId: requiredString(record['instanceId'], `${path}.instanceId`),
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    label: requiredString(record['label'], `${path}.label`),
+    description: nullableString(record['description'], `${path}.description`),
+    ownerEntityId: requiredString(
+      record['ownerEntityId'],
+      `${path}.ownerEntityId`,
+    ),
+    sourceEntityId: requiredString(
+      record['sourceEntityId'],
+      `${path}.sourceEntityId`,
+    ),
+    originX: nonNegativeInteger(record['originX'], `${path}.originX`),
+    originY: nonNegativeInteger(record['originY'], `${path}.originY`),
+    includedCellIds: stringArray(
+      record['includedCellIds'],
+      `${path}.includedCellIds`,
+    ),
+    radius: nonNegativeInteger(record['radius'], `${path}.radius`),
+    targetFilter: requiredString(
+      record['targetFilter'],
+      `${path}.targetFilter`,
+    ),
+    stacking: requiredString(record['stacking'], `${path}.stacking`),
+    tenure: requiredString(record['tenure'], `${path}.tenure`),
+    durationAnchor: requiredString(
+      record['durationAnchor'],
+      `${path}.durationAnchor`,
+    ),
+    remainingCount: nonNegativeInteger(
+      record['remainingCount'],
+      `${path}.remainingCount`,
+    ),
+    triggerBoundaries: stringArray(
+      record['triggerBoundaries'],
+      `${path}.triggerBoundaries`,
+    ),
+    triggerEvidence: requiredArray(
+      record['triggerEvidence'],
+      `${path}.triggerEvidence`,
+    ).map((entry, index) =>
+      gameplaySpatialSourceTrigger(
+        entry,
+        `${path}.triggerEvidence[${index}]`,
+      ),
+    ),
+  };
+}
+
+function gameplaySpatialSourceTrigger(
+  value: unknown,
+  path: string,
+): GameplaySpatialSourceTriggerDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'sequence',
+      'stateRevision',
+      'boundary',
+      'cellId',
+      'participantId',
+      'operationPath',
+      'disposition',
+    ],
+    path,
+  );
+  return {
+    sequence: nonNegativeIntegerString(
+      record['sequence'],
+      `${path}.sequence`,
+    ),
+    stateRevision: nonNegativeIntegerString(
+      record['stateRevision'],
+      `${path}.stateRevision`,
+    ),
+    boundary: requiredString(record['boundary'], `${path}.boundary`),
+    cellId: requiredString(record['cellId'], `${path}.cellId`),
+    participantId: requiredString(
+      record['participantId'],
+      `${path}.participantId`,
+    ),
+    operationPath: requiredString(
+      record['operationPath'],
+      `${path}.operationPath`,
+    ),
+    disposition: requiredString(
+      record['disposition'],
+      `${path}.disposition`,
     ),
   };
 }
@@ -1379,6 +1535,182 @@ function gameplayReactionOption(
     damageReduction: nonNegativeInteger(
       record['damageReduction'],
       `${path}.damageReduction`,
+    ),
+  };
+}
+
+function nullablePendingForcedMovement(
+  value: unknown,
+  path: string,
+): GameplayPendingForcedMovementDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'movementKind',
+      'sourceId',
+      'movedParticipantId',
+      'maximumDistance',
+      'operationPath',
+      'options',
+    ],
+    path,
+  );
+  return {
+    movementKind: requiredString(
+      record['movementKind'],
+      `${path}.movementKind`,
+    ),
+    sourceId: requiredString(record['sourceId'], `${path}.sourceId`),
+    movedParticipantId: requiredString(
+      record['movedParticipantId'],
+      `${path}.movedParticipantId`,
+    ),
+    maximumDistance: nonNegativeInteger(
+      record['maximumDistance'],
+      `${path}.maximumDistance`,
+    ),
+    operationPath: requiredString(
+      record['operationPath'],
+      `${path}.operationPath`,
+    ),
+    options: requiredArray(record['options'], `${path}.options`).map(
+      (entry, index) =>
+        gameplayForcedMovementOption(entry, `${path}.options[${index}]`),
+    ),
+  };
+}
+
+function gameplayForcedMovementOption(
+  value: unknown,
+  path: string,
+): GameplayForcedMovementOptionDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'sessionBindingId',
+      'artifactId',
+      'scenarioFingerprintAlgorithm',
+      'scenarioFingerprintValue',
+      'authorityRevision',
+      'round',
+      'turn',
+      'currentActorId',
+      'actionId',
+      'sourceId',
+      'movedParticipantId',
+      'operationPath',
+      'destinationCellId',
+      'cellIds',
+      'movementCost',
+    ],
+    path,
+  );
+  return {
+    sessionBindingId: requiredString(
+      record['sessionBindingId'],
+      `${path}.sessionBindingId`,
+    ),
+    artifactId: requiredString(record['artifactId'], `${path}.artifactId`),
+    scenarioFingerprintAlgorithm: requiredString(
+      record['scenarioFingerprintAlgorithm'],
+      `${path}.scenarioFingerprintAlgorithm`,
+    ),
+    scenarioFingerprintValue: requiredString(
+      record['scenarioFingerprintValue'],
+      `${path}.scenarioFingerprintValue`,
+    ),
+    authorityRevision: nonNegativeInteger(
+      record['authorityRevision'],
+      `${path}.authorityRevision`,
+    ),
+    round: nonNegativeIntegerString(record['round'], `${path}.round`),
+    turn: nonNegativeIntegerString(record['turn'], `${path}.turn`),
+    currentActorId: requiredString(
+      record['currentActorId'],
+      `${path}.currentActorId`,
+    ),
+    actionId: requiredString(record['actionId'], `${path}.actionId`),
+    sourceId: requiredString(record['sourceId'], `${path}.sourceId`),
+    movedParticipantId: requiredString(
+      record['movedParticipantId'],
+      `${path}.movedParticipantId`,
+    ),
+    operationPath: requiredString(
+      record['operationPath'],
+      `${path}.operationPath`,
+    ),
+    destinationCellId: requiredString(
+      record['destinationCellId'],
+      `${path}.destinationCellId`,
+    ),
+    cellIds: stringArray(record['cellIds'], `${path}.cellIds`),
+    movementCost: nonNegativeInteger(
+      record['movementCost'],
+      `${path}.movementCost`,
+    ),
+  };
+}
+
+function nullablePendingTurnSave(
+  value: unknown,
+  path: string,
+): GameplayPendingTurnSaveDto | null {
+  if (value === null) return null;
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['expectedRevision', 'actorId', 'control', 'candidates'],
+    path,
+  );
+  return {
+    expectedRevision: nonNegativeInteger(
+      record['expectedRevision'],
+      `${path}.expectedRevision`,
+    ),
+    actorId: requiredString(record['actorId'], `${path}.actorId`),
+    control: requiredString(record['control'], `${path}.control`),
+    candidates: requiredArray(
+      record['candidates'],
+      `${path}.candidates`,
+    ).map((entry, index) =>
+      gameplayEffectSaveCandidate(entry, `${path}.candidates[${index}]`),
+    ),
+  };
+}
+
+function gameplayEffectSaveCandidate(
+  value: unknown,
+  path: string,
+): GameplayEffectSaveCandidateDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'targetId',
+      'instanceId',
+      'definitionId',
+      'sourceEntityId',
+      'randomRequest',
+    ],
+    path,
+  );
+  return {
+    targetId: requiredString(record['targetId'], `${path}.targetId`),
+    instanceId: requiredString(record['instanceId'], `${path}.instanceId`),
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    sourceEntityId: requiredString(
+      record['sourceEntityId'],
+      `${path}.sourceEntityId`,
+    ),
+    randomRequest: gameplayRandomRequest(
+      record['randomRequest'],
+      `${path}.randomRequest`,
     ),
   };
 }

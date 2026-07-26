@@ -37,7 +37,7 @@ describe('play transport', () => {
     });
     await transport.activatePlayBundle();
     await transport.startScenario({
-      schema: { id: 'asha.rpg.scenario', version: 2 },
+      schema: { id: 'asha.rpg.scenario', version: 3 },
       playBundleId: 'artifact-1',
       board: { width: 5, height: 3, cells: [] },
       participants: [],
@@ -56,6 +56,24 @@ describe('play transport', () => {
       targetIds: ['raider'],
       itemBinding: null,
     });
+    const forcedMovement = {
+      sessionBindingId: 'session-1',
+      artifactId: 'artifact-1',
+      scenarioFingerprintAlgorithm: 'fnv1a64',
+      scenarioFingerprintValue: 'scenario-1',
+      authorityRevision: 2,
+      round: '1',
+      turn: '1',
+      currentActorId: 'hero',
+      actionId: 'action.shove',
+      sourceId: 'hero',
+      movedParticipantId: 'raider',
+      operationPath: '$.program[0]',
+      destinationCellId: 'cell-2-1',
+      cellIds: ['cell-1-1', 'cell-2-1'],
+      movementCost: 1,
+    };
+    await transport.forcedMovement({ option: forcedMovement });
 
     expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
       'GET /api/play-bundle/source-sets',
@@ -64,14 +82,9 @@ describe('play transport', () => {
       'POST /api/play-bundle/activate',
       'POST /api/scenario/start',
       'POST /api/session/command',
+      'POST /api/session/forced-movement',
     ]);
-    expect(requests.at(-1)?.body).toEqual({
-      expectedRevision: 2,
-      actionId: 'action.arc-lash',
-      actorId: 'hero',
-      targetIds: ['raider'],
-      itemBinding: null,
-    });
+    expect(requests.at(-1)?.body).toEqual({ option: forcedMovement });
   });
 
   it('strictly decodes configured Ruleset locations without a product default', async () => {

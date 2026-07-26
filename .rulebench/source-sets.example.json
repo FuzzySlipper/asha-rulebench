@@ -6,7 +6,7 @@
       "label": "Tactical Rollover",
       "repository": {
         "root": "/home/dev/asha-d20-fantasy",
-        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+        "revision": "e2bcc32346e70555b59a10034d8621118d53a27c"
       },
       "sourceSet": {
         "schemaVersion": 1,
@@ -53,7 +53,7 @@
       "label": "Context Tactics",
       "repository": {
         "root": "/home/dev/asha-d20-fantasy",
-        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+        "revision": "e2bcc32346e70555b59a10034d8621118d53a27c"
       },
       "sourceSet": {
         "schemaVersion": 1,
@@ -100,7 +100,7 @@
       "label": "Multi-Axis Pool",
       "repository": {
         "root": "/home/dev/asha-d20-fantasy",
-        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+        "revision": "e2bcc32346e70555b59a10034d8621118d53a27c"
       },
       "sourceSet": {
         "schemaVersion": 1,
@@ -137,6 +137,61 @@
             "label": "Multi-Axis Pool Scenario",
             "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
             "module": "multi-axis-pool-crossing.ts",
+            "exportKinds": ["scenarioTemplate"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ruleweaver-tactics",
+      "label": "RuleWeaver Tactics",
+      "repository": {
+        "root": "/home/dev/asha-d20-fantasy",
+        "revision": "e2bcc32346e70555b59a10034d8621118d53a27c"
+      },
+      "sourceSet": {
+        "schemaVersion": 1,
+        "allowedRoots": [
+          "/home/dev/asha-d20-fantasy/rulesets/ruleweaver-tactics",
+          "/home/dev/asha-d20-fantasy/content-packs/ruleweaver-foundation",
+          "/home/dev/asha-d20-fantasy/content-packs/crosswind-outpost",
+          "/home/dev/asha-d20-fantasy/play-bundles",
+          "/home/dev/asha-d20-fantasy/scenarios"
+        ],
+        "entries": [
+          {
+            "id": "ruleset",
+            "label": "RuleWeaver Tactics Ruleset",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/ruleweaver-tactics",
+            "module": "src/index.ts",
+            "exportKinds": ["ruleset"]
+          },
+          {
+            "id": "foundation",
+            "label": "RuleWeaver Tactics Foundation",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/ruleweaver-foundation",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "content-pack",
+            "label": "Crosswind Outpost Content",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/crosswind-outpost",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "play-bundle",
+            "label": "Crosswind Outpost PlayBundle",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/play-bundles",
+            "module": "crosswind-outpost.ts",
+            "exportKinds": ["playBundle"]
+          },
+          {
+            "id": "scenario",
+            "label": "Crosswind Outpost Scenario",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
+            "module": "crosswind-outpost-skirmish.ts",
             "exportKinds": ["scenarioTemplate"]
           }
         ]

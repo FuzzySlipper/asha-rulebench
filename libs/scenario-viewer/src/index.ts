@@ -22,6 +22,7 @@ import type {
   GameplayEntityView,
 } from '@asha-rulebench/domain';
 import type {
+  GameplayForcedMovementOptionDto,
   GameplayItemBindingDto,
   ItemAttributeDto,
   ScenarioCellCapabilityDto,
@@ -1056,9 +1057,11 @@ class SetupDiagnosticsComponent {
                     >
                     <span>Authority revision {{ gameplay.stateRevision }}</span>
                     <span class="muted">{{
-                      gameplay.pendingReaction === null
-                        ? 'Choose an authority action or turn control.'
-                        : 'A reaction must be resolved before play continues.'
+                      gameplay.pendingReaction !== null
+                        ? 'A reaction must be resolved before play continues.'
+                        : gameplay.pendingForcedMovement !== null
+                          ? 'A forced-movement destination must be chosen before play continues.'
+                          : 'Choose an authority action or turn control.'
                     }}</span>
                   }
                 } @else {
@@ -1118,6 +1121,55 @@ class SetupDiagnosticsComponent {
                       >
                         Decline reaction
                       </button>
+                    </div>
+                  </div>
+                } @else if (
+                  gameplay.pendingForcedMovement;
+                  as forcedMovement
+                ) {
+                  <div
+                    #reactionPanel
+                    class="reaction-card"
+                    role="group"
+                    aria-labelledby="forced-movement-title"
+                    tabindex="-1"
+                  >
+                    <p class="section-label">Movement choice</p>
+                    <h3 id="forced-movement-title">
+                      Move {{
+                        participantLabel(forcedMovement.movedParticipantId)
+                      }}
+                    </h3>
+                    <p>
+                      {{ forcedMovement.movementKind }} from
+                      {{ forcedMovement.sourceId }} · up to
+                      {{ forcedMovement.maximumDistance }} cells. Choose an
+                      authority-projected route.
+                    </p>
+                    <div class="button-row">
+                      @for (
+                        option of forcedMovement.options;
+                        track option.destinationCellId +
+                          ':' +
+                          option.cellIds.join(',')
+                      ) {
+                        <button
+                          type="button"
+                          [disabled]="store.busy()"
+                          [attr.aria-label]="
+                            forcedMovementOptionLabel(option)
+                          "
+                          (click)="resolveForcedMovement(option)"
+                        >
+                          {{ option.destinationCellId }} ·
+                          {{ option.cellIds.join(' → ') }} · cost
+                          {{ option.movementCost }}
+                        </button>
+                      } @empty {
+                        <p class="muted">
+                          Authority reported no valid forced-movement routes.
+                        </p>
+                      }
                     </div>
                   </div>
                 } @else {
@@ -3840,6 +3892,77 @@ class SetupDiagnosticsComponent {
                           />
                         </label>
                       }
+                      @case ('lineOfEffectObstruction') {
+                        <label>
+                          <span class="section-label"
+                            >Blocks line of effect</span
+                          >
+                          <select
+                            #setupControl
+                            #cellObstructionSelect
+                            class="setup-select"
+                            [attr.data-setup-path]="
+                              cellCapabilityFieldPath(
+                                cellIndex,
+                                capabilityIndex,
+                                'value.blocks'
+                              )
+                            "
+                            [attr.aria-invalid]="
+                              setupHasError(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.blocks'
+                                )
+                              )
+                            "
+                            [attr.aria-describedby]="
+                              setupDescribedBy(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.blocks'
+                                )
+                              )
+                            "
+                            [value]="
+                              capability.value.blocks ? 'true' : 'false'
+                            "
+                            (change)="
+                              updateCellCapabilityText(
+                                cellIndex,
+                                capabilityIndex,
+                                'booleanValue',
+                                cellObstructionSelect.value
+                              )
+                            "
+                          >
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                          </select>
+                          <arb-setup-diagnostics
+                            [diagnostics]="
+                              setupDiagnosticsFor(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.blocks'
+                                )
+                              )
+                            "
+                            [messageId]="
+                              setupDiagnosticId(
+                                cellCapabilityFieldPath(
+                                  cellIndex,
+                                  capabilityIndex,
+                                  'value.blocks'
+                                )
+                              )
+                            "
+                          />
+                        </label>
+                      }
                       @case ('flag') {
                         <label>
                           <span class="section-label">Value</span>
@@ -4317,6 +4440,41 @@ class SetupDiagnosticsComponent {
               }
             </ul>
           </section>
+          <section aria-labelledby="character-spatial-sources-heading">
+            <h3 id="character-spatial-sources-heading">Spatial sources</h3>
+            <ul class="detail-list">
+              @for (
+                source of spatialSourcesFor(participant.id);
+                track source.instanceId
+              ) {
+                <li>
+                  <strong>{{ source.label }}</strong>
+                  <span
+                    >{{ source.definitionId }} · origin {{ source.origin }} ·
+                    radius {{ source.radius }} ·
+                    {{ source.targetFilter }}</span
+                  >
+                  <span
+                    >Cells: {{ source.includedCellIds.join(' · ') }}</span
+                  >
+                  <span
+                    >{{ source.tenure }} · {{ source.remainingCount }}
+                    {{ source.durationAnchor }} ·
+                    {{ source.stacking }}</span
+                  >
+                  <span
+                    >Triggers:
+                    {{ source.triggerBoundaries.join(' · ') || 'none' }}</span
+                  >
+                  @for (evidence of source.triggerEvidence; track evidence) {
+                    <span>{{ evidence }}</span>
+                  }
+                </li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
         }
       </div>
     </arb-application-dialog>
@@ -4575,6 +4733,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
   ] as const;
   protected readonly cellCapabilityKinds = [
     'traversal',
+    'lineOfEffectObstruction',
     'flag',
     'integer',
     'identifier',
@@ -4890,8 +5049,14 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     });
     effect(() => {
       const reaction = this.store.view()?.gameplay?.pendingReaction;
+      const forcedMovement =
+        this.store.view()?.gameplay?.pendingForcedMovement;
       const panel = this.reactionPanel();
-      if (reaction !== null && reaction !== undefined && panel !== undefined) {
+      if (
+        (reaction !== null && reaction !== undefined) ||
+        (forcedMovement !== null && forcedMovement !== undefined)
+      ) {
+        if (panel === undefined) return;
         panel.nativeElement.focus();
       }
     });
@@ -5015,6 +5180,16 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     this.openDialog('character');
   }
 
+  protected spatialSourcesFor(participantId: string) {
+    return (
+      this.store
+        .view()
+        ?.gameplay?.spatialSources.filter(
+          (source) => source.ownerEntityId === participantId,
+        ) ?? []
+    );
+  }
+
   protected inspectRuleset(): void {
     void this.store.inspectSelectedRuleset();
   }
@@ -5059,7 +5234,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
       return;
     }
     this.setupDraft.set({
-      schema: { id: 'asha.rpg.scenario', version: 2 },
+      schema: { id: 'asha.rpg.scenario', version: 3 },
       playBundleId: view.activeArtifactId,
       board: { width: 5, height: 3, cells: [] },
       participants: [],
@@ -5077,7 +5252,7 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     const activeArtifactId = this.store.view()?.activeArtifactId;
     if (activeArtifactId === null || activeArtifactId === undefined) return;
     this.setupDraft.set({
-      schema: { id: 'asha.rpg.scenario', version: 2 },
+      schema: { id: 'asha.rpg.scenario', version: 3 },
       playBundleId: activeArtifactId,
       board: {
         ...template.board,
@@ -5654,6 +5829,15 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
           value: { ...capability.value, value: value === 'true' },
         };
       }
+      if (
+        field === 'booleanValue' &&
+        capability.value.kind === 'lineOfEffectObstruction'
+      ) {
+        return {
+          ...capability,
+          value: { ...capability.value, blocks: value === 'true' },
+        };
+      }
       if (field === 'valueId' && capability.value.kind === 'identifier') {
         return {
           ...capability,
@@ -6137,6 +6321,18 @@ export class RulebenchWorkspaceFeatureComponent implements OnInit {
     });
   }
 
+  protected forcedMovementOptionLabel(
+    option: GameplayForcedMovementOptionDto,
+  ): string {
+    return `Move ${this.participantLabel(option.movedParticipantId)} to ${option.destinationCellId} via ${option.cellIds.join(', ')}; movement cost ${option.movementCost}`;
+  }
+
+  protected resolveForcedMovement(
+    option: GameplayForcedMovementOptionDto,
+  ): void {
+    void this.store.forcedMovement({ option });
+  }
+
   private clearActionTargeting(): void {
     this.selectedActionId.set(null);
     this.selectedOptions.set([]);
@@ -6326,6 +6522,9 @@ function initialCellCapability(
   }
   if (kind === 'integer') {
     return { ...shared, value: { kind, value: 0 } };
+  }
+  if (kind === 'lineOfEffectObstruction') {
+    return { ...shared, value: { kind, blocks: false } };
   }
   return { ...shared, value: { kind, valueId: 'value-id' } };
 }

@@ -11,6 +11,7 @@ import {
 import type {
   ScenarioSetupRequestDto,
   GameplayCommandRequestDto,
+  GameplayForcedMovementRequestDto,
   GameplayReactionRequestDto,
   GameplayTurnControlRequestDto,
   PlayDiagnosticDto,
@@ -302,6 +303,12 @@ export class PlayWorkspaceStore {
 
   public async react(reaction: GameplayReactionRequestDto): Promise<void> {
     await this.run(() => this.transport.react(reaction));
+  }
+
+  public async forcedMovement(
+    request: GameplayForcedMovementRequestDto,
+  ): Promise<void> {
+    await this.run(() => this.transport.forcedMovement(request));
   }
 
   public async control(control: GameplayTurnControlRequestDto): Promise<void> {

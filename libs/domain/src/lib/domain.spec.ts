@@ -322,7 +322,10 @@ function gameplay(): NonNullable<PlayWorkspaceResponseDto['gameplay']> {
         activationBudgets: [],
       },
     ],
+    spatialSources: [],
     pendingReaction: null,
+    pendingForcedMovement: null,
+    pendingTurnSave: null,
     log: [
       {
         sequence: '1',
