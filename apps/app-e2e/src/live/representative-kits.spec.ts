@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { decodePlayWorkspaceResponse } from '@asha-rulebench/protocol';
 
 import { expect, liveScenario } from './support/live-scenario';
 
@@ -48,6 +49,7 @@ liveScenario(
     await expect(history).toContainText('areaTargetsDerived');
     await expect(history).toContainText('included cells');
     await expect(history).toContainText('included participants');
+    await assertStaleAreaCommandIsAtomic(page);
 
     await activateKit(page, workspace, 'context-tactics', 'Overlook Crossing');
     await executeParticipantAction(workspace, 'Measured Contact', 'Keeper');
@@ -263,4 +265,64 @@ async function openMenuItem(
 
 function escapePattern(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function assertStaleAreaCommandIsAtomic(page: Page): Promise<void> {
+  const beforeResponse = await page.request.get('/api/play');
+  expect(beforeResponse.ok()).toBe(true);
+  const before = decodePlayWorkspaceResponse(await beforeResponse.json());
+  const beforeGameplay = before.gameplay;
+  expect(beforeGameplay).not.toBeNull();
+  if (beforeGameplay === null) return;
+
+  const areaAction = beforeGameplay.actions.find(
+    (action) => action.label === 'Pressure Sweep',
+  );
+  expect(areaAction).toBeDefined();
+  const anchorCellId = areaAction?.options.areaIds[0];
+  expect(anchorCellId).toBeDefined();
+  expect(beforeGameplay.stateRevision).toBeGreaterThan(0);
+  if (areaAction === undefined || anchorCellId === undefined) return;
+
+  const staleResponse = await page.request.post('/api/session/command', {
+    data: {
+      expectedRevision: beforeGameplay.stateRevision - 1,
+      actionId: areaAction.definitionId,
+      actorId: beforeGameplay.actorId,
+      targetIds: [anchorCellId],
+      itemBinding: areaAction.itemBinding,
+    },
+  });
+  expect(staleResponse.ok()).toBe(true);
+  const rejected = decodePlayWorkspaceResponse(await staleResponse.json());
+  expect(rejected.ok).toBe(false);
+  expect(rejected.gameplay?.lastResult).toEqual(
+    expect.objectContaining({
+      status: 'rejected',
+      code: 'RPG_AREA_OPTION_STALE',
+    }),
+  );
+
+  const afterResponse = await page.request.get('/api/play');
+  expect(afterResponse.ok()).toBe(true);
+  const after = decodePlayWorkspaceResponse(await afterResponse.json());
+  const afterGameplay = after.gameplay;
+  expect(afterGameplay).not.toBeNull();
+  if (afterGameplay === null) return;
+
+  expect(afterGameplay.stateRevision).toBe(beforeGameplay.stateRevision);
+  expect(afterGameplay.acceptedRandomValues).toBe(
+    beforeGameplay.acceptedRandomValues,
+  );
+  expect(afterGameplay.log).toHaveLength(beforeGameplay.log.length);
+  expect(afterGameplay.archive.stateRevision).toBe(
+    beforeGameplay.archive.stateRevision,
+  );
+  expect(afterGameplay.archive.acceptedRandomPosition).toBe(
+    beforeGameplay.archive.acceptedRandomPosition,
+  );
+  expect(afterGameplay.archive.stateHash).toBe(beforeGameplay.archive.stateHash);
+  expect(afterGameplay.archive.replayEntries).toHaveLength(
+    beforeGameplay.archive.replayEntries.length,
+  );
 }

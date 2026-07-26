@@ -1583,7 +1583,7 @@ impl PlayHost {
             match active.session.submit_area_with_random_source_recorded(
                 RpgAreaActionProposal {
                     session_binding_id: option.session_binding_id,
-                    authority_revision: option.authority_revision,
+                    authority_revision: u64::from(request.expected_revision),
                     action_id: request.action_id,
                     actor_id: request.actor_id,
                     anchor_cell_id: option.anchor_cell_id,
