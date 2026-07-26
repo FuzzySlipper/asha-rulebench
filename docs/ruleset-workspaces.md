@@ -127,43 +127,47 @@ is ignored by git so machine paths stay local:
   "schemaVersion": 2,
   "sourceSets": [
     {
-      "id": "d20-fantasy",
-      "label": "d20 Fantasy",
+      "id": "tactical-rollover",
+      "label": "Tactical Rollover",
+      "repository": {
+        "root": "/home/dev/asha-d20-fantasy",
+        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+      },
       "sourceSet": {
         "schemaVersion": 1,
         "allowedRoots": [
-          "/home/dev/asha-d20-fantasy/rulesets/d20-fantasy",
-          "/home/dev/asha-d20-fantasy/content-packs/starter",
+          "/home/dev/asha-d20-fantasy/rulesets/tactical-rollover",
+          "/home/dev/asha-d20-fantasy/content-packs/tactical-rollover",
           "/home/dev/asha-d20-fantasy/play-bundles",
           "/home/dev/asha-d20-fantasy/scenarios"
         ],
         "entries": [
           {
-            "id": "d20-fantasy-rules",
-            "label": "d20 Fantasy Ruleset",
-            "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/d20-fantasy",
+            "id": "ruleset",
+            "label": "Tactical Rollover Ruleset",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/tactical-rollover",
             "module": "src/index.ts",
             "exportKinds": ["ruleset"]
           },
           {
-            "id": "d20-fantasy-starter-content",
-            "label": "d20 Fantasy Starter Content",
-            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/starter",
+            "id": "content-pack",
+            "label": "Tactical Rollover Content",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/tactical-rollover",
             "module": "src/index.ts",
             "exportKinds": ["contentPack"]
           },
           {
-            "id": "d20-fantasy-starter-play",
-            "label": "d20 Fantasy Starter PlayBundle",
+            "id": "play-bundle",
+            "label": "Tactical Rollover PlayBundle",
             "sourceRoot": "/home/dev/asha-d20-fantasy/play-bundles",
-            "module": "starter.ts",
+            "module": "tactical-rollover.ts",
             "exportKinds": ["playBundle"]
           },
           {
-            "id": "d20-fantasy-starter-scenarios",
-            "label": "d20 Fantasy Starter Scenarios",
+            "id": "scenario",
+            "label": "Tactical Rollover Scenario",
             "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
-            "module": "starter-skirmish.ts",
+            "module": "tactical-rollover-skirmish.ts",
             "exportKinds": ["scenarioTemplate"]
           }
         ]
@@ -172,6 +176,18 @@ is ignored by git so machine paths stay local:
   ]
 }
 ```
+
+The tracked `.rulebench/source-sets.example.json` contains the complete
+first-wave configuration for Tactical Rollover, Context Tactics, and Multi-Axis
+Pool. All three point at independent peer roots in `asha-d20-fantasy`; no
+authored content is copied into Rulebench.
+
+The optional `repository` record is trusted local provenance, not gameplay
+input. Startup resolves `root` and fails closed unless its current `HEAD`
+exactly equals the full lowercase `revision`. The record is stripped before the
+generated source-set DTO reaches the browser. This checkout uses Asha RPG
+`64a7c08815fa9856a1a8e95c767eca5096d74d9f` and the representative content
+repository revision shown above.
 
 `RULEBENCH_SOURCE_SET_CONFIG` can name another file. Configuration entries are
 only friendly source locations. They cannot preselect Content Packs, compile,
@@ -192,7 +208,7 @@ and artifact-closure diagnostics use the same product response. A failed
 inspection or compile does not replace the active PlayBundle or Session.
 
 After activation, **Session -> Create Scenario...** accepts or authors a strict
-`asha.rpg.scenario@1` setup document bound to the exact PlayBundle artifact.
+`asha.rpg.scenario@2` setup document bound to the exact PlayBundle artifact.
 Scenario data contains the board, participants, capabilities, initiative, and
 random-source binding. It does not contain a scripted action order, target
 choices, reactions, requested roll results, expected events, or winner. Those

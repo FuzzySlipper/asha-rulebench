@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
+import { promisify } from 'node:util';
 
 const SCHEMA_VERSION = 2;
 const SOURCE_SET_SCHEMA_VERSION = 1;
@@ -9,6 +11,7 @@ const EXPORT_KINDS = new Set([
   'playBundle',
   'scenarioTemplate',
 ]);
+const execFileAsync = promisify(execFile);
 
 export async function loadPlayBundleSourceSetConfig(workspaceRoot, configPath) {
   const absoluteConfigPath = isAbsolute(configPath)
@@ -30,7 +33,9 @@ export async function loadPlayBundleSourceSetConfig(workspaceRoot, configPath) {
       `PlayBundle source-set config ${absoluteConfigPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return decodePlayBundleSourceSetConfig(parsed, absoluteConfigPath);
+  const decoded = decodePlayBundleSourceSetConfig(parsed, absoluteConfigPath);
+  await validateRepositoryPins(parsed, workspaceRoot, absoluteConfigPath);
+  return decoded;
 }
 
 export function decodePlayBundleSourceSetConfig(
@@ -50,19 +55,75 @@ export function decodePlayBundleSourceSetConfig(
   const sourceSets = record['sourceSets'].map((entry, index) => {
     const path = `${source}.sourceSets[${index}]`;
     const location = requiredRecord(entry, path);
-    exactKeys(location, ['id', 'label', 'sourceSet'], path);
+    exactOptionalKeys(
+      location,
+      ['id', 'label', 'sourceSet'],
+      ['repository'],
+      path,
+    );
     const id = requiredString(location['id'], `${path}.id`);
     const label = requiredString(location['label'], `${path}.label`);
     const sourceSet = decodeSourceSet(
       location['sourceSet'],
       `${path}.sourceSet`,
     );
+    if (Object.prototype.hasOwnProperty.call(location, 'repository')) {
+      decodeRepositoryPin(location['repository'], `${path}.repository`);
+    }
     if (ids.has(id)) throw new Error(`${path}.id duplicates ${id}`);
     ids.add(id);
     return { id, label, sourceSet };
   });
 
   return { schemaVersion: SCHEMA_VERSION, sourceSets };
+}
+
+async function validateRepositoryPins(value, workspaceRoot, source) {
+  const record = requiredRecord(value, source);
+  const sourceSets = record['sourceSets'];
+  if (!Array.isArray(sourceSets)) return;
+  for (const [index, entryValue] of sourceSets.entries()) {
+    const path = `${source}.sourceSets[${index}]`;
+    const entry = requiredRecord(entryValue, path);
+    if (!Object.prototype.hasOwnProperty.call(entry, 'repository')) continue;
+    const pin = decodeRepositoryPin(entry['repository'], `${path}.repository`);
+    const repositoryRoot = isAbsolute(pin.root)
+      ? pin.root
+      : resolve(workspaceRoot, pin.root);
+    let actualRevision;
+    try {
+      const result = await execFileAsync('git', [
+        '-C',
+        repositoryRoot,
+        'rev-parse',
+        'HEAD',
+      ]);
+      actualRevision = result.stdout.trim();
+    } catch (error) {
+      throw new Error(
+        `${path}.repository could not inspect ${repositoryRoot}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (actualRevision !== pin.revision) {
+      throw new Error(
+        `${path}.repository expected revision ${pin.revision}, but ${repositoryRoot} is at ${actualRevision}`,
+      );
+    }
+  }
+}
+
+function decodeRepositoryPin(value, path) {
+  const repository = requiredRecord(value, path);
+  exactKeys(repository, ['root', 'revision'], path);
+  const root = requiredString(repository['root'], `${path}.root`);
+  const revision = requiredString(
+    repository['revision'],
+    `${path}.revision`,
+  );
+  if (!/^[0-9a-f]{40}$/.test(revision)) {
+    throw new Error(`${path}.revision must be a full lowercase Git SHA`);
+  }
+  return { root, revision };
 }
 
 function decodeSourceSet(value, path) {
@@ -166,6 +227,19 @@ function exactKeys(record, expectedKeys, path) {
   if (unexpected.length > 0 || missing.length > 0) {
     throw new Error(
       `${path} keys must be exactly ${expectedKeys.join(', ')}; missing ${missing.join(', ') || 'none'}; unexpected ${unexpected.join(', ') || 'none'}`,
+    );
+  }
+}
+
+function exactOptionalKeys(record, requiredKeys, optionalKeys, path) {
+  const expected = new Set([...requiredKeys, ...optionalKeys]);
+  const unexpected = Object.keys(record).filter((key) => !expected.has(key));
+  const missing = requiredKeys.filter(
+    (key) => !Object.prototype.hasOwnProperty.call(record, key),
+  );
+  if (unexpected.length > 0 || missing.length > 0) {
+    throw new Error(
+      `${path} keys must contain ${requiredKeys.join(', ')} and may contain ${optionalKeys.join(', ')}; missing ${missing.join(', ') || 'none'}; unexpected ${unexpected.join(', ') || 'none'}`,
     );
   }
 }

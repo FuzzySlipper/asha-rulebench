@@ -18,7 +18,11 @@ import {
   rulesetStat,
 } from '@asha-rpg/authoring';
 
-import { ruleset } from '../../rules/src/index.js';
+import {
+  attackSelector,
+  circumstanceStackingGroup,
+  ruleset,
+} from '../../rules/src/index.js';
 
 const attackBonus = rulesetStat(ruleset, 'attack-bonus');
 const guard = rulesetDefense(ruleset, 'guard');
@@ -41,7 +45,11 @@ const positionalStrikeAction = action({
   sourcePath:
     'test-fixtures/source-sets/independent/positional-content/src/index.ts',
   targets: hostile({ range: 1 }),
-  check: attack({ modifier: readStat('actor', attackBonus), defense: guard }),
+  check: attack({
+    modifier: readStat('actor', attackBonus),
+    defense: guard,
+    contributionSelector: attackSelector,
+  }),
   rollScope: 'perTarget',
   program: onCheck({
     hit: damage({
@@ -78,12 +86,13 @@ export const coordinatedFlankerFeature = defineCharacterFeatureDefinition({
     tags: ['positional', 'talent'],
   },
   characterFeature: {
-    rollContributions: [
+    contributions: [
       {
         id: 'coordinated-flanker',
-        selector: 'attack',
-        condition: { kind: 'actorFlanksTarget' },
-        amount: 2,
+        selector: attackSelector,
+        stackingGroup: circumstanceStackingGroup,
+        value: { kind: 'constant', value: 2 },
+        predicate: { kind: 'actorFlanksTarget' },
       },
     ],
   },
@@ -101,15 +110,16 @@ export const holdTheLineFeature = defineCharacterFeatureDefinition({
     tags: ['positional', 'talent'],
   },
   characterFeature: {
-    rollContributions: [
+    contributions: [
       {
         id: 'hold-the-line',
-        selector: 'attack',
-        condition: {
+        selector: attackSelector,
+        stackingGroup: circumstanceStackingGroup,
+        value: { kind: 'constant', value: 1 },
+        predicate: {
           kind: 'actorSurrounded',
           minimumHostiles: 2,
         },
-        amount: 1,
       },
     ],
   },

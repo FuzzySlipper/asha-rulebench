@@ -10,10 +10,10 @@ use rpg_compiler::{
     RpgCompileFailure, RpgDiagnostic, RpgDiagnosticSeverity, RpgDiagnosticStage,
 };
 use rpg_core::{
-    BoundedValue, GridPosition, RpgDomainEvent, RpgIntentItemBinding, RpgRandomEvidence,
-    RpgRandomRequest, RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt,
-    RpgResolutionRejection, RpgRollContribution, RpgRollContributionCondition,
-    RpgRollContributionReason, RpgRollContributionSelector, RpgTeamId, RpgTraceStep,
+    BoundedValue, GridPosition, RpgContributionDisposition, RpgDomainEvent, RpgIntentItemBinding,
+    RpgPoolContributionDecision, RpgPoolContributionEffect, RpgRandomEvidence, RpgRandomRequest,
+    RpgRandomRequestKind, RpgReactionRequest, RpgResolutionReceipt, RpgResolutionRejection,
+    RpgScalarContributionDecision, RpgTeamId, RpgTraceStep,
 };
 use rpg_ir::{
     CompiledPlayBundleArtifact, ContentConflictPolicy, ContentExtensionPolicy, ContentImpactPlane,
@@ -21,14 +21,14 @@ use rpg_ir::{
     MaterializedContentVisibility, RulesetValueKind,
 };
 use rpg_runtime::{
-    RpgActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure, RpgBoardSetup,
-    RpgCellCapabilitySetup, RpgCellCapabilityValue, RpgCellSetup, RpgCheckpointPhase,
-    RpgCommandOutcome, RpgEncounterOutcomeView, RpgEquipmentSlotSetup, RpgInitialCapability,
-    RpgItemInstanceSetup, RpgParticipantSetup, RpgRandomSource, RpgRandomSourceBinding,
-    RpgRandomSourceFailure, RpgReactionProposal, RpgReplayBoundary, RpgReplayEntry,
-    RpgReplayFailure, RpgReplayOperation, RpgReplayPhase, RpgScenario, RpgSchemaIdentity,
-    RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal, RpgTurnControlReceipt,
-    RpgTurnInitialization,
+    RpgActionProposal, RpgAreaActionProposal, RpgAuthoritySession, RpgAutomaticCommandFailure,
+    RpgBoardSetup, RpgCellCapabilitySetup, RpgCellCapabilityValue, RpgCellSetup,
+    RpgCheckpointPhase, RpgCommandOutcome, RpgEncounterOutcomeView, RpgEquipmentSlotSetup,
+    RpgInitialCapability, RpgItemInstanceSetup, RpgParticipantSetup, RpgRandomSource,
+    RpgRandomSourceBinding, RpgRandomSourceFailure, RpgReactionProposal, RpgReplayBoundary,
+    RpgReplayEntry, RpgReplayFailure, RpgReplayOperation, RpgReplayPhase, RpgScenario,
+    RpgSchemaIdentity, RpgSessionCheckpoint, RpgTurnControl, RpgTurnControlProposal,
+    RpgTurnControlReceipt, RpgTurnInitialization,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -633,6 +633,16 @@ pub struct GameplayRandomRequestDto {
     pub count: u32,
     pub sides: u32,
     pub path: String,
+    pub heterogeneous_terms: Vec<GameplayHeterogeneousRandomTermDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayHeterogeneousRandomTermDto {
+    pub die_type_id: String,
+    pub count: u32,
+    pub sides: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -714,6 +724,32 @@ pub struct GameplayModifierDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct GameplayEffectDto {
+    pub instance_id: String,
+    pub definition_id: String,
+    pub label: String,
+    pub source_entity_id: String,
+    pub stacking: String,
+    pub rank: i32,
+    pub duration_anchor: String,
+    pub remaining_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayActivationBudgetDto {
+    pub id: String,
+    pub label: String,
+    pub timing: String,
+    pub reset_boundary: String,
+    pub initial_amount: i32,
+    pub remaining: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct GameplayEntityDto {
     pub id: String,
     pub label: String,
@@ -730,6 +766,8 @@ pub struct GameplayEntityDto {
     pub defenses: Vec<GameplayNamedValueDto>,
     pub resources: Vec<GameplayNamedValueDto>,
     pub modifiers: Vec<GameplayModifierDto>,
+    pub effects: Vec<GameplayEffectDto>,
+    pub activation_budgets: Vec<GameplayActivationBudgetDto>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -753,6 +791,16 @@ pub struct GameplayEventDto {
     pub kind: String,
     pub summary: String,
     pub roll: Option<GameplayRollResolutionDto>,
+    pub contributions: Vec<GameplayRollContributionDto>,
+    pub details: Vec<GameplayEventDetailDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayEventDetailDto {
+    pub label: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -773,12 +821,14 @@ pub struct GameplayRollResolutionDto {
 #[ts(rename_all = "camelCase")]
 pub struct GameplayRollContributionDto {
     pub source_definition_id: String,
+    pub source_instance_id: Option<String>,
     pub source_label: String,
     pub amount: i32,
     pub reason_kind: String,
     pub contribution_id: Option<String>,
     pub selector: Option<String>,
-    pub condition: Option<String>,
+    pub stacking_group: Option<String>,
+    pub disposition: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -820,6 +870,17 @@ pub struct GameplayRandomEvidenceDto {
     pub sides: u32,
     pub path: String,
     pub values: Vec<u32>,
+    pub heterogeneous_values: Vec<GameplayHeterogeneousRandomValueDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct GameplayHeterogeneousRandomValueDto {
+    pub die_type_id: String,
+    pub ordinal: u32,
+    pub sides: u32,
+    pub value: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -1084,15 +1145,9 @@ impl RpgRandomSource for SystemGameplayRandomSource {
     }
 
     fn draw(&mut self, request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
-        if request.sides == 0 {
-            return Err(random_source_failure(
-                "SESSION_RANDOM_REQUEST_SIDES_INVALID",
-                &request.path,
-                "authority requested a die with zero sides",
-            ));
-        }
-        (0..request.count)
-            .map(|_| system_die_value(request.sides, &request.path))
+        request_die_sides(request)?
+            .into_iter()
+            .map(|sides| system_die_value(sides, &request.path))
             .collect()
     }
 }
@@ -1122,28 +1177,15 @@ impl RpgRandomSource for ScriptedGameplayRandomSource {
     }
 
     fn draw(&mut self, request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
-        if request.sides == 0 {
-            return Err(random_source_failure(
-                "SESSION_RANDOM_REQUEST_SIDES_INVALID",
-                &request.path,
-                "authority requested a die with zero sides",
-            ));
-        }
-        let count = usize::try_from(request.count).map_err(|_| {
-            random_source_failure(
-                "SESSION_RANDOM_REQUEST_COUNT_INVALID",
-                &request.path,
-                "authority random request count exceeds this host's address space",
-            )
-        })?;
+        let die_sides = request_die_sides(request)?;
+        let count = die_sides.len();
         if self.values.len() < count {
             return Err(random_source_failure(
                 "SESSION_RANDOM_TAPE_EXHAUSTED",
                 &request.path,
                 format!(
-                    "authority requested {}d{}, but the configured roll tape has {} value(s) remaining",
+                    "authority requested {} random value(s), but the configured roll tape has {} value(s) remaining",
                     request.count,
-                    request.sides,
                     self.values.len()
                 ),
             ));
@@ -1152,14 +1194,16 @@ impl RpgRandomSource for ScriptedGameplayRandomSource {
         if let Some((index, value)) = candidate
             .iter()
             .enumerate()
-            .find(|(_, value)| **value == 0 || **value > request.sides)
+            .zip(die_sides.iter())
+            .find(|((_, value), sides)| **value == 0 || **value > **sides)
         {
+            let ((index, value), sides) = (index, value);
             return Err(random_source_failure(
                 "SESSION_RANDOM_TAPE_VALUE_INVALID",
                 &request.path,
                 format!(
                     "roll tape value {} at request offset {} is outside 1..={} for {}",
-                    value, index, request.sides, request.path
+                    value, index, sides, request.path
                 ),
             ));
         }
@@ -1168,6 +1212,61 @@ impl RpgRandomSource for ScriptedGameplayRandomSource {
         }
         Ok(candidate)
     }
+}
+
+fn request_die_sides(request: &RpgRandomRequest) -> Result<Vec<u32>, RpgRandomSourceFailure> {
+    let expected_count = usize::try_from(request.count).map_err(|_| {
+        random_source_failure(
+            "SESSION_RANDOM_REQUEST_COUNT_INVALID",
+            &request.path,
+            "authority random request count exceeds this host's address space",
+        )
+    })?;
+    let die_sides = if request.heterogeneous_terms.is_empty() {
+        if request.sides == 0 {
+            return Err(random_source_failure(
+                "SESSION_RANDOM_REQUEST_SIDES_INVALID",
+                &request.path,
+                "authority requested a die with zero sides",
+            ));
+        }
+        vec![request.sides; expected_count]
+    } else {
+        let mut die_sides = Vec::with_capacity(expected_count);
+        for term in &request.heterogeneous_terms {
+            if term.sides == 0 {
+                return Err(random_source_failure(
+                    "SESSION_RANDOM_REQUEST_SIDES_INVALID",
+                    &request.path,
+                    format!(
+                        "authority requested a {} die with zero sides",
+                        term.die_type_id
+                    ),
+                ));
+            }
+            let count = usize::try_from(term.count).map_err(|_| {
+                random_source_failure(
+                    "SESSION_RANDOM_REQUEST_COUNT_INVALID",
+                    &request.path,
+                    "authority heterogeneous random term exceeds this host's address space",
+                )
+            })?;
+            die_sides.extend(std::iter::repeat_n(term.sides, count));
+        }
+        die_sides
+    };
+    if die_sides.len() != expected_count {
+        return Err(random_source_failure(
+            "SESSION_RANDOM_REQUEST_COUNT_INVALID",
+            &request.path,
+            format!(
+                "authority declared {} random value(s), but typed terms require {}",
+                request.count,
+                die_sides.len()
+            ),
+        ));
+    }
+    Ok(die_sides)
 }
 
 fn system_die_value(sides: u32, path: &str) -> Result<u32, RpgRandomSourceFailure> {
@@ -1462,28 +1561,74 @@ impl PlayHost {
             .random_source
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        let recorded = active.session.submit_with_random_source_recorded(
-            RpgActionProposal {
-                expected_revision: u64::from(request.expected_revision),
-                action_id: request.action_id,
-                actor_id: request.actor_id,
-                target_ids: request.target_ids,
-                item_binding: request.item_binding.map(item_binding_from_dto),
-            },
-            random_source.as_mut(),
-        );
-        let (outcome, entry) = match recorded {
-            Ok(recorded) => recorded,
-            Err(failure) => {
+        let item_binding = request.item_binding.map(item_binding_from_dto);
+        let authority = active.session.encounter_view();
+        let area_option = authority
+            .actions
+            .iter()
+            .find(|action| {
+                action.definition_id == request.action_id && action.item_binding == item_binding
+            })
+            .and_then(|action| {
+                action
+                    .options
+                    .area_options
+                    .iter()
+                    .find(|option| {
+                        request.target_ids.as_slice() == [option.anchor_cell_id.as_str()]
+                    })
+                    .cloned()
+            });
+        let (outcome, entry) = if let Some(option) = area_option {
+            match active.session.submit_area_with_random_source_recorded(
+                RpgAreaActionProposal {
+                    session_binding_id: option.session_binding_id,
+                    authority_revision: option.authority_revision,
+                    action_id: request.action_id,
+                    actor_id: request.actor_id,
+                    anchor_cell_id: option.anchor_cell_id,
+                    item_binding,
+                },
+                random_source.as_mut(),
+            ) {
+                Ok(result) => (result.outcome, result.replay_entry),
+                Err(failure) => {
+                    return response_from_slots(
+                        false,
+                        &slots,
+                        diagnostics_from_automatic_failure(failure),
+                    );
+                }
+            }
+        } else {
+            match active.session.submit_with_random_source_recorded(
+                RpgActionProposal {
+                    expected_revision: u64::from(request.expected_revision),
+                    action_id: request.action_id,
+                    actor_id: request.actor_id,
+                    target_ids: request.target_ids,
+                    item_binding,
+                },
+                random_source.as_mut(),
+            ) {
+                Ok((outcome, entry)) => (outcome, Some(entry)),
+                Err(failure) => {
+                    return response_from_slots(
+                        false,
+                        &slots,
+                        diagnostics_from_automatic_failure(failure),
+                    );
+                }
+            }
+        };
+        if let Some(entry) = entry {
+            if let Err(failure) = active.store_entry(entry) {
                 return response_from_slots(
                     false,
                     &slots,
-                    diagnostics_from_automatic_failure(failure),
+                    diagnostics_from_replay_failure(failure),
                 );
             }
-        };
-        if let Err(failure) = active.store_entry(entry) {
-            return response_from_slots(false, &slots, diagnostics_from_replay_failure(failure));
         }
         active.last_result = Some(gameplay_result(&outcome, active.session.state().revision()));
         response_from_slots(
@@ -2425,18 +2570,43 @@ fn replay_phase_label(phase: &RpgReplayPhase) -> String {
 }
 
 fn gameplay_random_evidence_label(evidence: &RpgRandomEvidence) -> String {
-    format!(
-        "{} {}d{} at {} = {}",
-        gameplay_random_request(&evidence.request).kind,
-        evidence.request.count,
-        evidence.request.sides,
-        evidence.request.path,
+    let dice = if evidence.request.heterogeneous_terms.is_empty() {
+        format!("{}d{}", evidence.request.count, evidence.request.sides)
+    } else {
+        evidence
+            .request
+            .heterogeneous_terms
+            .iter()
+            .map(|term| format!("{}×{} d{}", term.count, term.die_type_id, term.sides))
+            .collect::<Vec<_>>()
+            .join(" + ")
+    };
+    let values = if evidence.heterogeneous_values.is_empty() {
         evidence
             .values
             .iter()
             .map(u32::to_string)
             .collect::<Vec<_>>()
             .join(", ")
+    } else {
+        evidence
+            .heterogeneous_values
+            .iter()
+            .map(|value| {
+                format!(
+                    "{}#{} d{}={}",
+                    value.die_type_id, value.ordinal, value.sides, value.value
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    format!(
+        "{} {} at {} = {}",
+        gameplay_random_request(&evidence.request).kind,
+        dice,
+        evidence.request.path,
+        values
     )
 }
 
@@ -2467,7 +2637,12 @@ fn gameplay_authority_action(action: &rpg_runtime::RpgActionView) -> GameplayAut
                     movement_cost: path.movement_cost,
                 })
                 .collect(),
-            area_ids: action.options.area_ids.clone(),
+            area_ids: action
+                .options
+                .area_options
+                .iter()
+                .map(|option| option.anchor_cell_id.clone())
+                .collect(),
         },
     }
 }
@@ -2577,6 +2752,63 @@ fn gameplay_entity(entity: &rpg_runtime::RpgParticipantView) -> GameplayEntityDt
                 remaining_turns: modifier.remaining_turns,
             })
             .collect(),
+        effects: entity
+            .effects
+            .iter()
+            .map(|effect| GameplayEffectDto {
+                instance_id: effect.instance_id.clone(),
+                definition_id: effect.definition_id.clone(),
+                label: effect.label.clone(),
+                source_entity_id: effect.source_entity_id.clone(),
+                stacking: effect_stacking_label(effect.stacking).to_owned(),
+                rank: effect.rank,
+                duration_anchor: effect_duration_anchor_label(effect.duration_anchor).to_owned(),
+                remaining_count: effect.remaining_count,
+            })
+            .collect(),
+        activation_budgets: entity
+            .activation_budgets
+            .iter()
+            .map(|budget| GameplayActivationBudgetDto {
+                id: budget.id.clone(),
+                label: budget.label.clone(),
+                timing: activation_timing_label(budget.timing).to_owned(),
+                reset_boundary: activation_reset_label(budget.reset_boundary).to_owned(),
+                initial_amount: budget.initial_amount,
+                remaining: budget.remaining,
+            })
+            .collect(),
+    }
+}
+
+fn effect_stacking_label(stacking: rpg_core::RpgEffectStackingPolicy) -> &'static str {
+    match stacking {
+        rpg_core::RpgEffectStackingPolicy::IndependentBySource => "independentBySource",
+        rpg_core::RpgEffectStackingPolicy::Replace => "replace",
+        rpg_core::RpgEffectStackingPolicy::Refresh => "refresh",
+    }
+}
+
+fn effect_duration_anchor_label(anchor: rpg_core::RpgEffectDurationAnchor) -> &'static str {
+    match anchor {
+        rpg_core::RpgEffectDurationAnchor::GlobalTurnTransition => "globalTurnTransition",
+        rpg_core::RpgEffectDurationAnchor::RoundTransition => "roundTransition",
+        rpg_core::RpgEffectDurationAnchor::SourceTurnStart => "sourceTurnStart",
+        rpg_core::RpgEffectDurationAnchor::TargetTurnStart => "targetTurnStart",
+    }
+}
+
+fn activation_timing_label(timing: rpg_ir::RulesetActivationTiming) -> &'static str {
+    match timing {
+        rpg_ir::RulesetActivationTiming::Action => "action",
+        rpg_ir::RulesetActivationTiming::Reaction => "reaction",
+    }
+}
+
+fn activation_reset_label(boundary: rpg_ir::RulesetActivationBudgetResetBoundary) -> &'static str {
+    match boundary {
+        rpg_ir::RulesetActivationBudgetResetBoundary::OwnerTurnStart => "ownerTurnStart",
+        rpg_ir::RulesetActivationBudgetResetBoundary::RoundStart => "roundStart",
     }
 }
 
@@ -2717,12 +2949,23 @@ fn gameplay_random_request(request: &RpgRandomRequest) -> GameplayRandomRequestD
         kind: match request.kind {
             RpgRandomRequestKind::AttackCheck => "attackCheck",
             RpgRandomRequestKind::SavingThrowCheck => "savingThrowCheck",
+            RpgRandomRequestKind::ScalarTest => "scalarTest",
             RpgRandomRequestKind::FormulaDice => "formulaDice",
+            RpgRandomRequestKind::HeterogeneousPool => "heterogeneousPool",
         }
         .to_owned(),
         count: request.count,
         sides: request.sides,
         path: request.path.clone(),
+        heterogeneous_terms: request
+            .heterogeneous_terms
+            .iter()
+            .map(|term| GameplayHeterogeneousRandomTermDto {
+                die_type_id: term.die_type_id.clone(),
+                count: term.count,
+                sides: term.sides,
+            })
+            .collect(),
     }
 }
 
@@ -2731,13 +2974,25 @@ fn gameplay_random_evidence(evidence: &RpgRandomEvidence) -> GameplayRandomEvide
         kind: match evidence.request.kind {
             RpgRandomRequestKind::AttackCheck => "attackCheck",
             RpgRandomRequestKind::SavingThrowCheck => "savingThrowCheck",
+            RpgRandomRequestKind::ScalarTest => "scalarTest",
             RpgRandomRequestKind::FormulaDice => "formulaDice",
+            RpgRandomRequestKind::HeterogeneousPool => "heterogeneousPool",
         }
         .to_owned(),
         count: evidence.request.count,
         sides: evidence.request.sides,
         path: evidence.request.path.clone(),
         values: evidence.values.clone(),
+        heterogeneous_values: evidence
+            .heterogeneous_values
+            .iter()
+            .map(|value| GameplayHeterogeneousRandomValueDto {
+                die_type_id: value.die_type_id.clone(),
+                ordinal: value.ordinal,
+                sides: value.sides,
+                value: value.value,
+            })
+            .collect(),
     }
 }
 
@@ -2751,7 +3006,54 @@ fn gameplay_trace(trace: &RpgTraceStep) -> GameplayTraceDto {
 
 fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
     let mut roll_resolution = None;
+    let mut contributions = Vec::new();
+    let mut details = Vec::new();
     let (kind, summary) = match event {
+        RpgDomainEvent::ActivationBudgetSpent {
+            entity_id,
+            budget_id,
+            amount,
+            previous,
+            remaining,
+            accepted_activations,
+        } => {
+            details.push(event_detail("accepted activations", accepted_activations));
+            (
+                "activationBudgetSpent",
+                format!(
+                    "{entity_id} spent {amount} {budget_id}; {previous} → {remaining}"
+                ),
+            )
+        }
+        RpgDomainEvent::ActivationBudgetReset {
+            entity_id,
+            budget_id,
+            previous,
+            current,
+        } => (
+            "activationBudgetReset",
+            format!("{entity_id} reset {budget_id}; {previous} → {current}"),
+        ),
+        RpgDomainEvent::RoundTransitioned {
+            previous_round,
+            current_round,
+        } => (
+            "roundTransitioned",
+            format!("round {previous_round} → {current_round}"),
+        ),
+        RpgDomainEvent::TurnTransitioned {
+            previous_actor_id,
+            current_actor_id,
+            round,
+            turn,
+        } => {
+            details.push(event_detail("round", round));
+            details.push(event_detail("turn", turn));
+            (
+                "turnTransitioned",
+                format!("{previous_actor_id} → {current_actor_id}"),
+            )
+        }
         RpgDomainEvent::ResourceSpent {
             entity_id,
             resource_id,
@@ -2769,7 +3071,7 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             defense_id,
             defense,
             hit,
-            contributions,
+            contribution_ledger,
         } => (
             {
                 roll_resolution = Some(GameplayRollResolutionDto {
@@ -2779,11 +3081,18 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
                     threshold_label: defense_id.clone(),
                     threshold: *defense,
                     outcome: if *hit { "hit" } else { "miss" }.to_owned(),
-                    contributions: contributions
+                    contributions: contribution_ledger
+                        .candidates
                         .iter()
-                        .map(gameplay_roll_contribution)
+                        .map(gameplay_scalar_contribution)
                         .collect(),
                 });
+                details.push(event_detail(
+                    "selector",
+                    contribution_ledger.selector_id.as_str(),
+                ));
+                details.push(event_detail("base", contribution_ledger.base_value));
+                details.push(event_detail("final", contribution_ledger.final_value));
                 "attackResolved"
             },
             format!(
@@ -2813,18 +3122,262 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
                 "{target_id} rolled {roll} for {total} against {difficulty}; saved={saved}"
             ),
         ),
-        RpgDomainEvent::DamageApplied {
-            source_id,
+        RpgDomainEvent::ScalarTestResolved {
+            actor_id,
             target_id,
-            amount,
-            damage_type,
-            remaining_vitality,
+            profile_id,
+            roll,
+            base_value,
+            contribution_ledger,
+            difficulty,
+            total,
+            margin,
+            base_band_id,
+            natural_die_resolution,
+            band_shift_ledger,
+            final_band_id,
+        } => {
+            roll_resolution = Some(GameplayRollResolutionDto {
+                kind: "scalarTest".to_owned(),
+                die_result: *roll,
+                total: *total,
+                threshold_label: "difficulty".to_owned(),
+                threshold: *difficulty,
+                outcome: final_band_id.clone(),
+                contributions: contribution_ledger
+                    .candidates
+                    .iter()
+                    .map(gameplay_scalar_contribution)
+                    .collect(),
+            });
+            details.extend([
+                event_detail("profile", profile_id),
+                event_detail("base value", base_value),
+                event_detail("margin", margin),
+                event_detail("base band", base_band_id),
+                event_detail("final band", final_band_id),
+                event_detail("band shift", band_shift_ledger.total_shift),
+            ]);
+            if let Some(natural) = natural_die_resolution {
+                details.push(event_detail(
+                    "natural die rule",
+                    format!("{} → {}", natural.rule_id, natural.resulting_band_id),
+                ));
+            }
+            for shift in &band_shift_ledger.candidates {
+                details.push(event_detail(
+                    format!("band shift {}", shift.shift_id),
+                    format!(
+                        "{} ({}) → {}",
+                        shift.declared_shift,
+                        outcome_shift_disposition_label(&shift.disposition),
+                        shift.resulting_band_id
+                    ),
+                ));
+            }
+            (
+                "scalarTestResolved",
+                format!(
+                    "{actor_id} tested {profile_id} against {target_id}; {base_band_id} → {final_band_id}"
+                ),
+            )
+        }
+        RpgDomainEvent::ScalarOutcomeBranchSelected {
+            target_id,
+            profile_id,
+            final_band_id,
+            selected_branch_id,
         } => (
-            "damageApplied",
+            "scalarOutcomeBranchSelected",
             format!(
-                "{source_id} dealt {amount} {damage_type} to {target_id}; vitality {remaining_vitality}"
+                "{target_id} {profile_id} {final_band_id} selected {selected_branch_id}"
             ),
         ),
+        RpgDomainEvent::HeterogeneousPoolResolved {
+            actor_id,
+            target_id,
+            profile_id,
+            base_dice,
+            contribution_ledger,
+            frozen_dice,
+            evidence,
+            raw_axes,
+            automatic_axes,
+            cancellations,
+            net_axes,
+            final_band_id,
+        } => {
+            contributions = contribution_ledger
+                .candidates
+                .iter()
+                .map(gameplay_pool_contribution)
+                .collect();
+            details.extend([
+                event_detail("profile", profile_id),
+                event_detail("base dice", format_named_map(base_dice)),
+                event_detail("frozen dice", format_named_map(frozen_dice)),
+                event_detail(
+                    "typed evidence",
+                    evidence
+                        .iter()
+                        .map(|value| {
+                            format!(
+                                "{}#{} d{}={}",
+                                value.die_type_id, value.ordinal, value.sides, value.value
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+                event_detail("raw axes", format_named_map(raw_axes)),
+                event_detail("automatic axes", format_named_map(automatic_axes)),
+                event_detail("net axes", format_named_map(net_axes)),
+                event_detail("final band", final_band_id),
+            ]);
+            for cancellation in cancellations {
+                details.push(event_detail(
+                    format!("cancellation {}", cancellation.cancellation_id),
+                    format!(
+                        "{} ↔ {} cancelled {}; remaining {} / {}",
+                        cancellation.positive_axis_id,
+                        cancellation.negative_axis_id,
+                        cancellation.cancelled,
+                        cancellation.positive_remaining,
+                        cancellation.negative_remaining
+                    ),
+                ));
+            }
+            for replacement in &contribution_ledger.replacement_units {
+                details.push(event_detail(
+                    format!(
+                        "replacement {}#{}",
+                        replacement.contribution_id, replacement.unit
+                    ),
+                    format!(
+                        "{} → {}; fallback={}; counts {} → {} / {}",
+                        replacement.from_die_type_id,
+                        replacement.added_die_type_id,
+                        replacement.used_fallback,
+                        replacement.before_from_count,
+                        replacement.after_from_count,
+                        replacement.after_added_count
+                    ),
+                ));
+            }
+            (
+                "heterogeneousPoolResolved",
+                format!(
+                    "{actor_id} resolved {profile_id} against {target_id}; {final_band_id}"
+                ),
+            )
+        }
+        RpgDomainEvent::VectorOutcomeBranchSelected {
+            target_id,
+            profile_id,
+            final_band_id,
+            selected_branch_id,
+        } => (
+            "vectorOutcomeBranchSelected",
+            format!(
+                "{target_id} {profile_id} {final_band_id} selected {selected_branch_id}"
+            ),
+        ),
+        RpgDomainEvent::AreaTargetsDerived {
+            actor_id,
+            action_id,
+            proposal_revision,
+            shape,
+            origin,
+            origin_cell_id,
+            anchor_cell_id,
+            included_cell_ids,
+            filtered_cells,
+            included_participant_ids,
+            filtered_participants,
+        } => {
+            details.extend([
+                event_detail("authority revision", proposal_revision),
+                event_detail("origin", format!("{origin:?} at {origin_cell_id}")),
+                event_detail("shape", format!("{shape:?}")),
+                event_detail("anchor", anchor_cell_id),
+                event_detail("included cells", included_cell_ids.join(", ")),
+                event_detail("included participants", included_participant_ids.join(", ")),
+                event_detail(
+                    "filtered cells",
+                    filtered_cells
+                        .iter()
+                        .map(|cell| format!("({},{}): {}", cell.x, cell.y, cell.reason))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+                event_detail(
+                    "filtered participants",
+                    filtered_participants
+                        .iter()
+                        .map(|participant| {
+                            format!(
+                                "{}: {}",
+                                participant.participant_id, participant.reason
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+            ]);
+            (
+                "areaTargetsDerived",
+                format!(
+                    "{actor_id} projected {action_id} from {origin_cell_id} through {anchor_cell_id}; {} target(s)",
+                    included_participant_ids.len()
+                ),
+            )
+        }
+        RpgDomainEvent::DamagePacketApplied {
+            source_id,
+            target_id,
+            parts,
+            original_packet_sum,
+            adjusted_packet_sum,
+            bounded_vitality_delta,
+            actual_vitality_delta,
+            before_vitality,
+            after_vitality,
+        } => {
+            details.extend([
+                event_detail("original packet", original_packet_sum),
+                event_detail("adjusted packet", adjusted_packet_sum),
+                event_detail("bounded vitality delta", bounded_vitality_delta),
+                event_detail("actual vitality delta", actual_vitality_delta),
+            ]);
+            for part in parts {
+                let responses = part
+                    .response_candidates
+                    .iter()
+                    .map(|response| {
+                        format!(
+                            "{}:{}:{}",
+                            response.source_definition_id,
+                            response.response_id,
+                            damage_response_disposition_label(&response.disposition)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                details.push(event_detail(
+                    format!("damage part {}", part.part_id),
+                    format!(
+                        "{} {} → {}; responses [{}]",
+                        part.original_amount, part.damage_type_id, part.final_amount, responses
+                    ),
+                ));
+            }
+            (
+                "damagePacketApplied",
+                format!(
+                    "{source_id} applied {adjusted_packet_sum} damage to {target_id}; vitality {before_vitality} → {after_vitality}"
+                ),
+            )
+        }
         RpgDomainEvent::HealingApplied {
             source_id,
             target_id,
@@ -2876,6 +3429,123 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
             "modifierExpired",
             format!("{target_id} {modifier_id} expired"),
         ),
+        RpgDomainEvent::EffectApplied {
+            source_id,
+            target_id,
+            instance_id,
+            definition_id,
+            definition_version,
+            stacking_id,
+            stacking,
+            rank,
+            duration_anchor,
+            remaining_count,
+            application_revision,
+            replaced_instance_ids,
+        } => {
+            details.extend([
+                event_detail("instance", instance_id),
+                event_detail("definition", format!("{definition_id}@{definition_version}")),
+                event_detail("stacking", format!("{stacking_id} / {stacking:?}")),
+                event_detail("rank", rank),
+                event_detail("duration anchor", format!("{duration_anchor:?}")),
+                event_detail("remaining", remaining_count),
+                event_detail("application revision", application_revision),
+                event_detail("replaced instances", replaced_instance_ids.join(", ")),
+            ]);
+            (
+                "effectApplied",
+                format!("{source_id} applied {definition_id} to {target_id}"),
+            )
+        }
+        RpgDomainEvent::EffectRefreshed {
+            source_id,
+            target_id,
+            instance_id,
+            definition_id,
+            definition_version,
+            stacking_id,
+            stacking,
+            rank,
+            duration_anchor,
+            previous_count,
+            remaining_count,
+            application_revision,
+            removed_instance_ids,
+        } => {
+            details.extend([
+                event_detail("instance", instance_id),
+                event_detail("definition", format!("{definition_id}@{definition_version}")),
+                event_detail("stacking", format!("{stacking_id} / {stacking:?}")),
+                event_detail("rank", rank),
+                event_detail("duration anchor", format!("{duration_anchor:?}")),
+                event_detail("duration", format!("{previous_count} → {remaining_count}")),
+                event_detail("application revision", application_revision),
+                event_detail("removed instances", removed_instance_ids.join(", ")),
+            ]);
+            (
+                "effectRefreshed",
+                format!("{source_id} refreshed {definition_id} on {target_id}"),
+            )
+        }
+        RpgDomainEvent::EffectRemoved {
+            source_id,
+            target_id,
+            instance_id,
+            definition_id,
+            definition_version,
+            reason,
+        } => {
+            details.extend([
+                event_detail("instance", instance_id),
+                event_detail("definition", format!("{definition_id}@{definition_version}")),
+                event_detail("reason", reason),
+            ]);
+            (
+                "effectRemoved",
+                format!("{source_id} removed {definition_id} from {target_id}"),
+            )
+        }
+        RpgDomainEvent::EffectDurationChanged {
+            target_id,
+            instance_id,
+            definition_id,
+            definition_version,
+            duration_anchor,
+            previous_count,
+            remaining_count,
+        } => {
+            details.extend([
+                event_detail("instance", instance_id),
+                event_detail("definition", format!("{definition_id}@{definition_version}")),
+                event_detail("duration anchor", format!("{duration_anchor:?}")),
+            ]);
+            (
+                "effectDurationChanged",
+                format!(
+                    "{target_id} {definition_id} duration {previous_count} → {remaining_count}"
+                ),
+            )
+        }
+        RpgDomainEvent::EffectExpired {
+            target_id,
+            instance_id,
+            definition_id,
+            definition_version,
+            source_id,
+            duration_anchor,
+        } => {
+            details.extend([
+                event_detail("instance", instance_id),
+                event_detail("definition", format!("{definition_id}@{definition_version}")),
+                event_detail("source", source_id),
+                event_detail("duration anchor", format!("{duration_anchor:?}")),
+            ]);
+            (
+                "effectExpired",
+                format!("{target_id} {definition_id} expired"),
+            )
+        }
         RpgDomainEvent::PositionChanged {
             entity_id,
             previous,
@@ -2913,58 +3583,128 @@ fn gameplay_event(event: &RpgDomainEvent) -> GameplayEventDto {
         kind: kind.to_owned(),
         summary,
         roll: roll_resolution,
+        contributions,
+        details,
     }
 }
 
-fn gameplay_roll_contribution(contribution: &RpgRollContribution) -> GameplayRollContributionDto {
-    let (reason_kind, contribution_id, selector, condition) = match &contribution.reason {
-        RpgRollContributionReason::ActionCheckModifier => {
-            ("actionCheckModifier", None, Some("attack".to_owned()), None)
-        }
-        RpgRollContributionReason::CharacterFeature {
-            contribution_id,
-            selector,
-            condition,
-        } => (
-            "characterFeature",
-            Some(contribution_id.clone()),
-            Some(gameplay_roll_selector(*selector).to_owned()),
-            Some(gameplay_roll_condition(condition)),
-        ),
-    };
+fn gameplay_scalar_contribution(
+    contribution: &RpgScalarContributionDecision,
+) -> GameplayRollContributionDto {
     GameplayRollContributionDto {
         source_definition_id: contribution.source_definition_id.clone(),
+        source_instance_id: contribution.source_instance_id.clone(),
         source_label: contribution.source_label.clone(),
-        amount: contribution.amount,
-        reason_kind: reason_kind.to_owned(),
-        contribution_id,
-        selector,
-        condition,
+        amount: contribution.applied_value,
+        reason_kind: "scalarContribution".to_owned(),
+        contribution_id: Some(contribution.contribution_id.clone()),
+        selector: Some(contribution.selector_id.clone()),
+        stacking_group: Some(contribution.stacking_group_id.clone()),
+        disposition: contribution_disposition_label(&contribution.disposition),
     }
 }
 
-fn gameplay_roll_selector(selector: RpgRollContributionSelector) -> &'static str {
-    match selector {
-        RpgRollContributionSelector::Attack => "attack",
+fn gameplay_pool_contribution(
+    contribution: &RpgPoolContributionDecision,
+) -> GameplayRollContributionDto {
+    GameplayRollContributionDto {
+        source_definition_id: contribution.source_definition_id.clone(),
+        source_instance_id: contribution.source_instance_id.clone(),
+        source_label: contribution.source_label.clone(),
+        amount: contribution.effect.stacking_value(),
+        reason_kind: pool_contribution_effect_label(&contribution.effect),
+        contribution_id: Some(contribution.contribution_id.clone()),
+        selector: Some(contribution.profile_id.clone()),
+        stacking_group: Some(contribution.stacking_group_id.clone()),
+        disposition: contribution_disposition_label(&contribution.disposition),
     }
 }
 
-fn gameplay_roll_condition(condition: &RpgRollContributionCondition) -> String {
-    match condition {
-        RpgRollContributionCondition::Always => "always".to_owned(),
-        RpgRollContributionCondition::ActorFlanksTarget => "actorFlanksTarget".to_owned(),
-        RpgRollContributionCondition::ActorSurrounded { minimum_hostiles } => {
-            format!("actorSurrounded(minimumHostiles={minimum_hostiles})")
+fn contribution_disposition_label(disposition: &RpgContributionDisposition) -> String {
+    match disposition {
+        RpgContributionDisposition::Applied => "applied".to_owned(),
+        RpgContributionDisposition::Inapplicable { reason } => {
+            format!("inapplicable: {reason}")
         }
-        RpgRollContributionCondition::All { conditions } => format!(
-            "all({})",
-            conditions
-                .iter()
-                .map(gameplay_roll_condition)
-                .collect::<Vec<_>>()
-                .join(",")
+        RpgContributionDisposition::Suppressed {
+            policy,
+            retained_contribution_ids,
+        } => format!(
+            "suppressed by {}; retained {}",
+            contribution_stacking_policy_label(*policy),
+            retained_contribution_ids.join(", ")
         ),
     }
+}
+
+fn contribution_stacking_policy_label(
+    policy: rpg_core::RpgContributionStackingPolicy,
+) -> &'static str {
+    match policy {
+        rpg_core::RpgContributionStackingPolicy::Sum => "sum",
+        rpg_core::RpgContributionStackingPolicy::Greatest => "greatest",
+        rpg_core::RpgContributionStackingPolicy::Least => "least",
+        rpg_core::RpgContributionStackingPolicy::SignedExtremes => "signedExtremes",
+    }
+}
+
+fn pool_contribution_effect_label(effect: &RpgPoolContributionEffect) -> String {
+    match effect {
+        RpgPoolContributionEffect::AddDice { die_type_id, delta } => {
+            format!("addDice {die_type_id} {delta:+}")
+        }
+        RpgPoolContributionEffect::AddAxis { axis_id, value } => {
+            format!("addAxis {axis_id} {value:+}")
+        }
+        RpgPoolContributionEffect::ReplaceOrAddDie {
+            from_die_type_id,
+            to_die_type_id,
+            count,
+            fallback_die_type_id,
+        } => format!(
+            "replaceOrAddDie {count}× {from_die_type_id} → {to_die_type_id} (fallback {fallback_die_type_id})"
+        ),
+    }
+}
+
+fn outcome_shift_disposition_label(
+    disposition: &rpg_core::RpgOutcomeBandShiftDisposition,
+) -> String {
+    match disposition {
+        rpg_core::RpgOutcomeBandShiftDisposition::Applied => "applied".to_owned(),
+        rpg_core::RpgOutcomeBandShiftDisposition::Inapplicable { reason } => {
+            format!("inapplicable: {reason}")
+        }
+    }
+}
+
+fn damage_response_disposition_label(
+    disposition: &rpg_core::RpgDamageResponseDisposition,
+) -> String {
+    match disposition {
+        rpg_core::RpgDamageResponseDisposition::Applied => "applied".to_owned(),
+        rpg_core::RpgDamageResponseDisposition::Inapplicable { reason } => {
+            format!("inapplicable: {reason}")
+        }
+        rpg_core::RpgDamageResponseDisposition::Suppressed { reason } => {
+            format!("suppressed: {reason}")
+        }
+    }
+}
+
+fn event_detail(label: impl Into<String>, value: impl ToString) -> GameplayEventDetailDto {
+    GameplayEventDetailDto {
+        label: label.into(),
+        value: value.to_string(),
+    }
+}
+
+fn format_named_map<T: ToString>(values: &BTreeMap<String, T>) -> String {
+    values
+        .iter()
+        .map(|(id, value)| format!("{id}={}", value.to_string()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn host_diagnostic(code: &str, path: &str, message: &str) -> PlayDiagnosticDto {
@@ -3504,6 +4244,7 @@ fn definition_kind(kind: MaterializedContentDefinitionKind) -> &'static str {
         MaterializedContentDefinitionKind::ActionProcedure => "actionProcedure",
         MaterializedContentDefinitionKind::CharacterClass => "characterClass",
         MaterializedContentDefinitionKind::CharacterFeature => "characterFeature",
+        MaterializedContentDefinitionKind::Effect => "effect",
         MaterializedContentDefinitionKind::Item => "item",
         MaterializedContentDefinitionKind::Support => "support",
     }
@@ -3587,17 +4328,22 @@ pub fn generated_protocol() -> String {
         GameplayLogEntryDto::decl(),
         GameplayOutcomeDto::decl(),
         GameplayRandomRequestDto::decl(),
+        GameplayHeterogeneousRandomTermDto::decl(),
         GameplayNamedValueDto::decl(),
         GameplayModifierDto::decl(),
+        GameplayEffectDto::decl(),
+        GameplayActivationBudgetDto::decl(),
         GameplayEntityDto::decl(),
         GameplayItemInstanceDto::decl(),
         GameplayEventDto::decl(),
+        GameplayEventDetailDto::decl(),
         GameplayRollResolutionDto::decl(),
         GameplayRollContributionDto::decl(),
         GameplayTraceDto::decl(),
         GameplayReactionOptionDto::decl(),
         GameplayReactionDto::decl(),
         GameplayRandomEvidenceDto::decl(),
+        GameplayHeterogeneousRandomValueDto::decl(),
         GameplayResultDto::decl(),
         GameplayReplayBoundaryDto::decl(),
         GameplayReplayEntryDto::decl(),
@@ -3632,9 +4378,14 @@ pub fn generated_protocol() -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use rpg_core::{
-        RpgDomainEvent, RpgRandomRequest, RpgRandomRequestKind, RpgRollContribution,
-        RpgRollContributionCondition, RpgRollContributionReason, RpgRollContributionSelector,
+        RpgContributionDisposition, RpgContributionStackingPolicy, RpgDomainEvent,
+        RpgHeterogeneousRandomTerm, RpgHeterogeneousRandomValue, RpgPoolCancellationResult,
+        RpgPoolContributionDecision, RpgPoolContributionEffect, RpgPoolContributionLedger,
+        RpgPoolReplacementUnit, RpgRandomRequest, RpgRandomRequestKind,
+        RpgScalarContributionDecision, RpgScalarContributionLedger,
     };
     use rpg_ir::{
         CompiledParticipantProfile, ParticipantProfileBoundedValue,
@@ -3655,6 +4406,28 @@ mod tests {
             count,
             sides,
             path: "$.test".to_owned(),
+            heterogeneous_terms: Vec::new(),
+        }
+    }
+
+    fn heterogeneous_request() -> RpgRandomRequest {
+        RpgRandomRequest {
+            kind: RpgRandomRequestKind::HeterogeneousPool,
+            count: 2,
+            sides: 0,
+            path: "$.pool".to_owned(),
+            heterogeneous_terms: vec![
+                RpgHeterogeneousRandomTerm {
+                    die_type_id: "signal".to_owned(),
+                    count: 1,
+                    sides: 6,
+                },
+                RpgHeterogeneousRandomTerm {
+                    die_type_id: "drag".to_owned(),
+                    count: 1,
+                    sides: 4,
+                },
+            ],
         }
     }
 
@@ -3741,36 +4514,49 @@ mod tests {
             defense_id: "armorClass".to_owned(),
             defense: 17,
             hit: true,
-            contributions: vec![
-                RpgRollContribution {
-                    source_definition_id: "action.basic-attack".to_owned(),
-                    source_label: "Basic Attack".to_owned(),
-                    amount: 5,
-                    reason: RpgRollContributionReason::ActionCheckModifier,
-                },
-                RpgRollContribution {
-                    source_definition_id: "feature.coordinated-flanker".to_owned(),
-                    source_label: "Coordinated Flanker".to_owned(),
-                    amount: 2,
-                    reason: RpgRollContributionReason::CharacterFeature {
-                        contribution_id: "flanking-attack".to_owned(),
-                        selector: RpgRollContributionSelector::Attack,
-                        condition: RpgRollContributionCondition::ActorFlanksTarget,
+            contribution_ledger: RpgScalarContributionLedger {
+                selector_id: "attack".to_owned(),
+                base_value: 15,
+                final_value: 23,
+                candidates: vec![
+                    RpgScalarContributionDecision {
+                        source_definition_id: "action.basic-attack".to_owned(),
+                        source_instance_id: None,
+                        source_label: "Basic Attack".to_owned(),
+                        contribution_id: "action-check-modifier".to_owned(),
+                        selector_id: "attack".to_owned(),
+                        stacking_group_id: "untyped".to_owned(),
+                        declared_value: 5,
+                        applied_value: 5,
+                        disposition: RpgContributionDisposition::Applied,
                     },
-                },
-                RpgRollContribution {
-                    source_definition_id: "feature.hold-the-line".to_owned(),
-                    source_label: "Hold the Line".to_owned(),
-                    amount: 1,
-                    reason: RpgRollContributionReason::CharacterFeature {
+                    RpgScalarContributionDecision {
+                        source_definition_id: "feature.coordinated-flanker".to_owned(),
+                        source_instance_id: None,
+                        source_label: "Coordinated Flanker".to_owned(),
+                        contribution_id: "flanking-attack".to_owned(),
+                        selector_id: "attack".to_owned(),
+                        stacking_group_id: "circumstance".to_owned(),
+                        declared_value: 2,
+                        applied_value: 2,
+                        disposition: RpgContributionDisposition::Applied,
+                    },
+                    RpgScalarContributionDecision {
+                        source_definition_id: "feature.hold-the-line".to_owned(),
+                        source_instance_id: None,
+                        source_label: "Hold the Line".to_owned(),
                         contribution_id: "surrounded-attack".to_owned(),
-                        selector: RpgRollContributionSelector::Attack,
-                        condition: RpgRollContributionCondition::ActorSurrounded {
-                            minimum_hostiles: 2,
+                        selector_id: "attack".to_owned(),
+                        stacking_group_id: "circumstance".to_owned(),
+                        declared_value: 1,
+                        applied_value: 0,
+                        disposition: RpgContributionDisposition::Suppressed {
+                            policy: RpgContributionStackingPolicy::Greatest,
+                            retained_contribution_ids: vec!["flanking-attack".to_owned()],
                         },
                     },
-                },
-            ],
+                ],
+            },
         };
 
         let dto = gameplay_event(&event);
@@ -3788,25 +4574,130 @@ mod tests {
                     contribution.source_definition_id.as_str(),
                     contribution.source_label.as_str(),
                     contribution.amount,
-                    contribution.condition.as_deref(),
+                    contribution.disposition.as_str(),
                 ))
                 .collect::<Vec<_>>(),
             vec![
-                ("action.basic-attack", "Basic Attack", 5, None),
+                ("action.basic-attack", "Basic Attack", 5, "applied"),
                 (
                     "feature.coordinated-flanker",
                     "Coordinated Flanker",
                     2,
-                    Some("actorFlanksTarget"),
+                    "applied",
                 ),
                 (
                     "feature.hold-the-line",
                     "Hold the Line",
-                    1,
-                    Some("actorSurrounded(minimumHostiles=2)"),
+                    0,
+                    "suppressed by greatest; retained flanking-attack",
                 ),
             ]
         );
+    }
+
+    #[test]
+    fn heterogeneous_event_dto_preserves_typed_evidence_axes_and_dispositions() {
+        let event = RpgDomainEvent::HeterogeneousPoolResolved {
+            actor_id: "reader".to_owned(),
+            target_id: "operator".to_owned(),
+            profile_id: "signal-crossing".to_owned(),
+            base_dice: BTreeMap::from([("signal".to_owned(), 1)]),
+            contribution_ledger: Box::new(RpgPoolContributionLedger {
+                profile_id: "signal-crossing".to_owned(),
+                candidates: vec![
+                    RpgPoolContributionDecision {
+                        source_definition_id: "feature.reader".to_owned(),
+                        source_instance_id: None,
+                        source_label: "Reader".to_owned(),
+                        contribution_id: "add-signal".to_owned(),
+                        profile_id: "signal-crossing".to_owned(),
+                        stacking_group_id: "pool-sum".to_owned(),
+                        effect: RpgPoolContributionEffect::AddDice {
+                            die_type_id: "signal".to_owned(),
+                            delta: 1,
+                        },
+                        disposition: RpgContributionDisposition::Applied,
+                    },
+                    RpgPoolContributionDecision {
+                        source_definition_id: "feature.reader".to_owned(),
+                        source_instance_id: None,
+                        source_label: "Reader".to_owned(),
+                        contribution_id: "suppressed-benefit".to_owned(),
+                        profile_id: "signal-crossing".to_owned(),
+                        stacking_group_id: "pool-peak".to_owned(),
+                        effect: RpgPoolContributionEffect::AddAxis {
+                            axis_id: "benefit".to_owned(),
+                            value: 1,
+                        },
+                        disposition: RpgContributionDisposition::Suppressed {
+                            policy: RpgContributionStackingPolicy::Greatest,
+                            retained_contribution_ids: vec!["benefit-two".to_owned()],
+                        },
+                    },
+                ],
+                grouped_die_deltas: BTreeMap::from([("signal".to_owned(), 1)]),
+                grouped_axis_values: BTreeMap::new(),
+                replacement_units: vec![RpgPoolReplacementUnit {
+                    contribution_id: "replace-focus".to_owned(),
+                    unit: 1,
+                    from_die_type_id: "focus".to_owned(),
+                    added_die_type_id: "signal".to_owned(),
+                    used_fallback: false,
+                    before_from_count: 1,
+                    after_from_count: 0,
+                    after_added_count: 2,
+                }],
+            }),
+            frozen_dice: BTreeMap::from([("signal".to_owned(), 2)]),
+            evidence: vec![
+                RpgHeterogeneousRandomValue {
+                    die_type_id: "signal".to_owned(),
+                    ordinal: 1,
+                    sides: 4,
+                    value: 3,
+                },
+                RpgHeterogeneousRandomValue {
+                    die_type_id: "signal".to_owned(),
+                    ordinal: 2,
+                    sides: 4,
+                    value: 4,
+                },
+            ],
+            raw_axes: BTreeMap::from([("benefit".to_owned(), 2), ("complication".to_owned(), 1)]),
+            automatic_axes: BTreeMap::new(),
+            cancellations: vec![RpgPoolCancellationResult {
+                cancellation_id: "benefit-complication".to_owned(),
+                positive_axis_id: "benefit".to_owned(),
+                negative_axis_id: "complication".to_owned(),
+                cancelled: 1,
+                positive_remaining: 1,
+                negative_remaining: 0,
+            }],
+            net_axes: BTreeMap::from([("benefit".to_owned(), 1), ("complication".to_owned(), 0)]),
+            final_band_id: "progress".to_owned(),
+        };
+
+        let dto = gameplay_event(&event);
+        assert_eq!(dto.kind, "heterogeneousPoolResolved");
+        assert_eq!(dto.contributions.len(), 2);
+        assert_eq!(dto.contributions[0].disposition, "applied");
+        assert_eq!(
+            dto.contributions[1].disposition,
+            "suppressed by greatest; retained benefit-two"
+        );
+        assert!(dto
+            .details
+            .iter()
+            .any(|detail| detail.label == "typed evidence"
+                && detail.value == "signal#1 d4=3, signal#2 d4=4"));
+        assert!(dto.details.iter().any(|detail| {
+            detail.label == "cancellation benefit-complication"
+                && detail.value.contains("cancelled 1")
+        }));
+        assert!(dto
+            .details
+            .iter()
+            .any(|detail| detail.label == "replacement replace-focus#1"));
     }
 
     #[test]
@@ -3860,5 +4751,26 @@ mod tests {
         let values = source.draw(&random_request(128, 20)).unwrap();
         assert_eq!(values.len(), 128);
         assert!(values.iter().all(|value| (1..=20).contains(value)));
+    }
+
+    #[test]
+    fn random_sources_honor_each_heterogeneous_die_domain() {
+        let request = heterogeneous_request();
+        let mut system = SystemGameplayRandomSource::default();
+        let system_values = system.draw(&request).expect("system pool draw");
+        assert_eq!(system_values.len(), 2);
+        assert!((1..=6).contains(&system_values[0]));
+        assert!((1..=4).contains(&system_values[1]));
+
+        let mut tape = ScriptedGameplayRandomSource::new([6, 4]);
+        assert_eq!(tape.draw(&request).expect("typed tape draw"), [6, 4]);
+        assert_eq!(tape.remaining(), 0);
+
+        let mut invalid_tape = ScriptedGameplayRandomSource::new([6, 5]);
+        let failure = invalid_tape
+            .draw(&request)
+            .expect_err("drag d4 must reject five");
+        assert_eq!(failure.code, "SESSION_RANDOM_TAPE_VALUE_INVALID");
+        assert_eq!(invalid_tape.remaining(), 2);
     }
 }

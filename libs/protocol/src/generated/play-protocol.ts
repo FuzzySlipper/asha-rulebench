@@ -96,21 +96,29 @@ export type GameplayLogEntryDto = { sequence: string, stateRevision: string, act
 
 export type GameplayOutcomeDto = { status: string, winningTeamIds: Array<string>, };
 
-export type GameplayRandomRequestDto = { kind: string, count: number, sides: number, path: string, };
+export type GameplayRandomRequestDto = { kind: string, count: number, sides: number, path: string, heterogeneousTerms: Array<GameplayHeterogeneousRandomTermDto>, };
+
+export type GameplayHeterogeneousRandomTermDto = { dieTypeId: string, count: number, sides: number, };
 
 export type GameplayNamedValueDto = { id: string, current: number, maximum: number | null, };
 
 export type GameplayModifierDto = { stackingGroup: string, id: string, value: number, remainingTurns: number, };
 
-export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, classDefinitionId: string | null, featureDefinitionIds: Array<string>, items: Array<GameplayItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, };
+export type GameplayEffectDto = { instanceId: string, definitionId: string, label: string, sourceEntityId: string, stacking: string, rank: number, durationAnchor: string, remainingCount: number, };
+
+export type GameplayActivationBudgetDto = { id: string, label: string, timing: string, resetBoundary: string, initialAmount: number, remaining: number, };
+
+export type GameplayEntityDto = { id: string, label: string, teamId: string, x: number, y: number, definitionIds: Array<string>, classDefinitionId: string | null, featureDefinitionIds: Array<string>, items: Array<GameplayItemInstanceDto>, equipment: Array<ScenarioEquipmentSlotDto>, vitality: GameplayNamedValueDto, stats: Array<GameplayNamedValueDto>, defenses: Array<GameplayNamedValueDto>, resources: Array<GameplayNamedValueDto>, modifiers: Array<GameplayModifierDto>, effects: Array<GameplayEffectDto>, activationBudgets: Array<GameplayActivationBudgetDto>, };
 
 export type GameplayItemInstanceDto = { id: string, definitionId: string, label: string, description: string | null, tags: Array<string>, traits: Array<string>, allowedSlots: Array<string>, attributes: Array<ItemAttributeDto>, };
 
-export type GameplayEventDto = { kind: string, summary: string, roll: GameplayRollResolutionDto | null, };
+export type GameplayEventDto = { kind: string, summary: string, roll: GameplayRollResolutionDto | null, contributions: Array<GameplayRollContributionDto>, details: Array<GameplayEventDetailDto>, };
+
+export type GameplayEventDetailDto = { label: string, value: string, };
 
 export type GameplayRollResolutionDto = { kind: string, dieResult: number, total: number, thresholdLabel: string, threshold: number, outcome: string, contributions: Array<GameplayRollContributionDto>, };
 
-export type GameplayRollContributionDto = { sourceDefinitionId: string, sourceLabel: string, amount: number, reasonKind: string, contributionId: string | null, selector: string | null, condition: string | null, };
+export type GameplayRollContributionDto = { sourceDefinitionId: string, sourceInstanceId: string | null, sourceLabel: string, amount: number, reasonKind: string, contributionId: string | null, selector: string | null, stackingGroup: string | null, disposition: string, };
 
 export type GameplayTraceDto = { path: string, code: string, detail: string, };
 
@@ -118,7 +126,9 @@ export type GameplayReactionOptionDto = { id: string, label: string, damageReduc
 
 export type GameplayReactionDto = { reactionId: string, actorId: string, targetId: string, actionId: string, options: Array<GameplayReactionOptionDto>, path: string, };
 
-export type GameplayRandomEvidenceDto = { kind: string, count: number, sides: number, path: string, values: Array<number>, };
+export type GameplayRandomEvidenceDto = { kind: string, count: number, sides: number, path: string, values: Array<number>, heterogeneousValues: Array<GameplayHeterogeneousRandomValueDto>, };
+
+export type GameplayHeterogeneousRandomValueDto = { dieTypeId: string, ordinal: number, sides: number, value: number, };
 
 export type GameplayResultDto = { status: string, code: string | null, message: string, events: Array<GameplayEventDto>, trace: Array<GameplayTraceDto>, randomConsumed: string, randomEvidence: Array<GameplayRandomEvidenceDto>, stateRevision: number, randomRequest: GameplayRandomRequestDto | null, };
 

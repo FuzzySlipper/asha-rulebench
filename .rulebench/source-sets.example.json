@@ -2,51 +2,141 @@
   "schemaVersion": 2,
   "sourceSets": [
     {
-      "id": "rulebench-split-demo",
-      "label": "Rulebench split-source demo",
+      "id": "tactical-rollover",
+      "label": "Tactical Rollover",
+      "repository": {
+        "root": "/home/dev/asha-d20-fantasy",
+        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+      },
       "sourceSet": {
         "schemaVersion": 1,
         "allowedRoots": [
-          "test-fixtures/source-sets/independent/rules",
-          "test-fixtures/source-sets/independent/content",
-          "test-fixtures/source-sets/independent/positional-content",
-          "test-fixtures/source-sets/independent/bundles",
-          "test-fixtures/source-sets/independent/scenarios"
+          "/home/dev/asha-d20-fantasy/rulesets/tactical-rollover",
+          "/home/dev/asha-d20-fantasy/content-packs/tactical-rollover",
+          "/home/dev/asha-d20-fantasy/play-bundles",
+          "/home/dev/asha-d20-fantasy/scenarios"
         ],
         "entries": [
           {
             "id": "ruleset",
-            "label": "Independent Ruleset",
-            "sourceRoot": "test-fixtures/source-sets/independent/rules",
+            "label": "Tactical Rollover Ruleset",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/tactical-rollover",
             "module": "src/index.ts",
             "exportKinds": ["ruleset"]
           },
           {
             "id": "content-pack",
-            "label": "Independent Content Pack",
-            "sourceRoot": "test-fixtures/source-sets/independent/content",
-            "module": "src/index.ts",
-            "exportKinds": ["contentPack"]
-          },
-          {
-            "id": "positional-content-pack",
-            "label": "Independent Positional Content Pack",
-            "sourceRoot": "test-fixtures/source-sets/independent/positional-content",
+            "label": "Tactical Rollover Content",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/tactical-rollover",
             "module": "src/index.ts",
             "exportKinds": ["contentPack"]
           },
           {
             "id": "play-bundle",
-            "label": "Independent PlayBundle",
-            "sourceRoot": "test-fixtures/source-sets/independent/bundles",
-            "module": "src/primary.ts",
+            "label": "Tactical Rollover PlayBundle",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/play-bundles",
+            "module": "tactical-rollover.ts",
             "exportKinds": ["playBundle"]
           },
           {
             "id": "scenario",
-            "label": "Independent Scenario",
-            "sourceRoot": "test-fixtures/source-sets/independent/scenarios",
+            "label": "Tactical Rollover Scenario",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
+            "module": "tactical-rollover-skirmish.ts",
+            "exportKinds": ["scenarioTemplate"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "context-tactics",
+      "label": "Context Tactics",
+      "repository": {
+        "root": "/home/dev/asha-d20-fantasy",
+        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+      },
+      "sourceSet": {
+        "schemaVersion": 1,
+        "allowedRoots": [
+          "/home/dev/asha-d20-fantasy/rulesets/context-tactics",
+          "/home/dev/asha-d20-fantasy/content-packs/context-tactics",
+          "/home/dev/asha-d20-fantasy/play-bundles",
+          "/home/dev/asha-d20-fantasy/scenarios"
+        ],
+        "entries": [
+          {
+            "id": "ruleset",
+            "label": "Context Tactics Ruleset",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/context-tactics",
             "module": "src/index.ts",
+            "exportKinds": ["ruleset"]
+          },
+          {
+            "id": "content-pack",
+            "label": "Context Tactics Content",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/context-tactics",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "play-bundle",
+            "label": "Context Tactics PlayBundle",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/play-bundles",
+            "module": "context-tactics.ts",
+            "exportKinds": ["playBundle"]
+          },
+          {
+            "id": "scenario",
+            "label": "Context Tactics Scenario",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
+            "module": "context-tactics-crossing.ts",
+            "exportKinds": ["scenarioTemplate"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-axis-pool",
+      "label": "Multi-Axis Pool",
+      "repository": {
+        "root": "/home/dev/asha-d20-fantasy",
+        "revision": "95949af9be4a424ed23e2be25754c5c9e443e4f5"
+      },
+      "sourceSet": {
+        "schemaVersion": 1,
+        "allowedRoots": [
+          "/home/dev/asha-d20-fantasy/rulesets/multi-axis-pool",
+          "/home/dev/asha-d20-fantasy/content-packs/multi-axis-pool",
+          "/home/dev/asha-d20-fantasy/play-bundles",
+          "/home/dev/asha-d20-fantasy/scenarios"
+        ],
+        "entries": [
+          {
+            "id": "ruleset",
+            "label": "Multi-Axis Pool Ruleset",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/rulesets/multi-axis-pool",
+            "module": "src/index.ts",
+            "exportKinds": ["ruleset"]
+          },
+          {
+            "id": "content-pack",
+            "label": "Multi-Axis Pool Content",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/content-packs/multi-axis-pool",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "play-bundle",
+            "label": "Multi-Axis Pool PlayBundle",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/play-bundles",
+            "module": "multi-axis-pool.ts",
+            "exportKinds": ["playBundle"]
+          },
+          {
+            "id": "scenario",
+            "label": "Multi-Axis Pool Scenario",
+            "sourceRoot": "/home/dev/asha-d20-fantasy/scenarios",
+            "module": "multi-axis-pool-crossing.ts",
             "exportKinds": ["scenarioTemplate"]
           }
         ]

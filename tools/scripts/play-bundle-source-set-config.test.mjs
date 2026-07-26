@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { promisify } from 'node:util';
 
 import {
   decodePlayBundleSourceSetConfig,
   loadPlayBundleSourceSetConfig,
 } from './play-bundle-source-set-config.mjs';
+
+const execFileAsync = promisify(execFile);
 
 test('a missing local source-set config is an empty explicit list', async () => {
   const result = await loadPlayBundleSourceSetConfig(
@@ -88,4 +92,80 @@ test('rejects ambiguous or extended local configuration', () => {
       }),
     /unexpected defaultRuleset/,
   );
+});
+
+test('validates and strips an exact external repository pin', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'rulebench-pin-'));
+  const repositoryRoot = join(directory, 'content-repository');
+  try {
+    await execFileAsync('git', ['init', repositoryRoot]);
+    await execFileAsync('git', [
+      '-C',
+      repositoryRoot,
+      'config',
+      'user.name',
+      'Rulebench Test',
+    ]);
+    await execFileAsync('git', [
+      '-C',
+      repositoryRoot,
+      'config',
+      'user.email',
+      'rulebench@example.invalid',
+    ]);
+    await writeFile(join(repositoryRoot, 'content.txt'), 'fixture\n', 'utf8');
+    await execFileAsync('git', ['-C', repositoryRoot, 'add', 'content.txt']);
+    await execFileAsync('git', [
+      '-C',
+      repositoryRoot,
+      'commit',
+      '-m',
+      'fixture',
+    ]);
+    const revision = (
+      await execFileAsync('git', ['-C', repositoryRoot, 'rev-parse', 'HEAD'])
+    ).stdout.trim();
+    const config = {
+      schemaVersion: 2,
+      sourceSets: [
+        {
+          id: 'pinned',
+          label: 'Pinned content',
+          repository: {
+            root: repositoryRoot,
+            revision,
+          },
+          sourceSet: sourceSet(repositoryRoot),
+        },
+      ],
+    };
+    await writeFile(
+      join(directory, 'source-sets.json'),
+      JSON.stringify(config),
+      'utf8',
+    );
+
+    const result = await loadPlayBundleSourceSetConfig(
+      directory,
+      'source-sets.json',
+    );
+    assert.deepEqual(Object.keys(result.sourceSets[0] ?? {}).sort(), [
+      'id',
+      'label',
+      'sourceSet',
+    ]);
+
+    config.sourceSets[0].repository.revision = '0'.repeat(40);
+    await writeFile(
+      join(directory, 'source-sets.json'),
+      JSON.stringify(config),
+      'utf8',
+    );
+    await assert.rejects(
+      loadPlayBundleSourceSetConfig(directory, 'source-sets.json'),
+      /expected revision 0000000000000000000000000000000000000000/,
+    );
+  } finally {
+    await rm(directory, { recursive: true });
+  }
 });

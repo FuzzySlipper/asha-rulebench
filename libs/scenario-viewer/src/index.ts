@@ -1451,6 +1451,50 @@ class SetupDiagnosticsComponent {
                       }
                       @for (event of entry.events; track $index) {
                         <span>{{ event.kind }}: {{ event.summary }}</span>
+                        @if (event.details.length > 0) {
+                          <dl class="facts event-details">
+                            @for (
+                              detail of event.details;
+                              track detail.label + ':' + $index
+                            ) {
+                              <div>
+                                <dt>{{ detail.label }}</dt>
+                                <dd>{{ detail.value || 'none' }}</dd>
+                              </div>
+                            }
+                          </dl>
+                        }
+                        @if (event.contributions.length > 0) {
+                          <ul
+                            class="roll-contributions"
+                            aria-label="Authority contribution ledger"
+                          >
+                            @for (
+                              contribution of event.contributions;
+                              track contribution.sourceDefinitionId +
+                                ':' +
+                                contribution.sourceInstanceId +
+                                ':' +
+                                contribution.contributionId +
+                                ':' +
+                                $index
+                            ) {
+                              <li>
+                                <strong>{{ contribution.sourceLabel }}</strong>
+                                <strong>{{
+                                  signedAmount(contribution.amount)
+                                }}</strong>
+                                <span class="muted roll-contribution-source">
+                                  {{ contribution.reasonKind }} ·
+                                  {{ contribution.disposition }}
+                                  @if (contribution.stackingGroup) {
+                                    · {{ contribution.stackingGroup }}
+                                  }
+                                </span>
+                              </li>
+                            }
+                          </ul>
+                        }
                         @if (event.roll; as roll) {
                           <section
                             class="roll-breakdown"
@@ -1493,8 +1537,9 @@ class SetupDiagnosticsComponent {
                                     >
                                       {{ contribution.sourceDefinitionId }} ·
                                       {{ contribution.reasonKind }}
-                                      @if (contribution.condition) {
-                                        · {{ contribution.condition }}
+                                      · {{ contribution.disposition }}
+                                      @if (contribution.stackingGroup) {
+                                        · {{ contribution.stackingGroup }}
                                       }
                                     </span>
                                   </li>
@@ -4242,11 +4287,31 @@ class SetupDiagnosticsComponent {
               }
             </ul>
           </section>
+          <section aria-labelledby="character-budgets-heading">
+            <h3 id="character-budgets-heading">Activation budgets</h3>
+            <ul class="detail-list">
+              @for (budget of participant.activationBudgets; track budget) {
+                <li>{{ budget }}</li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
           <section aria-labelledby="character-modifiers-heading">
             <h3 id="character-modifiers-heading">Modifiers</h3>
             <ul class="detail-list">
               @for (modifier of participant.modifiers; track modifier) {
                 <li>{{ modifier }}</li>
+              } @empty {
+                <li class="muted">None</li>
+              }
+            </ul>
+          </section>
+          <section aria-labelledby="character-effects-heading">
+            <h3 id="character-effects-heading">Active effects</h3>
+            <ul class="detail-list">
+              @for (effect of participant.effects; track effect) {
+                <li>{{ effect }}</li>
               } @empty {
                 <li class="muted">None</li>
               }

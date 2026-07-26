@@ -1,4 +1,12 @@
-import { defineRuleset } from '@asha-rpg/authoring';
+import {
+  defineRuleset,
+  rulesetCalculationSelector,
+  rulesetContributionStackingGroup,
+} from '@asha-rpg/authoring';
+import {
+  RPG_CAPABILITY_VERSIONS,
+  RPG_OPERATION_VERSIONS,
+} from '@asha-rpg/ir';
 
 export const ruleset = defineRuleset({
   schema: { identity: 'asha.rpg.ruleset', major: 1 },
@@ -15,18 +23,13 @@ export const ruleset = defineRuleset({
     },
   },
   provides: {
-    operations: [
-      { id: 'operation.damage', version: 1 },
-      { id: 'operation.heal', version: 1 },
-      { id: 'operation.moveToCell', version: 1 },
-    ],
-    capabilities: [
-      { id: 'capability.defenses', version: 1 },
-      { id: 'capability.position', version: 1 },
-      { id: 'capability.random', version: 1 },
-      { id: 'capability.stats', version: 1 },
-      { id: 'capability.vitality', version: 1 },
-    ],
+    operations: Object.entries(RPG_OPERATION_VERSIONS).map(([id, version]) => ({
+      id,
+      version,
+    })),
+    capabilities: Object.entries(RPG_CAPABILITY_VERSIONS).map(
+      ([id, version]) => ({ id, version }),
+    ),
     values: [
       {
         kind: 'stat',
@@ -45,5 +48,27 @@ export const ruleset = defineRuleset({
       { id: 'signed-bonus', minimum: -20, maximum: 30 },
       { id: 'defense-score', minimum: 0, maximum: 50 },
     ],
+    calculationSelectors: [
+      {
+        id: 'attack',
+        version: 1,
+        label: 'Attack total',
+        numericDomainId: 'signed-bonus',
+      },
+    ],
+    contributionStackingGroups: [
+      {
+        id: 'circumstance',
+        version: 1,
+        label: 'Circumstance',
+        policy: 'sum',
+      },
+    ],
   },
 });
+
+export const attackSelector = rulesetCalculationSelector(ruleset, 'attack');
+export const circumstanceStackingGroup = rulesetContributionStackingGroup(
+  ruleset,
+  'circumstance',
+);

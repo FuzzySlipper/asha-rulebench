@@ -19,8 +19,13 @@ import type {
   GameplayItemBindingDto,
   GameplayTurnControlDto,
   GameplayEntityDto,
+  GameplayEffectDto,
+  GameplayActivationBudgetDto,
   GameplayItemInstanceDto,
   GameplayEventDto,
+  GameplayEventDetailDto,
+  GameplayHeterogeneousRandomTermDto,
+  GameplayHeterogeneousRandomValueDto,
   GameplayRollContributionDto,
   GameplayRollResolutionDto,
   GameplayLogEntryDto,
@@ -1094,12 +1099,38 @@ function gameplayRandomRequest(
   path: string,
 ): GameplayRandomRequestDto {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['kind', 'count', 'sides', 'path'], path);
+  exactKeys(
+    record,
+    ['kind', 'count', 'sides', 'path', 'heterogeneousTerms'],
+    path,
+  );
   return {
     kind: requiredString(record['kind'], `${path}.kind`),
     count: nonNegativeInteger(record['count'], `${path}.count`),
     sides: nonNegativeInteger(record['sides'], `${path}.sides`),
     path: requiredString(record['path'], `${path}.path`),
+    heterogeneousTerms: requiredArray(
+      record['heterogeneousTerms'],
+      `${path}.heterogeneousTerms`,
+    ).map((entry, index) =>
+      gameplayHeterogeneousRandomTerm(
+        entry,
+        `${path}.heterogeneousTerms[${index}]`,
+      ),
+    ),
+  };
+}
+
+function gameplayHeterogeneousRandomTerm(
+  value: unknown,
+  path: string,
+): GameplayHeterogeneousRandomTermDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['dieTypeId', 'count', 'sides'], path);
+  return {
+    dieTypeId: requiredString(record['dieTypeId'], `${path}.dieTypeId`),
+    count: nonNegativeInteger(record['count'], `${path}.count`),
+    sides: nonNegativeInteger(record['sides'], `${path}.sides`),
   };
 }
 
@@ -1123,6 +1154,8 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
       'defenses',
       'resources',
       'modifiers',
+      'effects',
+      'activationBudgets',
     ],
     path,
   );
@@ -1157,6 +1190,81 @@ function gameplayEntity(value: unknown, path: string): GameplayEntityDto {
     modifiers: requiredArray(record['modifiers'], `${path}.modifiers`).map(
       (entry, index) => gameplayModifier(entry, `${path}.modifiers[${index}]`),
     ),
+    effects: requiredArray(record['effects'], `${path}.effects`).map(
+      (entry, index) => gameplayEffect(entry, `${path}.effects[${index}]`),
+    ),
+    activationBudgets: requiredArray(
+      record['activationBudgets'],
+      `${path}.activationBudgets`,
+    ).map((entry, index) =>
+      gameplayActivationBudget(entry, `${path}.activationBudgets[${index}]`),
+    ),
+  };
+}
+
+function gameplayEffect(value: unknown, path: string): GameplayEffectDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    [
+      'instanceId',
+      'definitionId',
+      'label',
+      'sourceEntityId',
+      'stacking',
+      'rank',
+      'durationAnchor',
+      'remainingCount',
+    ],
+    path,
+  );
+  return {
+    instanceId: requiredString(record['instanceId'], `${path}.instanceId`),
+    definitionId: requiredString(
+      record['definitionId'],
+      `${path}.definitionId`,
+    ),
+    label: requiredString(record['label'], `${path}.label`),
+    sourceEntityId: requiredString(
+      record['sourceEntityId'],
+      `${path}.sourceEntityId`,
+    ),
+    stacking: requiredString(record['stacking'], `${path}.stacking`),
+    rank: requiredInteger(record['rank'], `${path}.rank`),
+    durationAnchor: requiredString(
+      record['durationAnchor'],
+      `${path}.durationAnchor`,
+    ),
+    remainingCount: nonNegativeInteger(
+      record['remainingCount'],
+      `${path}.remainingCount`,
+    ),
+  };
+}
+
+function gameplayActivationBudget(
+  value: unknown,
+  path: string,
+): GameplayActivationBudgetDto {
+  const record = requiredRecord(value, path);
+  exactKeys(
+    record,
+    ['id', 'label', 'timing', 'resetBoundary', 'initialAmount', 'remaining'],
+    path,
+  );
+  return {
+    id: requiredString(record['id'], `${path}.id`),
+    label: requiredString(record['label'], `${path}.label`),
+    timing: requiredString(record['timing'], `${path}.timing`),
+    resetBoundary: requiredString(
+      record['resetBoundary'],
+      `${path}.resetBoundary`,
+    ),
+    initialAmount: requiredInteger(
+      record['initialAmount'],
+      `${path}.initialAmount`,
+    ),
+    remaining: requiredInteger(record['remaining'], `${path}.remaining`),
   };
 }
 
@@ -1335,7 +1443,11 @@ function gameplayRandomEvidence(
   path: string,
 ): GameplayRandomEvidenceDto {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['kind', 'count', 'sides', 'path', 'values'], path);
+  exactKeys(
+    record,
+    ['kind', 'count', 'sides', 'path', 'values', 'heterogeneousValues'],
+    path,
+  );
   return {
     kind: requiredString(record['kind'], `${path}.kind`),
     count: nonNegativeInteger(record['count'], `${path}.count`),
@@ -1344,12 +1456,39 @@ function gameplayRandomEvidence(
     values: requiredArray(record['values'], `${path}.values`).map(
       (entry, index) => nonNegativeInteger(entry, `${path}.values[${index}]`),
     ),
+    heterogeneousValues: requiredArray(
+      record['heterogeneousValues'],
+      `${path}.heterogeneousValues`,
+    ).map((entry, index) =>
+      gameplayHeterogeneousRandomValue(
+        entry,
+        `${path}.heterogeneousValues[${index}]`,
+      ),
+    ),
+  };
+}
+
+function gameplayHeterogeneousRandomValue(
+  value: unknown,
+  path: string,
+): GameplayHeterogeneousRandomValueDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['dieTypeId', 'ordinal', 'sides', 'value'], path);
+  return {
+    dieTypeId: requiredString(record['dieTypeId'], `${path}.dieTypeId`),
+    ordinal: nonNegativeInteger(record['ordinal'], `${path}.ordinal`),
+    sides: nonNegativeInteger(record['sides'], `${path}.sides`),
+    value: nonNegativeInteger(record['value'], `${path}.value`),
   };
 }
 
 function gameplayEvent(value: unknown, path: string): GameplayEventDto {
   const record = requiredRecord(value, path);
-  exactKeys(record, ['kind', 'summary', 'roll'], path);
+  exactKeys(
+    record,
+    ['kind', 'summary', 'roll', 'contributions', 'details'],
+    path,
+  );
   return {
     kind: requiredString(record['kind'], `${path}.kind`),
     summary: requiredString(record['summary'], `${path}.summary`),
@@ -1357,6 +1496,27 @@ function gameplayEvent(value: unknown, path: string): GameplayEventDto {
       record['roll'] === null
         ? null
         : gameplayRollResolution(record['roll'], `${path}.roll`),
+    contributions: requiredArray(
+      record['contributions'],
+      `${path}.contributions`,
+    ).map((entry, index) =>
+      gameplayRollContribution(entry, `${path}.contributions[${index}]`),
+    ),
+    details: requiredArray(record['details'], `${path}.details`).map(
+      (entry, index) => gameplayEventDetail(entry, `${path}.details[${index}]`),
+    ),
+  };
+}
+
+function gameplayEventDetail(
+  value: unknown,
+  path: string,
+): GameplayEventDetailDto {
+  const record = requiredRecord(value, path);
+  exactKeys(record, ['label', 'value'], path);
+  return {
+    label: requiredString(record['label'], `${path}.label`),
+    value: requiredString(record['value'], `${path}.value`),
   };
 }
 
@@ -1406,12 +1566,14 @@ function gameplayRollContribution(
     record,
     [
       'sourceDefinitionId',
+      'sourceInstanceId',
       'sourceLabel',
       'amount',
       'reasonKind',
       'contributionId',
       'selector',
-      'condition',
+      'stackingGroup',
+      'disposition',
     ],
     path,
   );
@@ -1419,6 +1581,10 @@ function gameplayRollContribution(
     sourceDefinitionId: requiredString(
       record['sourceDefinitionId'],
       `${path}.sourceDefinitionId`,
+    ),
+    sourceInstanceId: nullableString(
+      record['sourceInstanceId'],
+      `${path}.sourceInstanceId`,
     ),
     sourceLabel: requiredString(record['sourceLabel'], `${path}.sourceLabel`),
     amount: requiredInteger(record['amount'], `${path}.amount`),
@@ -1428,7 +1594,11 @@ function gameplayRollContribution(
       `${path}.contributionId`,
     ),
     selector: nullableString(record['selector'], `${path}.selector`),
-    condition: nullableString(record['condition'], `${path}.condition`),
+    stackingGroup: nullableString(
+      record['stackingGroup'],
+      `${path}.stackingGroup`,
+    ),
+    disposition: requiredString(record['disposition'], `${path}.disposition`),
   };
 }
 

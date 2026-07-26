@@ -215,16 +215,20 @@ export interface GameplayEntityView {
   readonly defenses: readonly string[];
   readonly resources: readonly string[];
   readonly modifiers: readonly string[];
+  readonly effects: readonly string[];
+  readonly activationBudgets: readonly string[];
 }
 
 export interface GameplayRollContributionView {
   readonly sourceDefinitionId: string;
+  readonly sourceInstanceId: string | null;
   readonly sourceLabel: string;
   readonly amount: number;
   readonly reasonKind: string;
   readonly contributionId: string | null;
   readonly selector: string | null;
-  readonly condition: string | null;
+  readonly stackingGroup: string | null;
+  readonly disposition: string;
 }
 
 export interface GameplayRollResolutionView {
@@ -241,6 +245,11 @@ export interface GameplayEventView {
   readonly kind: string;
   readonly summary: string;
   readonly roll: GameplayRollResolutionView | null;
+  readonly contributions: readonly GameplayRollContributionView[];
+  readonly details: readonly {
+    readonly label: string;
+    readonly value: string;
+  }[];
 }
 
 export interface GameplayWorkspaceView {
@@ -513,6 +522,14 @@ function gameplayView(
         (modifier) =>
           `${catalogLabels.get(`modifier:${modifier.id}`) ?? modifier.id} ${modifier.value} (${modifier.remainingTurns} turns, ${modifier.stackingGroup})`,
       ),
+      effects: entity.effects.map(
+        (effect) =>
+          `${effect.label} · ${effect.definitionId} · ${effect.remainingCount} ${effect.durationAnchor} · ${effect.stacking} · source ${effect.sourceEntityId}`,
+      ),
+      activationBudgets: entity.activationBudgets.map(
+        (budget) =>
+          `${budget.label} ${budget.remaining}/${budget.initialAmount} · ${budget.timing} · resets ${budget.resetBoundary}`,
+      ),
     })),
     log: gameplay.log.map((entry) => ({
       sequence: entry.sequence,
@@ -535,14 +552,28 @@ function gameplayView(
                 outcome: event.roll.outcome,
                 contributions: event.roll.contributions.map((contribution) => ({
                   sourceDefinitionId: contribution.sourceDefinitionId,
+                  sourceInstanceId: contribution.sourceInstanceId,
                   sourceLabel: contribution.sourceLabel,
                   amount: contribution.amount,
                   reasonKind: contribution.reasonKind,
                   contributionId: contribution.contributionId,
                   selector: contribution.selector,
-                  condition: contribution.condition,
+                  stackingGroup: contribution.stackingGroup,
+                  disposition: contribution.disposition,
                 })),
               },
+        contributions: event.contributions.map((contribution) => ({
+          sourceDefinitionId: contribution.sourceDefinitionId,
+          sourceInstanceId: contribution.sourceInstanceId,
+          sourceLabel: contribution.sourceLabel,
+          amount: contribution.amount,
+          reasonKind: contribution.reasonKind,
+          contributionId: contribution.contributionId,
+          selector: contribution.selector,
+          stackingGroup: contribution.stackingGroup,
+          disposition: contribution.disposition,
+        })),
+        details: event.details,
       })),
     })),
     outcome: gameplay.outcome,
@@ -566,12 +597,47 @@ function gameplayView(
             randomRequest:
               gameplay.lastResult.randomRequest === null
                 ? null
-                : `${gameplay.lastResult.randomRequest.count}d${gameplay.lastResult.randomRequest.sides} at ${gameplay.lastResult.randomRequest.path}`,
+                : `${randomRequestDiceLabel(gameplay.lastResult.randomRequest)} at ${gameplay.lastResult.randomRequest.path}`,
             randomEvidence: gameplay.lastResult.randomEvidence.map(
               (evidence) => ({
                 kind: evidence.kind,
-                dice: `${evidence.count}d${evidence.sides}`,
-                values: evidence.values,
+                dice: randomRequestDiceLabel({
+                  count: evidence.count,
+                  sides: evidence.sides,
+                  heterogeneousTerms: evidence.heterogeneousValues.reduce(
+                    (terms, value) => {
+                      const existing = terms.find(
+                        (term) =>
+                          term.dieTypeId === value.dieTypeId &&
+                          term.sides === value.sides,
+                      );
+                      if (existing === undefined) {
+                        return [
+                          ...terms,
+                          {
+                            dieTypeId: value.dieTypeId,
+                            count: 1,
+                            sides: value.sides,
+                          },
+                        ];
+                      }
+                      return terms.map((term) =>
+                        term === existing
+                          ? { ...term, count: term.count + 1 }
+                          : term,
+                      );
+                    },
+                    [] as {
+                      readonly dieTypeId: string;
+                      readonly count: number;
+                      readonly sides: number;
+                    }[],
+                  ),
+                }),
+                values:
+                  evidence.heterogeneousValues.length > 0
+                    ? evidence.heterogeneousValues.map((value) => value.value)
+                    : evidence.values,
                 path: evidence.path,
               }),
             ),
@@ -768,4 +834,21 @@ function patchChangeView(
     transition: `${change.before} → ${change.after}`,
     effective: change.effective,
   };
+}
+
+function randomRequestDiceLabel(request: {
+  readonly count: number;
+  readonly sides: number;
+  readonly heterogeneousTerms: readonly {
+    readonly dieTypeId: string;
+    readonly count: number;
+    readonly sides: number;
+  }[];
+}): string {
+  if (request.heterogeneousTerms.length === 0) {
+    return `${request.count}d${request.sides}`;
+  }
+  return request.heterogeneousTerms
+    .map((term) => `${term.count}× ${term.dieTypeId} d${term.sides}`)
+    .join(' + ');
 }

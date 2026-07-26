@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "sourceSets": [
+    {
+      "id": "rulebench-split-demo",
+      "label": "Rulebench split-source demo",
+      "sourceSet": {
+        "schemaVersion": 1,
+        "allowedRoots": [
+          "test-fixtures/source-sets/independent/rules",
+          "test-fixtures/source-sets/independent/content",
+          "test-fixtures/source-sets/independent/positional-content",
+          "test-fixtures/source-sets/independent/bundles",
+          "test-fixtures/source-sets/independent/scenarios"
+        ],
+        "entries": [
+          {
+            "id": "ruleset",
+            "label": "Independent Ruleset",
+            "sourceRoot": "test-fixtures/source-sets/independent/rules",
+            "module": "src/index.ts",
+            "exportKinds": ["ruleset"]
+          },
+          {
+            "id": "content-pack",
+            "label": "Independent Content Pack",
+            "sourceRoot": "test-fixtures/source-sets/independent/content",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "positional-content-pack",
+            "label": "Independent Positional Content Pack",
+            "sourceRoot": "test-fixtures/source-sets/independent/positional-content",
+            "module": "src/index.ts",
+            "exportKinds": ["contentPack"]
+          },
+          {
+            "id": "play-bundle",
+            "label": "Independent PlayBundle",
+            "sourceRoot": "test-fixtures/source-sets/independent/bundles",
+            "module": "src/primary.ts",
+            "exportKinds": ["playBundle"]
+          },
+          {
+            "id": "scenario",
+            "label": "Independent Scenario",
+            "sourceRoot": "test-fixtures/source-sets/independent/scenarios",
+            "module": "src/index.ts",
+            "exportKinds": ["scenarioTemplate"]
+          }
+        ]
+      }
+    }
+  ]
+}

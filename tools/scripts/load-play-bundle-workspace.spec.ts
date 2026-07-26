@@ -239,7 +239,10 @@ describe('explicit PlayBundle source-set loader', () => {
       { operation: 'inspect', sourceSet },
       gatewayRoot,
     );
-    expect(result.ok).toBe(true);
+    expect(
+      result.ok,
+      result.ok ? undefined : JSON.stringify(result.diagnostics),
+    ).toBe(true);
     if (!result.ok) return;
     expect(result.catalog.sourceSet).toEqual(sourceSet);
     expect(result.catalog.ruleset.id).toBe('rulebench.independent');

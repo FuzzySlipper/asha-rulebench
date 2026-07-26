@@ -334,12 +334,7 @@ test('loads peer roots and opens participant details @gate', async ({
   const vanguardContributions = vanguardRoll.getByRole('list', {
     name: 'Applied roll contributions',
   });
-  await expect(vanguardContributions.locator(':scope > li')).toHaveCount(3);
-  await expect(vanguardContributions).toContainText(
-    'action.rulebench.positional-strike',
-  );
-  await expect(vanguardContributions).toContainText('Positional Strike');
-  await expect(vanguardContributions).toContainText('+5');
+  await expect(vanguardContributions.locator(':scope > li')).toHaveCount(2);
   await expect(vanguardContributions).toContainText(
     'feature.rulebench.coordinated-flanker',
   );
@@ -364,10 +359,10 @@ test('loads peer roots and opens participant details @gate', async ({
   await expect(unfeaturedRoll).toContainText('Die 3 → total 8');
   await expect(unfeaturedRoll).toContainText('vs guard 15 · miss');
   await expect(
-    unfeaturedRoll
-      .getByRole('list', { name: 'Applied roll contributions' })
-      .locator(':scope > li'),
-  ).toHaveCount(1);
+    unfeaturedRoll.getByRole('list', {
+      name: 'Applied roll contributions',
+    }),
+  ).toHaveCount(0);
   await expect(unfeaturedRoll).not.toContainText('Coordinated Flanker');
   await expect(unfeaturedRoll).not.toContainText('Hold the Line');
 });
